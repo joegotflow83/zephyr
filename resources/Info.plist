@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Info.plist template for Zephyr Desktop.
+
+  PyInstaller's BUNDLE() merges its own info_plist dict on top of this
+  template, so values here act as defaults that the spec file can
+  override.  Keep this file as the canonical reference for macOS
+  metadata; the spec file's info_plist dict should stay in sync.
+-->
+<plist version="1.0">
+<dict>
+    <!-- Bundle identity -->
+    <key>CFBundleIdentifier</key>
+    <string>com.zephyr.desktop</string>
+
+    <key>CFBundleName</key>
+    <string>Zephyr</string>
+
+    <key>CFBundleDisplayName</key>
+    <string>Zephyr Desktop</string>
+
+    <key>CFBundleExecutable</key>
+    <string>Zephyr</string>
+
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+
+    <!-- Versioning -->
+    <key>CFBundleVersion</key>
+    <string>0.1.0</string>
+
+    <key>CFBundleShortVersionString</key>
+    <string>0.1.0</string>
+
+    <!-- macOS requirements -->
+    <key>LSMinimumSystemVersion</key>
+    <string>15.0</string>
+
+    <!-- Display -->
+    <key>NSHighResolutionCapable</key>
+    <true/>
+
+    <!-- Icon (relative to Resources inside .app bundle) -->
+    <key>CFBundleIconFile</key>
+    <string>icon.icns</string>
+
+    <!-- Legal -->
+    <key>NSHumanReadableCopyright</key>
+    <string>Copyright 2025 Zephyr Contributors. MIT License.</string>
+
+    <!-- App category -->
+    <key>LSApplicationCategoryType</key>
+    <string>public.app-category.developer-tools</string>
+</dict>
+</plist>

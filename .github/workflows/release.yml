@@ -1,0 +1,169 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build-macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Extract version from tag
+        id: version
+        run: echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Patch version files
+        run: |
+          echo '__version__ = "${{ steps.version.outputs.VERSION }}"' > src/lib/_version.py
+          sed -i.bak 's/^version = .*/version = "${{ steps.version.outputs.VERSION }}"/' pyproject.toml && rm -f pyproject.toml.bak
+
+      - name: Install dependencies
+        run: pip install -e ".[dev]" pyinstaller
+
+      - name: Generate icon
+        run: python scripts/generate_icon.py
+
+      - name: Generate icns
+        run: ./scripts/generate_icns.sh
+
+      - name: Build with PyInstaller
+        run: pyinstaller zephyr.spec --clean
+
+      - name: Package artifact
+        run: cd dist && zip -r "Zephyr-macOS-${{ steps.version.outputs.VERSION }}.zip" Zephyr.app
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Zephyr-macOS-${{ steps.version.outputs.VERSION }}
+          path: dist/Zephyr-macOS-${{ steps.version.outputs.VERSION }}.zip
+
+  build-linux:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Extract version from tag
+        id: version
+        run: echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Patch version files
+        run: |
+          echo '__version__ = "${{ steps.version.outputs.VERSION }}"' > src/lib/_version.py
+          sed -i 's/^version = .*/version = "${{ steps.version.outputs.VERSION }}"/' pyproject.toml
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgl1 libegl1 libxkbcommon0 libdbus-1-3 libfontconfig1
+
+      - name: Install dependencies
+        run: pip install -e ".[dev]" pyinstaller
+
+      - name: Build with PyInstaller
+        run: pyinstaller zephyr.spec --clean
+
+      - name: Package artifact
+        run: tar czf "Zephyr-Linux-${{ steps.version.outputs.VERSION }}.tar.gz" -C dist Zephyr/
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Zephyr-Linux-${{ steps.version.outputs.VERSION }}
+          path: Zephyr-Linux-${{ steps.version.outputs.VERSION }}.tar.gz
+
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Extract version from tag
+        id: version
+        shell: bash
+        run: echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Patch version files
+        shell: bash
+        run: |
+          echo '__version__ = "${{ steps.version.outputs.VERSION }}"' > src/lib/_version.py
+          sed -i 's/^version = .*/version = "${{ steps.version.outputs.VERSION }}"/' pyproject.toml
+
+      - name: Install dependencies
+        run: pip install -e ".[dev]" pyinstaller
+
+      - name: Build with PyInstaller
+        run: pyinstaller zephyr.spec --clean
+
+      - name: Package artifact
+        shell: pwsh
+        run: Compress-Archive -Path dist\Zephyr\* -DestinationPath "Zephyr-Windows-${{ steps.version.outputs.VERSION }}.zip"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Zephyr-Windows-${{ steps.version.outputs.VERSION }}
+          path: Zephyr-Windows-${{ steps.version.outputs.VERSION }}.zip
+
+  publish:
+    runs-on: ubuntu-latest
+    needs: [build-macos, build-linux, build-windows]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Extract version from tag
+        id: version
+        run: echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Determine pre-release status
+        id: prerelease
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          if echo "$TAG" | grep -qE '(-alpha|-beta|-rc)'; then
+            echo "IS_PRERELEASE=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "IS_PRERELEASE=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION="${{ steps.version.outputs.VERSION }}"
+          TAG="${GITHUB_REF_NAME}"
+          PRERELEASE_FLAG=""
+          if [ "${{ steps.prerelease.outputs.IS_PRERELEASE }}" = "true" ]; then
+            PRERELEASE_FLAG="--prerelease"
+          fi
+          gh release create "$TAG" \
+            --title "Zephyr Desktop $VERSION" \
+            --generate-notes \
+            $PRERELEASE_FLAG \
+            artifacts/Zephyr-macOS-${VERSION}/Zephyr-macOS-${VERSION}.zip \
+            artifacts/Zephyr-Linux-${VERSION}/Zephyr-Linux-${VERSION}.tar.gz \
+            artifacts/Zephyr-Windows-${VERSION}/Zephyr-Windows-${VERSION}.zip
