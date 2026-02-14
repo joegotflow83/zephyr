@@ -472,6 +472,21 @@ class TestHandleStartLoop:
 
         MockMsgBox.warning.assert_called_once()
 
+    @patch("src.lib.app_controller.QMessageBox")
+    def test_start_loop_image_not_found(
+        self, MockMsgBox, controller, mock_loop_runner
+    ):
+        """Docker ImageNotFound (not ValueError/RuntimeError) must not crash the app."""
+        mock_loop_runner.start_loop.side_effect = Exception(
+            '404 Client Error: Not Found ("No such image: ubuntu:24.04")'
+        )
+
+        controller.handle_start_loop("proj123")
+
+        MockMsgBox.critical.assert_called_once()
+        args = MockMsgBox.critical.call_args
+        assert "No such image" in args[0][2]
+
 
 class TestHandleStopLoop:
     """Verify stop loop handler invokes LoopRunner.stop_loop."""
@@ -1923,6 +1938,177 @@ class TestGitManagerWiring:
 
     def test_start_loop_works_without_git_manager(self, controller, mock_loop_runner):
         """When git_manager is None, handle_start_loop skips the check."""
+        state = LoopState(project_id="proj123", status=LoopStatus.RUNNING)
+        mock_loop_runner.start_loop.return_value = state
+
+        controller.handle_start_loop("proj123")
+
+        mock_loop_runner.start_loop.assert_called_once_with(
+            "proj123", LoopMode.CONTINUOUS
+        )
+
+
+# ---------------------------------------------------------------------------
+# Docker image pull pre-check
+# ---------------------------------------------------------------------------
+
+
+class TestImagePullPreCheck:
+    """Verify that handle_start_loop checks for the Docker image locally
+    and offers to pull it when it's missing.
+    """
+
+    @pytest.fixture
+    def project_with_image(self):
+        return ProjectConfig(
+            name="Test",
+            repo_url="https://github.com/test/repo",
+            docker_image="myapp:latest",
+        )
+
+    def test_image_already_available_starts_loop(
+        self,
+        controller,
+        mock_docker_manager,
+        mock_project_store,
+        mock_loop_runner,
+        project_with_image,
+    ):
+        """When the image exists locally, loop starts normally — no pull dialog."""
+        mock_docker_manager.is_docker_available.return_value = True
+        mock_docker_manager.is_image_available.return_value = True
+        mock_project_store.get_project.return_value = project_with_image
+        state = LoopState(project_id="proj123", status=LoopStatus.RUNNING)
+        mock_loop_runner.start_loop.return_value = state
+
+        controller.handle_start_loop("proj123")
+
+        mock_docker_manager.is_image_available.assert_called_once_with("myapp:latest")
+        mock_docker_manager.pull_image.assert_not_called()
+        mock_loop_runner.start_loop.assert_called_once_with(
+            "proj123", LoopMode.CONTINUOUS
+        )
+
+    @patch("src.lib.app_controller.QProgressDialog")
+    @patch("src.lib.app_controller.QMessageBox")
+    def test_image_missing_user_accepts_pull_succeeds(
+        self,
+        MockMsgBox,
+        MockProgressDialog,
+        controller,
+        mock_docker_manager,
+        mock_project_store,
+        mock_loop_runner,
+        project_with_image,
+    ):
+        """Image not available, user accepts pull, pull succeeds — loop starts."""
+        mock_docker_manager.is_docker_available.return_value = True
+        mock_docker_manager.is_image_available.return_value = False
+        mock_project_store.get_project.return_value = project_with_image
+        MockMsgBox.StandardButton = QMessageBox.StandardButton
+        MockMsgBox.question.return_value = QMessageBox.StandardButton.Yes
+
+        # Progress dialog mock
+        progress_instance = MockProgressDialog.return_value
+        progress_instance.wasCanceled.return_value = False
+
+        state = LoopState(project_id="proj123", status=LoopStatus.RUNNING)
+        mock_loop_runner.start_loop.return_value = state
+
+        controller.handle_start_loop("proj123")
+
+        mock_docker_manager.pull_image.assert_called_once_with("myapp:latest")
+        mock_loop_runner.start_loop.assert_called_once_with(
+            "proj123", LoopMode.CONTINUOUS
+        )
+
+    @patch("src.lib.app_controller.QMessageBox")
+    def test_image_missing_user_declines_pull(
+        self,
+        MockMsgBox,
+        controller,
+        mock_docker_manager,
+        mock_project_store,
+        mock_loop_runner,
+        project_with_image,
+    ):
+        """Image not available, user declines pull — loop not started."""
+        mock_docker_manager.is_docker_available.return_value = True
+        mock_docker_manager.is_image_available.return_value = False
+        mock_project_store.get_project.return_value = project_with_image
+        MockMsgBox.StandardButton = QMessageBox.StandardButton
+        MockMsgBox.question.return_value = QMessageBox.StandardButton.No
+
+        controller.handle_start_loop("proj123")
+
+        mock_docker_manager.pull_image.assert_not_called()
+        mock_loop_runner.start_loop.assert_not_called()
+
+    @patch("src.lib.app_controller.QProgressDialog")
+    @patch("src.lib.app_controller.QMessageBox")
+    def test_image_missing_pull_fails_shows_error(
+        self,
+        MockMsgBox,
+        MockProgressDialog,
+        controller,
+        mock_docker_manager,
+        mock_project_store,
+        mock_loop_runner,
+        project_with_image,
+    ):
+        """Image not available, user accepts pull, pull fails — error shown."""
+        mock_docker_manager.is_docker_available.return_value = True
+        mock_docker_manager.is_image_available.return_value = False
+        mock_project_store.get_project.return_value = project_with_image
+        MockMsgBox.StandardButton = QMessageBox.StandardButton
+        MockMsgBox.question.return_value = QMessageBox.StandardButton.Yes
+
+        progress_instance = MockProgressDialog.return_value
+        progress_instance.wasCanceled.return_value = False
+
+        mock_docker_manager.pull_image.side_effect = Exception("Network error")
+
+        controller.handle_start_loop("proj123")
+
+        MockMsgBox.critical.assert_called_once()
+        args = MockMsgBox.critical.call_args[0]
+        assert "Image Pull Failed" in args[1]
+        assert "Network error" in args[2]
+        mock_loop_runner.start_loop.assert_not_called()
+
+    def test_image_check_skipped_when_docker_unavailable(
+        self,
+        controller,
+        mock_docker_manager,
+        mock_project_store,
+        mock_loop_runner,
+        project_with_image,
+    ):
+        """When Docker is unavailable, image check is skipped entirely."""
+        mock_docker_manager.is_docker_available.return_value = False
+        mock_project_store.get_project.return_value = project_with_image
+        state = LoopState(project_id="proj123", status=LoopStatus.RUNNING)
+        mock_loop_runner.start_loop.return_value = state
+
+        controller.handle_start_loop("proj123")
+
+        mock_docker_manager.is_image_available.assert_not_called()
+        mock_loop_runner.start_loop.assert_called_once_with(
+            "proj123", LoopMode.CONTINUOUS
+        )
+
+    def test_image_check_exception_does_not_block_loop(
+        self,
+        controller,
+        mock_docker_manager,
+        mock_project_store,
+        mock_loop_runner,
+        project_with_image,
+    ):
+        """If the image check raises, the loop still starts (best-effort)."""
+        mock_docker_manager.is_docker_available.return_value = True
+        mock_docker_manager.is_image_available.side_effect = Exception("Unexpected")
+        mock_project_store.get_project.return_value = project_with_image
         state = LoopState(project_id="proj123", status=LoopStatus.RUNNING)
         mock_loop_runner.start_loop.return_value = state
 

@@ -8,9 +8,11 @@ appropriate backend operations and then refresh the UI to reflect new state.
 """
 
 import logging
+import threading
 from pathlib import Path
 
-from PyQt6.QtWidgets import QDialog, QFileDialog, QMessageBox
+from PyQt6.QtCore import Qt
+from PyQt6.QtWidgets import QApplication, QDialog, QFileDialog, QMessageBox, QProgressDialog
 
 from src.lib._version import __version__
 from src.lib.config_manager import ConfigManager
@@ -186,8 +188,10 @@ class AppController:
         1. Git repository validation — warns if the project's repo_url
            points to an invalid or missing Git repository.
         2. Disk space check — warns if disk space is critically low.
+        3. Docker image check — if the image is not found locally,
+           offers to pull it from the registry.
 
-        Both checks are best-effort: exceptions are logged but never
+        All checks are best-effort: exceptions are logged but never
         prevent the loop from starting.
         """
         try:
@@ -227,11 +231,30 @@ class AppController:
                     QMessageBox.warning(self._window, "Low Disk Space", warning)
                     return
 
+            # Pre-start Docker image check (best-effort — failures do not block)
+            if self._docker_manager.is_docker_available():
+                try:
+                    project = self._project_store.get_project(project_id)
+                    if project is not None and not self._ensure_image_available(
+                        project
+                    ):
+                        return
+                except Exception:
+                    logger.debug("Docker image check failed", exc_info=True)
+
             self._loop_runner.start_loop(project_id, LoopMode.CONTINUOUS)
             logger.info("Started loop for project: %s", project_id)
             self._refresh_loops_tab()
         except (ValueError, RuntimeError) as exc:
             QMessageBox.warning(self._window, "Start Loop", str(exc))
+        except Exception as exc:
+            logger.error("Failed to start loop for project %s: %s", project_id, exc)
+            QMessageBox.critical(
+                self._window,
+                "Start Loop Failed",
+                f"Failed to start loop:\n{exc}",
+            )
+            self._refresh_loops_tab()
 
     def handle_stop_loop(self, project_id: str) -> None:
         """Stop the running loop for the given project."""
@@ -241,6 +264,72 @@ class AppController:
             self._refresh_loops_tab()
         except ValueError as exc:
             QMessageBox.warning(self._window, "Stop Loop", str(exc))
+
+    def _ensure_image_available(self, project) -> bool:
+        """Check that the project's Docker image exists locally; offer to pull if not.
+
+        Returns True if the image is available (or was successfully pulled),
+        False if the user declined or the pull failed.
+        """
+        image = project.docker_image
+        if not image:
+            return True
+
+        if self._docker_manager.is_image_available(image):
+            return True
+
+        reply = QMessageBox.question(
+            self._window,
+            "Docker Image Not Found",
+            f"The Docker image '{image}' was not found locally.\n\n"
+            f"Would you like to pull it from the registry?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.Yes,
+        )
+        if reply != QMessageBox.StandardButton.Yes:
+            return False
+
+        # Show indeterminate progress dialog while pulling
+        progress = QProgressDialog(
+            f"Pulling image '{image}'...", "Cancel", 0, 0, self._window
+        )
+        progress.setWindowTitle("Pulling Docker Image")
+        progress.setWindowModality(Qt.WindowModality.WindowModal)
+        progress.setMinimumDuration(0)
+        progress.setValue(0)
+
+        pull_error = [None]  # mutable container for thread result
+        pull_done = threading.Event()
+
+        def _pull():
+            try:
+                self._docker_manager.pull_image(image)
+            except Exception as exc:
+                pull_error[0] = exc
+            finally:
+                pull_done.set()
+
+        thread = threading.Thread(target=_pull, daemon=True)
+        thread.start()
+
+        while not pull_done.is_set():
+            if progress.wasCanceled():
+                progress.close()
+                return False
+            QApplication.processEvents()
+            pull_done.wait(timeout=0.1)
+
+        progress.close()
+
+        if pull_error[0] is not None:
+            QMessageBox.critical(
+                self._window,
+                "Image Pull Failed",
+                f"Failed to pull image '{image}':\n{pull_error[0]}",
+            )
+            return False
+
+        return True
 
     # -- Credential handlers ------------------------------------------------
 
