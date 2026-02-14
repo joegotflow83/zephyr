@@ -19,14 +19,21 @@ def checker():
 # get_available_space
 # ---------------------------------------------------------------------------
 
+
 class TestGetAvailableSpace:
     """Tests for DiskChecker.get_available_space."""
 
     def test_returns_free_space_from_disk_usage(self, checker, tmp_path):
         """Should delegate to shutil.disk_usage and return the free field."""
-        fake_usage = os.statvfs_result((4096, 4096, 1000000, 500000, 500000, 0, 0, 0, 0, 255))
+        fake_usage = os.statvfs_result(
+            (4096, 4096, 1000000, 500000, 500000, 0, 0, 0, 0, 255)
+        )
         with patch("shutil.disk_usage") as mock_du:
-            mock_du.return_value = type("Usage", (), {"total": 100_000_000, "used": 40_000_000, "free": 60_000_000})()
+            mock_du.return_value = type(
+                "Usage",
+                (),
+                {"total": 100_000_000, "used": 40_000_000, "free": 60_000_000},
+            )()
             result = checker.get_available_space(tmp_path)
             assert result == 60_000_000
             mock_du.assert_called_once_with(tmp_path.resolve())
@@ -48,7 +55,9 @@ class TestGetAvailableSpace:
         f = tmp_path / "somefile.txt"
         f.write_text("hello")
         with patch("shutil.disk_usage") as mock_du:
-            mock_du.return_value = type("Usage", (), {"total": 100, "used": 40, "free": 60})()
+            mock_du.return_value = type(
+                "Usage", (), {"total": 100, "used": 40, "free": 60}
+            )()
             result = checker.get_available_space(f)
             assert result == 60
 
@@ -57,7 +66,9 @@ class TestGetAvailableSpace:
         sub = tmp_path / "a" / "b"
         sub.mkdir(parents=True)
         with patch("shutil.disk_usage") as mock_du:
-            mock_du.return_value = type("Usage", (), {"total": 100, "used": 40, "free": 60})()
+            mock_du.return_value = type(
+                "Usage", (), {"total": 100, "used": 40, "free": 60}
+            )()
             checker.get_available_space(sub)
             mock_du.assert_called_once_with(sub.resolve())
 
@@ -65,6 +76,7 @@ class TestGetAvailableSpace:
 # ---------------------------------------------------------------------------
 # check_repo_size
 # ---------------------------------------------------------------------------
+
 
 class TestCheckRepoSize:
     """Tests for DiskChecker.check_repo_size."""
@@ -147,6 +159,7 @@ class TestCheckRepoSize:
 # warn_if_low
 # ---------------------------------------------------------------------------
 
+
 class TestWarnIfLow:
     """Tests for DiskChecker.warn_if_low."""
 
@@ -196,7 +209,9 @@ class TestWarnIfLow:
     def test_default_path_is_home(self, checker):
         """Should use home directory when no path is given."""
         ten_gb = 10 * 1024 * 1024 * 1024
-        with patch.object(checker, "get_available_space", return_value=ten_gb) as mock_space:
+        with patch.object(
+            checker, "get_available_space", return_value=ten_gb
+        ) as mock_space:
             checker.warn_if_low()
             mock_space.assert_called_once_with(Path.home())
 

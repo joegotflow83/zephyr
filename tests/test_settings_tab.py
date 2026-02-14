@@ -20,7 +20,6 @@ from PyQt6.QtWidgets import (
 from src.lib.models import AppSettings
 from src.ui.settings_tab import CREDENTIAL_SERVICES, SettingsTab
 
-
 # ── Helpers ──────────────────────────────────────────────────────────
 
 
@@ -245,7 +244,9 @@ class TestGeneralSection:
     def test_log_level_options(self, qtbot):
         tab = SettingsTab()
         qtbot.addWidget(tab)
-        items = [tab.log_level_combo.itemText(i) for i in range(tab.log_level_combo.count())]
+        items = [
+            tab.log_level_combo.itemText(i) for i in range(tab.log_level_combo.count())
+        ]
         assert items == ["DEBUG", "INFO", "WARNING", "ERROR"]
 
     def test_log_level_change_emits_settings_changed(self, qtbot):
@@ -267,6 +268,7 @@ class TestGeneralSection:
         tab = SettingsTab()
         qtbot.addWidget(tab)
         from src.lib._version import __version__
+
         assert f"v{__version__}" in tab.about_label.text()
 
     def test_about_label_contains_app_name(self, qtbot):

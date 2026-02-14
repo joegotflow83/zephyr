@@ -116,7 +116,9 @@ def _show_docker_warning(parent: MainWindow) -> None:
     )
 
 
-def create_app(argv: list[str] | None = None) -> tuple[QApplication, MainWindow, AppController]:
+def create_app(
+    argv: list[str] | None = None,
+) -> tuple[QApplication, MainWindow, AppController]:
     """Build the full application stack and return the key objects.
 
     This factory is the primary entry point for both production use

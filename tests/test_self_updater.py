@@ -16,7 +16,6 @@ from src.lib.self_updater import SelfUpdater, SELF_UPDATE_PROJECT_ID
 from src.lib.models import ProjectConfig
 from src.lib.loop_runner import LoopMode, LoopStatus, LoopState
 
-
 # ── Helpers ─────────────────────────────────────────────────────────
 
 
@@ -280,15 +279,11 @@ class TestTriggerSelfUpdate:
         with pytest.raises(ValueError, match="Not a valid git repository"):
             updater.trigger_self_update(app_repo)
 
-    def test_validates_repo_before_starting(
-        self, updater, mock_git_manager, app_repo
-    ):
+    def test_validates_repo_before_starting(self, updater, mock_git_manager, app_repo):
         updater.trigger_self_update(app_repo)
         mock_git_manager.validate_repo.assert_called_once_with(app_repo)
 
-    def test_starts_loop_with_single_mode(
-        self, updater, mock_loop_runner, app_repo
-    ):
+    def test_starts_loop_with_single_mode(self, updater, mock_loop_runner, app_repo):
         updater.trigger_self_update(app_repo)
         mock_loop_runner.start_loop.assert_called_once_with(
             project_id=SELF_UPDATE_PROJECT_ID,
@@ -334,17 +329,13 @@ class TestTriggerSelfUpdate:
         added_project = mock_project_store.add_project.call_args[0][0]
         assert added_project.repo_url == str(app_repo)
 
-    def test_loop_runner_error_propagates(
-        self, updater, mock_loop_runner, app_repo
-    ):
+    def test_loop_runner_error_propagates(self, updater, mock_loop_runner, app_repo):
         """RuntimeError from LoopRunner (e.g., max concurrent) propagates."""
         mock_loop_runner.start_loop.side_effect = RuntimeError("max limit")
         with pytest.raises(RuntimeError, match="max limit"):
             updater.trigger_self_update(app_repo)
 
-    def test_loop_already_active_propagates(
-        self, updater, mock_loop_runner, app_repo
-    ):
+    def test_loop_already_active_propagates(self, updater, mock_loop_runner, app_repo):
         """ValueError from LoopRunner (already running) propagates."""
         mock_loop_runner.start_loop.side_effect = ValueError("already active")
         with pytest.raises(ValueError, match="already active"):

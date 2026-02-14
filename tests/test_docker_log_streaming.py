@@ -15,7 +15,6 @@ from docker.errors import DockerException, APIError, NotFound
 
 from src.lib.docker_manager import DockerManager
 
-
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
@@ -145,9 +144,7 @@ class TestStreamLogs:
 
     def test_passes_follow_false_when_requested(self, manager, mock_container):
         mock_container.logs.return_value = iter([])
-        thread = manager.stream_logs(
-            "abc123deadbeef", lambda line: None, follow=False
-        )
+        thread = manager.stream_logs("abc123deadbeef", lambda line: None, follow=False)
         thread.join(timeout=1)
 
         mock_container.logs.assert_called_once_with(
@@ -187,9 +184,7 @@ class TestStreamLogs:
         assert received == ["line before error"]
         assert not thread.is_alive()
 
-    def test_multiple_stream_threads_are_independent(
-        self, manager, mock_client
-    ):
+    def test_multiple_stream_threads_are_independent(self, manager, mock_client):
         """Starting streams for different containers creates separate
         threads that don't interfere with each other."""
         c1 = MagicMock()
@@ -214,9 +209,7 @@ class TestStreamLogs:
         assert received1 == ["c1-line1", "c1-line2"]
         assert received2 == ["c2-line1"]
 
-    def test_handles_lines_without_trailing_newline(
-        self, manager, mock_container
-    ):
+    def test_handles_lines_without_trailing_newline(self, manager, mock_container):
         log_lines = [b"no newline"]
         mock_container.logs.return_value = iter(log_lines)
 
@@ -258,16 +251,12 @@ class TestGetLogs:
     def test_default_tail_is_100(self, manager, mock_container):
         mock_container.logs.return_value = b""
         manager.get_logs("abc123deadbeef")
-        mock_container.logs.assert_called_once_with(
-            tail=100, timestamps=False
-        )
+        mock_container.logs.assert_called_once_with(tail=100, timestamps=False)
 
     def test_custom_tail(self, manager, mock_container):
         mock_container.logs.return_value = b""
         manager.get_logs("abc123deadbeef", tail=50)
-        mock_container.logs.assert_called_once_with(
-            tail=50, timestamps=False
-        )
+        mock_container.logs.assert_called_once_with(tail=50, timestamps=False)
 
     def test_handles_utf8(self, manager, mock_container):
         mock_container.logs.return_value = "café résumé\n".encode("utf-8")

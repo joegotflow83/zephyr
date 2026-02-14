@@ -9,7 +9,11 @@ import json
 import logging
 from typing import Callable, Optional
 
-from playwright.sync_api import sync_playwright, BrowserContext, TimeoutError as PlaywrightTimeout
+from playwright.sync_api import (
+    sync_playwright,
+    BrowserContext,
+    TimeoutError as PlaywrightTimeout,
+)
 
 from src.lib.credential_manager import CredentialManager
 
@@ -127,8 +131,7 @@ class LoginManager:
                         all_cookies = context.cookies()
                         if domain:
                             filtered = [
-                                c for c in all_cookies
-                                if domain in c.get("domain", "")
+                                c for c in all_cookies if domain in c.get("domain", "")
                             ]
                         else:
                             filtered = all_cookies

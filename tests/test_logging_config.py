@@ -20,10 +20,10 @@ from src.lib.logging_config import (
     setup_logging,
 )
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _get_zephyr_logger() -> logging.Logger:
     return logging.getLogger("zephyr")
@@ -105,7 +105,7 @@ class TestFileHandler:
         # Should look like zephyr-YYYY-MM-DD.log
         assert name.startswith("zephyr-")
         assert name.endswith(".log")
-        date_part = name[len("zephyr-"):-len(".log")]
+        date_part = name[len("zephyr-") : -len(".log")]
         parts = date_part.split("-")
         assert len(parts) == 3
         assert all(p.isdigit() for p in parts)
@@ -172,15 +172,19 @@ class TestConsoleHandler:
 
     def _get_console_handler(self, logger: logging.Logger) -> logging.StreamHandler:
         for h in logger.handlers:
-            if isinstance(h, logging.StreamHandler) and not isinstance(h, RotatingFileHandler):
+            if isinstance(h, logging.StreamHandler) and not isinstance(
+                h, RotatingFileHandler
+            ):
                 return h
         raise AssertionError("No StreamHandler (non-file) found")
 
     def test_coloured_formatter_when_tty(self, tmp_path: Path):
         fake_tty = io.StringIO()
         fake_tty.isatty = lambda: True  # type: ignore[attr-defined]
-        with mock.patch("sys.stderr", fake_tty), \
-             mock.patch.dict(os.environ, {}, clear=False):
+        with (
+            mock.patch("sys.stderr", fake_tty),
+            mock.patch.dict(os.environ, {}, clear=False),
+        ):
             # Remove NO_COLOR if present
             os.environ.pop("NO_COLOR", None)
             setup_logging(log_dir=tmp_path)
@@ -245,8 +249,13 @@ class TestColouredFormatter:
     def test_info_gets_green(self):
         fmt = _ColouredFormatter(_DEFAULT_FORMAT)
         record = logging.LogRecord(
-            name="zephyr.test", level=logging.INFO, pathname="",
-            lineno=0, msg="test", args=(), exc_info=None,
+            name="zephyr.test",
+            level=logging.INFO,
+            pathname="",
+            lineno=0,
+            msg="test",
+            args=(),
+            exc_info=None,
         )
         output = fmt.format(record)
         assert _LEVEL_COLOURS["INFO"] in output
@@ -255,8 +264,13 @@ class TestColouredFormatter:
     def test_error_gets_red(self):
         fmt = _ColouredFormatter(_DEFAULT_FORMAT)
         record = logging.LogRecord(
-            name="zephyr.test", level=logging.ERROR, pathname="",
-            lineno=0, msg="err", args=(), exc_info=None,
+            name="zephyr.test",
+            level=logging.ERROR,
+            pathname="",
+            lineno=0,
+            msg="err",
+            args=(),
+            exc_info=None,
         )
         output = fmt.format(record)
         assert _LEVEL_COLOURS["ERROR"] in output
@@ -264,8 +278,13 @@ class TestColouredFormatter:
     def test_warning_gets_yellow(self):
         fmt = _ColouredFormatter(_DEFAULT_FORMAT)
         record = logging.LogRecord(
-            name="zephyr.test", level=logging.WARNING, pathname="",
-            lineno=0, msg="warn", args=(), exc_info=None,
+            name="zephyr.test",
+            level=logging.WARNING,
+            pathname="",
+            lineno=0,
+            msg="warn",
+            args=(),
+            exc_info=None,
         )
         output = fmt.format(record)
         assert _LEVEL_COLOURS["WARNING"] in output
@@ -273,8 +292,13 @@ class TestColouredFormatter:
     def test_debug_gets_cyan(self):
         fmt = _ColouredFormatter(_DEFAULT_FORMAT)
         record = logging.LogRecord(
-            name="zephyr.test", level=logging.DEBUG, pathname="",
-            lineno=0, msg="dbg", args=(), exc_info=None,
+            name="zephyr.test",
+            level=logging.DEBUG,
+            pathname="",
+            lineno=0,
+            msg="dbg",
+            args=(),
+            exc_info=None,
         )
         output = fmt.format(record)
         assert _LEVEL_COLOURS["DEBUG"] in output
@@ -282,8 +306,13 @@ class TestColouredFormatter:
     def test_critical_gets_bold_red(self):
         fmt = _ColouredFormatter(_DEFAULT_FORMAT)
         record = logging.LogRecord(
-            name="zephyr.test", level=logging.CRITICAL, pathname="",
-            lineno=0, msg="crit", args=(), exc_info=None,
+            name="zephyr.test",
+            level=logging.CRITICAL,
+            pathname="",
+            lineno=0,
+            msg="crit",
+            args=(),
+            exc_info=None,
         )
         output = fmt.format(record)
         assert _LEVEL_COLOURS["CRITICAL"] in output
@@ -297,16 +326,19 @@ class TestColouredFormatter:
 class TestLoggerHierarchy:
     """Verify that subsystem loggers inherit from the root zephyr logger."""
 
-    @pytest.mark.parametrize("subsystem", [
-        "zephyr.docker",
-        "zephyr.loop",
-        "zephyr.ui",
-        "zephyr.auth",
-        "zephyr.main",
-        "zephyr.controller",
-        "zephyr.git",
-        "zephyr.scheduler",
-    ])
+    @pytest.mark.parametrize(
+        "subsystem",
+        [
+            "zephyr.docker",
+            "zephyr.loop",
+            "zephyr.ui",
+            "zephyr.auth",
+            "zephyr.main",
+            "zephyr.controller",
+            "zephyr.git",
+            "zephyr.scheduler",
+        ],
+    )
     def test_subsystem_inherits_handlers(self, tmp_path: Path, subsystem: str):
         setup_logging(log_dir=tmp_path)
         sub = logging.getLogger(subsystem)

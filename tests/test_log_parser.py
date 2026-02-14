@@ -353,15 +353,15 @@ class TestEdgeCases:
         ]
         types = [parser.parse_line(l)["type"] for l in lines]
         assert types == [
-            "info",     # boundary line is info when parsed with parse_line
-            "info",     # "Running iteration..." is info
-            "info",     # installing
-            "plan",     # PLAN: prefix
-            "error",    # traceback header
-            "info",     # traceback body line (not itself an error marker)
-            "error",    # AssertionError
-            "commit",   # git commit output
-            "info",     # boundary
+            "info",  # boundary line is info when parsed with parse_line
+            "info",  # "Running iteration..." is info
+            "info",  # installing
+            "plan",  # PLAN: prefix
+            "error",  # traceback header
+            "info",  # traceback body line (not itself an error marker)
+            "error",  # AssertionError
+            "commit",  # git commit output
+            "info",  # boundary
         ]
 
         boundaries = [parser.parse_iteration_boundary(l) for l in lines]

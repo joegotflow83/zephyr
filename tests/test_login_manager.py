@@ -14,10 +14,10 @@ from src.lib.login_manager import (
 )
 from playwright.sync_api import TimeoutError as PlaywrightTimeout
 
-
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture
 def mock_credential_manager():
@@ -82,6 +82,7 @@ def login_manager(mock_credential_manager, mock_playwright_objects):
 # Constants / mapping tests
 # ---------------------------------------------------------------------------
 
+
 class TestServiceMappings:
     """Verify service URL and cookie domain constants."""
 
@@ -104,6 +105,7 @@ class TestServiceMappings:
 # ---------------------------------------------------------------------------
 # launch_login tests
 # ---------------------------------------------------------------------------
+
 
 class TestLaunchLogin:
     """Tests for LoginManager.launch_login."""
@@ -168,9 +170,7 @@ class TestLaunchLogin:
         assert len(result["cookies"]) == 2
         assert result["cookies"][0]["name"] == "session"
 
-    def test_filters_cookies_by_domain(
-        self, login_manager, mock_playwright_objects
-    ):
+    def test_filters_cookies_by_domain(self, login_manager, mock_playwright_objects):
         """Only cookies matching the service domain should be returned."""
         mixed_cookies = [
             {"name": "session", "value": "abc", "domain": ".anthropic.com"},
@@ -197,17 +197,13 @@ class TestLaunchLogin:
         ]
         mock_playwright_objects["context"].cookies.return_value = cookies
 
-        result = login_manager.launch_login(
-            "anthropic", cookie_domain=".custom.com"
-        )
+        result = login_manager.launch_login("anthropic", cookie_domain=".custom.com")
 
         assert result is not None
         assert len(result["cookies"]) == 1
         assert result["cookies"][0]["domain"] == ".custom.com"
 
-    def test_returns_none_on_timeout(
-        self, login_manager, mock_playwright_objects
-    ):
+    def test_returns_none_on_timeout(self, login_manager, mock_playwright_objects):
         """Should return None if the user doesn't complete login in time."""
         mock_playwright_objects["page"].wait_for_url.side_effect = PlaywrightTimeout(
             "Timeout"
@@ -217,18 +213,14 @@ class TestLaunchLogin:
 
         assert result is None
 
-    def test_custom_timeout_is_passed(
-        self, login_manager, mock_playwright_objects
-    ):
+    def test_custom_timeout_is_passed(self, login_manager, mock_playwright_objects):
         """The timeout_ms parameter should be forwarded to wait_for_url."""
         login_manager.launch_login("anthropic", timeout_ms=60_000)
 
         call_args = mock_playwright_objects["page"].wait_for_url.call_args
         assert call_args[1]["timeout"] == 60_000
 
-    def test_waits_for_url_change(
-        self, login_manager, mock_playwright_objects
-    ):
+    def test_waits_for_url_change(self, login_manager, mock_playwright_objects):
         """wait_for_url should be called with a function that detects URL change."""
         login_manager.launch_login("anthropic")
 
@@ -264,9 +256,7 @@ class TestLaunchLogin:
         mock_playwright_objects["browser"].close.assert_called_once()
         mock_playwright_objects["pw_cm"].__exit__.assert_called_once()
 
-    def test_returns_none_on_exception(
-        self, login_manager, mock_playwright_objects
-    ):
+    def test_returns_none_on_exception(self, login_manager, mock_playwright_objects):
         """Should return None if an unexpected exception occurs."""
         mock_playwright_objects["chromium"].launch.side_effect = RuntimeError(
             "Browser not installed"
@@ -276,13 +266,9 @@ class TestLaunchLogin:
 
         assert result is None
 
-    def test_cleanup_on_exception(
-        self, login_manager, mock_playwright_objects
-    ):
+    def test_cleanup_on_exception(self, login_manager, mock_playwright_objects):
         """Playwright context manager should be exited even on exceptions."""
-        mock_playwright_objects["chromium"].launch.side_effect = RuntimeError(
-            "fail"
-        )
+        mock_playwright_objects["chromium"].launch.side_effect = RuntimeError("fail")
 
         login_manager.launch_login("anthropic")
 
@@ -310,17 +296,13 @@ class TestLaunchLogin:
         assert result["cookies"] == []
         assert result["service"] == "anthropic"
 
-    def test_new_context_is_created(
-        self, login_manager, mock_playwright_objects
-    ):
+    def test_new_context_is_created(self, login_manager, mock_playwright_objects):
         """A fresh browser context should be used for each login."""
         login_manager.launch_login("anthropic")
 
         mock_playwright_objects["browser"].new_context.assert_called_once()
 
-    def test_new_page_is_created(
-        self, login_manager, mock_playwright_objects
-    ):
+    def test_new_page_is_created(self, login_manager, mock_playwright_objects):
         """A new page should be created in the context."""
         login_manager.launch_login("anthropic")
 
@@ -331,10 +313,13 @@ class TestLaunchLogin:
 # save_session tests
 # ---------------------------------------------------------------------------
 
+
 class TestSaveSession:
     """Tests for LoginManager.save_session."""
 
-    def test_stores_via_credential_manager(self, login_manager, mock_credential_manager):
+    def test_stores_via_credential_manager(
+        self, login_manager, mock_credential_manager
+    ):
         """Session data should be JSON-serialized and stored."""
         session_data = {
             "service": "anthropic",
@@ -354,7 +339,9 @@ class TestSaveSession:
     def test_save_overwrites_previous(self, login_manager, mock_credential_manager):
         """Saving a session should overwrite any previously stored value."""
         login_manager.save_session("anthropic", {"service": "anthropic", "cookies": []})
-        login_manager.save_session("anthropic", {"service": "anthropic", "cookies": [{"name": "new"}]})
+        login_manager.save_session(
+            "anthropic", {"service": "anthropic", "cookies": [{"name": "new"}]}
+        )
 
         assert mock_credential_manager.store_api_key.call_count == 2
 
@@ -372,8 +359,14 @@ class TestSaveSession:
         complex_data = {
             "service": "anthropic",
             "cookies": [
-                {"name": "session", "value": "tok-abc", "domain": ".anthropic.com",
-                 "path": "/", "httpOnly": True, "secure": True},
+                {
+                    "name": "session",
+                    "value": "tok-abc",
+                    "domain": ".anthropic.com",
+                    "path": "/",
+                    "httpOnly": True,
+                    "secure": True,
+                },
             ],
         }
 
@@ -387,6 +380,7 @@ class TestSaveSession:
 # ---------------------------------------------------------------------------
 # get_session tests
 # ---------------------------------------------------------------------------
+
 
 class TestGetSession:
     """Tests for LoginManager.get_session."""
@@ -411,7 +405,9 @@ class TestGetSession:
 
         assert result == session_data
 
-    def test_returns_none_for_plain_api_key(self, login_manager, mock_credential_manager):
+    def test_returns_none_for_plain_api_key(
+        self, login_manager, mock_credential_manager
+    ):
         """Should return None if stored value is a plain API key, not JSON."""
         mock_credential_manager.get_api_key.return_value = "sk-ant-abc123"
 
@@ -484,14 +480,20 @@ class TestGetSession:
 # get_login_url tests
 # ---------------------------------------------------------------------------
 
+
 class TestGetLoginUrl:
     """Tests for LoginManager.get_login_url."""
 
     def test_known_service_anthropic(self, login_manager):
-        assert login_manager.get_login_url("anthropic") == "https://console.anthropic.com/login"
+        assert (
+            login_manager.get_login_url("anthropic")
+            == "https://console.anthropic.com/login"
+        )
 
     def test_known_service_openai(self, login_manager):
-        assert login_manager.get_login_url("openai") == "https://platform.openai.com/login"
+        assert (
+            login_manager.get_login_url("openai") == "https://platform.openai.com/login"
+        )
 
     def test_unknown_service_returns_none(self, login_manager):
         assert login_manager.get_login_url("unknown") is None
@@ -504,6 +506,7 @@ class TestGetLoginUrl:
 # ---------------------------------------------------------------------------
 # Constructor tests
 # ---------------------------------------------------------------------------
+
 
 class TestConstructor:
     """Tests for LoginManager construction."""

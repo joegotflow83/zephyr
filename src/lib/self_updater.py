@@ -111,9 +111,7 @@ class SelfUpdater:
                 or if the max concurrent loop limit is reached.
         """
         if not self._git.validate_repo(app_repo_path):
-            raise ValueError(
-                f"Not a valid git repository: {app_repo_path}"
-            )
+            raise ValueError(f"Not a valid git repository: {app_repo_path}")
 
         from src.lib.loop_runner import LoopMode
 

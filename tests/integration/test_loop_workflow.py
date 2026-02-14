@@ -29,7 +29,6 @@ from src.lib.loop_runner import LoopMode, LoopRunner, LoopState, LoopStatus
 from src.lib.models import ProjectConfig
 from src.lib.project_store import ProjectStore
 
-
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
@@ -61,13 +60,9 @@ def mock_keyring():
     store = {}
     with patch("src.lib.credential_manager.keyring") as kr:
         kr.set_password = MagicMock(
-            side_effect=lambda app, svc, key: store.__setitem__(
-                (app, svc), key
-            )
+            side_effect=lambda app, svc, key: store.__setitem__((app, svc), key)
         )
-        kr.get_password = MagicMock(
-            side_effect=lambda app, svc: store.get((app, svc))
-        )
+        kr.get_password = MagicMock(side_effect=lambda app, svc: store.get((app, svc)))
         kr.delete_password = MagicMock(
             side_effect=lambda app, svc: store.pop((app, svc), None)
         )
@@ -193,8 +188,7 @@ class TestLoopStartStop:
         call_kwargs = mock_docker.stream_logs.call_args.kwargs
         assert call_kwargs.get("container_id") == "container-abc123"
         assert callable(
-            call_kwargs.get("callback")
-            or mock_docker.stream_logs.call_args[0][1]
+            call_kwargs.get("callback") or mock_docker.stream_logs.call_args[0][1]
         )
 
     def test_stop_loop_stops_container(
@@ -354,9 +348,7 @@ class TestCredentialInjection:
 class TestLoopStateTracking:
     """Verify LoopState is maintained correctly through the lifecycle."""
 
-    def test_initial_state_fields(
-        self, loop_runner, project_store, sample_project
-    ):
+    def test_initial_state_fields(self, loop_runner, project_store, sample_project):
         project_store.add_project(sample_project)
         state = loop_runner.start_loop(sample_project.id, LoopMode.SINGLE)
 
@@ -390,9 +382,7 @@ class TestLoopStateTracking:
         assert sample_project.id in all_states
         assert all_states[sample_project.id].status == LoopStatus.RUNNING
 
-    def test_state_after_stop(
-        self, loop_runner, project_store, sample_project
-    ):
+    def test_state_after_stop(self, loop_runner, project_store, sample_project):
         project_store.add_project(sample_project)
         loop_runner.start_loop(sample_project.id, LoopMode.SINGLE)
         loop_runner.stop_loop(sample_project.id)
@@ -421,16 +411,12 @@ class TestLoopStateTracking:
     def test_nonexistent_project_state_is_none(self, loop_runner):
         assert loop_runner.get_loop_state("nonexistent-id") is None
 
-    def test_continuous_mode_recorded(
-        self, loop_runner, project_store, sample_project
-    ):
+    def test_continuous_mode_recorded(self, loop_runner, project_store, sample_project):
         project_store.add_project(sample_project)
         state = loop_runner.start_loop(sample_project.id, LoopMode.CONTINUOUS)
         assert state.mode == LoopMode.CONTINUOUS
 
-    def test_scheduled_mode_recorded(
-        self, loop_runner, project_store, sample_project
-    ):
+    def test_scheduled_mode_recorded(self, loop_runner, project_store, sample_project):
         project_store.add_project(sample_project)
         state = loop_runner.start_loop(sample_project.id, LoopMode.SCHEDULED)
         assert state.mode == LoopMode.SCHEDULED
@@ -517,9 +503,7 @@ class TestErrorHandling:
         with pytest.raises(ValueError, match="not found"):
             loop_runner.start_loop("nonexistent-id", LoopMode.SINGLE)
 
-    def test_double_start_raises(
-        self, loop_runner, project_store, sample_project
-    ):
+    def test_double_start_raises(self, loop_runner, project_store, sample_project):
         project_store.add_project(sample_project)
         loop_runner.start_loop(sample_project.id, LoopMode.SINGLE)
 
@@ -569,9 +553,7 @@ class TestErrorHandling:
 
         failing_docker = MagicMock()
         failing_docker.create_container.return_value = "container-xyz"
-        failing_docker.start_container.side_effect = RuntimeError(
-            "Port already in use"
-        )
+        failing_docker.start_container.side_effect = RuntimeError("Port already in use")
         runner = LoopRunner(failing_docker, project_store, credential_manager)
 
         with pytest.raises(RuntimeError, match="Port already in use"):
@@ -629,9 +611,7 @@ class TestConcurrencyLimits:
         with pytest.raises(RuntimeError, match="Maximum concurrent"):
             runner.start_loop(p3.id, LoopMode.CONTINUOUS)
 
-    def test_stop_frees_slot(
-        self, project_store, credential_manager, mock_docker
-    ):
+    def test_stop_frees_slot(self, project_store, credential_manager, mock_docker):
         runner = LoopRunner(
             mock_docker, project_store, credential_manager, max_concurrent=2
         )
@@ -650,9 +630,7 @@ class TestConcurrencyLimits:
         state = runner.start_loop(p3.id, LoopMode.CONTINUOUS)
         assert state.status == LoopStatus.RUNNING
 
-    def test_failed_start_releases_semaphore(
-        self, project_store, credential_manager
-    ):
+    def test_failed_start_releases_semaphore(self, project_store, credential_manager):
         failing_docker = MagicMock()
         failing_docker.create_container.side_effect = RuntimeError("Boom")
 
@@ -673,9 +651,7 @@ class TestConcurrencyLimits:
         # Need a working docker for p2
         working_docker = MagicMock()
         working_docker.create_container.return_value = "container-p2"
-        working_docker.stream_logs.return_value = MagicMock(
-            spec=threading.Thread
-        )
+        working_docker.stream_logs.return_value = MagicMock(spec=threading.Thread)
         runner._docker = working_docker
 
         state = runner.start_loop(p2.id, LoopMode.SINGLE)
@@ -786,14 +762,10 @@ class TestMultiProjectLoops:
 
         # Give each project a unique container ID
         container_ids = iter(["container-1", "container-2"])
-        mock_docker.create_container.side_effect = lambda **kw: next(
-            container_ids
-        )
+        mock_docker.create_container.side_effect = lambda **kw: next(container_ids)
 
         state1 = loop_runner.start_loop(sample_project.id, LoopMode.CONTINUOUS)
-        state2 = loop_runner.start_loop(
-            second_project.id, LoopMode.CONTINUOUS
-        )
+        state2 = loop_runner.start_loop(second_project.id, LoopMode.CONTINUOUS)
 
         assert state1.status == LoopStatus.RUNNING
         assert state2.status == LoopStatus.RUNNING
@@ -815,9 +787,7 @@ class TestMultiProjectLoops:
         project_store.add_project(second_project)
 
         container_ids = iter(["container-1", "container-2"])
-        mock_docker.create_container.side_effect = lambda **kw: next(
-            container_ids
-        )
+        mock_docker.create_container.side_effect = lambda **kw: next(container_ids)
 
         loop_runner.start_loop(sample_project.id, LoopMode.CONTINUOUS)
         loop_runner.start_loop(second_project.id, LoopMode.CONTINUOUS)
@@ -826,12 +796,10 @@ class TestMultiProjectLoops:
         loop_runner.stop_loop(sample_project.id)
 
         assert (
-            loop_runner.get_loop_state(sample_project.id).status
-            == LoopStatus.STOPPED
+            loop_runner.get_loop_state(sample_project.id).status == LoopStatus.STOPPED
         )
         assert (
-            loop_runner.get_loop_state(second_project.id).status
-            == LoopStatus.RUNNING
+            loop_runner.get_loop_state(second_project.id).status == LoopStatus.RUNNING
         )
 
     def test_each_project_gets_own_log_callback(
@@ -846,9 +814,7 @@ class TestMultiProjectLoops:
         project_store.add_project(second_project)
 
         container_ids = iter(["container-1", "container-2"])
-        mock_docker.create_container.side_effect = lambda **kw: next(
-            container_ids
-        )
+        mock_docker.create_container.side_effect = lambda **kw: next(container_ids)
 
         loop_runner.start_loop(sample_project.id, LoopMode.CONTINUOUS)
         loop_runner.start_loop(second_project.id, LoopMode.CONTINUOUS)
@@ -892,8 +858,7 @@ class TestRestartAfterStop:
         loop_runner.stop_loop(sample_project.id)
 
         assert (
-            loop_runner.get_loop_state(sample_project.id).status
-            == LoopStatus.STOPPED
+            loop_runner.get_loop_state(sample_project.id).status == LoopStatus.STOPPED
         )
 
         # Second run
@@ -908,9 +873,7 @@ class TestRestartAfterStop:
         loop_runner.start_loop(sample_project.id, LoopMode.SINGLE)
         loop_runner.stop_loop(sample_project.id)
 
-        state = loop_runner.start_loop(
-            sample_project.id, LoopMode.CONTINUOUS
-        )
+        state = loop_runner.start_loop(sample_project.id, LoopMode.CONTINUOUS)
         assert state.mode == LoopMode.CONTINUOUS
         assert state.status == LoopStatus.RUNNING
 
@@ -954,9 +917,7 @@ class TestProjectStoreIntegration:
         with pytest.raises(ValueError, match="not found"):
             loop_runner.start_loop(sample_project.id, LoopMode.SINGLE)
 
-    def test_loop_with_minimal_project(
-        self, loop_runner, project_store, mock_docker
-    ):
+    def test_loop_with_minimal_project(self, loop_runner, project_store, mock_docker):
         """A project with only required fields can still start a loop."""
         minimal = ProjectConfig(
             name="Minimal",

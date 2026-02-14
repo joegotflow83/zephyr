@@ -15,7 +15,6 @@ from PyQt6.QtWidgets import (
 
 from src.ui.credential_dialog import CredentialDialog
 
-
 # ── Helpers ──────────────────────────────────────────────────────────
 
 

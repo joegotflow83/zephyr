@@ -159,9 +159,7 @@ class LoopScheduler:
         """
         with self._lock:
             if project_id not in self._schedules:
-                raise KeyError(
-                    f"No schedule found for project '{project_id}'"
-                )
+                raise KeyError(f"No schedule found for project '{project_id}'")
             del self._schedules[project_id]
             timer = self._timers.pop(project_id, None)
 
@@ -176,13 +174,9 @@ class LoopScheduler:
 
     # -- Internal helpers ----------------------------------------------------
 
-    def _start_timer(
-        self, project_id: str, cron_expr: str, interval: float
-    ) -> None:
+    def _start_timer(self, project_id: str, cron_expr: str, interval: float) -> None:
         """Create and start a Timer that will fire ``_on_timer``."""
-        timer = threading.Timer(
-            interval, self._on_timer, args=(project_id, cron_expr)
-        )
+        timer = threading.Timer(interval, self._on_timer, args=(project_id, cron_expr))
         timer.daemon = True
         timer.name = f"zephyr-sched-{project_id[:12]}"
 
@@ -212,9 +206,7 @@ class LoopScheduler:
                 project_id=project_id,
                 mode=LoopMode.SCHEDULED,
             )
-            logger.info(
-                "Scheduled fire: started loop for project %s", project_id
-            )
+            logger.info("Scheduled fire: started loop for project %s", project_id)
         except Exception as exc:
             logger.error(
                 "Scheduled fire failed for project %s: %s",

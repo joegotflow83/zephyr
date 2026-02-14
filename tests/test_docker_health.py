@@ -13,10 +13,10 @@ from PyQt6.QtCore import QCoreApplication
 
 from src.lib.docker_health import DockerHealthMonitor
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _process_events(timeout_ms: int = 100) -> None:
     """Process pending Qt events so queued signals get delivered."""
@@ -33,6 +33,7 @@ def _process_events(timeout_ms: int = 100) -> None:
 # ---------------------------------------------------------------------------
 # Construction
 # ---------------------------------------------------------------------------
+
 
 class TestDockerHealthMonitorConstruction:
     """Tests for DockerHealthMonitor initialization."""
@@ -61,6 +62,7 @@ class TestDockerHealthMonitorConstruction:
 # ---------------------------------------------------------------------------
 # Start / Stop lifecycle
 # ---------------------------------------------------------------------------
+
 
 class TestStartStop:
     """Tests for start() and stop() lifecycle management."""
@@ -153,6 +155,7 @@ class TestStartStop:
 # ---------------------------------------------------------------------------
 # Connection state transitions
 # ---------------------------------------------------------------------------
+
 
 class TestConnectionTransitions:
     """Tests for docker_connected / docker_disconnected signal emissions."""
@@ -284,7 +287,9 @@ class TestConnectionTransitions:
         monitor.start()
         try:
             deadline = time.monotonic() + 2.0
-            while (len(connected_signals) < 1 or len(disconnected_signals) < 1) and time.monotonic() < deadline:
+            while (
+                len(connected_signals) < 1 or len(disconnected_signals) < 1
+            ) and time.monotonic() < deadline:
                 _process_events(50)
                 time.sleep(0.02)
 
@@ -297,6 +302,7 @@ class TestConnectionTransitions:
 # ---------------------------------------------------------------------------
 # Error handling in poll
 # ---------------------------------------------------------------------------
+
 
 class TestPollingErrors:
     """Tests for resilience when is_docker_available raises exceptions."""
@@ -367,6 +373,7 @@ class TestPollingErrors:
 # is_connected state tracking
 # ---------------------------------------------------------------------------
 
+
 class TestIsConnected:
     """Tests for the is_connected() state query."""
 
@@ -419,6 +426,7 @@ class TestIsConnected:
 # Thread safety
 # ---------------------------------------------------------------------------
 
+
 class TestThreadSafety:
     """Tests for thread-safe signal delivery."""
 
@@ -470,6 +478,7 @@ class TestThreadSafety:
 # ---------------------------------------------------------------------------
 # Stop event responsiveness
 # ---------------------------------------------------------------------------
+
 
 class TestStopResponsiveness:
     """Tests that stop() interrupts the poll sleep promptly."""

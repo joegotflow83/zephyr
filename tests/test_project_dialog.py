@@ -8,10 +8,10 @@ from PyQt6.QtWidgets import QDialog, QDialogButtonBox, QMessageBox
 from src.lib.models import ProjectConfig
 from src.ui.project_dialog import ProjectDialog, PromptEditorDialog
 
-
 # ---------------------------------------------------------------------------
 # PromptEditorDialog tests
 # ---------------------------------------------------------------------------
+
 
 class TestPromptEditorDialog:
     """Tests for the prompt editor sub-dialog."""
@@ -52,6 +52,7 @@ class TestPromptEditorDialog:
 # ---------------------------------------------------------------------------
 # ProjectDialog - add mode tests
 # ---------------------------------------------------------------------------
+
 
 class TestProjectDialogAddMode:
     """Tests for ProjectDialog in add mode (no existing project)."""
@@ -188,6 +189,7 @@ class TestProjectDialogAddMode:
 # ProjectDialog - edit mode tests
 # ---------------------------------------------------------------------------
 
+
 class TestProjectDialogEditMode:
     """Tests for ProjectDialog in edit mode (existing project)."""
 
@@ -198,7 +200,10 @@ class TestProjectDialogEditMode:
             name="Existing Project",
             repo_url="https://github.com/owner/existing",
             jtbd="Fix all the bugs",
-            custom_prompts={"PROMPT_build.md": "build instructions", "PROMPT_test.md": "test plan"},
+            custom_prompts={
+                "PROMPT_build.md": "build instructions",
+                "PROMPT_test.md": "test plan",
+            },
             docker_image="node:20",
             created_at="2025-01-01T00:00:00+00:00",
             updated_at="2025-06-15T12:00:00+00:00",
@@ -220,7 +225,10 @@ class TestProjectDialogEditMode:
     def test_custom_prompts_populated(self, qtbot, sample_project):
         dialog = ProjectDialog(project=sample_project)
         qtbot.addWidget(dialog)
-        items = [dialog.prompts_list.item(i).text() for i in range(dialog.prompts_list.count())]
+        items = [
+            dialog.prompts_list.item(i).text()
+            for i in range(dialog.prompts_list.count())
+        ]
         assert "PROMPT_build.md" in items
         assert "PROMPT_test.md" in items
 
@@ -268,6 +276,7 @@ class TestProjectDialogEditMode:
 # Validation tests
 # ---------------------------------------------------------------------------
 
+
 class TestProjectDialogValidation:
     """Tests for form validation behavior."""
 
@@ -276,7 +285,9 @@ class TestProjectDialogValidation:
         qtbot.addWidget(dialog)
         dialog.name_edit.setText("")
         dialog.repo_url_edit.setText("https://github.com/test/test")
-        with patch.object(QMessageBox, "warning", return_value=QMessageBox.StandardButton.Ok):
+        with patch.object(
+            QMessageBox, "warning", return_value=QMessageBox.StandardButton.Ok
+        ):
             dialog._validate_and_accept()
         assert dialog.result() != QDialog.DialogCode.Accepted
 
@@ -285,7 +296,9 @@ class TestProjectDialogValidation:
         qtbot.addWidget(dialog)
         dialog.name_edit.setText("Test Project")
         dialog.repo_url_edit.setText("")
-        with patch.object(QMessageBox, "warning", return_value=QMessageBox.StandardButton.Ok):
+        with patch.object(
+            QMessageBox, "warning", return_value=QMessageBox.StandardButton.Ok
+        ):
             dialog._validate_and_accept()
         assert dialog.result() != QDialog.DialogCode.Accepted
 
@@ -294,7 +307,9 @@ class TestProjectDialogValidation:
         qtbot.addWidget(dialog)
         dialog.name_edit.setText("Test Project")
         dialog.repo_url_edit.setText("not a valid url")
-        with patch.object(QMessageBox, "warning", return_value=QMessageBox.StandardButton.Ok):
+        with patch.object(
+            QMessageBox, "warning", return_value=QMessageBox.StandardButton.Ok
+        ):
             dialog._validate_and_accept()
         assert dialog.result() != QDialog.DialogCode.Accepted
 
@@ -367,7 +382,9 @@ class TestProjectDialogValidation:
         qtbot.addWidget(dialog)
         dialog.name_edit.setText("   ")
         dialog.repo_url_edit.setText("https://github.com/test/test")
-        with patch.object(QMessageBox, "warning", return_value=QMessageBox.StandardButton.Ok):
+        with patch.object(
+            QMessageBox, "warning", return_value=QMessageBox.StandardButton.Ok
+        ):
             dialog._validate_and_accept()
         assert dialog.result() != QDialog.DialogCode.Accepted
 
@@ -376,13 +393,17 @@ class TestProjectDialogValidation:
 # Custom prompts management tests
 # ---------------------------------------------------------------------------
 
+
 class TestProjectDialogCustomPrompts:
     """Tests for custom prompt add/edit/remove functionality."""
 
     def test_add_prompt(self, qtbot):
         dialog = ProjectDialog()
         qtbot.addWidget(dialog)
-        with patch("src.ui.project_dialog.QInputDialog.getText", return_value=("PROMPT_new.md", True)):
+        with patch(
+            "src.ui.project_dialog.QInputDialog.getText",
+            return_value=("PROMPT_new.md", True),
+        ):
             with patch.object(dialog, "_open_prompt_editor"):
                 dialog._add_prompt()
         assert dialog.prompts_list.count() == 1
@@ -392,7 +413,9 @@ class TestProjectDialogCustomPrompts:
     def test_add_prompt_cancelled(self, qtbot):
         dialog = ProjectDialog()
         qtbot.addWidget(dialog)
-        with patch("src.ui.project_dialog.QInputDialog.getText", return_value=("", False)):
+        with patch(
+            "src.ui.project_dialog.QInputDialog.getText", return_value=("", False)
+        ):
             dialog._add_prompt()
         assert dialog.prompts_list.count() == 0
 
@@ -401,8 +424,13 @@ class TestProjectDialogCustomPrompts:
         qtbot.addWidget(dialog)
         dialog._custom_prompts["PROMPT_build.md"] = "content"
         dialog.prompts_list.addItem("PROMPT_build.md")
-        with patch("src.ui.project_dialog.QInputDialog.getText", return_value=("PROMPT_build.md", True)):
-            with patch.object(QMessageBox, "warning", return_value=QMessageBox.StandardButton.Ok):
+        with patch(
+            "src.ui.project_dialog.QInputDialog.getText",
+            return_value=("PROMPT_build.md", True),
+        ):
+            with patch.object(
+                QMessageBox, "warning", return_value=QMessageBox.StandardButton.Ok
+            ):
                 dialog._add_prompt()
         assert dialog.prompts_list.count() == 1  # still just one
 
@@ -451,8 +479,12 @@ class TestProjectDialogCustomPrompts:
         qtbot.addWidget(dialog)
         dialog._custom_prompts["test.md"] = "old"
 
-        with patch.object(PromptEditorDialog, "exec", return_value=QDialog.DialogCode.Accepted):
-            with patch.object(PromptEditorDialog, "get_content", return_value="new content"):
+        with patch.object(
+            PromptEditorDialog, "exec", return_value=QDialog.DialogCode.Accepted
+        ):
+            with patch.object(
+                PromptEditorDialog, "get_content", return_value="new content"
+            ):
                 dialog._open_prompt_editor("test.md")
 
         assert dialog._custom_prompts["test.md"] == "new content"
@@ -462,7 +494,9 @@ class TestProjectDialogCustomPrompts:
         qtbot.addWidget(dialog)
         dialog._custom_prompts["test.md"] = "old"
 
-        with patch.object(PromptEditorDialog, "exec", return_value=QDialog.DialogCode.Rejected):
+        with patch.object(
+            PromptEditorDialog, "exec", return_value=QDialog.DialogCode.Rejected
+        ):
             dialog._open_prompt_editor("test.md")
 
         assert dialog._custom_prompts["test.md"] == "old"
@@ -488,7 +522,10 @@ class TestProjectDialogCustomPrompts:
         )
         dialog = ProjectDialog(project=project)
         qtbot.addWidget(dialog)
-        items = [dialog.prompts_list.item(i).text() for i in range(dialog.prompts_list.count())]
+        items = [
+            dialog.prompts_list.item(i).text()
+            for i in range(dialog.prompts_list.count())
+        ]
         assert items == ["a_prompt.md", "m_prompt.md", "z_prompt.md"]
 
 
@@ -496,30 +533,37 @@ class TestProjectDialogCustomPrompts:
 # URL validation static method tests
 # ---------------------------------------------------------------------------
 
+
 class TestRepoUrlValidation:
     """Tests for the _is_valid_repo_url static method."""
 
-    @pytest.mark.parametrize("url", [
-        "https://github.com/user/repo",
-        "http://gitlab.com/user/repo",
-        "git://github.com/user/repo.git",
-        "git@github.com:user/repo.git",
-        "ssh://git@github.com/user/repo",
-        "/home/user/repo",
-        "/tmp/test",
-        "~/projects/repo",
-        "./local-repo",
-        "../parent-repo",
-    ])
+    @pytest.mark.parametrize(
+        "url",
+        [
+            "https://github.com/user/repo",
+            "http://gitlab.com/user/repo",
+            "git://github.com/user/repo.git",
+            "git@github.com:user/repo.git",
+            "ssh://git@github.com/user/repo",
+            "/home/user/repo",
+            "/tmp/test",
+            "~/projects/repo",
+            "./local-repo",
+            "../parent-repo",
+        ],
+    )
     def test_valid_urls(self, url):
         assert ProjectDialog._is_valid_repo_url(url) is True
 
-    @pytest.mark.parametrize("url", [
-        "not-a-url",
-        "ftp://files.example.com/repo",
-        "just some text",
-        "repo-name",
-        "",
-    ])
+    @pytest.mark.parametrize(
+        "url",
+        [
+            "not-a-url",
+            "ftp://files.example.com/repo",
+            "just some text",
+            "repo-name",
+            "",
+        ],
+    )
     def test_invalid_urls(self, url):
         assert ProjectDialog._is_valid_repo_url(url) is False

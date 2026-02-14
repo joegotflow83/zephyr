@@ -15,7 +15,9 @@ from src.lib.models import ProjectConfig
 from src.ui.projects_tab import ProjectsTab
 
 
-def _make_project(name="Test Project", repo_url="https://github.com/test/repo", **kwargs):
+def _make_project(
+    name="Test Project", repo_url="https://github.com/test/repo", **kwargs
+):
     """Helper to create a ProjectConfig with sensible defaults."""
     return ProjectConfig(name=name, repo_url=repo_url, **kwargs)
 
@@ -67,7 +69,9 @@ class TestProjectsTabStructure:
     def test_table_selection_behavior(self, qtbot):
         tab = ProjectsTab()
         qtbot.addWidget(tab)
-        assert tab.table.selectionBehavior() == QTableWidget.SelectionBehavior.SelectRows
+        assert (
+            tab.table.selectionBehavior() == QTableWidget.SelectionBehavior.SelectRows
+        )
 
     def test_table_not_editable(self, qtbot):
         tab = ProjectsTab()
@@ -242,7 +246,9 @@ class TestActionButtons:
         qtbot.addWidget(tab)
         project = _make_project()
         tab.refresh([project])
-        edit_btn = tab.table.cellWidget(0, 4).findChild(QPushButton, f"edit_btn_{project.id}")
+        edit_btn = tab.table.cellWidget(0, 4).findChild(
+            QPushButton, f"edit_btn_{project.id}"
+        )
         assert edit_btn is not None
 
     def test_delete_button_object_name(self, qtbot):
@@ -250,7 +256,9 @@ class TestActionButtons:
         qtbot.addWidget(tab)
         project = _make_project()
         tab.refresh([project])
-        delete_btn = tab.table.cellWidget(0, 4).findChild(QPushButton, f"delete_btn_{project.id}")
+        delete_btn = tab.table.cellWidget(0, 4).findChild(
+            QPushButton, f"delete_btn_{project.id}"
+        )
         assert delete_btn is not None
 
     def test_run_button_object_name(self, qtbot):
@@ -258,7 +266,9 @@ class TestActionButtons:
         qtbot.addWidget(tab)
         project = _make_project()
         tab.refresh([project])
-        run_btn = tab.table.cellWidget(0, 4).findChild(QPushButton, f"run_btn_{project.id}")
+        run_btn = tab.table.cellWidget(0, 4).findChild(
+            QPushButton, f"run_btn_{project.id}"
+        )
         assert run_btn is not None
 
     def test_actions_layout_is_hbox(self, qtbot):
@@ -284,7 +294,9 @@ class TestSignals:
         qtbot.addWidget(tab)
         project = _make_project()
         tab.refresh([project])
-        edit_btn = tab.table.cellWidget(0, 4).findChild(QPushButton, f"edit_btn_{project.id}")
+        edit_btn = tab.table.cellWidget(0, 4).findChild(
+            QPushButton, f"edit_btn_{project.id}"
+        )
         with qtbot.waitSignal(tab.project_edit_requested, timeout=1000) as blocker:
             edit_btn.click()
         assert blocker.args == [project.id]
@@ -294,7 +306,9 @@ class TestSignals:
         qtbot.addWidget(tab)
         project = _make_project()
         tab.refresh([project])
-        delete_btn = tab.table.cellWidget(0, 4).findChild(QPushButton, f"delete_btn_{project.id}")
+        delete_btn = tab.table.cellWidget(0, 4).findChild(
+            QPushButton, f"delete_btn_{project.id}"
+        )
         with qtbot.waitSignal(tab.project_delete_requested, timeout=1000) as blocker:
             delete_btn.click()
         assert blocker.args == [project.id]
@@ -304,7 +318,9 @@ class TestSignals:
         qtbot.addWidget(tab)
         project = _make_project()
         tab.refresh([project])
-        run_btn = tab.table.cellWidget(0, 4).findChild(QPushButton, f"run_btn_{project.id}")
+        run_btn = tab.table.cellWidget(0, 4).findChild(
+            QPushButton, f"run_btn_{project.id}"
+        )
         with qtbot.waitSignal(tab.project_run_requested, timeout=1000) as blocker:
             run_btn.click()
         assert blocker.args == [project.id]
@@ -318,7 +334,9 @@ class TestSignals:
         tab.refresh([p1, p2, p3])
 
         # Click edit on the second row
-        edit_btn = tab.table.cellWidget(1, 4).findChild(QPushButton, f"edit_btn_{p2.id}")
+        edit_btn = tab.table.cellWidget(1, 4).findChild(
+            QPushButton, f"edit_btn_{p2.id}"
+        )
         with qtbot.waitSignal(tab.project_edit_requested, timeout=1000) as blocker:
             edit_btn.click()
         assert blocker.args == [p2.id]
@@ -331,7 +349,9 @@ class TestSignals:
         tab.refresh([p1, p2])
 
         # Click delete on the second row
-        delete_btn = tab.table.cellWidget(1, 4).findChild(QPushButton, f"delete_btn_{p2.id}")
+        delete_btn = tab.table.cellWidget(1, 4).findChild(
+            QPushButton, f"delete_btn_{p2.id}"
+        )
         with qtbot.waitSignal(tab.project_delete_requested, timeout=1000) as blocker:
             delete_btn.click()
         assert blocker.args == [p2.id]

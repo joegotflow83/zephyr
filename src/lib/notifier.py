@@ -64,13 +64,9 @@ class Notifier:
             notification.notify(**kwargs)
             logger.info("Notification sent: %s", title)
         except Exception:
-            logger.warning(
-                "Failed to send notification: %s", title, exc_info=True
-            )
+            logger.warning("Failed to send notification: %s", title, exc_info=True)
 
-    def notify_loop_complete(
-        self, project_name: str, iterations: int
-    ) -> None:
+    def notify_loop_complete(self, project_name: str, iterations: int) -> None:
         """Notify that a loop finished successfully.
 
         Args:

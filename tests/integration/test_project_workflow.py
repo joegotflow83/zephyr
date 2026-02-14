@@ -23,10 +23,10 @@ from src.lib.import_export import export_config, import_config
 from src.lib.models import AppSettings, ProjectConfig
 from src.lib.project_store import ProjectStore
 
-
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture
 def config_dir(tmp_path):
@@ -77,6 +77,7 @@ def second_project():
 # ---------------------------------------------------------------------------
 # 1. Full CRUD lifecycle
 # ---------------------------------------------------------------------------
+
 
 class TestProjectCRUDLifecycle:
     """End-to-end: add -> list -> get -> edit -> persist -> delete."""
@@ -170,6 +171,7 @@ class TestProjectCRUDLifecycle:
 # 2. Persistence across store instances
 # ---------------------------------------------------------------------------
 
+
 class TestPersistenceAcrossInstances:
     """Verify data survives creating a new ProjectStore on the same dir."""
 
@@ -205,10 +207,13 @@ class TestPersistenceAcrossInstances:
 # 3. Raw file verification
 # ---------------------------------------------------------------------------
 
+
 class TestRawFileIntegrity:
     """Verify the on-disk JSON structure matches expectations."""
 
-    def test_projects_json_structure(self, config_manager, project_store, sample_project):
+    def test_projects_json_structure(
+        self, config_manager, project_store, sample_project
+    ):
         project_store.add_project(sample_project)
 
         raw = config_manager.load_json("projects.json")
@@ -221,7 +226,9 @@ class TestRawFileIntegrity:
         assert entry["docker_image"] == "python:3.12-slim"
         assert "PROMPT_build.md" in entry["custom_prompts"]
 
-    def test_projects_json_is_valid_json(self, config_manager, project_store, sample_project):
+    def test_projects_json_is_valid_json(
+        self, config_manager, project_store, sample_project
+    ):
         project_store.add_project(sample_project)
 
         filepath = config_manager.get_config_dir() / "projects.json"
@@ -242,6 +249,7 @@ class TestRawFileIntegrity:
 # ---------------------------------------------------------------------------
 # 4. Export/Import round-trip
 # ---------------------------------------------------------------------------
+
 
 class TestExportImportRoundTrip:
     """Full export -> import into fresh dir -> verify data matches."""
@@ -376,6 +384,7 @@ class TestExportImportRoundTrip:
 # 5. Export with custom prompt files
 # ---------------------------------------------------------------------------
 
+
 class TestExportWithPromptFiles:
     """Verify custom prompt .md files are bundled in exports."""
 
@@ -425,6 +434,7 @@ class TestExportWithPromptFiles:
 # 6. ConfigManager direct integration
 # ---------------------------------------------------------------------------
 
+
 class TestConfigManagerIntegration:
     """Verify ConfigManager works correctly with real filesystem."""
 
@@ -458,6 +468,7 @@ class TestConfigManagerIntegration:
 # ---------------------------------------------------------------------------
 # 7. Edge cases and concurrent-store scenarios
 # ---------------------------------------------------------------------------
+
 
 class TestEdgeCases:
     """Edge cases: empty fields, special characters, large data."""

@@ -185,9 +185,7 @@ class DockerManager:
             logger.error("Failed to stop container %s: %s", container_id, exc)
             raise
 
-    def remove_container(
-        self, container_id: str, force: bool = False
-    ) -> None:
+    def remove_container(self, container_id: str, force: bool = False) -> None:
         """Remove a container, optionally *force* killing it first.
 
         Raises ``DockerException`` if Docker is unavailable or removal fails.
@@ -199,9 +197,7 @@ class DockerManager:
             container.remove(force=force)
             logger.info("Removed container %s (force=%s)", container_id, force)
         except (DockerException, APIError) as exc:
-            logger.error(
-                "Failed to remove container %s: %s", container_id, exc
-            )
+            logger.error("Failed to remove container %s: %s", container_id, exc)
             raise
 
     def get_container_status(self, container_id: str) -> str:

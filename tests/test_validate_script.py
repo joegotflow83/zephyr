@@ -12,7 +12,6 @@ import subprocess
 
 import pytest
 
-
 SCRIPT_PATH = os.path.join(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "validate.sh"
 )
@@ -78,7 +77,7 @@ class TestValidateScriptContent:
 
     def test_default_mode_is_full(self):
         """Default mode (no args) should be 'full'."""
-        assert '${1:-full}' in self.content or ":-full" in self.content
+        assert "${1:-full}" in self.content or ":-full" in self.content
 
     def test_unknown_mode_exits_nonzero(self):
         """An unknown mode should print usage and exit 1."""
@@ -114,7 +113,11 @@ class TestValidateScriptExecution:
     def test_targeted_mode_runs_single_test(self):
         """targeted mode should run a specific test file successfully."""
         result = subprocess.run(
-            [SCRIPT_PATH, "targeted", "tests/test_validate_script.py::TestValidateScriptExists::test_script_file_exists"],
+            [
+                SCRIPT_PATH,
+                "targeted",
+                "tests/test_validate_script.py::TestValidateScriptExists::test_script_file_exists",
+            ],
             capture_output=True,
             text=True,
             timeout=60,

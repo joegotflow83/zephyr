@@ -7,10 +7,10 @@ and graceful handling of missing optional fields during deserialization.
 import pytest
 from src.lib.loop_runner import LoopMode, LoopState, LoopStatus
 
-
 # ---------------------------------------------------------------------------
 # LoopMode enum
 # ---------------------------------------------------------------------------
+
 
 class TestLoopMode:
     def test_single_value(self):
@@ -38,6 +38,7 @@ class TestLoopMode:
 # ---------------------------------------------------------------------------
 # LoopStatus enum
 # ---------------------------------------------------------------------------
+
 
 class TestLoopStatus:
     def test_idle_value(self):
@@ -79,6 +80,7 @@ class TestLoopStatus:
 # ---------------------------------------------------------------------------
 # LoopState dataclass — construction & defaults
 # ---------------------------------------------------------------------------
+
 
 class TestLoopStateDefaults:
     def test_minimal_construction(self):
@@ -136,6 +138,7 @@ class TestLoopStateDefaults:
 # ---------------------------------------------------------------------------
 # LoopState serialization — to_dict
 # ---------------------------------------------------------------------------
+
 
 class TestLoopStateToDict:
     def test_minimal_to_dict(self):
@@ -201,6 +204,7 @@ class TestLoopStateToDict:
 # ---------------------------------------------------------------------------
 # LoopState deserialization — from_dict
 # ---------------------------------------------------------------------------
+
 
 class TestLoopStateFromDict:
     def test_full_round_trip(self):

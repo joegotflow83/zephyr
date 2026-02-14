@@ -84,7 +84,8 @@ class TestReleaseTriggers:
 def _find_steps(job, keyword, field="run"):
     """Find steps containing a keyword in a given field."""
     return [
-        s for s in job.get("steps", [])
+        s
+        for s in job.get("steps", [])
         if isinstance(s.get(field), str) and keyword in s[field]
     ]
 
@@ -92,7 +93,8 @@ def _find_steps(job, keyword, field="run"):
 def _find_steps_by_uses(job, keyword):
     """Find steps with a 'uses' action containing a keyword."""
     return [
-        s for s in job.get("steps", [])
+        s
+        for s in job.get("steps", [])
         if isinstance(s.get("uses"), str) and keyword in s["uses"]
     ]
 
@@ -200,7 +202,13 @@ class TestBuildLinux:
         apt_steps = _find_steps(job, "apt-get")
         assert len(apt_steps) >= 1
         apt_run = apt_steps[0]["run"]
-        for pkg in ["libgl1", "libegl1", "libxkbcommon0", "libdbus-1-3", "libfontconfig1"]:
+        for pkg in [
+            "libgl1",
+            "libegl1",
+            "libxkbcommon0",
+            "libdbus-1-3",
+            "libfontconfig1",
+        ]:
             assert pkg in apt_run, f"Missing system package: {pkg}"
 
     def test_installs_deps_with_dev_and_pyinstaller(self, job):
@@ -251,14 +259,17 @@ class TestBuildWindows:
     def test_extracts_version_from_tag(self, job):
         """Windows version extraction may use bash shell."""
         version_steps = [
-            s for s in job.get("steps", [])
+            s
+            for s in job.get("steps", [])
             if isinstance(s.get("run"), str) and "GITHUB_REF_NAME" in s["run"]
         ]
         assert len(version_steps) >= 1
 
     def test_patches_version_py(self, job):
         all_runs = " ".join(
-            s.get("run", "") for s in job.get("steps", []) if isinstance(s.get("run"), str)
+            s.get("run", "")
+            for s in job.get("steps", [])
+            if isinstance(s.get("run"), str)
         )
         assert "_version.py" in all_runs
 
@@ -271,14 +282,18 @@ class TestBuildWindows:
 
     def test_runs_pyinstaller(self, job):
         all_runs = " ".join(
-            s.get("run", "") for s in job.get("steps", []) if isinstance(s.get("run"), str)
+            s.get("run", "")
+            for s in job.get("steps", [])
+            if isinstance(s.get("run"), str)
         )
         assert "pyinstaller" in all_runs.lower()
 
     def test_creates_zip(self, job):
         """Windows should produce a .zip artifact."""
         all_runs = " ".join(
-            s.get("run", "") for s in job.get("steps", []) if isinstance(s.get("run"), str)
+            s.get("run", "")
+            for s in job.get("steps", [])
+            if isinstance(s.get("run"), str)
         )
         assert "Zephyr-Windows" in all_runs
 
@@ -317,7 +332,9 @@ class TestPublishJob:
     def test_detects_prerelease(self, job):
         """Should check tag for -alpha, -beta, or -rc suffixes."""
         all_runs = " ".join(
-            s.get("run", "") for s in job.get("steps", []) if isinstance(s.get("run"), str)
+            s.get("run", "")
+            for s in job.get("steps", [])
+            if isinstance(s.get("run"), str)
         )
         assert "alpha" in all_runs
         assert "beta" in all_runs
@@ -354,7 +371,5 @@ class TestPublishJob:
 
     def test_uses_github_token(self, job):
         """Should use github.token for authentication."""
-        all_envs = " ".join(
-            str(s.get("env", {})) for s in job.get("steps", [])
-        )
+        all_envs = " ".join(str(s.get("env", {})) for s in job.get("steps", []))
         assert "github.token" in all_envs or "GH_TOKEN" in all_envs

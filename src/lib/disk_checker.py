@@ -72,7 +72,9 @@ class DiskChecker:
                 logger.debug("Could not stat file: %s", entry)
         return total
 
-    def warn_if_low(self, path: Path | None = None, threshold_gb: float = 5.0) -> str | None:
+    def warn_if_low(
+        self, path: Path | None = None, threshold_gb: float = 5.0
+    ) -> str | None:
         """Return a warning message if available disk space is below *threshold_gb*.
 
         Args:

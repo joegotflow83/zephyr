@@ -22,6 +22,7 @@ BUILD_SCRIPT = PROJECT_ROOT / "scripts" / "build.sh"
 # Spec file existence and syntax
 # ---------------------------------------------------------------------------
 
+
 class TestSpecFileValidity:
     """Verify zephyr.spec is parseable and well-formed."""
 
@@ -44,6 +45,7 @@ class TestSpecFileValidity:
 # Hidden imports
 # ---------------------------------------------------------------------------
 
+
 def _extract_hidden_imports() -> list[str]:
     """Parse the spec file and extract the hiddenimports list."""
     source = SPEC_FILE.read_text(encoding="utf-8")
@@ -58,7 +60,8 @@ def _extract_hidden_imports() -> list[str]:
                         return [
                             elt.value
                             for elt in node.value.elts
-                            if isinstance(elt, ast.Constant) and isinstance(elt.value, str)
+                            if isinstance(elt, ast.Constant)
+                            and isinstance(elt.value, str)
                         ]
     return []
 
@@ -158,6 +161,7 @@ class TestHiddenImports:
 # Spec file content checks
 # ---------------------------------------------------------------------------
 
+
 class TestSpecContent:
     """Verify key elements in the spec file content."""
 
@@ -178,7 +182,10 @@ class TestSpecContent:
     def test_bundle_guarded_by_darwin_check(self):
         """BUNDLE must be wrapped in a sys.platform == 'darwin' guard
         so PyInstaller does not fail on Linux / Windows."""
-        assert 'sys.platform == "darwin"' in self.source or "sys.platform == 'darwin'" in self.source
+        assert (
+            'sys.platform == "darwin"' in self.source
+            or "sys.platform == 'darwin'" in self.source
+        )
 
     def test_agents_md_in_datas(self):
         assert "AGENTS.md" in self.source
@@ -211,6 +218,7 @@ class TestSpecContent:
 # ---------------------------------------------------------------------------
 # Build script
 # ---------------------------------------------------------------------------
+
 
 class TestBuildScript:
     """Verify scripts/build.sh exists and is well-formed."""

@@ -8,7 +8,6 @@ loop output (e.g. bedrock_loop.sh).
 import re
 from datetime import datetime, timezone
 
-
 # -- Commit patterns ----------------------------------------------------------
 # Match `git commit` short output: [branch hash] message
 _RE_COMMIT_SHORT = re.compile(r"\[[\w/.-]+\s+([0-9a-f]{7,40})\]")
@@ -35,22 +34,14 @@ _ERROR_PATTERNS = [_RE_TRACEBACK, _RE_EXCEPTION, _RE_ERROR_PREFIX, _RE_PYTEST_FA
 
 # -- Iteration boundary patterns ----------------------------------------------
 # bedrock_loop.sh: "======================== LOOP 3 ========================"
-_RE_LOOP_BOUNDARY = re.compile(
-    r"^=+\s*LOOP\s+(\d+)\s*=+$", re.IGNORECASE
-)
+_RE_LOOP_BOUNDARY = re.compile(r"^=+\s*LOOP\s+(\d+)\s*=+$", re.IGNORECASE)
 # Alternative: "iteration 3" or "Iteration: 3"
-_RE_ITERATION_BOUNDARY = re.compile(
-    r"^\s*iteration\s*[:\s]+(\d+)", re.IGNORECASE
-)
+_RE_ITERATION_BOUNDARY = re.compile(r"^\s*iteration\s*[:\s]+(\d+)", re.IGNORECASE)
 # "Running iteration 3..." (from bedrock_loop.sh line 51)
-_RE_RUNNING_ITERATION = re.compile(
-    r"^\s*Running\s+iteration\s+(\d+)", re.IGNORECASE
-)
+_RE_RUNNING_ITERATION = re.compile(r"^\s*Running\s+iteration\s+(\d+)", re.IGNORECASE)
 
 # -- Timestamp extraction -----------------------------------------------------
-_RE_ISO_TIMESTAMP = re.compile(
-    r"\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}"
-)
+_RE_ISO_TIMESTAMP = re.compile(r"\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}")
 
 
 class LogParser:
@@ -121,7 +112,11 @@ class LogParser:
         """
         stripped = line.strip()
 
-        for pattern in (_RE_LOOP_BOUNDARY, _RE_RUNNING_ITERATION, _RE_ITERATION_BOUNDARY):
+        for pattern in (
+            _RE_LOOP_BOUNDARY,
+            _RE_RUNNING_ITERATION,
+            _RE_ITERATION_BOUNDARY,
+        ):
             match = pattern.match(stripped)
             if match:
                 return int(match.group(1))

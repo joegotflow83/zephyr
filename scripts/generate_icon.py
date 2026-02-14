@@ -60,8 +60,8 @@ def generate_icon(size: int = 512, output_path: str | None = None) -> Path:
     radius = int(size * 0.18)
 
     # Build vertical gradient from top-blue to bottom-blue
-    top_colour = (41, 98, 255)      # bright blue
-    bot_colour = (13, 42, 148)      # deeper blue
+    top_colour = (41, 98, 255)  # bright blue
+    bot_colour = (13, 42, 148)  # deeper blue
 
     for y in range(margin, size - margin):
         t = (y - margin) / (size - 2 * margin - 1)
@@ -73,7 +73,9 @@ def generate_icon(size: int = 512, output_path: str | None = None) -> Path:
     # Apply rounded-rect mask
     mask = Image.new("L", (size, size), 0)
     mask_draw = ImageDraw.Draw(mask)
-    _rounded_rect(mask_draw, (margin, margin, size - margin, size - margin), radius, 255)
+    _rounded_rect(
+        mask_draw, (margin, margin, size - margin, size - margin), radius, 255
+    )
     img.putalpha(mask)
 
     # --- Letter "Z" in white -------------------------------------------
@@ -82,7 +84,9 @@ def generate_icon(size: int = 512, output_path: str | None = None) -> Path:
     # Try to use a bold system font; fall back to default
     font_size = int(size * 0.52)
     try:
-        font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", font_size)
+        font = ImageFont.truetype(
+            "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", font_size
+        )
     except (OSError, IOError):
         try:
             font = ImageFont.truetype("Arial Bold", font_size)
@@ -97,7 +101,12 @@ def generate_icon(size: int = 512, output_path: str | None = None) -> Path:
 
     # Subtle shadow
     shadow_offset = max(2, size // 128)
-    draw.text((tx + shadow_offset, ty + shadow_offset), letter, fill=(0, 0, 40, 100), font=font)
+    draw.text(
+        (tx + shadow_offset, ty + shadow_offset),
+        letter,
+        fill=(0, 0, 40, 100),
+        font=font,
+    )
     # Main letter
     draw.text((tx, ty), letter, fill=(255, 255, 255, 255), font=font)
 

@@ -29,6 +29,7 @@ SPEC_FILE = PROJECT_ROOT / "zephyr.spec"
 # Icon PNG
 # ---------------------------------------------------------------------------
 
+
 class TestIconPng:
     """Verify resources/icon.png is a well-formed icon image."""
 
@@ -68,12 +69,15 @@ class TestIconPng:
         """Rounded-rect icon should have transparent corners."""
         img = Image.open(RESOURCES_DIR / "icon.png")
         alpha = img.split()[-1]
-        assert alpha.getextrema()[0] == 0, "Icon should have transparent regions (corners)"
+        assert (
+            alpha.getextrema()[0] == 0
+        ), "Icon should have transparent regions (corners)"
 
 
 # ---------------------------------------------------------------------------
 # Info.plist template
 # ---------------------------------------------------------------------------
+
 
 class TestInfoPlist:
     """Verify resources/Info.plist is a valid plist with required keys."""
@@ -119,12 +123,16 @@ class TestInfoPlist:
         assert self.plist["CFBundlePackageType"] == "APPL"
 
     def test_app_category(self):
-        assert self.plist["LSApplicationCategoryType"] == "public.app-category.developer-tools"
+        assert (
+            self.plist["LSApplicationCategoryType"]
+            == "public.app-category.developer-tools"
+        )
 
 
 # ---------------------------------------------------------------------------
 # generate_icns.sh
 # ---------------------------------------------------------------------------
+
 
 class TestGenerateIcnsScript:
     """Verify scripts/generate_icns.sh is well-formed."""
@@ -187,6 +195,7 @@ class TestGenerateIcnsScript:
 # generate_icon.py (icon generator script)
 # ---------------------------------------------------------------------------
 
+
 class TestGenerateIconScript:
     """Verify the icon generation script works correctly."""
 
@@ -198,12 +207,15 @@ class TestGenerateIconScript:
     def test_generate_icon_produces_valid_image(self):
         """Import and call the generator to verify it produces a valid PNG."""
         import importlib.util
+
         spec = importlib.util.spec_from_file_location("generate_icon", self.SCRIPT)
         mod = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(mod)
 
         with tempfile.TemporaryDirectory() as tmpdir:
-            out = mod.generate_icon(size=128, output_path=os.path.join(tmpdir, "test_icon.png"))
+            out = mod.generate_icon(
+                size=128, output_path=os.path.join(tmpdir, "test_icon.png")
+            )
             assert out.is_file()
             img = Image.open(out)
             assert img.size == (128, 128)
@@ -212,12 +224,15 @@ class TestGenerateIconScript:
     def test_generate_icon_custom_size(self):
         """Generator should support arbitrary sizes."""
         import importlib.util
+
         spec = importlib.util.spec_from_file_location("generate_icon", self.SCRIPT)
         mod = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(mod)
 
         with tempfile.TemporaryDirectory() as tmpdir:
-            out = mod.generate_icon(size=256, output_path=os.path.join(tmpdir, "icon256.png"))
+            out = mod.generate_icon(
+                size=256, output_path=os.path.join(tmpdir, "icon256.png")
+            )
             img = Image.open(out)
             assert img.size == (256, 256)
 
@@ -225,6 +240,7 @@ class TestGenerateIconScript:
 # ---------------------------------------------------------------------------
 # Spec file resource references
 # ---------------------------------------------------------------------------
+
 
 class TestSpecResourceReferences:
     """Verify the PyInstaller spec references resource files."""

@@ -40,9 +40,7 @@ def export_config(config_manager: ConfigManager, output_path: Path) -> Path:
     """
     config_dir = config_manager.get_config_dir()
     if not config_dir.is_dir():
-        raise FileNotFoundError(
-            f"Config directory does not exist: {config_dir}"
-        )
+        raise FileNotFoundError(f"Config directory does not exist: {config_dir}")
 
     output_path = Path(output_path)
     if output_path.suffix != ".zip":
@@ -119,9 +117,7 @@ def import_config(config_manager: ConfigManager, zip_path: Path) -> dict:
         for name in members:
             resolved = (config_dir / name).resolve()
             if not str(resolved).startswith(str(config_dir.resolve())):
-                raise ValueError(
-                    f"Zip contains unsafe path: {name}"
-                )
+                raise ValueError(f"Zip contains unsafe path: {name}")
 
         # Check for conflicts — any existing file blocks the import.
         conflicts = []

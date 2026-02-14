@@ -27,7 +27,6 @@ from src.lib.models import AppSettings, ProjectConfig
 from src.lib.project_store import ProjectStore
 from src.ui.main_window import MainWindow
 
-
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
@@ -234,8 +233,12 @@ class TestProjectsTabIntegration:
         assert table.item(0, 3).text() == "Idle"
 
     def test_multiple_projects_in_table(
-        self, app_controller, main_window, project_store,
-        sample_project, sample_project_b,
+        self,
+        app_controller,
+        main_window,
+        project_store,
+        sample_project,
+        sample_project_b,
     ):
         project_store.add_project(sample_project)
         project_store.add_project(sample_project_b)
@@ -247,8 +250,12 @@ class TestProjectsTabIntegration:
         assert names == {"Test Project", "Project Beta"}
 
     def test_project_status_reflects_loop_state(
-        self, app_controller, main_window, project_store,
-        sample_project, mock_loop_runner,
+        self,
+        app_controller,
+        main_window,
+        project_store,
+        sample_project,
+        mock_loop_runner,
     ):
         """When a loop is running, the projects table shows its status."""
         project_store.add_project(sample_project)
@@ -265,7 +272,11 @@ class TestProjectsTabIntegration:
         assert table.item(0, 3).text() == "Running"
 
     def test_edit_project_persists(
-        self, app_controller, main_window, project_store, sample_project,
+        self,
+        app_controller,
+        main_window,
+        project_store,
+        sample_project,
     ):
         """Editing a project through the store and refreshing updates the table."""
         project_store.add_project(sample_project)
@@ -278,7 +289,11 @@ class TestProjectsTabIntegration:
         assert main_window.projects_tab.table.item(0, 0).text() == "Updated Project"
 
     def test_delete_project_removes_from_table(
-        self, app_controller, main_window, project_store, sample_project,
+        self,
+        app_controller,
+        main_window,
+        project_store,
+        sample_project,
     ):
         project_store.add_project(sample_project)
         app_controller.refresh_all()
@@ -294,20 +309,28 @@ class TestProjectsTabIntegration:
         Uses a bare MainWindow (no controller) to avoid modal dialogs.
         """
         received = []
-        main_window.projects_tab.project_add_requested.connect(lambda: received.append(True))
+        main_window.projects_tab.project_add_requested.connect(
+            lambda: received.append(True)
+        )
         main_window.projects_tab.add_button.click()
         assert len(received) == 1
 
     def test_edit_button_emits_signal(
-        self, qtbot, main_window, sample_project,
+        self,
+        qtbot,
+        main_window,
+        sample_project,
     ):
         """Clicking Edit on a project row emits project_edit_requested."""
         main_window.projects_tab.refresh([sample_project])
 
         received = []
-        main_window.projects_tab.project_edit_requested.connect(lambda pid: received.append(pid))
+        main_window.projects_tab.project_edit_requested.connect(
+            lambda pid: received.append(pid)
+        )
 
         from PyQt6.QtWidgets import QPushButton
+
         edit_btn = main_window.projects_tab.table.cellWidget(0, 4).findChild(
             QPushButton, f"edit_btn_{sample_project.id}"
         )
@@ -315,15 +338,21 @@ class TestProjectsTabIntegration:
         assert received == [sample_project.id]
 
     def test_delete_button_emits_signal(
-        self, qtbot, main_window, sample_project,
+        self,
+        qtbot,
+        main_window,
+        sample_project,
     ):
         """Clicking Delete on a project row emits project_delete_requested."""
         main_window.projects_tab.refresh([sample_project])
 
         received = []
-        main_window.projects_tab.project_delete_requested.connect(lambda pid: received.append(pid))
+        main_window.projects_tab.project_delete_requested.connect(
+            lambda pid: received.append(pid)
+        )
 
         from PyQt6.QtWidgets import QPushButton
+
         delete_btn = main_window.projects_tab.table.cellWidget(0, 4).findChild(
             QPushButton, f"delete_btn_{sample_project.id}"
         )
@@ -331,15 +360,21 @@ class TestProjectsTabIntegration:
         assert received == [sample_project.id]
 
     def test_run_button_emits_signal(
-        self, qtbot, main_window, sample_project,
+        self,
+        qtbot,
+        main_window,
+        sample_project,
     ):
         """Clicking Run on a project row emits project_run_requested."""
         main_window.projects_tab.refresh([sample_project])
 
         received = []
-        main_window.projects_tab.project_run_requested.connect(lambda pid: received.append(pid))
+        main_window.projects_tab.project_run_requested.connect(
+            lambda pid: received.append(pid)
+        )
 
         from PyQt6.QtWidgets import QPushButton
+
         run_btn = main_window.projects_tab.table.cellWidget(0, 4).findChild(
             QPushButton, f"run_btn_{sample_project.id}"
         )
@@ -349,8 +384,7 @@ class TestProjectsTabIntegration:
     def test_project_table_columns(self, main_window):
         table = main_window.projects_tab.table
         headers = [
-            table.horizontalHeaderItem(c).text()
-            for c in range(table.columnCount())
+            table.horizontalHeaderItem(c).text() for c in range(table.columnCount())
         ]
         assert headers == ["Name", "Repo URL", "Docker Image", "Status", "Actions"]
 
@@ -367,8 +401,12 @@ class TestLoopsTabIntegration:
         assert main_window.loops_tab.table.rowCount() == 0
 
     def test_loop_states_populate_table(
-        self, app_controller, main_window, project_store,
-        sample_project, mock_loop_runner,
+        self,
+        app_controller,
+        main_window,
+        project_store,
+        sample_project,
+        mock_loop_runner,
     ):
         """Loop states from the runner appear in the loops table."""
         project_store.add_project(sample_project)
@@ -391,8 +429,13 @@ class TestLoopsTabIntegration:
         assert table.item(0, 3).text() == "3"
 
     def test_multiple_loop_states(
-        self, app_controller, main_window, project_store,
-        sample_project, sample_project_b, mock_loop_runner,
+        self,
+        app_controller,
+        main_window,
+        project_store,
+        sample_project,
+        sample_project_b,
+        mock_loop_runner,
     ):
         project_store.add_project(sample_project)
         project_store.add_project(sample_project_b)
@@ -415,8 +458,12 @@ class TestLoopsTabIntegration:
         assert table.rowCount() == 2
 
     def test_loop_start_button_disabled_when_running(
-        self, app_controller, main_window, project_store,
-        sample_project, mock_loop_runner,
+        self,
+        app_controller,
+        main_window,
+        project_store,
+        sample_project,
+        mock_loop_runner,
     ):
         project_store.add_project(sample_project)
         mock_loop_runner.get_all_states.return_value = {
@@ -429,6 +476,7 @@ class TestLoopsTabIntegration:
         app_controller.refresh_all()
 
         from PyQt6.QtWidgets import QPushButton
+
         start_btn = main_window.loops_tab.table.cellWidget(0, 5).findChild(
             QPushButton, "start_btn_proj-001"
         )
@@ -436,8 +484,12 @@ class TestLoopsTabIntegration:
         assert not start_btn.isEnabled()
 
     def test_loop_stop_button_enabled_when_running(
-        self, app_controller, main_window, project_store,
-        sample_project, mock_loop_runner,
+        self,
+        app_controller,
+        main_window,
+        project_store,
+        sample_project,
+        mock_loop_runner,
     ):
         project_store.add_project(sample_project)
         mock_loop_runner.get_all_states.return_value = {
@@ -450,6 +502,7 @@ class TestLoopsTabIntegration:
         app_controller.refresh_all()
 
         from PyQt6.QtWidgets import QPushButton
+
         stop_btn = main_window.loops_tab.table.cellWidget(0, 5).findChild(
             QPushButton, "stop_btn_proj-001"
         )
@@ -457,8 +510,12 @@ class TestLoopsTabIntegration:
         assert stop_btn.isEnabled()
 
     def test_loop_stop_button_disabled_when_completed(
-        self, app_controller, main_window, project_store,
-        sample_project, mock_loop_runner,
+        self,
+        app_controller,
+        main_window,
+        project_store,
+        sample_project,
+        mock_loop_runner,
     ):
         project_store.add_project(sample_project)
         mock_loop_runner.get_all_states.return_value = {
@@ -471,14 +528,20 @@ class TestLoopsTabIntegration:
         app_controller.refresh_all()
 
         from PyQt6.QtWidgets import QPushButton
+
         stop_btn = main_window.loops_tab.table.cellWidget(0, 5).findChild(
             QPushButton, "stop_btn_proj-001"
         )
         assert not stop_btn.isEnabled()
 
     def test_log_append_shows_in_viewer_when_selected(
-        self, qtbot, app_controller, main_window, project_store,
-        sample_project, mock_loop_runner,
+        self,
+        qtbot,
+        app_controller,
+        main_window,
+        project_store,
+        sample_project,
+        mock_loop_runner,
     ):
         """Appending logs for the selected project shows in the log viewer."""
         project_store.add_project(sample_project)
@@ -504,8 +567,14 @@ class TestLoopsTabIntegration:
         assert "Build complete." in text
 
     def test_log_not_shown_for_unselected_project(
-        self, qtbot, app_controller, main_window, project_store,
-        sample_project, sample_project_b, mock_loop_runner,
+        self,
+        qtbot,
+        app_controller,
+        main_window,
+        project_store,
+        sample_project,
+        sample_project_b,
+        mock_loop_runner,
     ):
         """Logs for non-selected projects are buffered but not displayed."""
         project_store.add_project(sample_project)
@@ -542,8 +611,13 @@ class TestLoopsTabIntegration:
         assert "Beta log line" in text
 
     def test_clear_log_clears_buffer_and_viewer(
-        self, qtbot, app_controller, main_window, project_store,
-        sample_project, mock_loop_runner,
+        self,
+        qtbot,
+        app_controller,
+        main_window,
+        project_store,
+        sample_project,
+        mock_loop_runner,
     ):
         project_store.add_project(sample_project)
         mock_loop_runner.get_all_states.return_value = {
@@ -567,10 +641,16 @@ class TestLoopsTabIntegration:
     def test_loops_table_columns(self, main_window):
         table = main_window.loops_tab.table
         headers = [
-            table.horizontalHeaderItem(c).text()
-            for c in range(table.columnCount())
+            table.horizontalHeaderItem(c).text() for c in range(table.columnCount())
         ]
-        assert headers == ["Project", "Status", "Mode", "Iteration", "Started", "Actions"]
+        assert headers == [
+            "Project",
+            "Status",
+            "Mode",
+            "Iteration",
+            "Started",
+            "Actions",
+        ]
 
 
 # ---------------------------------------------------------------------------
@@ -588,7 +668,10 @@ class TestSettingsTabIntegration:
         assert settings_tab.log_level_combo.currentText() == "INFO"
 
     def test_settings_loaded_from_config(
-        self, app_controller, main_window, config_manager,
+        self,
+        app_controller,
+        main_window,
+        config_manager,
     ):
         """Settings saved to config are loaded into the UI."""
         settings = AppSettings(
@@ -605,7 +688,11 @@ class TestSettingsTabIntegration:
         assert st.log_level_combo.currentText() == "DEBUG"
 
     def test_settings_change_persists_to_config(
-        self, qtbot, app_controller, main_window, config_manager,
+        self,
+        qtbot,
+        app_controller,
+        main_window,
+        config_manager,
     ):
         """Changing a setting in the UI triggers persistence to config file."""
         st = main_window.settings_tab
@@ -619,7 +706,11 @@ class TestSettingsTabIntegration:
         assert data["max_concurrent_containers"] == 7
 
     def test_notification_toggle_persists(
-        self, qtbot, app_controller, main_window, config_manager,
+        self,
+        qtbot,
+        app_controller,
+        main_window,
+        config_manager,
     ):
         st = main_window.settings_tab
 
@@ -630,7 +721,11 @@ class TestSettingsTabIntegration:
         assert data["notification_enabled"] is False
 
     def test_log_level_change_persists(
-        self, qtbot, app_controller, main_window, config_manager,
+        self,
+        qtbot,
+        app_controller,
+        main_window,
+        config_manager,
     ):
         st = main_window.settings_tab
 
@@ -646,7 +741,10 @@ class TestSettingsTabIntegration:
         assert st.docker_status_label.text() == "Connected"
 
     def test_docker_disconnected_in_settings(
-        self, app_controller, main_window, mock_docker_manager,
+        self,
+        app_controller,
+        main_window,
+        mock_docker_manager,
     ):
         mock_docker_manager.is_docker_available.return_value = False
         app_controller.refresh_all()
@@ -686,6 +784,7 @@ class TestSettingsTabIntegration:
     def test_about_label_present(self, main_window):
         st = main_window.settings_tab
         from src.lib._version import __version__
+
         assert f"v{__version__}" in st.about_label.text()
 
 
@@ -714,7 +813,12 @@ class TestTabSwitching:
         assert main_window.tab_widget.currentWidget() is main_window.projects_tab
 
     def test_projects_persist_after_tab_switch(
-        self, qtbot, app_controller, main_window, project_store, sample_project,
+        self,
+        qtbot,
+        app_controller,
+        main_window,
+        project_store,
+        sample_project,
     ):
         """Project data remains visible after switching tabs back and forth."""
         project_store.add_project(sample_project)
@@ -729,8 +833,13 @@ class TestTabSwitching:
         assert table.item(0, 0).text() == "Test Project"
 
     def test_loop_data_persists_after_tab_switch(
-        self, qtbot, app_controller, main_window, project_store,
-        sample_project, mock_loop_runner,
+        self,
+        qtbot,
+        app_controller,
+        main_window,
+        project_store,
+        sample_project,
+        mock_loop_runner,
     ):
         """Loop states remain visible after switching tabs."""
         project_store.add_project(sample_project)
@@ -753,7 +862,10 @@ class TestTabSwitching:
         assert table.item(0, 3).text() == "5"
 
     def test_settings_persist_after_tab_switch(
-        self, qtbot, app_controller, main_window,
+        self,
+        qtbot,
+        app_controller,
+        main_window,
     ):
         """Settings values remain after switching tabs."""
         st = main_window.settings_tab
@@ -776,8 +888,13 @@ class TestControllerWiring:
     """Verify AppController connects signals to the correct handlers."""
 
     def test_run_button_triggers_start_loop(
-        self, qtbot, app_controller, main_window, project_store,
-        sample_project, mock_loop_runner,
+        self,
+        qtbot,
+        app_controller,
+        main_window,
+        project_store,
+        sample_project,
+        mock_loop_runner,
     ):
         """Clicking Run in projects tab calls loop_runner.start_loop.
 
@@ -788,6 +905,7 @@ class TestControllerWiring:
         app_controller.refresh_all()
 
         from PyQt6.QtWidgets import QPushButton
+
         run_btn = main_window.projects_tab.table.cellWidget(0, 4).findChild(
             QPushButton, f"run_btn_{sample_project.id}"
         )
@@ -798,8 +916,13 @@ class TestControllerWiring:
         )
 
     def test_stop_button_triggers_stop_loop(
-        self, qtbot, app_controller, main_window, project_store,
-        sample_project, mock_loop_runner,
+        self,
+        qtbot,
+        app_controller,
+        main_window,
+        project_store,
+        sample_project,
+        mock_loop_runner,
     ):
         """Clicking Stop in loops tab calls loop_runner.stop_loop."""
         project_store.add_project(sample_project)
@@ -813,6 +936,7 @@ class TestControllerWiring:
         app_controller.refresh_all()
 
         from PyQt6.QtWidgets import QPushButton
+
         stop_btn = main_window.loops_tab.table.cellWidget(0, 5).findChild(
             QPushButton, "stop_btn_proj-001"
         )
@@ -821,7 +945,11 @@ class TestControllerWiring:
         mock_loop_runner.stop_loop.assert_called_once_with("proj-001")
 
     def test_add_project_handler_opens_dialog(
-        self, qtbot, app_controller, main_window, project_store,
+        self,
+        qtbot,
+        app_controller,
+        main_window,
+        project_store,
     ):
         """handle_add_project opens ProjectDialog; accepting it adds the project.
 
@@ -835,6 +963,7 @@ class TestControllerWiring:
 
         with patch("src.lib.app_controller.ProjectDialog") as MockDialog:
             from PyQt6.QtWidgets import QDialog
+
             instance = MockDialog.return_value
             instance.exec.return_value = QDialog.DialogCode.Accepted
             instance.get_project.return_value = mock_project
@@ -846,7 +975,12 @@ class TestControllerWiring:
         assert projects[0].name == "Dialog Project"
 
     def test_delete_project_handler_with_confirmation(
-        self, qtbot, app_controller, main_window, project_store, sample_project,
+        self,
+        qtbot,
+        app_controller,
+        main_window,
+        project_store,
+        sample_project,
     ):
         """handle_delete_project removes the project when user confirms.
 
@@ -857,6 +991,7 @@ class TestControllerWiring:
         assert len(project_store.list_projects()) == 1
 
         from PyQt6.QtWidgets import QMessageBox
+
         with patch.object(
             QMessageBox, "question", return_value=QMessageBox.StandardButton.Yes
         ):
@@ -865,7 +1000,11 @@ class TestControllerWiring:
         assert len(project_store.list_projects()) == 0
 
     def test_settings_change_calls_save(
-        self, qtbot, app_controller, main_window, config_manager,
+        self,
+        qtbot,
+        app_controller,
+        main_window,
+        config_manager,
     ):
         """Changing settings triggers config save via the controller."""
         st = main_window.settings_tab
@@ -878,14 +1017,20 @@ class TestControllerWiring:
         assert data["max_concurrent_containers"] == 2
 
     def test_refresh_all_updates_docker_status_in_main_window(
-        self, app_controller, main_window, mock_docker_manager,
+        self,
+        app_controller,
+        main_window,
+        mock_docker_manager,
     ):
         mock_docker_manager.is_docker_available.return_value = True
         app_controller.refresh_all()
         assert main_window.docker_status_label.text() == "Docker: Connected"
 
     def test_refresh_all_updates_docker_status_in_settings(
-        self, app_controller, main_window, mock_docker_manager,
+        self,
+        app_controller,
+        main_window,
+        mock_docker_manager,
     ):
         mock_docker_manager.is_docker_available.return_value = True
         app_controller.refresh_all()
@@ -901,8 +1046,13 @@ class TestFullWorkflow:
     """End-to-end UI workflow: add project, check loops, change settings."""
 
     def test_add_project_then_view_loop_state(
-        self, qtbot, app_controller, main_window, project_store,
-        sample_project, mock_loop_runner,
+        self,
+        qtbot,
+        app_controller,
+        main_window,
+        project_store,
+        sample_project,
+        mock_loop_runner,
     ):
         """Full flow: add project -> start loop -> verify in loops tab."""
         # 1. Add project
@@ -935,8 +1085,13 @@ class TestFullWorkflow:
         assert main_window.projects_tab.table.item(0, 3).text() == "Running"
 
     def test_add_project_run_stop_complete_lifecycle(
-        self, qtbot, app_controller, main_window, project_store,
-        sample_project, mock_loop_runner,
+        self,
+        qtbot,
+        app_controller,
+        main_window,
+        project_store,
+        sample_project,
+        mock_loop_runner,
     ):
         """Full lifecycle: add -> run -> verify running -> stop -> verify stopped."""
         project_store.add_project(sample_project)
@@ -968,8 +1123,14 @@ class TestFullWorkflow:
         assert main_window.loops_tab.table.item(0, 1).text() == "stopped"
 
     def test_multi_project_multi_tab_workflow(
-        self, qtbot, app_controller, main_window, project_store,
-        sample_project, sample_project_b, mock_loop_runner,
+        self,
+        qtbot,
+        app_controller,
+        main_window,
+        project_store,
+        sample_project,
+        sample_project_b,
+        mock_loop_runner,
     ):
         """Two projects with different loop states across all tabs."""
         project_store.add_project(sample_project)
@@ -1005,8 +1166,14 @@ class TestFullWorkflow:
         assert ltable.rowCount() == 2
 
     def test_settings_change_while_loop_running(
-        self, qtbot, app_controller, main_window, project_store,
-        sample_project, mock_loop_runner, config_manager,
+        self,
+        qtbot,
+        app_controller,
+        main_window,
+        project_store,
+        sample_project,
+        mock_loop_runner,
+        config_manager,
     ):
         """Changing settings while a loop is running works correctly."""
         project_store.add_project(sample_project)
@@ -1034,8 +1201,14 @@ class TestFullWorkflow:
         assert main_window.loops_tab.table.item(0, 1).text() == "running"
 
     def test_log_viewing_across_projects(
-        self, qtbot, app_controller, main_window, project_store,
-        sample_project, sample_project_b, mock_loop_runner,
+        self,
+        qtbot,
+        app_controller,
+        main_window,
+        project_store,
+        sample_project,
+        sample_project_b,
+        mock_loop_runner,
     ):
         """Switching between projects in loops tab shows correct logs."""
         project_store.add_project(sample_project)

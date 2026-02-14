@@ -16,10 +16,10 @@ import pytest
 from src.lib.models import AppSettings
 from src.lib.notifier import Notifier
 
-
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture
 def enabled_settings():
@@ -49,6 +49,7 @@ def disabled_notifier(disabled_settings):
 # Basic notify() tests
 # ---------------------------------------------------------------------------
 
+
 class TestNotifyBasic:
     """Tests for the core notify() method."""
 
@@ -64,7 +65,9 @@ class TestNotifyBasic:
         )
 
     @patch("src.lib.notifier.notification")
-    def test_notify_suppressed_when_disabled(self, mock_notification, disabled_notifier):
+    def test_notify_suppressed_when_disabled(
+        self, mock_notification, disabled_notifier
+    ):
         """notify() should not call plyer when notifications are disabled."""
         disabled_notifier.notify("Title", "Message")
         mock_notification.notify.assert_not_called()
@@ -98,6 +101,7 @@ class TestNotifyBasic:
 # ---------------------------------------------------------------------------
 # Error handling tests
 # ---------------------------------------------------------------------------
+
 
 class TestNotifyErrorHandling:
     """Tests that notify() catches all exceptions gracefully."""
@@ -155,6 +159,7 @@ class TestNotifyErrorHandling:
 # Dynamic settings tests
 # ---------------------------------------------------------------------------
 
+
 class TestDynamicSettings:
     """Tests that settings changes take effect immediately."""
 
@@ -194,6 +199,7 @@ class TestDynamicSettings:
 # notify_loop_complete() tests
 # ---------------------------------------------------------------------------
 
+
 class TestNotifyLoopComplete:
     """Tests for the loop-complete convenience method."""
 
@@ -228,7 +234,9 @@ class TestNotifyLoopComplete:
         assert "Zephyr" in call_kwargs["title"]
 
     @patch("src.lib.notifier.notification")
-    def test_loop_complete_suppressed_when_disabled(self, mock_notification, disabled_notifier):
+    def test_loop_complete_suppressed_when_disabled(
+        self, mock_notification, disabled_notifier
+    ):
         """Should respect notification_enabled for loop complete."""
         disabled_notifier.notify_loop_complete("P", 1)
         mock_notification.notify.assert_not_called()
@@ -237,6 +245,7 @@ class TestNotifyLoopComplete:
 # ---------------------------------------------------------------------------
 # notify_loop_failed() tests
 # ---------------------------------------------------------------------------
+
 
 class TestNotifyLoopFailed:
     """Tests for the loop-failed convenience method."""
@@ -272,7 +281,9 @@ class TestNotifyLoopFailed:
         assert "Zephyr" in call_kwargs["title"]
 
     @patch("src.lib.notifier.notification")
-    def test_loop_failed_suppressed_when_disabled(self, mock_notification, disabled_notifier):
+    def test_loop_failed_suppressed_when_disabled(
+        self, mock_notification, disabled_notifier
+    ):
         """Should respect notification_enabled for loop failed."""
         disabled_notifier.notify_loop_failed("P", "err")
         mock_notification.notify.assert_not_called()
@@ -281,6 +292,7 @@ class TestNotifyLoopFailed:
 # ---------------------------------------------------------------------------
 # Constructor tests
 # ---------------------------------------------------------------------------
+
 
 class TestNotifierConstructor:
     """Tests for Notifier initialization."""

@@ -18,10 +18,10 @@ from src.lib.app_controller import AppController
 from src.lib.log_bridge import LogBridge
 from src.ui.main_window import MainWindow
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _mock_docker_module(available: bool = False):
     """Return a patch context for docker.from_env.

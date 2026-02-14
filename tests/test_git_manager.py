@@ -13,10 +13,10 @@ from git.exc import GitCommandError, InvalidGitRepositoryError, NoSuchPathError
 
 from src.lib.git_manager import GitManager, _ProgressHandler
 
-
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture
 def gm():
@@ -33,6 +33,7 @@ def tmp_repo(tmp_path):
 # ---------------------------------------------------------------------------
 # clone_repo tests
 # ---------------------------------------------------------------------------
+
 
 class TestCloneRepo:
     """Tests for GitManager.clone_repo."""
@@ -59,7 +60,9 @@ class TestCloneRepo:
         mock_clone.return_value = mock_repo
         callback = MagicMock()
 
-        gm.clone_repo("https://github.com/user/repo.git", tmp_repo, progress_callback=callback)
+        gm.clone_repo(
+            "https://github.com/user/repo.git", tmp_repo, progress_callback=callback
+        )
 
         # Progress handler should be passed
         args, kwargs = mock_clone.call_args
@@ -137,6 +140,7 @@ class TestCloneRepo:
 # validate_repo tests
 # ---------------------------------------------------------------------------
 
+
 class TestValidateRepo:
     """Tests for GitManager.validate_repo."""
 
@@ -180,10 +184,16 @@ class TestValidateRepo:
 # get_repo_info tests
 # ---------------------------------------------------------------------------
 
+
 class TestGetRepoInfo:
     """Tests for GitManager.get_repo_info."""
 
-    def _make_mock_repo(self, branch="main", commit_sha="abc123def456", remote_url="https://github.com/user/repo.git"):
+    def _make_mock_repo(
+        self,
+        branch="main",
+        commit_sha="abc123def456",
+        remote_url="https://github.com/user/repo.git",
+    ):
         """Create a mock Repo object with configurable state."""
         mock_repo = MagicMock()
 
@@ -222,7 +232,9 @@ class TestGetRepoInfo:
     @patch("src.lib.git_manager.git.Repo")
     def test_detached_head(self, mock_repo_cls, gm, tmp_path):
         mock_repo = self._make_mock_repo()
-        type(mock_repo).active_branch = PropertyMock(side_effect=TypeError("HEAD is detached"))
+        type(mock_repo).active_branch = PropertyMock(
+            side_effect=TypeError("HEAD is detached")
+        )
         mock_repo_cls.return_value = mock_repo
 
         info = gm.get_repo_info(tmp_path)
@@ -296,6 +308,7 @@ class TestGetRepoInfo:
 # get_recent_commits tests
 # ---------------------------------------------------------------------------
 
+
 class TestGetRecentCommits:
     """Tests for GitManager.get_recent_commits."""
 
@@ -315,7 +328,9 @@ class TestGetRecentCommits:
         dt2 = datetime(2024, 1, 14, 9, 0, 0, tzinfo=timezone.utc)
 
         commits = [
-            self._make_commit("aaa111", "Add feature X\n\nDetailed description", "Alice", dt1),
+            self._make_commit(
+                "aaa111", "Add feature X\n\nDetailed description", "Alice", dt1
+            ),
             self._make_commit("bbb222", "Fix bug Y", "Bob", dt2),
         ]
 
@@ -365,7 +380,9 @@ class TestGetRecentCommits:
         assert result == []
 
     @patch("src.lib.git_manager.git.Repo")
-    def test_commit_message_multiline_uses_first_line(self, mock_repo_cls, gm, tmp_path):
+    def test_commit_message_multiline_uses_first_line(
+        self, mock_repo_cls, gm, tmp_path
+    ):
         dt = datetime(2024, 1, 15, 10, 0, 0, tzinfo=timezone.utc)
         commit = self._make_commit(
             "ccc333",
@@ -421,6 +438,7 @@ class TestGetRecentCommits:
 # ---------------------------------------------------------------------------
 # _ProgressHandler tests
 # ---------------------------------------------------------------------------
+
 
 class TestProgressHandler:
     """Tests for the _ProgressHandler helper."""

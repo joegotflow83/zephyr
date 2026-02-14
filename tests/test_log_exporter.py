@@ -10,10 +10,10 @@ import pytest
 from src.lib.log_exporter import LogExporter
 from src.lib.loop_runner import LoopMode, LoopState, LoopStatus
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _make_state(project_id: str, **kwargs) -> LoopState:
     """Create a LoopState with sensible defaults, overridable via kwargs."""
@@ -35,6 +35,7 @@ def _make_state(project_id: str, **kwargs) -> LoopState:
 # ---------------------------------------------------------------------------
 # export_loop_log
 # ---------------------------------------------------------------------------
+
 
 class TestExportLoopLog:
     """Tests for LogExporter.export_loop_log."""
@@ -105,6 +106,7 @@ class TestExportLoopLog:
 # ---------------------------------------------------------------------------
 # export_all_logs
 # ---------------------------------------------------------------------------
+
 
 class TestExportAllLogs:
     """Tests for LogExporter.export_all_logs."""
@@ -217,6 +219,7 @@ class TestExportAllLogs:
 # ---------------------------------------------------------------------------
 # get_default_export_path
 # ---------------------------------------------------------------------------
+
 
 class TestGetDefaultExportPath:
     """Tests for LogExporter.get_default_export_path."""

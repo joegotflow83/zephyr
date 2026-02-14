@@ -10,7 +10,6 @@ from docker.errors import DockerException, ImageNotFound, APIError
 
 from src.lib.docker_manager import DockerManager
 
-
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
@@ -173,9 +172,7 @@ class TestPullImage:
         callback.assert_any_call({"status": "Download complete", "id": "abc123"})
 
     def test_pull_without_callback_succeeds(self, manager, mock_client):
-        mock_client.api.pull.return_value = iter(
-            [{"status": "Done"}]
-        )
+        mock_client.api.pull.return_value = iter([{"status": "Done"}])
         # Should not raise
         manager.pull_image("ubuntu:24.04", progress_callback=None)
 

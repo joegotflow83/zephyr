@@ -80,14 +80,16 @@ class TestTestJob:
 
     def test_checks_out_repo(self, test_job):
         checkout_steps = [
-            s for s in test_job["steps"]
+            s
+            for s in test_job["steps"]
             if isinstance(s.get("uses"), str) and "checkout" in s["uses"]
         ]
         assert len(checkout_steps) >= 1
 
     def test_sets_up_python_312(self, test_job):
         python_steps = [
-            s for s in test_job["steps"]
+            s
+            for s in test_job["steps"]
             if isinstance(s.get("uses"), str) and "setup-python" in s["uses"]
         ]
         assert len(python_steps) >= 1
@@ -97,34 +99,46 @@ class TestTestJob:
     def test_installs_system_qt_deps(self, test_job):
         """Spec requires: libgl1, libegl1, libxkbcommon0, libdbus-1-3, libfontconfig1."""
         apt_steps = [
-            s for s in test_job["steps"]
+            s
+            for s in test_job["steps"]
             if isinstance(s.get("run"), str) and "apt-get" in s["run"]
         ]
         assert len(apt_steps) >= 1
         apt_run = apt_steps[0]["run"]
-        for pkg in ["libgl1", "libegl1", "libxkbcommon0", "libdbus-1-3", "libfontconfig1"]:
+        for pkg in [
+            "libgl1",
+            "libegl1",
+            "libxkbcommon0",
+            "libdbus-1-3",
+            "libfontconfig1",
+        ]:
             assert pkg in apt_run, f"Missing system package: {pkg}"
 
     def test_installs_pip_editable_with_dev(self, test_job):
         pip_steps = [
-            s for s in test_job["steps"]
+            s
+            for s in test_job["steps"]
             if isinstance(s.get("run"), str) and "pip install" in s["run"]
         ]
-        assert any('.[dev]' in s["run"] for s in pip_steps), \
-            "Should install with [dev] extras"
+        assert any(
+            ".[dev]" in s["run"] for s in pip_steps
+        ), "Should install with [dev] extras"
 
     def test_pyinstaller_in_dev_dependencies(self):
         """Pyinstaller should be in dev dependencies so it's installed with .[dev]."""
         import tomllib
+
         with open("pyproject.toml", "rb") as f:
             config = tomllib.load(f)
         dev_deps = config["project"]["optional-dependencies"]["dev"]
-        assert any("pyinstaller" in dep.lower() for dep in dev_deps), \
-            "pyinstaller should be listed in [project.optional-dependencies] dev"
+        assert any(
+            "pyinstaller" in dep.lower() for dep in dev_deps
+        ), "pyinstaller should be listed in [project.optional-dependencies] dev"
 
     def test_runs_pytest_with_offscreen(self, test_job):
         pytest_steps = [
-            s for s in test_job["steps"]
+            s
+            for s in test_job["steps"]
             if isinstance(s.get("run"), str) and "pytest" in s["run"]
         ]
         assert len(pytest_steps) >= 1
@@ -133,7 +147,8 @@ class TestTestJob:
 
     def test_runs_pytest_with_junitxml(self, test_job):
         pytest_steps = [
-            s for s in test_job["steps"]
+            s
+            for s in test_job["steps"]
             if isinstance(s.get("run"), str) and "pytest" in s["run"]
         ]
         pytest_run = pytest_steps[0]["run"]
@@ -141,7 +156,8 @@ class TestTestJob:
 
     def test_uploads_test_results_artifact(self, test_job):
         upload_steps = [
-            s for s in test_job["steps"]
+            s
+            for s in test_job["steps"]
             if isinstance(s.get("uses"), str) and "upload-artifact" in s["uses"]
         ]
         assert len(upload_steps) >= 1
@@ -169,21 +185,24 @@ class TestLintJob:
 
     def test_checks_out_repo(self, lint_job):
         checkout_steps = [
-            s for s in lint_job["steps"]
+            s
+            for s in lint_job["steps"]
             if isinstance(s.get("uses"), str) and "checkout" in s["uses"]
         ]
         assert len(checkout_steps) >= 1
 
     def test_sets_up_python_312(self, lint_job):
         python_steps = [
-            s for s in lint_job["steps"]
+            s
+            for s in lint_job["steps"]
             if isinstance(s.get("uses"), str) and "setup-python" in s["uses"]
         ]
         assert len(python_steps) >= 1
 
     def test_installs_black_and_pylint(self, lint_job):
         pip_steps = [
-            s for s in lint_job["steps"]
+            s
+            for s in lint_job["steps"]
             if isinstance(s.get("run"), str) and "pip install" in s["run"]
         ]
         assert len(pip_steps) >= 1
@@ -193,8 +212,11 @@ class TestLintJob:
 
     def test_runs_black_check(self, lint_job):
         black_steps = [
-            s for s in lint_job["steps"]
-            if isinstance(s.get("run"), str) and "black" in s["run"] and "--check" in s["run"]
+            s
+            for s in lint_job["steps"]
+            if isinstance(s.get("run"), str)
+            and "black" in s["run"]
+            and "--check" in s["run"]
         ]
         assert len(black_steps) >= 1
         black_run = black_steps[0]["run"]
@@ -203,7 +225,8 @@ class TestLintJob:
 
     def test_runs_pylint_with_fail_under(self, lint_job):
         pylint_steps = [
-            s for s in lint_job["steps"]
+            s
+            for s in lint_job["steps"]
             if isinstance(s.get("run"), str)
             and "pylint" in s["run"]
             and "--fail-under" in s["run"]

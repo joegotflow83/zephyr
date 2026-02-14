@@ -60,9 +60,7 @@ class CredentialDialog(QDialog):
         layout.addWidget(self.login_mode_checkbox)
 
         # Login mode note (hidden by default)
-        self.login_note = QLabel(
-            "A browser window will open for you to authenticate."
-        )
+        self.login_note = QLabel("A browser window will open for you to authenticate.")
         self.login_note.setObjectName("login_note")
         self.login_note.setWordWrap(True)
         self.login_note.setVisible(False)

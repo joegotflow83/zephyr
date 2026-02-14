@@ -105,7 +105,9 @@ class LoopsTab(QWidget):
 
         layout.addWidget(splitter)
 
-    def refresh(self, states: dict[str, LoopState], project_names: dict[str, str] | None = None):
+    def refresh(
+        self, states: dict[str, LoopState], project_names: dict[str, str] | None = None
+    ):
         """Update the table with current loop states.
 
         Args:
@@ -140,17 +142,30 @@ class LoopsTab(QWidget):
 
             start_btn = QPushButton("Start")
             start_btn.setObjectName(f"start_btn_{project_id}")
-            start_btn.clicked.connect(lambda checked, p=pid: self.loop_start_requested.emit(p))
+            start_btn.clicked.connect(
+                lambda checked, p=pid: self.loop_start_requested.emit(p)
+            )
             # Disable start if loop is already active
-            if state.status in (LoopStatus.STARTING, LoopStatus.RUNNING, LoopStatus.PAUSED, LoopStatus.STOPPING):
+            if state.status in (
+                LoopStatus.STARTING,
+                LoopStatus.RUNNING,
+                LoopStatus.PAUSED,
+                LoopStatus.STOPPING,
+            ):
                 start_btn.setEnabled(False)
             actions_layout.addWidget(start_btn)
 
             stop_btn = QPushButton("Stop")
             stop_btn.setObjectName(f"stop_btn_{project_id}")
-            stop_btn.clicked.connect(lambda checked, p=pid: self.loop_stop_requested.emit(p))
+            stop_btn.clicked.connect(
+                lambda checked, p=pid: self.loop_stop_requested.emit(p)
+            )
             # Disable stop if loop is not active
-            if state.status not in (LoopStatus.STARTING, LoopStatus.RUNNING, LoopStatus.PAUSED):
+            if state.status not in (
+                LoopStatus.STARTING,
+                LoopStatus.RUNNING,
+                LoopStatus.PAUSED,
+            ):
                 stop_btn.setEnabled(False)
             actions_layout.addWidget(stop_btn)
 

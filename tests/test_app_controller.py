@@ -18,10 +18,10 @@ from src.lib.app_controller import AppController
 from src.lib.loop_runner import LoopMode, LoopState, LoopStatus
 from src.lib.models import AppSettings, ProjectConfig
 
-
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture
 def mock_config_manager():
@@ -68,6 +68,7 @@ def mock_notifier():
 def main_window(qtbot):
     """Create a real MainWindow for signal testing."""
     from src.ui.main_window import MainWindow
+
     w = MainWindow()
     qtbot.addWidget(w)
     return w
@@ -106,6 +107,7 @@ def _make_project(name="Test Project", project_id="proj123"):
 # ---------------------------------------------------------------------------
 # setup_connections
 # ---------------------------------------------------------------------------
+
 
 class TestSetupConnections:
     """Verify that setup_connections wires all expected signals.
@@ -151,57 +153,92 @@ class TestSetupConnections:
         assert tab.receivers(tab.settings_changed) > before_settings
 
     def test_menu_actions_connected(self, controller, main_window):
-        before_import = main_window.import_action.receivers(main_window.import_action.triggered)
-        before_export = main_window.export_action.receivers(main_window.export_action.triggered)
-        before_about = main_window.about_action.receivers(main_window.about_action.triggered)
+        before_import = main_window.import_action.receivers(
+            main_window.import_action.triggered
+        )
+        before_export = main_window.export_action.receivers(
+            main_window.export_action.triggered
+        )
+        before_about = main_window.about_action.receivers(
+            main_window.about_action.triggered
+        )
 
         controller.setup_connections()
 
-        assert main_window.import_action.receivers(main_window.import_action.triggered) > before_import
-        assert main_window.export_action.receivers(main_window.export_action.triggered) > before_export
-        assert main_window.about_action.receivers(main_window.about_action.triggered) > before_about
+        assert (
+            main_window.import_action.receivers(main_window.import_action.triggered)
+            > before_import
+        )
+        assert (
+            main_window.export_action.receivers(main_window.export_action.triggered)
+            > before_export
+        )
+        assert (
+            main_window.about_action.receivers(main_window.about_action.triggered)
+            > before_about
+        )
 
 
 # ---------------------------------------------------------------------------
 # refresh_all
 # ---------------------------------------------------------------------------
 
+
 class TestRefreshAll:
     """Verify refresh_all populates all tabs from backend state."""
 
-    def test_refresh_all_calls_backend(self, controller, mock_project_store, mock_loop_runner, mock_docker_manager, mock_config_manager):
+    def test_refresh_all_calls_backend(
+        self,
+        controller,
+        mock_project_store,
+        mock_loop_runner,
+        mock_docker_manager,
+        mock_config_manager,
+    ):
         controller.refresh_all()
         mock_project_store.list_projects.assert_called_once()
         mock_loop_runner.get_all_states.assert_called()
         mock_docker_manager.is_docker_available.assert_called_once()
         mock_config_manager.load_json.assert_called_with("settings.json")
 
-    def test_refresh_projects_tab_populates_table(self, controller, mock_project_store, main_window):
+    def test_refresh_projects_tab_populates_table(
+        self, controller, mock_project_store, main_window
+    ):
         project = _make_project()
         mock_project_store.list_projects.return_value = [project]
         controller.refresh_all()
         assert main_window.projects_tab.table.rowCount() == 1
         assert main_window.projects_tab.table.item(0, 0).text() == "Test Project"
 
-    def test_refresh_loops_tab_populates_table(self, controller, mock_loop_runner, mock_project_store, main_window):
-        state = LoopState(project_id="proj123", status=LoopStatus.RUNNING, mode=LoopMode.CONTINUOUS)
+    def test_refresh_loops_tab_populates_table(
+        self, controller, mock_loop_runner, mock_project_store, main_window
+    ):
+        state = LoopState(
+            project_id="proj123", status=LoopStatus.RUNNING, mode=LoopMode.CONTINUOUS
+        )
         mock_loop_runner.get_all_states.return_value = {"proj123": state}
         project = _make_project()
         mock_project_store.get_project.return_value = project
         controller.refresh_all()
         assert main_window.loops_tab.table.rowCount() == 1
 
-    def test_refresh_docker_status_connected(self, controller, mock_docker_manager, main_window):
+    def test_refresh_docker_status_connected(
+        self, controller, mock_docker_manager, main_window
+    ):
         mock_docker_manager.is_docker_available.return_value = True
         controller.refresh_all()
         assert "Connected" in main_window.docker_status_label.text()
 
-    def test_refresh_docker_status_disconnected(self, controller, mock_docker_manager, main_window):
+    def test_refresh_docker_status_disconnected(
+        self, controller, mock_docker_manager, main_window
+    ):
         mock_docker_manager.is_docker_available.return_value = False
         controller.refresh_all()
         assert "Disconnected" in main_window.docker_status_label.text()
 
-    def test_refresh_settings_loads_defaults(self, controller, mock_config_manager, main_window):
+    def test_refresh_settings_loads_defaults(
+        self, controller, mock_config_manager, main_window
+    ):
         mock_config_manager.load_json.return_value = {}
         controller.refresh_all()
         settings = main_window.settings_tab.get_settings()
@@ -209,7 +246,9 @@ class TestRefreshAll:
         assert settings.notification_enabled is True
         assert settings.log_level == "INFO"
 
-    def test_refresh_settings_loads_saved(self, controller, mock_config_manager, main_window):
+    def test_refresh_settings_loads_saved(
+        self, controller, mock_config_manager, main_window
+    ):
         mock_config_manager.load_json.return_value = {
             "max_concurrent_containers": 3,
             "notification_enabled": False,
@@ -221,7 +260,9 @@ class TestRefreshAll:
         assert settings.notification_enabled is False
         assert settings.log_level == "DEBUG"
 
-    def test_refresh_projects_with_loop_status(self, controller, mock_project_store, mock_loop_runner, main_window):
+    def test_refresh_projects_with_loop_status(
+        self, controller, mock_project_store, mock_loop_runner, main_window
+    ):
         project = _make_project()
         mock_project_store.list_projects.return_value = [project]
         state = LoopState(project_id="proj123", status=LoopStatus.RUNNING)
@@ -234,6 +275,7 @@ class TestRefreshAll:
 # ---------------------------------------------------------------------------
 # handle_add_project
 # ---------------------------------------------------------------------------
+
 
 class TestHandleAddProject:
     """Verify add project handler opens dialog and persists on accept."""
@@ -261,7 +303,9 @@ class TestHandleAddProject:
 
     @patch("src.lib.app_controller.QMessageBox")
     @patch("src.lib.app_controller.ProjectDialog")
-    def test_add_project_duplicate_shows_warning(self, MockDialog, MockMsgBox, controller, mock_project_store):
+    def test_add_project_duplicate_shows_warning(
+        self, MockDialog, MockMsgBox, controller, mock_project_store
+    ):
         project = _make_project()
         dialog_instance = MockDialog.return_value
         dialog_instance.exec.return_value = QDialog.DialogCode.Accepted
@@ -276,6 +320,7 @@ class TestHandleAddProject:
 # ---------------------------------------------------------------------------
 # handle_edit_project
 # ---------------------------------------------------------------------------
+
 
 class TestHandleEditProject:
     """Verify edit project handler fetches, opens dialog, and persists."""
@@ -307,7 +352,9 @@ class TestHandleEditProject:
         mock_project_store.update_project.assert_not_called()
 
     @patch("src.lib.app_controller.QMessageBox")
-    def test_edit_project_not_found_shows_warning(self, MockMsgBox, controller, mock_project_store):
+    def test_edit_project_not_found_shows_warning(
+        self, MockMsgBox, controller, mock_project_store
+    ):
         mock_project_store.get_project.return_value = None
 
         controller.handle_edit_project("nonexistent")
@@ -316,7 +363,9 @@ class TestHandleEditProject:
 
     @patch("src.lib.app_controller.QMessageBox")
     @patch("src.lib.app_controller.ProjectDialog")
-    def test_edit_project_update_error_shows_warning(self, MockDialog, MockMsgBox, controller, mock_project_store):
+    def test_edit_project_update_error_shows_warning(
+        self, MockDialog, MockMsgBox, controller, mock_project_store
+    ):
         project = _make_project()
         mock_project_store.get_project.return_value = project
         dialog_instance = MockDialog.return_value
@@ -332,6 +381,7 @@ class TestHandleEditProject:
 # ---------------------------------------------------------------------------
 # handle_delete_project
 # ---------------------------------------------------------------------------
+
 
 class TestHandleDeleteProject:
     """Verify delete project handler confirms and removes."""
@@ -359,7 +409,9 @@ class TestHandleDeleteProject:
         mock_project_store.remove_project.assert_not_called()
 
     @patch("src.lib.app_controller.QMessageBox")
-    def test_delete_project_not_found_uses_id_as_name(self, MockMsgBox, controller, mock_project_store):
+    def test_delete_project_not_found_uses_id_as_name(
+        self, MockMsgBox, controller, mock_project_store
+    ):
         mock_project_store.get_project.return_value = None
         MockMsgBox.StandardButton = QMessageBox.StandardButton
         MockMsgBox.question.return_value = QMessageBox.StandardButton.Yes
@@ -370,7 +422,9 @@ class TestHandleDeleteProject:
         mock_project_store.remove_project.assert_called_once_with("unknown_id")
 
     @patch("src.lib.app_controller.QMessageBox")
-    def test_delete_project_error_shows_warning(self, MockMsgBox, controller, mock_project_store):
+    def test_delete_project_error_shows_warning(
+        self, MockMsgBox, controller, mock_project_store
+    ):
         mock_project_store.get_project.return_value = _make_project()
         MockMsgBox.StandardButton = QMessageBox.StandardButton
         MockMsgBox.question.return_value = QMessageBox.StandardButton.Yes
@@ -385,6 +439,7 @@ class TestHandleDeleteProject:
 # handle_start_loop / handle_stop_loop
 # ---------------------------------------------------------------------------
 
+
 class TestHandleStartLoop:
     """Verify start loop handler invokes LoopRunner.start_loop."""
 
@@ -394,11 +449,15 @@ class TestHandleStartLoop:
 
         controller.handle_start_loop("proj123")
 
-        mock_loop_runner.start_loop.assert_called_once_with("proj123", LoopMode.CONTINUOUS)
+        mock_loop_runner.start_loop.assert_called_once_with(
+            "proj123", LoopMode.CONTINUOUS
+        )
         mock_loop_runner.get_all_states.assert_called()  # refresh
 
     @patch("src.lib.app_controller.QMessageBox")
-    def test_start_loop_project_not_found(self, MockMsgBox, controller, mock_loop_runner):
+    def test_start_loop_project_not_found(
+        self, MockMsgBox, controller, mock_loop_runner
+    ):
         mock_loop_runner.start_loop.side_effect = ValueError("Project not found")
 
         controller.handle_start_loop("nonexistent")
@@ -436,11 +495,14 @@ class TestHandleStopLoop:
 # handle_update_credential
 # ---------------------------------------------------------------------------
 
+
 class TestHandleUpdateCredential:
     """Verify credential update handler opens dialog and stores key."""
 
     @patch("src.lib.app_controller.CredentialDialog")
-    def test_update_credential_accepted(self, MockDialog, controller, mock_credential_manager):
+    def test_update_credential_accepted(
+        self, MockDialog, controller, mock_credential_manager
+    ):
         dialog_instance = MockDialog.return_value
         dialog_instance.exec.return_value = QDialog.DialogCode.Accepted
         dialog_instance.get_result.return_value = ("sk-test-key", False)
@@ -448,10 +510,14 @@ class TestHandleUpdateCredential:
         controller.handle_update_credential("anthropic")
 
         MockDialog.assert_called_once_with("anthropic", parent=controller._window)
-        mock_credential_manager.store_api_key.assert_called_once_with("anthropic", "sk-test-key")
+        mock_credential_manager.store_api_key.assert_called_once_with(
+            "anthropic", "sk-test-key"
+        )
 
     @patch("src.lib.app_controller.CredentialDialog")
-    def test_update_credential_cancelled(self, MockDialog, controller, mock_credential_manager):
+    def test_update_credential_cancelled(
+        self, MockDialog, controller, mock_credential_manager
+    ):
         dialog_instance = MockDialog.return_value
         dialog_instance.exec.return_value = QDialog.DialogCode.Rejected
 
@@ -461,7 +527,9 @@ class TestHandleUpdateCredential:
 
     @patch("src.lib.app_controller.QMessageBox")
     @patch("src.lib.app_controller.CredentialDialog")
-    def test_update_credential_login_mode_no_manager(self, MockDialog, MockMsgBox, controller, mock_credential_manager):
+    def test_update_credential_login_mode_no_manager(
+        self, MockDialog, MockMsgBox, controller, mock_credential_manager
+    ):
         """Login mode without a LoginManager shows an unavailable warning."""
         dialog_instance = MockDialog.return_value
         dialog_instance.exec.return_value = QDialog.DialogCode.Accepted
@@ -475,13 +543,23 @@ class TestHandleUpdateCredential:
 
     @patch("src.lib.app_controller.QMessageBox")
     @patch("src.lib.app_controller.CredentialDialog")
-    def test_update_credential_login_mode_success(self, MockDialog, MockMsgBox,
-                                                   main_window, mock_project_store,
-                                                   mock_docker_manager, mock_loop_runner,
-                                                   mock_credential_manager, mock_config_manager):
+    def test_update_credential_login_mode_success(
+        self,
+        MockDialog,
+        MockMsgBox,
+        main_window,
+        mock_project_store,
+        mock_docker_manager,
+        mock_loop_runner,
+        mock_credential_manager,
+        mock_config_manager,
+    ):
         """Login mode with LoginManager launches browser and saves session."""
         mock_login_mgr = MagicMock()
-        mock_login_mgr.launch_login.return_value = {"service": "anthropic", "cookies": [{"name": "tok"}]}
+        mock_login_mgr.launch_login.return_value = {
+            "service": "anthropic",
+            "cookies": [{"name": "tok"}],
+        }
 
         ctrl = AppController(
             main_window=main_window,
@@ -508,10 +586,17 @@ class TestHandleUpdateCredential:
 
     @patch("src.lib.app_controller.QMessageBox")
     @patch("src.lib.app_controller.CredentialDialog")
-    def test_update_credential_login_mode_timeout(self, MockDialog, MockMsgBox,
-                                                   main_window, mock_project_store,
-                                                   mock_docker_manager, mock_loop_runner,
-                                                   mock_credential_manager, mock_config_manager):
+    def test_update_credential_login_mode_timeout(
+        self,
+        MockDialog,
+        MockMsgBox,
+        main_window,
+        mock_project_store,
+        mock_docker_manager,
+        mock_loop_runner,
+        mock_credential_manager,
+        mock_config_manager,
+    ):
         """Login mode returns None on timeout — shows warning."""
         mock_login_mgr = MagicMock()
         mock_login_mgr.launch_login.return_value = None
@@ -539,13 +624,22 @@ class TestHandleUpdateCredential:
 
     @patch("src.lib.app_controller.QMessageBox")
     @patch("src.lib.app_controller.CredentialDialog")
-    def test_update_credential_login_mode_launch_error(self, MockDialog, MockMsgBox,
-                                                        main_window, mock_project_store,
-                                                        mock_docker_manager, mock_loop_runner,
-                                                        mock_credential_manager, mock_config_manager):
+    def test_update_credential_login_mode_launch_error(
+        self,
+        MockDialog,
+        MockMsgBox,
+        main_window,
+        mock_project_store,
+        mock_docker_manager,
+        mock_loop_runner,
+        mock_credential_manager,
+        mock_config_manager,
+    ):
         """Login mode catches exceptions from launch_login and shows warning."""
         mock_login_mgr = MagicMock()
-        mock_login_mgr.launch_login.side_effect = RuntimeError("Playwright not installed")
+        mock_login_mgr.launch_login.side_effect = RuntimeError(
+            "Playwright not installed"
+        )
 
         ctrl = AppController(
             main_window=main_window,
@@ -568,13 +662,23 @@ class TestHandleUpdateCredential:
 
     @patch("src.lib.app_controller.QMessageBox")
     @patch("src.lib.app_controller.CredentialDialog")
-    def test_update_credential_login_mode_save_error(self, MockDialog, MockMsgBox,
-                                                      main_window, mock_project_store,
-                                                      mock_docker_manager, mock_loop_runner,
-                                                      mock_credential_manager, mock_config_manager):
+    def test_update_credential_login_mode_save_error(
+        self,
+        MockDialog,
+        MockMsgBox,
+        main_window,
+        mock_project_store,
+        mock_docker_manager,
+        mock_loop_runner,
+        mock_credential_manager,
+        mock_config_manager,
+    ):
         """Login mode catches exceptions from save_session."""
         mock_login_mgr = MagicMock()
-        mock_login_mgr.launch_login.return_value = {"service": "anthropic", "cookies": []}
+        mock_login_mgr.launch_login.return_value = {
+            "service": "anthropic",
+            "cookies": [],
+        }
         mock_login_mgr.save_session.side_effect = ValueError("Storage error")
 
         ctrl = AppController(
@@ -597,7 +701,9 @@ class TestHandleUpdateCredential:
         assert "Credential Error" in MockMsgBox.warning.call_args[0][1]
 
     @patch("src.lib.app_controller.CredentialDialog")
-    def test_update_credential_empty_key_not_stored(self, MockDialog, controller, mock_credential_manager):
+    def test_update_credential_empty_key_not_stored(
+        self, MockDialog, controller, mock_credential_manager
+    ):
         dialog_instance = MockDialog.return_value
         dialog_instance.exec.return_value = QDialog.DialogCode.Accepted
         dialog_instance.get_result.return_value = ("", False)
@@ -608,11 +714,15 @@ class TestHandleUpdateCredential:
 
     @patch("src.lib.app_controller.QMessageBox")
     @patch("src.lib.app_controller.CredentialDialog")
-    def test_update_credential_invalid_service(self, MockDialog, MockMsgBox, controller, mock_credential_manager):
+    def test_update_credential_invalid_service(
+        self, MockDialog, MockMsgBox, controller, mock_credential_manager
+    ):
         dialog_instance = MockDialog.return_value
         dialog_instance.exec.return_value = QDialog.DialogCode.Accepted
         dialog_instance.get_result.return_value = ("some-key", False)
-        mock_credential_manager.store_api_key.side_effect = ValueError("Unsupported service")
+        mock_credential_manager.store_api_key.side_effect = ValueError(
+            "Unsupported service"
+        )
 
         controller.handle_update_credential("unsupported")
 
@@ -623,6 +733,7 @@ class TestHandleUpdateCredential:
 # LoginManager wiring in create_app
 # ---------------------------------------------------------------------------
 
+
 class TestLoginManagerWiring:
     """Verify LoginManager is created and passed to the controller."""
 
@@ -632,7 +743,10 @@ class TestLoginManagerWiring:
         from docker.errors import DockerException
 
         with (
-            _patch("src.lib.docker_manager.docker.from_env", side_effect=DockerException("mock")),
+            _patch(
+                "src.lib.docker_manager.docker.from_env",
+                side_effect=DockerException("mock"),
+            ),
             _patch("src.lib.credential_manager.keyring"),
             _patch("src.lib.login_manager.sync_playwright"),
         ):
@@ -646,6 +760,7 @@ class TestLoginManagerWiring:
 
             assert "login_manager" in services
             from src.lib.login_manager import LoginManager
+
             assert isinstance(services["login_manager"], LoginManager)
 
     def test_login_manager_passed_to_controller(self, qtbot, tmp_path):
@@ -653,7 +768,10 @@ class TestLoginManagerWiring:
         from docker.errors import DockerException
 
         with (
-            patch("src.lib.docker_manager.docker.from_env", side_effect=DockerException("mock")),
+            patch(
+                "src.lib.docker_manager.docker.from_env",
+                side_effect=DockerException("mock"),
+            ),
             patch("src.lib.credential_manager.keyring"),
             patch("src.lib.login_manager.sync_playwright"),
             patch("src.main.DockerHealthMonitor") as MockHM,
@@ -681,11 +799,14 @@ class TestLoginManagerWiring:
 # handle_settings_changed
 # ---------------------------------------------------------------------------
 
+
 class TestHandleSettingsChanged:
     """Verify settings handler persists to config file."""
 
     def test_settings_saved(self, controller, mock_config_manager):
-        settings = AppSettings(max_concurrent_containers=3, notification_enabled=False, log_level="DEBUG")
+        settings = AppSettings(
+            max_concurrent_containers=3, notification_enabled=False, log_level="DEBUG"
+        )
         controller.handle_settings_changed(settings)
 
         mock_config_manager.save_json.assert_called_once_with(
@@ -697,6 +818,7 @@ class TestHandleSettingsChanged:
 # handle_import / handle_export
 # ---------------------------------------------------------------------------
 
+
 class TestHandleImport:
     """Verify import handler opens file dialog and calls import_config."""
 
@@ -705,7 +827,11 @@ class TestHandleImport:
     @patch("src.lib.app_controller.QMessageBox")
     def test_import_success(self, MockMsgBox, MockFileDialog, mock_import, controller):
         MockFileDialog.getOpenFileName.return_value = ("/tmp/config.zip", "")
-        mock_import.return_value = {"files": ["projects.json"], "projects_count": 2, "has_settings": True}
+        mock_import.return_value = {
+            "files": ["projects.json"],
+            "projects_count": 2,
+            "has_settings": True,
+        }
 
         controller.handle_import()
 
@@ -784,6 +910,7 @@ class TestHandleExport:
 # handle_about
 # ---------------------------------------------------------------------------
 
+
 class TestHandleAbout:
     """Verify about handler shows a message box."""
 
@@ -797,11 +924,14 @@ class TestHandleAbout:
 # Signal-driven integration (signals -> handlers)
 # ---------------------------------------------------------------------------
 
+
 class TestSignalIntegration:
     """Verify that emitting UI signals triggers the correct handlers."""
 
     @patch("src.lib.app_controller.ProjectDialog")
-    def test_add_button_triggers_handler(self, MockDialog, controller, main_window, mock_project_store):
+    def test_add_button_triggers_handler(
+        self, MockDialog, controller, main_window, mock_project_store
+    ):
         dialog_instance = MockDialog.return_value
         dialog_instance.exec.return_value = QDialog.DialogCode.Rejected
         controller.setup_connections()
@@ -810,7 +940,9 @@ class TestSignalIntegration:
 
         MockDialog.assert_called_once()
 
-    def test_start_loop_signal_triggers_handler(self, controller, main_window, mock_loop_runner, qtbot):
+    def test_start_loop_signal_triggers_handler(
+        self, controller, main_window, mock_loop_runner, qtbot
+    ):
         state = LoopState(project_id="p1", status=LoopStatus.RUNNING)
         mock_loop_runner.start_loop.return_value = state
         controller.setup_connections()
@@ -819,7 +951,9 @@ class TestSignalIntegration:
 
         mock_loop_runner.start_loop.assert_called_once_with("p1", LoopMode.CONTINUOUS)
 
-    def test_stop_loop_signal_triggers_handler(self, controller, main_window, mock_loop_runner, qtbot):
+    def test_stop_loop_signal_triggers_handler(
+        self, controller, main_window, mock_loop_runner, qtbot
+    ):
         controller.setup_connections()
 
         main_window.loops_tab.loop_stop_requested.emit("p1")
@@ -827,7 +961,9 @@ class TestSignalIntegration:
         mock_loop_runner.stop_loop.assert_called_once_with("p1")
 
     @patch("src.lib.app_controller.CredentialDialog")
-    def test_credential_signal_triggers_handler(self, MockDialog, controller, main_window, mock_credential_manager, qtbot):
+    def test_credential_signal_triggers_handler(
+        self, MockDialog, controller, main_window, mock_credential_manager, qtbot
+    ):
         dialog_instance = MockDialog.return_value
         dialog_instance.exec.return_value = QDialog.DialogCode.Rejected
         controller.setup_connections()
@@ -836,16 +972,22 @@ class TestSignalIntegration:
 
         MockDialog.assert_called_once_with("anthropic", parent=main_window)
 
-    def test_settings_changed_signal_triggers_handler(self, controller, main_window, mock_config_manager, qtbot):
+    def test_settings_changed_signal_triggers_handler(
+        self, controller, main_window, mock_config_manager, qtbot
+    ):
         controller.setup_connections()
         settings = AppSettings(max_concurrent_containers=2, log_level="ERROR")
 
         main_window.settings_tab.settings_changed.emit(settings)
 
-        mock_config_manager.save_json.assert_called_with("settings.json", settings.to_dict())
+        mock_config_manager.save_json.assert_called_with(
+            "settings.json", settings.to_dict()
+        )
 
     @patch("src.lib.app_controller.QMessageBox")
-    def test_edit_signal_triggers_handler(self, MockMsgBox, controller, main_window, mock_project_store, qtbot):
+    def test_edit_signal_triggers_handler(
+        self, MockMsgBox, controller, main_window, mock_project_store, qtbot
+    ):
         mock_project_store.get_project.return_value = None
         controller.setup_connections()
 
@@ -855,7 +997,9 @@ class TestSignalIntegration:
         MockMsgBox.warning.assert_called_once()
 
     @patch("src.lib.app_controller.QMessageBox")
-    def test_delete_signal_triggers_handler(self, MockMsgBox, controller, main_window, mock_project_store, qtbot):
+    def test_delete_signal_triggers_handler(
+        self, MockMsgBox, controller, main_window, mock_project_store, qtbot
+    ):
         mock_project_store.get_project.return_value = None
         MockMsgBox.StandardButton = QMessageBox.StandardButton
         MockMsgBox.question.return_value = QMessageBox.StandardButton.No
@@ -869,6 +1013,7 @@ class TestSignalIntegration:
 # ---------------------------------------------------------------------------
 # Notifier wiring
 # ---------------------------------------------------------------------------
+
 
 class TestNotifierWiring:
     """Verify that the Notifier is wired into the loop lifecycle."""
@@ -894,11 +1039,15 @@ class TestNotifierWiring:
             notifier=mock_notifier,
         )
 
-    def test_setup_registers_completion_callback(self, controller_with_notifier, mock_loop_runner):
+    def test_setup_registers_completion_callback(
+        self, controller_with_notifier, mock_loop_runner
+    ):
         controller_with_notifier.setup_connections()
         mock_loop_runner.add_completion_callback.assert_called_once()
 
-    def test_setup_registers_failure_callback(self, controller_with_notifier, mock_loop_runner):
+    def test_setup_registers_failure_callback(
+        self, controller_with_notifier, mock_loop_runner
+    ):
         controller_with_notifier.setup_connections()
         mock_loop_runner.add_failure_callback.assert_called_once()
 
@@ -908,7 +1057,9 @@ class TestNotifierWiring:
         mock_loop_runner.add_completion_callback.assert_not_called()
         mock_loop_runner.add_failure_callback.assert_not_called()
 
-    def test_on_loop_completed_calls_notifier(self, controller_with_notifier, mock_project_store, mock_notifier):
+    def test_on_loop_completed_calls_notifier(
+        self, controller_with_notifier, mock_project_store, mock_notifier
+    ):
         project = _make_project(name="My Project")
         mock_project_store.get_project.return_value = project
 
@@ -916,29 +1067,41 @@ class TestNotifierWiring:
 
         mock_notifier.notify_loop_complete.assert_called_once_with("My Project", 3)
 
-    def test_on_loop_completed_uses_id_when_project_missing(self, controller_with_notifier, mock_project_store, mock_notifier):
+    def test_on_loop_completed_uses_id_when_project_missing(
+        self, controller_with_notifier, mock_project_store, mock_notifier
+    ):
         mock_project_store.get_project.return_value = None
 
         controller_with_notifier._on_loop_completed("unknown_id", 1)
 
         mock_notifier.notify_loop_complete.assert_called_once_with("unknown_id", 1)
 
-    def test_on_loop_failed_calls_notifier(self, controller_with_notifier, mock_project_store, mock_notifier):
+    def test_on_loop_failed_calls_notifier(
+        self, controller_with_notifier, mock_project_store, mock_notifier
+    ):
         project = _make_project(name="Failing Project")
         mock_project_store.get_project.return_value = project
 
         controller_with_notifier._on_loop_failed("proj123", "Container crashed")
 
-        mock_notifier.notify_loop_failed.assert_called_once_with("Failing Project", "Container crashed")
+        mock_notifier.notify_loop_failed.assert_called_once_with(
+            "Failing Project", "Container crashed"
+        )
 
-    def test_on_loop_failed_uses_id_when_project_missing(self, controller_with_notifier, mock_project_store, mock_notifier):
+    def test_on_loop_failed_uses_id_when_project_missing(
+        self, controller_with_notifier, mock_project_store, mock_notifier
+    ):
         mock_project_store.get_project.return_value = None
 
         controller_with_notifier._on_loop_failed("unknown_id", "Error msg")
 
-        mock_notifier.notify_loop_failed.assert_called_once_with("unknown_id", "Error msg")
+        mock_notifier.notify_loop_failed.assert_called_once_with(
+            "unknown_id", "Error msg"
+        )
 
-    def test_on_loop_completed_no_notifier_is_safe(self, controller, mock_project_store):
+    def test_on_loop_completed_no_notifier_is_safe(
+        self, controller, mock_project_store
+    ):
         """Calling _on_loop_completed without notifier should not raise."""
         mock_project_store.get_project.return_value = _make_project()
         controller._on_loop_completed("proj123", 1)  # Should not raise
@@ -953,12 +1116,14 @@ class TestNotifierWiring:
 # DockerHealthMonitor wiring
 # ---------------------------------------------------------------------------
 
+
 class TestDockerHealthMonitorWiring:
     """Verify that DockerHealthMonitor signals update the UI status."""
 
     @pytest.fixture
     def mock_health_monitor(self):
         from src.lib.docker_health import DockerHealthMonitor
+
         monitor = MagicMock(spec=DockerHealthMonitor)
         # Provide real signal-like attributes for connection counting
         monitor.docker_connected = MagicMock()
@@ -986,7 +1151,9 @@ class TestDockerHealthMonitorWiring:
             docker_health_monitor=mock_health_monitor,
         )
 
-    def test_setup_connects_health_signals(self, controller_with_health, mock_health_monitor):
+    def test_setup_connects_health_signals(
+        self, controller_with_health, mock_health_monitor
+    ):
         """setup_connections wires docker_connected and docker_disconnected signals."""
         controller_with_health.setup_connections()
         mock_health_monitor.docker_connected.connect.assert_called_once()
@@ -996,7 +1163,9 @@ class TestDockerHealthMonitorWiring:
         """When no health monitor is provided, setup_connections does not fail."""
         controller.setup_connections()  # Should not raise
 
-    def test_on_docker_connected_updates_status_bar(self, controller_with_health, main_window):
+    def test_on_docker_connected_updates_status_bar(
+        self, controller_with_health, main_window
+    ):
         """_on_docker_connected sets both status indicators to connected."""
         # Start disconnected
         main_window.set_docker_status(False)
@@ -1006,7 +1175,9 @@ class TestDockerHealthMonitorWiring:
 
         assert "Connected" in main_window.docker_status_label.text()
 
-    def test_on_docker_disconnected_updates_status_bar(self, controller_with_health, main_window):
+    def test_on_docker_disconnected_updates_status_bar(
+        self, controller_with_health, main_window
+    ):
         """_on_docker_disconnected sets both status indicators to disconnected."""
         # Start connected
         main_window.set_docker_status(True)
@@ -1016,20 +1187,26 @@ class TestDockerHealthMonitorWiring:
 
         assert "Disconnected" in main_window.docker_status_label.text()
 
-    def test_on_docker_connected_updates_settings_tab(self, controller_with_health, main_window):
+    def test_on_docker_connected_updates_settings_tab(
+        self, controller_with_health, main_window
+    ):
         """_on_docker_connected updates the settings tab docker status."""
         main_window.settings_tab.set_docker_status(False)
         controller_with_health._on_docker_connected()
         # Settings tab should reflect connected
         assert "Connected" in main_window.settings_tab.docker_status_label.text()
 
-    def test_on_docker_disconnected_updates_settings_tab(self, controller_with_health, main_window):
+    def test_on_docker_disconnected_updates_settings_tab(
+        self, controller_with_health, main_window
+    ):
         """_on_docker_disconnected updates the settings tab docker status."""
         main_window.settings_tab.set_docker_status(True)
         controller_with_health._on_docker_disconnected()
         assert "Disconnected" in main_window.settings_tab.docker_status_label.text()
 
-    def test_shutdown_stops_health_monitor(self, controller_with_health, mock_health_monitor):
+    def test_shutdown_stops_health_monitor(
+        self, controller_with_health, mock_health_monitor
+    ):
         """shutdown() calls stop() on the health monitor."""
         controller_with_health.shutdown()
         mock_health_monitor.stop.assert_called_once()
@@ -1038,7 +1215,9 @@ class TestDockerHealthMonitorWiring:
         """shutdown() is safe when no health monitor is provided."""
         controller.shutdown()  # Should not raise
 
-    def test_health_monitor_stored_on_controller(self, controller_with_health, mock_health_monitor):
+    def test_health_monitor_stored_on_controller(
+        self, controller_with_health, mock_health_monitor
+    ):
         """The health monitor is accessible via the controller."""
         assert controller_with_health._docker_health_monitor is mock_health_monitor
 
@@ -1046,6 +1225,7 @@ class TestDockerHealthMonitorWiring:
 # ---------------------------------------------------------------------------
 # DiskChecker wiring
 # ---------------------------------------------------------------------------
+
 
 class TestDiskCheckerWiring:
     """Verify that DiskChecker is wired into the loop startup flow.
@@ -1080,11 +1260,15 @@ class TestDiskCheckerWiring:
             disk_checker=mock_disk_checker,
         )
 
-    def test_disk_checker_stored_on_controller(self, controller_with_disk_checker, mock_disk_checker):
+    def test_disk_checker_stored_on_controller(
+        self, controller_with_disk_checker, mock_disk_checker
+    ):
         """The disk checker is accessible via the controller."""
         assert controller_with_disk_checker._disk_checker is mock_disk_checker
 
-    def test_start_loop_proceeds_when_disk_ok(self, controller_with_disk_checker, mock_disk_checker, mock_loop_runner):
+    def test_start_loop_proceeds_when_disk_ok(
+        self, controller_with_disk_checker, mock_disk_checker, mock_loop_runner
+    ):
         """When warn_if_low returns None, the loop starts normally."""
         mock_disk_checker.warn_if_low.return_value = None
         state = LoopState(project_id="proj123", status=LoopStatus.RUNNING)
@@ -1093,12 +1277,22 @@ class TestDiskCheckerWiring:
         controller_with_disk_checker.handle_start_loop("proj123")
 
         mock_disk_checker.warn_if_low.assert_called_once()
-        mock_loop_runner.start_loop.assert_called_once_with("proj123", LoopMode.CONTINUOUS)
+        mock_loop_runner.start_loop.assert_called_once_with(
+            "proj123", LoopMode.CONTINUOUS
+        )
 
     @patch("src.lib.app_controller.QMessageBox")
-    def test_start_loop_blocked_when_disk_low(self, MockMsgBox, controller_with_disk_checker, mock_disk_checker, mock_loop_runner):
+    def test_start_loop_blocked_when_disk_low(
+        self,
+        MockMsgBox,
+        controller_with_disk_checker,
+        mock_disk_checker,
+        mock_loop_runner,
+    ):
         """When warn_if_low returns a warning, the loop is NOT started."""
-        mock_disk_checker.warn_if_low.return_value = "Low disk space warning: only 2.1 GB available"
+        mock_disk_checker.warn_if_low.return_value = (
+            "Low disk space warning: only 2.1 GB available"
+        )
 
         controller_with_disk_checker.handle_start_loop("proj123")
 
@@ -1117,10 +1311,18 @@ class TestDiskCheckerWiring:
 
         controller.handle_start_loop("proj123")
 
-        mock_loop_runner.start_loop.assert_called_once_with("proj123", LoopMode.CONTINUOUS)
+        mock_loop_runner.start_loop.assert_called_once_with(
+            "proj123", LoopMode.CONTINUOUS
+        )
 
     @patch("src.lib.app_controller.QMessageBox")
-    def test_start_loop_disk_checker_exception_does_not_block(self, MockMsgBox, controller_with_disk_checker, mock_disk_checker, mock_loop_runner):
+    def test_start_loop_disk_checker_exception_does_not_block(
+        self,
+        MockMsgBox,
+        controller_with_disk_checker,
+        mock_disk_checker,
+        mock_loop_runner,
+    ):
         """If DiskChecker.warn_if_low raises, the loop still starts.
 
         DiskChecker failures should not prevent loop execution — the check
@@ -1132,7 +1334,9 @@ class TestDiskCheckerWiring:
 
         controller_with_disk_checker.handle_start_loop("proj123")
 
-        mock_loop_runner.start_loop.assert_called_once_with("proj123", LoopMode.CONTINUOUS)
+        mock_loop_runner.start_loop.assert_called_once_with(
+            "proj123", LoopMode.CONTINUOUS
+        )
 
     def test_disk_checker_default_is_none(self, controller):
         """Without explicit disk_checker, the attribute is None."""
@@ -1143,19 +1347,23 @@ class TestDiskCheckerWiring:
 # Log export handlers
 # ---------------------------------------------------------------------------
 
+
 class TestHandleExportLog:
     """Verify single-loop log export via handle_export_log."""
 
     @patch("src.lib.app_controller.LogExporter")
     @patch("src.lib.app_controller.QFileDialog")
     @patch("src.lib.app_controller.QMessageBox")
-    def test_export_log_success(self, MockMsgBox, MockFileDialog, MockExporter,
-                                 controller, main_window):
+    def test_export_log_success(
+        self, MockMsgBox, MockFileDialog, MockExporter, controller, main_window
+    ):
         """Exporting a single log writes the file and shows success."""
         main_window.loops_tab.append_log("p1", "line 1")
         main_window.loops_tab.append_log("p1", "line 2")
         MockFileDialog.getExistingDirectory.return_value = "/tmp/export"
-        MockExporter.export_loop_log.return_value = Path("/tmp/export/zephyr-p1-20250101T000000Z.log")
+        MockExporter.export_loop_log.return_value = Path(
+            "/tmp/export/zephyr-p1-20250101T000000Z.log"
+        )
 
         controller.handle_export_log("p1")
 
@@ -1176,8 +1384,9 @@ class TestHandleExportLog:
 
     @patch("src.lib.app_controller.LogExporter")
     @patch("src.lib.app_controller.QFileDialog")
-    def test_export_log_cancelled(self, MockFileDialog, MockExporter,
-                                   controller, main_window):
+    def test_export_log_cancelled(
+        self, MockFileDialog, MockExporter, controller, main_window
+    ):
         """When user cancels directory selection, nothing is exported."""
         main_window.loops_tab.append_log("p1", "data")
         MockFileDialog.getExistingDirectory.return_value = ""
@@ -1189,8 +1398,9 @@ class TestHandleExportLog:
     @patch("src.lib.app_controller.LogExporter")
     @patch("src.lib.app_controller.QFileDialog")
     @patch("src.lib.app_controller.QMessageBox")
-    def test_export_log_error(self, MockMsgBox, MockFileDialog, MockExporter,
-                               controller, main_window):
+    def test_export_log_error(
+        self, MockMsgBox, MockFileDialog, MockExporter, controller, main_window
+    ):
         """Export errors show a critical dialog."""
         main_window.loops_tab.append_log("p1", "data")
         MockFileDialog.getExistingDirectory.return_value = "/tmp"
@@ -1207,8 +1417,15 @@ class TestHandleExportAllLogs:
     @patch("src.lib.app_controller.LogExporter")
     @patch("src.lib.app_controller.QFileDialog")
     @patch("src.lib.app_controller.QMessageBox")
-    def test_export_all_logs_success(self, MockMsgBox, MockFileDialog, MockExporter,
-                                      controller, main_window, mock_loop_runner):
+    def test_export_all_logs_success(
+        self,
+        MockMsgBox,
+        MockFileDialog,
+        MockExporter,
+        controller,
+        main_window,
+        mock_loop_runner,
+    ):
         """Exporting all logs creates a zip and shows success."""
         main_window.loops_tab.append_log("p1", "log1")
         main_window.loops_tab.append_log("p2", "log2")
@@ -1218,7 +1435,9 @@ class TestHandleExportAllLogs:
         }
         mock_loop_runner.get_all_states.return_value = states
         MockFileDialog.getExistingDirectory.return_value = "/tmp/export"
-        MockExporter.export_all_logs.return_value = Path("/tmp/export/zephyr-logs-20250101T000000Z.zip")
+        MockExporter.export_all_logs.return_value = Path(
+            "/tmp/export/zephyr-logs-20250101T000000Z.zip"
+        )
 
         controller.handle_export_all_logs()
 
@@ -1229,8 +1448,9 @@ class TestHandleExportAllLogs:
 
     @patch("src.lib.app_controller.QFileDialog")
     @patch("src.lib.app_controller.QMessageBox")
-    def test_export_all_logs_no_data(self, MockMsgBox, MockFileDialog,
-                                      controller, mock_loop_runner):
+    def test_export_all_logs_no_data(
+        self, MockMsgBox, MockFileDialog, controller, mock_loop_runner
+    ):
         """When no logs and no states, shows informational message."""
         mock_loop_runner.get_all_states.return_value = {}
 
@@ -1242,8 +1462,9 @@ class TestHandleExportAllLogs:
 
     @patch("src.lib.app_controller.LogExporter")
     @patch("src.lib.app_controller.QFileDialog")
-    def test_export_all_logs_cancelled(self, MockFileDialog, MockExporter,
-                                        controller, main_window, mock_loop_runner):
+    def test_export_all_logs_cancelled(
+        self, MockFileDialog, MockExporter, controller, main_window, mock_loop_runner
+    ):
         """When user cancels, nothing is exported."""
         main_window.loops_tab.append_log("p1", "data")
         mock_loop_runner.get_all_states.return_value = {
@@ -1258,8 +1479,15 @@ class TestHandleExportAllLogs:
     @patch("src.lib.app_controller.LogExporter")
     @patch("src.lib.app_controller.QFileDialog")
     @patch("src.lib.app_controller.QMessageBox")
-    def test_export_all_logs_error(self, MockMsgBox, MockFileDialog, MockExporter,
-                                    controller, main_window, mock_loop_runner):
+    def test_export_all_logs_error(
+        self,
+        MockMsgBox,
+        MockFileDialog,
+        MockExporter,
+        controller,
+        main_window,
+        mock_loop_runner,
+    ):
         """Export errors show a critical dialog."""
         main_window.loops_tab.append_log("p1", "data")
         mock_loop_runner.get_all_states.return_value = {
@@ -1276,8 +1504,7 @@ class TestHandleExportAllLogs:
     @patch("src.lib.app_controller.QFileDialog")
     @patch("src.lib.app_controller.QMessageBox")
     def test_export_all_logs_with_states_but_no_log_content(
-        self, MockMsgBox, MockFileDialog, MockExporter,
-        controller, mock_loop_runner
+        self, MockMsgBox, MockFileDialog, MockExporter, controller, mock_loop_runner
     ):
         """States alone (without log content) should still allow export."""
         mock_loop_runner.get_all_states.return_value = {
@@ -1347,11 +1574,15 @@ class TestHandleCheckUpdates:
         mock_updater.check_for_updates.return_value = True
         controller._self_updater = mock_updater
 
-        with patch.object(controller, "_resolve_app_repo_path", return_value=Path("/app")):
+        with patch.object(
+            controller, "_resolve_app_repo_path", return_value=Path("/app")
+        ):
             controller.handle_check_updates()
 
         mock_updater.check_for_updates.assert_called_once_with(Path("/app"))
-        assert main_window.settings_tab.update_status_label.text() == "Updates available"
+        assert (
+            main_window.settings_tab.update_status_label.text() == "Updates available"
+        )
         assert main_window.settings_tab.update_app_btn.isEnabled()
 
     @patch("src.lib.app_controller.QMessageBox")
@@ -1361,7 +1592,9 @@ class TestHandleCheckUpdates:
         mock_updater.check_for_updates.return_value = False
         controller._self_updater = mock_updater
 
-        with patch.object(controller, "_resolve_app_repo_path", return_value=Path("/app")):
+        with patch.object(
+            controller, "_resolve_app_repo_path", return_value=Path("/app")
+        ):
             controller.handle_check_updates()
 
         assert main_window.settings_tab.update_status_label.text() == "Up to date"
@@ -1374,7 +1607,9 @@ class TestHandleCheckUpdates:
         mock_updater.check_for_updates.side_effect = RuntimeError("fetch failed")
         controller._self_updater = mock_updater
 
-        with patch.object(controller, "_resolve_app_repo_path", return_value=Path("/app")):
+        with patch.object(
+            controller, "_resolve_app_repo_path", return_value=Path("/app")
+        ):
             controller.handle_check_updates()
 
         MockMsgBox.warning.assert_called_once()
@@ -1413,7 +1648,9 @@ class TestHandleTriggerUpdate:
         MockMsgBox.question.return_value = QMessageBox.StandardButton.Yes
         MockMsgBox.StandardButton = QMessageBox.StandardButton
 
-        with patch.object(controller, "_resolve_app_repo_path", return_value=Path("/app")):
+        with patch.object(
+            controller, "_resolve_app_repo_path", return_value=Path("/app")
+        ):
             controller.handle_trigger_update()
 
         mock_updater.trigger_self_update.assert_called_once_with(Path("/app"))
@@ -1430,7 +1667,9 @@ class TestHandleTriggerUpdate:
         MockMsgBox.question.return_value = QMessageBox.StandardButton.Yes
         MockMsgBox.StandardButton = QMessageBox.StandardButton
 
-        with patch.object(controller, "_resolve_app_repo_path", return_value=Path("/app")):
+        with patch.object(
+            controller, "_resolve_app_repo_path", return_value=Path("/app")
+        ):
             controller.handle_trigger_update()
 
         MockMsgBox.warning.assert_called_once()
@@ -1439,14 +1678,18 @@ class TestHandleTriggerUpdate:
         assert "already running" in args[2]
 
     @patch("src.lib.app_controller.QMessageBox")
-    def test_trigger_update_refreshes_loops_tab(self, MockMsgBox, controller, mock_loop_runner):
+    def test_trigger_update_refreshes_loops_tab(
+        self, MockMsgBox, controller, mock_loop_runner
+    ):
         """After successful update start, loops tab is refreshed."""
         mock_updater = MagicMock()
         controller._self_updater = mock_updater
         MockMsgBox.question.return_value = QMessageBox.StandardButton.Yes
         MockMsgBox.StandardButton = QMessageBox.StandardButton
 
-        with patch.object(controller, "_resolve_app_repo_path", return_value=Path("/app")):
+        with patch.object(
+            controller, "_resolve_app_repo_path", return_value=Path("/app")
+        ):
             controller.handle_trigger_update()
 
         mock_loop_runner.get_all_states.assert_called()
@@ -1463,6 +1706,7 @@ class TestResolveAppRepoPath:
         (src_dir / "__init__.py").write_text("")
 
         import src as src_module
+
         original_file = src_module.__file__
         try:
             src_module.__file__ = str(src_dir / "__init__.py")
@@ -1476,6 +1720,7 @@ class TestResolveAppRepoPath:
 # ---------------------------------------------------------------------------
 # GitManager wiring — repo validation before loop start
 # ---------------------------------------------------------------------------
+
 
 class TestGitManagerWiring:
     """Verify GitManager validates the project repo before starting a loop.
@@ -1516,7 +1761,9 @@ class TestGitManagerWiring:
             git_manager=mock_git_manager,
         )
 
-    def test_git_manager_stored_on_controller(self, controller_with_git, mock_git_manager):
+    def test_git_manager_stored_on_controller(
+        self, controller_with_git, mock_git_manager
+    ):
         """The git manager is accessible via the controller."""
         assert controller_with_git._git_manager is mock_git_manager
 
@@ -1525,7 +1772,12 @@ class TestGitManagerWiring:
         assert controller._git_manager is None
 
     def test_start_loop_proceeds_when_repo_valid(
-        self, controller_with_git, mock_git_manager, mock_project_store, mock_loop_runner, project_with_repo
+        self,
+        controller_with_git,
+        mock_git_manager,
+        mock_project_store,
+        mock_loop_runner,
+        project_with_repo,
     ):
         """When validate_repo returns True, the loop starts normally."""
         mock_project_store.get_project.return_value = project_with_repo
@@ -1536,11 +1788,19 @@ class TestGitManagerWiring:
         controller_with_git.handle_start_loop("proj123")
 
         mock_git_manager.validate_repo.assert_called_once()
-        mock_loop_runner.start_loop.assert_called_once_with("proj123", LoopMode.CONTINUOUS)
+        mock_loop_runner.start_loop.assert_called_once_with(
+            "proj123", LoopMode.CONTINUOUS
+        )
 
     @patch("src.lib.app_controller.QMessageBox")
     def test_start_loop_warns_when_repo_invalid_user_declines(
-        self, MockMsgBox, controller_with_git, mock_git_manager, mock_project_store, mock_loop_runner, project_with_repo
+        self,
+        MockMsgBox,
+        controller_with_git,
+        mock_git_manager,
+        mock_project_store,
+        mock_loop_runner,
+        project_with_repo,
     ):
         """When validate_repo returns False and user declines, loop is NOT started."""
         mock_project_store.get_project.return_value = project_with_repo
@@ -1559,7 +1819,13 @@ class TestGitManagerWiring:
 
     @patch("src.lib.app_controller.QMessageBox")
     def test_start_loop_proceeds_when_repo_invalid_user_accepts(
-        self, MockMsgBox, controller_with_git, mock_git_manager, mock_project_store, mock_loop_runner, project_with_repo
+        self,
+        MockMsgBox,
+        controller_with_git,
+        mock_git_manager,
+        mock_project_store,
+        mock_loop_runner,
+        project_with_repo,
     ):
         """When validate_repo returns False but user clicks Yes, loop starts."""
         mock_project_store.get_project.return_value = project_with_repo
@@ -1572,13 +1838,21 @@ class TestGitManagerWiring:
 
         controller_with_git.handle_start_loop("proj123")
 
-        mock_loop_runner.start_loop.assert_called_once_with("proj123", LoopMode.CONTINUOUS)
+        mock_loop_runner.start_loop.assert_called_once_with(
+            "proj123", LoopMode.CONTINUOUS
+        )
 
     def test_start_loop_skips_git_check_for_url_repos(
-        self, controller_with_git, mock_git_manager, mock_project_store, mock_loop_runner
+        self,
+        controller_with_git,
+        mock_git_manager,
+        mock_project_store,
+        mock_loop_runner,
     ):
         """Git validation is skipped for non-absolute paths (e.g. URLs)."""
-        project = ProjectConfig(name="Test", repo_url="https://github.com/user/repo.git")
+        project = ProjectConfig(
+            name="Test", repo_url="https://github.com/user/repo.git"
+        )
         mock_project_store.get_project.return_value = project
         state = LoopState(project_id="proj123", status=LoopStatus.RUNNING)
         mock_loop_runner.start_loop.return_value = state
@@ -1589,7 +1863,11 @@ class TestGitManagerWiring:
         mock_loop_runner.start_loop.assert_called_once()
 
     def test_start_loop_skips_git_check_for_empty_repo_url(
-        self, controller_with_git, mock_git_manager, mock_project_store, mock_loop_runner
+        self,
+        controller_with_git,
+        mock_git_manager,
+        mock_project_store,
+        mock_loop_runner,
     ):
         """Git validation is skipped when repo_url is empty."""
         project = ProjectConfig(name="Test", repo_url="")
@@ -1603,7 +1881,11 @@ class TestGitManagerWiring:
         mock_loop_runner.start_loop.assert_called_once()
 
     def test_start_loop_skips_git_check_when_project_not_found(
-        self, controller_with_git, mock_git_manager, mock_project_store, mock_loop_runner
+        self,
+        controller_with_git,
+        mock_git_manager,
+        mock_project_store,
+        mock_loop_runner,
     ):
         """Git validation is skipped when project lookup returns None."""
         mock_project_store.get_project.return_value = None
@@ -1616,7 +1898,12 @@ class TestGitManagerWiring:
         mock_loop_runner.start_loop.assert_called_once()
 
     def test_start_loop_git_exception_does_not_block(
-        self, controller_with_git, mock_git_manager, mock_project_store, mock_loop_runner, project_with_repo
+        self,
+        controller_with_git,
+        mock_git_manager,
+        mock_project_store,
+        mock_loop_runner,
+        project_with_repo,
     ):
         """If GitManager raises, the loop still starts (best-effort).
 
@@ -1630,7 +1917,9 @@ class TestGitManagerWiring:
 
         controller_with_git.handle_start_loop("proj123")
 
-        mock_loop_runner.start_loop.assert_called_once_with("proj123", LoopMode.CONTINUOUS)
+        mock_loop_runner.start_loop.assert_called_once_with(
+            "proj123", LoopMode.CONTINUOUS
+        )
 
     def test_start_loop_works_without_git_manager(self, controller, mock_loop_runner):
         """When git_manager is None, handle_start_loop skips the check."""
@@ -1639,4 +1928,6 @@ class TestGitManagerWiring:
 
         controller.handle_start_loop("proj123")
 
-        mock_loop_runner.start_loop.assert_called_once_with("proj123", LoopMode.CONTINUOUS)
+        mock_loop_runner.start_loop.assert_called_once_with(
+            "proj123", LoopMode.CONTINUOUS
+        )

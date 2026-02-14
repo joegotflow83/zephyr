@@ -8,7 +8,6 @@ import pytest
 
 from src.lib.cleanup import CleanupManager
 
-
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
@@ -197,9 +196,11 @@ class TestCleanupAll:
 
     def test_partial_failure(self, cleanup, mock_docker):
         """One container fails, others succeed."""
+
         def stop_side_effect(cid, timeout=30):
             if cid == "c2":
                 raise Exception("stop c2 failed")
+
         mock_docker.stop_container.side_effect = stop_side_effect
 
         cleanup.register_container("c1")
@@ -339,9 +340,7 @@ class TestSignalWithCleanup:
             cleanup.register_container("c1")
             cleanup.register_container("c2")
 
-            cleanup.install_signal_handlers(
-                lambda: cleanup.cleanup_all(mock_docker)
-            )
+            cleanup.install_signal_handlers(lambda: cleanup.cleanup_all(mock_docker))
 
             handler = signal.getsignal(signal.SIGTERM)
             handler(signal.SIGTERM, None)

@@ -11,7 +11,6 @@ from docker.errors import DockerException, APIError, NotFound
 from src.lib.docker_manager import DockerManager
 from src.lib.models import ProjectConfig
 
-
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
@@ -219,9 +218,7 @@ class TestRemoveContainer:
         mock_client.containers.get.assert_called_once_with("abc123deadbeef")
         mock_container.remove.assert_called_once_with(force=False)
 
-    def test_removes_container_with_force(
-        self, manager, mock_client, mock_container
-    ):
+    def test_removes_container_with_force(self, manager, mock_client, mock_container):
         manager.remove_container("abc123deadbeef", force=True)
         mock_container.remove.assert_called_once_with(force=True)
 

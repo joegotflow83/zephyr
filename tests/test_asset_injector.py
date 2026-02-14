@@ -24,7 +24,6 @@ from src.lib.asset_injector import (
 from src.lib.config_manager import ConfigManager
 from src.lib.models import ProjectConfig
 
-
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
@@ -149,13 +148,14 @@ class TestPrepareInjectionDirCustomPrompts:
         try:
             pb = injection_dir / "PROMPT_build.md"
             assert pb.exists()
-            assert pb.read_text(encoding="utf-8") == "# Custom build\nDo something special.\n"
+            assert (
+                pb.read_text(encoding="utf-8")
+                == "# Custom build\nDo something special.\n"
+            )
         finally:
             injector.cleanup(injection_dir)
 
-    def test_extra_custom_prompts_written(
-        self, injector, project_with_custom_prompts
-    ):
+    def test_extra_custom_prompts_written(self, injector, project_with_custom_prompts):
         injection_dir = injector.prepare_injection_dir(project_with_custom_prompts)
         try:
             review = injection_dir / "PROMPT_review.md"
@@ -177,9 +177,7 @@ class TestPrepareInjectionDirCustomPrompts:
         finally:
             injector.cleanup(injection_dir)
 
-    def test_all_expected_files_present(
-        self, injector, project_with_custom_prompts
-    ):
+    def test_all_expected_files_present(self, injector, project_with_custom_prompts):
         injection_dir = injector.prepare_injection_dir(project_with_custom_prompts)
         try:
             files = sorted(f.name for f in injection_dir.iterdir())
@@ -196,9 +194,7 @@ class TestPrepareInjectionDirCustomPrompts:
 class TestPrepareInjectionDirAgentsOverride:
     """Test that a project can override AGENTS.md."""
 
-    def test_project_agents_md_used(
-        self, injector, project_with_agents_override
-    ):
+    def test_project_agents_md_used(self, injector, project_with_agents_override):
         injection_dir = injector.prepare_injection_dir(project_with_agents_override)
         try:
             agents = injection_dir / "AGENTS.md"
@@ -376,9 +372,7 @@ class TestErrorHandling:
         # There should be no leaked directories (cleanup ran).
         # Note: other tests might leave dirs, so we only check that
         # the one created during this test was cleaned up.
-        assert len(leaked) == 0 or all(
-            project.id[:8] not in d.name for d in leaked
-        )
+        assert len(leaked) == 0 or all(project.id[:8] not in d.name for d in leaked)
 
 
 # ---------------------------------------------------------------------------

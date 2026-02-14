@@ -100,14 +100,18 @@ class ProjectDialog(QDialog):
         layout.addWidget(QLabel("Repository URL:"))
         self.repo_url_edit = QLineEdit()
         self.repo_url_edit.setObjectName("repo_url_edit")
-        self.repo_url_edit.setPlaceholderText("https://github.com/user/repo or /local/path")
+        self.repo_url_edit.setPlaceholderText(
+            "https://github.com/user/repo or /local/path"
+        )
         layout.addWidget(self.repo_url_edit)
 
         # JTBD field
         layout.addWidget(QLabel("Jobs-to-be-done:"))
         self.jtbd_edit = QTextEdit()
         self.jtbd_edit.setObjectName("jtbd_edit")
-        self.jtbd_edit.setPlaceholderText("Describe what this project should accomplish...")
+        self.jtbd_edit.setPlaceholderText(
+            "Describe what this project should accomplish..."
+        )
         self.jtbd_edit.setMaximumHeight(100)
         self.jtbd_edit.setAcceptRichText(False)
         layout.addWidget(self.jtbd_edit)

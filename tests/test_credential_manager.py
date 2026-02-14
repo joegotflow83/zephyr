@@ -35,6 +35,7 @@ def mock_keyring():
 
     def delete_password(service_name, username):
         from keyring.errors import PasswordDeleteError
+
         if (service_name, username) not in storage:
             raise PasswordDeleteError(f"No password for {username}")
         del storage[(service_name, username)]
@@ -114,9 +115,7 @@ class TestDeleteApiKey:
     def test_removes_from_keyring(self, cred_mgr, mock_keyring):
         cred_mgr.store_api_key("anthropic", "sk-test-123")
         cred_mgr.delete_api_key("anthropic")
-        mock_keyring.delete_password.assert_called_once_with(
-            APP_NAME, "anthropic"
-        )
+        mock_keyring.delete_password.assert_called_once_with(APP_NAME, "anthropic")
 
     def test_removes_from_index(self, cred_mgr, config_manager):
         cred_mgr.store_api_key("anthropic", "sk-test-123")

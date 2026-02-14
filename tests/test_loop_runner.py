@@ -20,7 +20,6 @@ from src.lib.loop_runner import (
 )
 from src.lib.models import ProjectConfig
 
-
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
@@ -187,9 +186,7 @@ class TestStartLoopValidation:
 
 
 class TestStartLoopFailure:
-    def test_state_becomes_failed_on_docker_error(
-        self, runner, mock_docker_manager
-    ):
+    def test_state_becomes_failed_on_docker_error(self, runner, mock_docker_manager):
         mock_docker_manager.create_container.side_effect = Exception("Docker broke")
         with pytest.raises(Exception, match="Docker broke"):
             runner.start_loop("proj-001-abcdef1234567890", LoopMode.SINGLE)
@@ -197,9 +194,7 @@ class TestStartLoopFailure:
         assert state.status == LoopStatus.FAILED
         assert state.error == "Docker broke"
 
-    def test_semaphore_released_on_failure(
-        self, runner, mock_docker_manager
-    ):
+    def test_semaphore_released_on_failure(self, runner, mock_docker_manager):
         """After a failed start, the semaphore slot should be returned."""
         mock_docker_manager.create_container.side_effect = Exception("fail")
         with pytest.raises(Exception):
@@ -213,9 +208,7 @@ class TestStartLoopFailure:
         for i in range(5):
             pid = f"proj-{i:03d}-{'x' * 20}"
             runner._states.pop(pid, None)  # clean state
-            project = ProjectConfig(
-                id=pid, name=f"P{i}", repo_url="/tmp/r"
-            )
+            project = ProjectConfig(id=pid, name=f"P{i}", repo_url="/tmp/r")
             runner._projects.get_project.return_value = project
             runner.start_loop(pid, LoopMode.SINGLE)
 
@@ -230,17 +223,13 @@ class TestConcurrencyLimit:
         """Only 5 loops may run concurrently (default semaphore size)."""
         for i in range(5):
             pid = f"proj-{i:03d}-{'a' * 20}"
-            project = ProjectConfig(
-                id=pid, name=f"Project {i}", repo_url="/tmp/r"
-            )
+            project = ProjectConfig(id=pid, name=f"Project {i}", repo_url="/tmp/r")
             mock_project_store.get_project.return_value = project
             runner.start_loop(pid, LoopMode.SINGLE)
 
         # 6th should fail
         pid_6 = f"proj-005-{'b' * 20}"
-        project_6 = ProjectConfig(
-            id=pid_6, name="Project 5", repo_url="/tmp/r"
-        )
+        project_6 = ProjectConfig(id=pid_6, name="Project 5", repo_url="/tmp/r")
         mock_project_store.get_project.return_value = project_6
         with pytest.raises(RuntimeError, match="Maximum concurrent"):
             runner.start_loop(pid_6, LoopMode.SINGLE)
@@ -250,9 +239,7 @@ class TestConcurrencyLimit:
         pids = []
         for i in range(5):
             pid = f"proj-{i:03d}-{'c' * 20}"
-            project = ProjectConfig(
-                id=pid, name=f"Project {i}", repo_url="/tmp/r"
-            )
+            project = ProjectConfig(id=pid, name=f"Project {i}", repo_url="/tmp/r")
             mock_project_store.get_project.return_value = project
             runner.start_loop(pid, LoopMode.SINGLE)
             pids.append(pid)
@@ -262,9 +249,7 @@ class TestConcurrencyLimit:
 
         # Now a new one should succeed
         pid_new = f"proj-new-{'d' * 20}"
-        project_new = ProjectConfig(
-            id=pid_new, name="New Project", repo_url="/tmp/r"
-        )
+        project_new = ProjectConfig(id=pid_new, name="New Project", repo_url="/tmp/r")
         mock_project_store.get_project.return_value = project_new
         state = runner.start_loop(pid_new, LoopMode.SINGLE)
         assert state.status == LoopStatus.RUNNING
@@ -281,17 +266,13 @@ class TestConcurrencyLimit:
         )
         for i in range(2):
             pid = f"proj-{i:03d}-{'e' * 20}"
-            project = ProjectConfig(
-                id=pid, name=f"P{i}", repo_url="/tmp/r"
-            )
+            project = ProjectConfig(id=pid, name=f"P{i}", repo_url="/tmp/r")
             mock_project_store.get_project.return_value = project
             runner.start_loop(pid, LoopMode.SINGLE)
 
         # 3rd should fail
         pid_3 = f"proj-002-{'f' * 20}"
-        project_3 = ProjectConfig(
-            id=pid_3, name="P2", repo_url="/tmp/r"
-        )
+        project_3 = ProjectConfig(id=pid_3, name="P2", repo_url="/tmp/r")
         mock_project_store.get_project.return_value = project_3
         with pytest.raises(RuntimeError, match="Maximum concurrent"):
             runner.start_loop(pid_3, LoopMode.SINGLE)
@@ -353,9 +334,7 @@ class TestStopLoop:
 
         # Should be able to start a new loop
         pid_new = "proj-new-abcdef1234567890"
-        project = ProjectConfig(
-            id=pid_new, name="New", repo_url="/tmp/r"
-        )
+        project = ProjectConfig(id=pid_new, name="New", repo_url="/tmp/r")
         mock_project_store.get_project.return_value = project
         state = runner.start_loop(pid_new, LoopMode.SINGLE)
         assert state.status == LoopStatus.RUNNING
@@ -382,9 +361,7 @@ class TestGetState:
     def test_get_all_states_multiple(self, runner, mock_project_store):
         for i in range(3):
             pid = f"proj-{i:03d}-{'g' * 20}"
-            project = ProjectConfig(
-                id=pid, name=f"P{i}", repo_url="/tmp/r"
-            )
+            project = ProjectConfig(id=pid, name=f"P{i}", repo_url="/tmp/r")
             mock_project_store.get_project.return_value = project
             runner.start_loop(pid, LoopMode.SINGLE)
 
@@ -529,9 +506,7 @@ class TestLifecycleCallbacks:
         runner.add_completion_callback(cb2)
         assert len(runner._on_loop_completed) == 2
 
-    def test_failure_callback_called_on_start_error(
-        self, runner, mock_docker_manager
-    ):
+    def test_failure_callback_called_on_start_error(self, runner, mock_docker_manager):
         cb = MagicMock()
         runner.add_failure_callback(cb)
         mock_docker_manager.create_container.side_effect = Exception("boom")
@@ -575,9 +550,7 @@ class TestLifecycleCallbacks:
 
         cb.assert_called_once_with("proj-001-abcdef1234567890", "oops")
 
-    def test_callback_exception_does_not_propagate(
-        self, runner, mock_docker_manager
-    ):
+    def test_callback_exception_does_not_propagate(self, runner, mock_docker_manager):
         """If a callback raises, it should be caught and not crash the loop."""
         bad_cb = MagicMock(side_effect=Exception("callback bug"))
         good_cb = MagicMock()

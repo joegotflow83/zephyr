@@ -120,12 +120,9 @@ class MainWindow(QMainWindow):
             and self._cleanup_manager.has_active_containers
         ):
             containers = self._cleanup_manager.tracked_containers
-            logger.info("Window closing — cleaning up %d container(s)",
-                        len(containers))
+            logger.info("Window closing — cleaning up %d container(s)", len(containers))
 
-            progress = QProgressDialog(
-                "Stopping containers...", None, 0, 0, self
-            )
+            progress = QProgressDialog("Stopping containers...", None, 0, 0, self)
             progress.setWindowTitle("Shutting Down")
             progress.setCancelButton(None)
             progress.setMinimumDuration(0)
@@ -133,6 +130,7 @@ class MainWindow(QMainWindow):
 
             # Process events so the dialog is visible before blocking cleanup
             from PyQt6.QtWidgets import QApplication
+
             QApplication.processEvents()
 
             self._cleanup_manager.cleanup_all(self._docker_manager)

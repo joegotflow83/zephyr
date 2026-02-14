@@ -282,9 +282,7 @@ class LoopRunner:
                 try:
                     cb(project_id, str(exc))
                 except Exception:
-                    logger.warning(
-                        "Failure callback error", exc_info=True
-                    )
+                    logger.warning("Failure callback error", exc_info=True)
             raise
 
     def stop_loop(self, project_id: str) -> None:
@@ -303,17 +301,13 @@ class LoopRunner:
                 LoopStatus.RUNNING,
                 LoopStatus.PAUSED,
             ):
-                raise ValueError(
-                    f"No active loop for project '{project_id}'"
-                )
+                raise ValueError(f"No active loop for project '{project_id}'")
             state.status = LoopStatus.STOPPING
 
         try:
             if state.container_id:
                 self._docker.stop_container(state.container_id)
-                self._docker.remove_container(
-                    state.container_id, force=True
-                )
+                self._docker.remove_container(state.container_id, force=True)
         except Exception as exc:
             logger.warning(
                 "Error stopping container for project %s: %s",
@@ -410,9 +404,7 @@ class LoopRunner:
                         try:
                             cb(project_id, str(status_exc))
                         except Exception:
-                            logger.warning(
-                                "Failure callback error", exc_info=True
-                            )
+                            logger.warning("Failure callback error", exc_info=True)
                     return
 
                 if status == "exited" or status == "dead":
@@ -421,16 +413,12 @@ class LoopRunner:
                             current_state.iteration += 1
                             current_state.status = LoopStatus.COMPLETED
                     self._semaphore.release()
-                    logger.info(
-                        "Loop completed for project %s", project_id
-                    )
+                    logger.info("Loop completed for project %s", project_id)
                     for cb in self._on_loop_completed:
                         try:
                             cb(project_id, current_state.iteration)
                         except Exception:
-                            logger.warning(
-                                "Completion callback error", exc_info=True
-                            )
+                            logger.warning("Completion callback error", exc_info=True)
                     return
 
                 # Brief sleep to avoid busy-waiting
@@ -455,6 +443,4 @@ class LoopRunner:
                 try:
                     cb(project_id, str(exc))
                 except Exception:
-                    logger.warning(
-                        "Failure callback error", exc_info=True
-                    )
+                    logger.warning("Failure callback error", exc_info=True)

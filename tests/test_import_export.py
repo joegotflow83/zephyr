@@ -12,11 +12,12 @@ import pytest
 from src.lib.config_manager import ConfigManager
 from src.lib.import_export import export_config, import_config
 
-
 # ── helpers ──────────────────────────────────────────────────────────
 
 
-def _make_config_dir(tmp_path, projects=None, settings=None, prompts=None, md_files=None):
+def _make_config_dir(
+    tmp_path, projects=None, settings=None, prompts=None, md_files=None
+):
     """Set up a config directory with optional data files."""
     config_dir = tmp_path / "config"
     config_dir.mkdir()
@@ -119,7 +120,10 @@ class TestExportConfig:
             assert data == _sample_settings()
 
     def test_export_includes_prompt_files(self, tmp_path):
-        prompts = {"PROMPT_build.md": "build instructions", "PROMPT_test.md": "test plan"}
+        prompts = {
+            "PROMPT_build.md": "build instructions",
+            "PROMPT_test.md": "test plan",
+        }
         cm = _make_config_dir(tmp_path, projects=_sample_projects(), prompts=prompts)
         out = tmp_path / "backup.zip"
 
@@ -184,9 +188,7 @@ class TestImportConfig:
 
     def test_import_extracts_files(self, tmp_path):
         projects = _sample_projects()
-        zip_path = self._create_zip(
-            tmp_path, {"projects.json": json.dumps(projects)}
-        )
+        zip_path = self._create_zip(tmp_path, {"projects.json": json.dumps(projects)})
         dest = tmp_path / "dest"
         dest.mkdir()
         cm = ConfigManager(config_dir=dest)

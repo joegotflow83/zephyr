@@ -136,9 +136,7 @@ class AppController:
                 logger.info("Added project: %s (%s)", project.name, project.id)
                 self._refresh_projects_tab()
             except ValueError as exc:
-                QMessageBox.warning(
-                    self._window, "Add Project", str(exc)
-                )
+                QMessageBox.warning(self._window, "Add Project", str(exc))
 
     def handle_edit_project(self, project_id: str) -> None:
         """Open the Edit Project dialog and persist changes."""
@@ -157,9 +155,7 @@ class AppController:
                 logger.info("Updated project: %s (%s)", updated.name, updated.id)
                 self._refresh_projects_tab()
             except KeyError as exc:
-                QMessageBox.warning(
-                    self._window, "Edit Project", str(exc)
-                )
+                QMessageBox.warning(self._window, "Edit Project", str(exc))
 
     def handle_delete_project(self, project_id: str) -> None:
         """Confirm and delete a project."""
@@ -179,9 +175,7 @@ class AppController:
                 logger.info("Deleted project: %s", project_id)
                 self._refresh_projects_tab()
             except KeyError as exc:
-                QMessageBox.warning(
-                    self._window, "Delete Project", str(exc)
-                )
+                QMessageBox.warning(self._window, "Delete Project", str(exc))
 
     # -- Loop handlers ------------------------------------------------------
 
@@ -203,14 +197,18 @@ class AppController:
                     project = self._project_store.get_project(project_id)
                     if project is not None and project.repo_url:
                         repo_path = Path(project.repo_url)
-                        if repo_path.is_absolute() and not self._git_manager.validate_repo(repo_path):
+                        if (
+                            repo_path.is_absolute()
+                            and not self._git_manager.validate_repo(repo_path)
+                        ):
                             reply = QMessageBox.question(
                                 self._window,
                                 "Invalid Git Repository",
                                 f"The project path does not appear to be a valid "
                                 f"Git repository:\n\n{project.repo_url}\n\n"
                                 f"Do you want to start the loop anyway?",
-                                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                                QMessageBox.StandardButton.Yes
+                                | QMessageBox.StandardButton.No,
                                 QMessageBox.StandardButton.No,
                             )
                             if reply != QMessageBox.StandardButton.Yes:
@@ -226,18 +224,14 @@ class AppController:
                     logger.debug("Disk space check failed", exc_info=True)
                     warning = None
                 if warning is not None:
-                    QMessageBox.warning(
-                        self._window, "Low Disk Space", warning
-                    )
+                    QMessageBox.warning(self._window, "Low Disk Space", warning)
                     return
 
             self._loop_runner.start_loop(project_id, LoopMode.CONTINUOUS)
             logger.info("Started loop for project: %s", project_id)
             self._refresh_loops_tab()
         except (ValueError, RuntimeError) as exc:
-            QMessageBox.warning(
-                self._window, "Start Loop", str(exc)
-            )
+            QMessageBox.warning(self._window, "Start Loop", str(exc))
 
     def handle_stop_loop(self, project_id: str) -> None:
         """Stop the running loop for the given project."""
@@ -246,9 +240,7 @@ class AppController:
             logger.info("Stopped loop for project: %s", project_id)
             self._refresh_loops_tab()
         except ValueError as exc:
-            QMessageBox.warning(
-                self._window, "Stop Loop", str(exc)
-            )
+            QMessageBox.warning(self._window, "Stop Loop", str(exc))
 
     # -- Credential handlers ------------------------------------------------
 
@@ -270,9 +262,7 @@ class AppController:
                     self._credential_manager.store_api_key(service, key_text)
                     logger.info("Updated credential for: %s", service)
                 except ValueError as exc:
-                    QMessageBox.warning(
-                        self._window, "Credential Error", str(exc)
-                    )
+                    QMessageBox.warning(self._window, "Credential Error", str(exc))
 
     def _handle_login_mode(self, service: str) -> None:
         """Launch browser-based login and store the session."""
@@ -350,9 +340,7 @@ class AppController:
             )
             self.refresh_all()
         except FileExistsError as exc:
-            QMessageBox.warning(
-                self._window, "Import Conflict", str(exc)
-            )
+            QMessageBox.warning(self._window, "Import Conflict", str(exc))
         except Exception as exc:
             QMessageBox.critical(
                 self._window, "Import Error", f"Failed to import: {exc}"

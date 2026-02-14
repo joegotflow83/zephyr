@@ -58,7 +58,9 @@ class ProjectsTab(QWidget):
         self.table.horizontalHeader().setStretchLastSection(True)
         layout.addWidget(self.table)
 
-    def refresh(self, projects: list[ProjectConfig], statuses: dict[str, str] | None = None):
+    def refresh(
+        self, projects: list[ProjectConfig], statuses: dict[str, str] | None = None
+    ):
         """Populate the table with the given projects.
 
         Args:
@@ -78,7 +80,9 @@ class ProjectsTab(QWidget):
             self.table.setItem(row, 0, QTableWidgetItem(project.name))
             self.table.setItem(row, 1, QTableWidgetItem(project.repo_url))
             self.table.setItem(row, 2, QTableWidgetItem(project.docker_image))
-            self.table.setItem(row, 3, QTableWidgetItem(statuses.get(project.id, "Idle")))
+            self.table.setItem(
+                row, 3, QTableWidgetItem(statuses.get(project.id, "Idle"))
+            )
 
             # Action buttons
             actions_widget = QWidget()
@@ -88,17 +92,23 @@ class ProjectsTab(QWidget):
             edit_btn = QPushButton("Edit")
             edit_btn.setObjectName(f"edit_btn_{project.id}")
             pid = project.id
-            edit_btn.clicked.connect(lambda checked, p=pid: self.project_edit_requested.emit(p))
+            edit_btn.clicked.connect(
+                lambda checked, p=pid: self.project_edit_requested.emit(p)
+            )
             actions_layout.addWidget(edit_btn)
 
             delete_btn = QPushButton("Delete")
             delete_btn.setObjectName(f"delete_btn_{project.id}")
-            delete_btn.clicked.connect(lambda checked, p=pid: self.project_delete_requested.emit(p))
+            delete_btn.clicked.connect(
+                lambda checked, p=pid: self.project_delete_requested.emit(p)
+            )
             actions_layout.addWidget(delete_btn)
 
             run_btn = QPushButton("Run")
             run_btn.setObjectName(f"run_btn_{project.id}")
-            run_btn.clicked.connect(lambda checked, p=pid: self.project_run_requested.emit(p))
+            run_btn.clicked.connect(
+                lambda checked, p=pid: self.project_run_requested.emit(p)
+            )
             actions_layout.addWidget(run_btn)
 
             self.table.setCellWidget(row, 4, actions_widget)

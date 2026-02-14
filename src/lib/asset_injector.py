@@ -126,16 +126,12 @@ class AssetInjector:
 
     # -- internal helpers ----------------------------------------------------
 
-    def _write_agents_md(
-        self, injection_dir: Path, project: ProjectConfig
-    ) -> None:
+    def _write_agents_md(self, injection_dir: Path, project: ProjectConfig) -> None:
         """Write AGENTS.md — project override wins over app default."""
         target = injection_dir / "AGENTS.md"
 
         if "AGENTS.md" in project.custom_prompts:
-            target.write_text(
-                project.custom_prompts["AGENTS.md"], encoding="utf-8"
-            )
+            target.write_text(project.custom_prompts["AGENTS.md"], encoding="utf-8")
             logger.debug("Using project-override AGENTS.md for %s", project.name)
             return
 
@@ -166,9 +162,7 @@ class AssetInjector:
                 "Wrote custom prompt %s for project %s", filename, project.name
             )
 
-    def _ensure_prompt_build(
-        self, injection_dir: Path, project: ProjectConfig
-    ) -> None:
+    def _ensure_prompt_build(self, injection_dir: Path, project: ProjectConfig) -> None:
         """Ensure PROMPT_build.md exists — write default if missing."""
         target = injection_dir / "PROMPT_build.md"
         if target.exists():

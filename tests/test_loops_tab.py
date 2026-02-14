@@ -66,12 +66,21 @@ class TestLoopsTabStructure:
         headers = []
         for col in range(tab.table.columnCount()):
             headers.append(tab.table.horizontalHeaderItem(col).text())
-        assert headers == ["Project", "Status", "Mode", "Iteration", "Started", "Actions"]
+        assert headers == [
+            "Project",
+            "Status",
+            "Mode",
+            "Iteration",
+            "Started",
+            "Actions",
+        ]
 
     def test_table_selection_behavior(self, qtbot):
         tab = LoopsTab()
         qtbot.addWidget(tab)
-        assert tab.table.selectionBehavior() == QTableWidget.SelectionBehavior.SelectRows
+        assert (
+            tab.table.selectionBehavior() == QTableWidget.SelectionBehavior.SelectRows
+        )
 
     def test_table_not_editable(self, qtbot):
         tab = LoopsTab()
@@ -224,10 +233,12 @@ class TestRefresh:
         tab.refresh({"p1": _make_state(project_id="p1")})
         assert tab.table.rowCount() == 1
 
-        tab.refresh({
-            "p2": _make_state(project_id="p2"),
-            "p3": _make_state(project_id="p3"),
-        })
+        tab.refresh(
+            {
+                "p2": _make_state(project_id="p2"),
+                "p3": _make_state(project_id="p3"),
+            }
+        )
         assert tab.table.rowCount() == 2
         assert tab._project_ids == ["p2", "p3"]
 
@@ -719,18 +730,21 @@ class TestMainWindowIntegration:
 
     def test_main_window_has_loops_tab_instance(self, qtbot):
         from src.ui.main_window import MainWindow
+
         window = MainWindow()
         qtbot.addWidget(window)
         assert isinstance(window.loops_tab, LoopsTab)
 
     def test_loops_tab_is_second_tab(self, qtbot):
         from src.ui.main_window import MainWindow
+
         window = MainWindow()
         qtbot.addWidget(window)
         assert window.tab_widget.widget(1) is window.loops_tab
 
     def test_loops_tab_label(self, qtbot):
         from src.ui.main_window import MainWindow
+
         window = MainWindow()
         qtbot.addWidget(window)
         assert window.tab_widget.tabText(1) == "Running Loops"

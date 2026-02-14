@@ -31,15 +31,21 @@ class CleanupManager:
         """Add *container_id* to the set of tracked containers."""
         with self._lock:
             self._containers.add(container_id)
-            logger.debug("Registered container %s (total: %d)",
-                         container_id, len(self._containers))
+            logger.debug(
+                "Registered container %s (total: %d)",
+                container_id,
+                len(self._containers),
+            )
 
     def unregister_container(self, container_id: str) -> None:
         """Remove *container_id* from the set of tracked containers."""
         with self._lock:
             self._containers.discard(container_id)
-            logger.debug("Unregistered container %s (total: %d)",
-                         container_id, len(self._containers))
+            logger.debug(
+                "Unregistered container %s (total: %d)",
+                container_id,
+                len(self._containers),
+            )
 
     @property
     def tracked_containers(self) -> list[str]:
@@ -113,10 +119,8 @@ class CleanupManager:
             logger.info("Received %s — running cleanup", sig_name)
 
             # Restore originals so a second signal terminates immediately
-            signal.signal(signal.SIGINT,
-                          self._original_sigint or signal.SIG_DFL)
-            signal.signal(signal.SIGTERM,
-                          self._original_sigterm or signal.SIG_DFL)
+            signal.signal(signal.SIGINT, self._original_sigint or signal.SIG_DFL)
+            signal.signal(signal.SIGTERM, self._original_sigterm or signal.SIG_DFL)
 
             try:
                 cleanup_callback()

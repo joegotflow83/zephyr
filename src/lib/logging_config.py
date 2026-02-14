@@ -15,10 +15,10 @@ from pathlib import Path
 
 # ANSI colour codes keyed by log-level name.
 _LEVEL_COLOURS = {
-    "DEBUG": "\033[36m",     # cyan
-    "INFO": "\033[32m",      # green
-    "WARNING": "\033[33m",   # yellow
-    "ERROR": "\033[31m",     # red
+    "DEBUG": "\033[36m",  # cyan
+    "INFO": "\033[32m",  # green
+    "WARNING": "\033[33m",  # yellow
+    "ERROR": "\033[31m",  # red
     "CRITICAL": "\033[1;31m",  # bold red
 }
 _RESET = "\033[0m"

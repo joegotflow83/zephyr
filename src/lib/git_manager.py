@@ -153,12 +153,14 @@ class GitManager:
         commits: list[dict] = []
         try:
             for commit in repo.iter_commits(max_count=count):
-                commits.append({
-                    "hash": str(commit.hexsha),
-                    "message": commit.message.strip().split("\n")[0],
-                    "author": str(commit.author),
-                    "date": commit.committed_datetime.isoformat(),
-                })
+                commits.append(
+                    {
+                        "hash": str(commit.hexsha),
+                        "message": commit.message.strip().split("\n")[0],
+                        "author": str(commit.author),
+                        "date": commit.committed_datetime.isoformat(),
+                    }
+                )
         except ValueError:
             # Empty repo — no commits to iterate
             pass
@@ -173,7 +175,9 @@ class _ProgressHandler(git.RemoteProgress):
         super().__init__()
         self._callback = callback
 
-    def update(self, op_code: int, cur_count, max_count=None, message: str = "") -> None:
+    def update(
+        self, op_code: int, cur_count, max_count=None, message: str = ""
+    ) -> None:
         """Called by gitpython during remote operations."""
         if message:
             self._callback(message)
