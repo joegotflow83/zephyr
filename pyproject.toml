@@ -28,6 +28,7 @@ dev = [
     "pylint>=3.0.0",
     "pyyaml>=6.0",
     "pyinstaller>=6.0.0",
+    "Pillow>=10.0.0",
 ]
 
 [project.scripts]
@@ -47,4 +48,10 @@ line-length = 88
 target-version = ["py312"]
 
 [tool.pylint.main]
-source-roots = ["src"]
+source-roots = ["."]
+
+[tool.pylint."messages_control"]
+# PyQt6 uses compiled C++ bindings that pylint cannot introspect
+# broad-exception-caught is intentional in a desktop app that must stay running
+disable = ["no-name-in-module"]
+extension-pkg-allow-list = ["PyQt6"]
