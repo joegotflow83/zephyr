@@ -473,9 +473,7 @@ class TestHandleStartLoop:
         MockMsgBox.warning.assert_called_once()
 
     @patch("src.lib.app_controller.QMessageBox")
-    def test_start_loop_image_not_found(
-        self, MockMsgBox, controller, mock_loop_runner
-    ):
+    def test_start_loop_image_not_found(self, MockMsgBox, controller, mock_loop_runner):
         """Docker ImageNotFound (not ValueError/RuntimeError) must not crash the app."""
         mock_loop_runner.start_loop.side_effect = Exception(
             '404 Client Error: Not Found ("No such image: ubuntu:24.04")'

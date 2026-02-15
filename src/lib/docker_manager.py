@@ -97,6 +97,31 @@ class DockerManager:
                     progress_callback(chunk)
             logger.info("Successfully pulled image %s", image)
         except (DockerException, APIError) as exc:
+            # docker-py wraps StoreError (missing credentials helper) as a
+            # DockerException.  For public images this is recoverable: retry
+            # with an empty auth_config to bypass the credentials store.
+            if "Credentials store error" in str(exc) or "StoreError" in str(exc):
+                logger.warning(
+                    "Credentials store unavailable for %s, retrying without auth: %s",
+                    image,
+                    exc,
+                )
+                try:
+                    resp = self._client.api.pull(
+                        image, stream=True, decode=True, auth_config={}
+                    )
+                    for chunk in resp:
+                        if progress_callback is not None:
+                            progress_callback(chunk)
+                    logger.info(
+                        "Successfully pulled image %s (no credentials store)", image
+                    )
+                    return
+                except (DockerException, APIError) as retry_exc:
+                    logger.error(
+                        "Failed to pull image %s (no-auth retry): %s", image, retry_exc
+                    )
+                    raise retry_exc
             logger.error("Failed to pull image %s: %s", image, exc)
             raise
 

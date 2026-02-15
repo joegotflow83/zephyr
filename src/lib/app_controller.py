@@ -12,7 +12,13 @@ import threading
 from pathlib import Path
 
 from PyQt6.QtCore import Qt
-from PyQt6.QtWidgets import QApplication, QDialog, QFileDialog, QMessageBox, QProgressDialog
+from PyQt6.QtWidgets import (
+    QApplication,
+    QDialog,
+    QFileDialog,
+    QMessageBox,
+    QProgressDialog,
+)
 
 from src.lib._version import __version__
 from src.lib.config_manager import ConfigManager
