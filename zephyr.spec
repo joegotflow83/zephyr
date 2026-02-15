@@ -23,7 +23,12 @@ from pathlib import Path
 from PyInstaller.utils.hooks import collect_all
 
 # Read version from _version.py so builds pick up the CI-patched value.
-_version_file = os.path.join(os.path.abspath(SPECPATH) if "SPECPATH" in dir() else os.path.abspath("."), "src", "lib", "_version.py")
+_version_file = os.path.join(
+    os.path.abspath(SPECPATH) if "SPECPATH" in dir() else os.path.abspath("."),
+    "src",
+    "lib",
+    "_version.py",
+)
 _version_ns: dict = {}
 with open(_version_file, encoding="utf-8") as _vf:
     exec(compile(_vf.read(), _version_file, "exec"), _version_ns)  # noqa: S102
@@ -34,15 +39,20 @@ block_cipher = None
 # ---------------------------------------------------------------------------
 # Paths
 # ---------------------------------------------------------------------------
-PROJECT_ROOT = os.path.abspath(SPECPATH) if "SPECPATH" in dir() else os.path.abspath(".")
+PROJECT_ROOT = (
+    os.path.abspath(SPECPATH) if "SPECPATH" in dir() else os.path.abspath(".")
+)
 SRC_DIR = os.path.join(PROJECT_ROOT, "src")
 
 # ---------------------------------------------------------------------------
 # Data files: (source, destination_in_bundle)
 # ---------------------------------------------------------------------------
-datas = [
-    (os.path.join(PROJECT_ROOT, "AGENTS.md"), "."),
-]
+datas = []
+
+# Include AGENTS.md template if it exists
+agents_md = os.path.join(PROJECT_ROOT, "AGENTS.md")
+if os.path.isfile(agents_md):
+    datas.append((agents_md, "."))
 
 # Include resources directory if it exists (icon, Info.plist, etc.)
 resources_dir = os.path.join(PROJECT_ROOT, "resources")
@@ -198,7 +208,11 @@ if sys.platform == "darwin":
     app = BUNDLE(
         coll,
         name="Zephyr.app",
-        icon=os.path.join(resources_dir, "icon.icns") if os.path.isfile(os.path.join(resources_dir, "icon.icns")) else None,
+        icon=(
+            os.path.join(resources_dir, "icon.icns")
+            if os.path.isfile(os.path.join(resources_dir, "icon.icns"))
+            else None
+        ),
         bundle_identifier="com.zephyr.desktop",
         info_plist={
             "CFBundleName": "Zephyr",

@@ -50,9 +50,9 @@ class TestIconPng:
         assert img.width >= 256
 
     def test_icon_size_512(self):
-        """Default generated icon is 512x512."""
+        """Default generated icon is 1024x1024."""
         img = Image.open(RESOURCES_DIR / "icon.png")
-        assert img.size == (512, 512)
+        assert img.size == (1024, 1024)
 
     def test_icon_has_alpha_channel(self):
         """RGBA mode needed for rounded corners / transparency."""

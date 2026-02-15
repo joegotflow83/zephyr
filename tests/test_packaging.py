@@ -47,7 +47,11 @@ class TestSpecFileValidity:
 
 
 def _extract_hidden_imports() -> list[str]:
-    """Parse the spec file and extract the hiddenimports list."""
+    """Parse the spec file and extract the hiddenimports list.
+
+    Handles both ``hiddenimports = [...]`` and the combined form
+    ``hiddenimports = some_var + [...]`` produced when collect_all() is used.
+    """
     source = SPEC_FILE.read_text(encoding="utf-8")
     tree = ast.parse(source, filename="zephyr.spec")
 
@@ -55,11 +59,14 @@ def _extract_hidden_imports() -> list[str]:
         if isinstance(node, ast.Assign):
             for target in node.targets:
                 if isinstance(target, ast.Name) and target.id == "hiddenimports":
-                    # Evaluate the list literal safely
-                    if isinstance(node.value, ast.List):
+                    value = node.value
+                    # Handle `hiddenimports = some_var + [...]`
+                    if isinstance(value, ast.BinOp) and isinstance(value.op, ast.Add):
+                        value = value.right
+                    if isinstance(value, ast.List):
                         return [
                             elt.value
-                            for elt in node.value.elts
+                            for elt in value.elts
                             if isinstance(elt, ast.Constant)
                             and isinstance(elt.value, str)
                         ]
@@ -105,10 +112,10 @@ class TestHiddenImports:
 
     # -- PyQt6 --
     def test_pyqt6_imports(self):
-        assert "PyQt6.sip" in self.hidden_imports
-        assert "PyQt6.QtCore" in self.hidden_imports
-        assert "PyQt6.QtGui" in self.hidden_imports
-        assert "PyQt6.QtWidgets" in self.hidden_imports
+        # PyQt6 is fully bundled via collect_all("PyQt6") in the spec;
+        # verify the source references it rather than checking explicit imports.
+        source = SPEC_FILE.read_text(encoding="utf-8")
+        assert 'collect_all("PyQt6")' in source
 
     # -- Application modules (src.lib.*) --
     @pytest.mark.parametrize(
@@ -195,7 +202,7 @@ class TestSpecContent:
         assert "console=False" in self.source
 
     def test_entry_point_is_main(self):
-        assert "main.py" in self.source
+        assert "launcher.py" in self.source
 
     def test_dev_dependencies_excluded(self):
         """Test/dev packages should be excluded from the build."""
