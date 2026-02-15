@@ -20,8 +20,10 @@ import os
 import sys
 from pathlib import Path
 
+from PyInstaller.utils.hooks import collect_all
+
 # Read version from _version.py so builds pick up the CI-patched value.
-_version_file = os.path.join(os.path.abspath(os.path.dirname(SPECPATH)) if "SPECPATH" in dir() else os.path.abspath("."), "src", "lib", "_version.py")
+_version_file = os.path.join(os.path.abspath(SPECPATH) if "SPECPATH" in dir() else os.path.abspath("."), "src", "lib", "_version.py")
 _version_ns: dict = {}
 with open(_version_file, encoding="utf-8") as _vf:
     exec(compile(_vf.read(), _version_file, "exec"), _version_ns)  # noqa: S102
@@ -32,7 +34,7 @@ block_cipher = None
 # ---------------------------------------------------------------------------
 # Paths
 # ---------------------------------------------------------------------------
-PROJECT_ROOT = os.path.abspath(os.path.dirname(SPECPATH)) if "SPECPATH" in dir() else os.path.abspath(".")
+PROJECT_ROOT = os.path.abspath(SPECPATH) if "SPECPATH" in dir() else os.path.abspath(".")
 SRC_DIR = os.path.join(PROJECT_ROOT, "src")
 
 # ---------------------------------------------------------------------------
@@ -47,13 +49,19 @@ resources_dir = os.path.join(PROJECT_ROOT, "resources")
 if os.path.isdir(resources_dir):
     datas.append((resources_dir, "resources"))
 
+# Collect ALL PyQt6 files: Python modules, C extensions, Qt frameworks,
+# and platform plugins (e.g. libqcocoa.dylib on macOS).
+_pyqt6_datas, _pyqt6_binaries, _pyqt6_hiddenimports = collect_all("PyQt6")
+datas += _pyqt6_datas
+binaries = _pyqt6_binaries
+
 # ---------------------------------------------------------------------------
 # Hidden imports
 # PyInstaller's static analysis misses these because they are loaded
 # dynamically at runtime (e.g. docker transport backends, keyring backends,
 # plyer platform facades, PyQt6 plugins).
 # ---------------------------------------------------------------------------
-hiddenimports = [
+hiddenimports = _pyqt6_hiddenimports + [
     # Docker SDK — transport backends are selected at runtime
     "docker",
     "docker.transport",
@@ -89,11 +97,6 @@ hiddenimports = [
     "playwright.sync_api",
     # Anthropic SDK
     "anthropic",
-    # PyQt6 plugins sometimes missed
-    "PyQt6.sip",
-    "PyQt6.QtCore",
-    "PyQt6.QtGui",
-    "PyQt6.QtWidgets",
     # Application modules
     "src",
     "src.lib",
@@ -133,9 +136,9 @@ hiddenimports = [
 # Analysis
 # ---------------------------------------------------------------------------
 a = Analysis(
-    [os.path.join(SRC_DIR, "main.py")],
-    pathex=[SRC_DIR],
-    binaries=[],
+    [os.path.join(PROJECT_ROOT, "launcher.py")],
+    pathex=[PROJECT_ROOT],
+    binaries=binaries,
     datas=datas,
     hiddenimports=hiddenimports,
     hookspath=[],
@@ -169,7 +172,7 @@ exe = EXE(
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
-    upx=True,
+    upx=False,
     console=False,
     disable_windowed_traceback=False,
 )
@@ -183,7 +186,7 @@ coll = COLLECT(
     a.zipfiles,
     a.datas,
     strip=False,
-    upx=True,
+    upx=False,
     upx_exclude=[],
     name="Zephyr",
 )
