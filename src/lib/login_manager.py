@@ -11,7 +11,6 @@ from typing import Callable, Optional
 
 from playwright.sync_api import (
     sync_playwright,
-    BrowserContext,
     TimeoutError as PlaywrightTimeout,
 )
 
@@ -169,7 +168,6 @@ class LoginManager:
             service: Service identifier.
             session_data: Dict containing session cookies/tokens.
         """
-        key = f"{SESSION_KEY_PREFIX}{service}"
         serialized = json.dumps(session_data)
         self._credential_manager.store_api_key(service, serialized)
         logger.info("Saved session for service: %s", service)

@@ -5,7 +5,6 @@ Provides zip-based backup and restore of configuration data
 enable cross-machine portability.
 """
 
-import json
 import logging
 import zipfile
 from pathlib import Path

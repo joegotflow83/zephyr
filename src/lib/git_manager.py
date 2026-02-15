@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Callable
 
 import git
-from git.exc import GitCommandError, InvalidGitRepositoryError, NoSuchPathError
+from git.exc import InvalidGitRepositoryError, NoSuchPathError
 
 logger = logging.getLogger("zephyr.git")
 

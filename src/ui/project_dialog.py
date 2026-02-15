@@ -7,7 +7,6 @@ Supports fields for name, repo URL, JTBD, Docker image, and custom prompts.
 from datetime import datetime, timezone
 from uuid import uuid4
 
-from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
     QDialog,
     QDialogButtonBox,

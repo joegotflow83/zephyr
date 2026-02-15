@@ -92,7 +92,7 @@ class LoopsTab(QWidget):
         self.export_all_logs_btn = QPushButton("Export All Logs")
         self.export_all_logs_btn.setObjectName("export_all_logs_btn")
         self.export_all_logs_btn.clicked.connect(
-            lambda: self.log_export_all_requested.emit()
+            lambda: self.log_export_all_requested.emit()  # pylint: disable=unnecessary-lambda
         )
         export_row.addWidget(self.export_all_logs_btn)
         export_row.addStretch()

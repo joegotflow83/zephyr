@@ -173,7 +173,7 @@ class LoopRunner:
 
     # -- Public API ----------------------------------------------------------
 
-    def start_loop(
+    def start_loop(  # pylint: disable=unused-argument
         self,
         project_id: str,
         mode: LoopMode,
@@ -241,7 +241,7 @@ class LoopRunner:
             self._docker.start_container(container_id)
 
             # Start log streaming in a background thread
-            log_thread = self._docker.stream_logs(
+            self._docker.stream_logs(
                 container_id=container_id,
                 callback=self._make_log_callback(project_id),
             )

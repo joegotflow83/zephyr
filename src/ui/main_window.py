@@ -2,16 +2,12 @@
 
 import logging
 
-from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QAction, QCloseEvent
 from PyQt6.QtWidgets import (
     QLabel,
     QMainWindow,
-    QMenuBar,
     QProgressDialog,
-    QStatusBar,
     QTabWidget,
-    QWidget,
 )
 
 from src.ui.loops_tab import LoopsTab

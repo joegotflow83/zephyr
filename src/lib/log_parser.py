@@ -6,7 +6,6 @@ loop output (e.g. bedrock_loop.sh).
 """
 
 import re
-from datetime import datetime, timezone
 
 # -- Commit patterns ----------------------------------------------------------
 # Match `git commit` short output: [branch hash] message
