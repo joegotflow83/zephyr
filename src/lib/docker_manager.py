@@ -3,10 +3,11 @@
 Provides DockerManager for checking Docker availability, querying
 daemon info, verifying image presence, pulling images, managing
 container lifecycle (create, start, stop, remove, status, list),
-and streaming container logs.
+streaming container logs, and creating interactive exec sessions.
 """
 
 import logging
+import socket
 import threading
 from typing import Callable
 
@@ -357,3 +358,108 @@ class DockerManager:
                 exc,
             )
             raise
+
+    # -- Exec / interactive terminal -----------------------------------------
+
+    def exec_create(
+        self, container_id: str, cmd: list[str], user: str = "root"
+    ) -> str:
+        """Create an exec instance inside *container_id*.
+
+        Opens a PTY-enabled, stdin-attached exec session running *cmd*
+        as *user*.
+
+        Returns the exec ID string.
+
+        Raises ``DockerException`` if Docker is unavailable or the call
+        fails.
+        """
+        if self._client is None:
+            raise DockerException("Docker daemon is not available")
+        try:
+            exec_id = self._client.api.exec_create(
+                container_id,
+                cmd,
+                tty=True,
+                stdin=True,
+                user=user,
+            )
+            logger.info(
+                "Created exec instance in container %s (cmd=%s, user=%s)",
+                container_id,
+                cmd,
+                user,
+            )
+            # docker-py returns a dict like {"Id": "..."} or a plain string
+            if isinstance(exec_id, dict):
+                return exec_id["Id"]
+            return str(exec_id)
+        except (DockerException, APIError) as exc:
+            logger.error(
+                "Failed to create exec in container %s: %s",
+                container_id,
+                exc,
+            )
+            raise
+
+    def exec_start_socket(self, exec_id: str) -> socket.socket:
+        """Start an exec session and return the underlying raw socket.
+
+        Launches the exec instance identified by *exec_id* with PTY
+        mode.  The docker-py / urllib3 socket wrapper is unwrapped to
+        obtain a plain ``socket.socket`` which is set to non-blocking
+        mode so it can be driven by an asyncio event loop.
+
+        Returns the raw ``socket.socket``.
+
+        Raises ``DockerException`` if Docker is unavailable or the call
+        fails.
+        """
+        if self._client is None:
+            raise DockerException("Docker daemon is not available")
+        try:
+            sock_wrapper = self._client.api.exec_start(
+                exec_id, tty=True, socket=True
+            )
+            # Unwrap urllib3 / docker-py socket layers to get the raw socket.
+            # The wrapper exposes .raw._sock or .raw.raw.raw depending on version.
+            raw: socket.socket = sock_wrapper
+            for attr in ("raw", "_sock"):
+                wrapped = getattr(raw, attr, None)
+                if wrapped is not None:
+                    raw = wrapped
+            raw.setblocking(False)
+            logger.info("Started exec socket for exec_id %s", exec_id)
+            return raw
+        except (DockerException, APIError) as exc:
+            logger.error(
+                "Failed to start exec socket for exec_id %s: %s",
+                exec_id,
+                exc,
+            )
+            raise
+
+    def exec_resize(self, exec_id: str, rows: int, cols: int) -> None:
+        """Resize the PTY for exec instance *exec_id*.
+
+        Updates the terminal dimensions to *rows* × *cols*.  Any
+        failure is logged as a warning but does not propagate — a
+        resize error should never crash the terminal session.
+
+        Raises ``DockerException`` if Docker is unavailable.
+        """
+        if self._client is None:
+            raise DockerException("Docker daemon is not available")
+        try:
+            self._client.api.exec_resize(exec_id, height=rows, width=cols)
+            logger.debug(
+                "Resized exec %s to %dx%d", exec_id, cols, rows
+            )
+        except (DockerException, APIError) as exc:
+            logger.warning(
+                "Failed to resize exec %s (%dx%d): %s",
+                exec_id,
+                cols,
+                rows,
+                exc,
+            )
