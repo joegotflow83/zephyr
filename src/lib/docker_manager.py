@@ -280,6 +280,24 @@ class DockerManager:
             logger.warning("Failed to list containers: %s", exc)
             return []
 
+    def get_container_created(self, container_id: str) -> str | None:
+        """Return the container's created timestamp as an ISO 8601 string.
+
+        Returns None if Docker is unavailable or the container cannot be found.
+        """
+        if self._client is None:
+            return None
+        try:
+            container = self._client.containers.get(container_id)
+            return container.attrs.get("Created")
+        except (DockerException, APIError, NotFound) as exc:
+            logger.warning(
+                "Failed to get created timestamp for container %s: %s",
+                container_id,
+                exc,
+            )
+            return None
+
     # -- Log streaming -------------------------------------------------------
 
     def stream_logs(

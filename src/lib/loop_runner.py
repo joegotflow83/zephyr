@@ -241,24 +241,13 @@ class LoopRunner:
             self._docker.start_container(container_id)
 
             # Start log streaming in a background thread
-            self._docker.stream_logs(
-                container_id=container_id,
-                callback=self._make_log_callback(project_id),
-            )
-
-            # Start the loop monitor thread
-            thread = threading.Thread(
-                target=self._run_loop,
-                args=(project_id,),
-                name=f"zephyr-loop-{project_id[:12]}",
-                daemon=True,
-            )
+            self._stream_logs_for_container(project_id, container_id)
 
             with self._lock:
                 state.status = LoopStatus.RUNNING
-                self._threads[project_id] = thread
 
-            thread.start()
+            # Start the loop monitor thread
+            self._start_monitor_thread(project_id)
             logger.info(
                 "Started loop for project %s (mode=%s, container=%s)",
                 project_id,
@@ -332,7 +321,115 @@ class LoopRunner:
         with self._lock:
             return dict(self._states)
 
+    def recover_loops(self, containers: list[dict]) -> list[str]:
+        """Recover tracking of already-running Docker containers.
+
+        Called at startup to re-populate _states from containers that survived
+        an application restart. Each dict in containers must contain 'id' and
+        'project_id' keys (as returned by DockerManager.list_running_containers()).
+
+        Returns a list of project IDs that were successfully recovered.
+        """
+        recovered: list[str] = []
+
+        for container_info in containers:
+            project_id = container_info.get("project_id", "")
+            container_id = container_info.get("id", "")
+
+            if not project_id or not container_id:
+                logger.warning(
+                    "Skipping container with missing id/project_id: %s",
+                    container_info,
+                )
+                continue
+
+            # Validate project still exists
+            project = self._projects.get_project(project_id)
+            if project is None:
+                logger.warning(
+                    "Skipping recovery for container %s: project %s no longer exists",
+                    container_id,
+                    project_id,
+                )
+                continue
+
+            # Skip if already tracked (avoid double-tracking)
+            with self._lock:
+                if project_id in self._states:
+                    logger.info(
+                        "Skipping recovery for project %s: already tracked",
+                        project_id,
+                    )
+                    continue
+
+            # Respect concurrency limit
+            if not self._semaphore.acquire(blocking=False):
+                logger.warning(
+                    "Skipping recovery for project %s: concurrency limit reached",
+                    project_id,
+                )
+                continue
+
+            # Get container creation timestamp (best-effort)
+            started_at = self._docker.get_container_created(container_id)
+            if started_at is None:
+                started_at = datetime.now(timezone.utc).isoformat()
+
+            # Create state
+            state = LoopState(
+                project_id=project_id,
+                container_id=container_id,
+                mode=LoopMode.CONTINUOUS,
+                status=LoopStatus.RUNNING,
+                iteration=0,
+                started_at=started_at,
+            )
+
+            with self._lock:
+                self._states[project_id] = state
+
+            # Resume log streaming (non-fatal if it fails)
+            try:
+                self._stream_logs_for_container(project_id, container_id)
+            except Exception as exc:
+                logger.warning(
+                    "Failed to resume log streaming for project %s: %s",
+                    project_id,
+                    exc,
+                )
+
+            # Start monitor thread
+            self._start_monitor_thread(project_id)
+
+            recovered.append(project_id)
+            logger.info(
+                "Recovered loop for project %s (container %s)",
+                project_id,
+                container_id,
+            )
+
+        return recovered
+
     # -- Internal helpers ----------------------------------------------------
+
+    def _stream_logs_for_container(self, project_id: str, container_id: str) -> None:
+        """Start log streaming for an already-running container."""
+        self._docker.stream_logs(
+            container_id=container_id,
+            callback=self._make_log_callback(project_id),
+        )
+
+    def _start_monitor_thread(self, project_id: str) -> None:
+        """Start the loop monitor thread for a project."""
+        thread = threading.Thread(
+            target=self._run_loop,
+            args=(project_id,),
+            name=f"zephyr-loop-{project_id[:12]}",
+            daemon=True,
+        )
+        with self._lock:
+            self._threads[project_id] = thread
+        thread.start()
 
     def _build_env_vars(self) -> dict[str, str]:
         """Collect API keys from CredentialManager into env var dict."""

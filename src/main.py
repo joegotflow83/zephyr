@@ -108,6 +108,34 @@ def _create_services(config_manager: ConfigManager) -> dict:
     }
 
 
+def _recover_loops(docker_manager, loop_runner, project_store, cleanup_manager):
+    """Best-effort recovery of running loops from a previous session.
+
+    Discovers Zephyr-labeled Docker containers that are still running,
+    re-registers them in the LoopRunner, and tracks them in the
+    CleanupManager. Any failure is logged but never blocks startup.
+    """
+    try:
+        if not docker_manager.is_docker_available():
+            return
+        containers = docker_manager.list_running_containers()
+        if not containers:
+            return
+        recovered_ids = loop_runner.recover_loops(containers)
+        # Build project_id -> container_id mapping to register containers
+        pid_to_cid = {c["project_id"]: c["id"] for c in containers}
+        for pid in recovered_ids:
+            cid = pid_to_cid.get(pid)
+            if cid:
+                cleanup_manager.register_container(cid)
+        if recovered_ids:
+            logger.info(
+                "Recovered %d loop(s) from previous session", len(recovered_ids)
+            )
+    except Exception:
+        logger.exception("Loop recovery failed")
+
+
 def _show_docker_warning(parent: MainWindow) -> None:
     """Display a non-blocking warning when Docker is not available."""
     QMessageBox.warning(
@@ -187,6 +215,14 @@ def create_app(
     window.set_cleanup_manager(cleanup_manager, services["docker_manager"])
     cleanup_manager.install_signal_handlers(
         lambda: cleanup_manager.cleanup_all(services["docker_manager"])
+    )
+
+    # Recover loops from previous session (best-effort)
+    _recover_loops(
+        services["docker_manager"],
+        services["loop_runner"],
+        services["project_store"],
+        cleanup_manager,
     )
 
     # Initial data load
