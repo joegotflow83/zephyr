@@ -13,6 +13,7 @@ from PyQt6.QtWidgets import (
 from src.ui.loops_tab import LoopsTab
 from src.ui.projects_tab import ProjectsTab
 from src.ui.settings_tab import SettingsTab
+from src.ui.terminal_tab import TerminalTab
 
 logger = logging.getLogger("zephyr.ui")
 
@@ -37,17 +38,19 @@ class MainWindow(QMainWindow):
         self._setup_status_bar()
 
     def _setup_tabs(self):
-        """Create the central tab widget with three tabs."""
+        """Create the central tab widget with four tabs."""
         self.tab_widget = QTabWidget()
         self.setCentralWidget(self.tab_widget)
 
         self.projects_tab = ProjectsTab()
         self.loops_tab = LoopsTab()
         self.settings_tab = SettingsTab()
+        self.terminal_tab = TerminalTab()
 
         self.tab_widget.addTab(self.projects_tab, "Projects")
         self.tab_widget.addTab(self.loops_tab, "Running Loops")
         self.tab_widget.addTab(self.settings_tab, "Settings")
+        self.tab_widget.addTab(self.terminal_tab, "Terminal")
 
     def _setup_menu_bar(self):
         """Create File and Help menus."""

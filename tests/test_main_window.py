@@ -34,10 +34,10 @@ class TestTabWidget:
         qtbot.addWidget(window)
         assert isinstance(window.centralWidget(), QTabWidget)
 
-    def test_has_three_tabs(self, qtbot):
+    def test_has_four_tabs(self, qtbot):
         window = MainWindow()
         qtbot.addWidget(window)
-        assert window.tab_widget.count() == 3
+        assert window.tab_widget.count() == 4
 
     def test_tab_labels(self, qtbot):
         window = MainWindow()
@@ -45,6 +45,7 @@ class TestTabWidget:
         assert window.tab_widget.tabText(0) == "Projects"
         assert window.tab_widget.tabText(1) == "Running Loops"
         assert window.tab_widget.tabText(2) == "Settings"
+        assert window.tab_widget.tabText(3) == "Terminal"
 
     def test_tab_widgets_accessible(self, qtbot):
         window = MainWindow()
@@ -52,6 +53,7 @@ class TestTabWidget:
         assert window.projects_tab is not None
         assert window.loops_tab is not None
         assert window.settings_tab is not None
+        assert window.terminal_tab is not None
 
     def test_tab_widget_matches_central(self, qtbot):
         window = MainWindow()

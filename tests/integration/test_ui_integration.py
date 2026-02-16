@@ -170,15 +170,15 @@ class TestMainWindowStructure:
     def test_window_title(self, main_window):
         assert main_window.windowTitle() == "Zephyr Desktop"
 
-    def test_three_tabs_exist(self, main_window):
-        assert main_window.tab_widget.count() == 3
+    def test_four_tabs_exist(self, main_window):
+        assert main_window.tab_widget.count() == 4
 
     def test_tab_labels(self, main_window):
         labels = [
             main_window.tab_widget.tabText(i)
             for i in range(main_window.tab_widget.count())
         ]
-        assert labels == ["Projects", "Running Loops", "Settings"]
+        assert labels == ["Projects", "Running Loops", "Settings", "Terminal"]
 
     def test_projects_tab_is_first(self, main_window):
         assert main_window.tab_widget.currentIndex() == 0
