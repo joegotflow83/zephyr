@@ -2214,11 +2214,12 @@ class TestTerminalBridgeWiring:
             "container123", "MyProject"
         )
 
-    @patch("src.lib.app_controller.QMessageBox")
-    def test_handle_open_terminal_no_bridge_shows_warning(self, MockMsgBox, controller):
-        """_handle_open_terminal shows a warning when no bridge is configured."""
-        controller._handle_open_terminal("c1", "p1")
-        MockMsgBox.warning.assert_called_once()
+    def test_handle_open_terminal_no_bridge_logs_warning(self, controller, caplog):
+        """_handle_open_terminal logs a warning when no bridge is configured."""
+        import logging
+        with caplog.at_level(logging.WARNING, logger="zephyr.controller"):
+            controller._handle_open_terminal("c1", "p1")
+        assert any("Terminal bridge" in msg for msg in caplog.messages)
 
     def test_handle_close_terminal_calls_bridge(
         self, controller_with_bridge, mock_terminal_bridge

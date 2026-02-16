@@ -764,12 +764,7 @@ class AppController:
     def _handle_open_terminal(self, container_id: str, project_name: str) -> None:
         """Request a new terminal session via the terminal bridge."""
         if self._terminal_bridge is None:
-            QMessageBox.warning(
-                self._window,
-                "Terminal Unavailable",
-                "Terminal bridge is not available.\n"
-                "Please ensure the terminal bridge is properly initialized.",
-            )
+            logger.warning("Terminal bridge is not available; cannot open terminal session.")
             return
         self._terminal_bridge.open_session(container_id, project_name)
 
