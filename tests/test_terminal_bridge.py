@@ -137,15 +137,17 @@ class TestStartStop:
 
 
 class TestOpenSessionWithoutStart:
-    def test_open_session_without_start_logs_warning(self, qapp, caplog) -> None:
-        """open_session before start() should warn but not raise."""
-        import logging
+    def test_open_session_without_start_emits_error(self, qapp) -> None:
+        """open_session before start() should emit session_error."""
         from src.lib.terminal_bridge import TerminalBridge
         dm = _make_docker_manager()
         bridge = TerminalBridge(dm)
-        with caplog.at_level(logging.WARNING, logger="zephyr.terminal_bridge"):
+        errors = []
+        bridge.session_error.connect(lambda sid, msg: errors.append((sid, msg)))
+        with patch("src.lib.terminal_bridge.HAS_WEBSOCKETS", True):
             bridge.open_session("container-123", "my-project")
-        assert "not started" in caplog.text.lower() or caplog.records  # warning was emitted
+        assert len(errors) == 1
+        assert "not started" in errors[0][1].lower()
 
     def test_close_session_without_start_is_safe(self, qapp) -> None:
         from src.lib.terminal_bridge import TerminalBridge
@@ -219,6 +221,28 @@ class TestOpenSessionErrorHandling:
         bridge.stop()
         # If we get here without crashing, the test passes
 
+    def test_exec_create_failure_emits_session_error(self, qapp) -> None:
+        """If exec_create raises, session_error should be emitted."""
+        from src.lib.terminal_bridge import TerminalBridge
+        from PyQt6.QtWidgets import QApplication
+
+        dm = _make_docker_manager()
+        dm.exec_create.side_effect = RuntimeError("Docker exec failed")
+
+        bridge = TerminalBridge(dm)
+        errors = []
+        bridge.session_error.connect(lambda sid, msg: errors.append((sid, msg)))
+        bridge.start()
+        with patch("src.lib.terminal_bridge.HAS_WEBSOCKETS", True):
+            bridge.open_session("container-err", "project-err")
+        # Process events to allow queued signal delivery
+        for _ in range(20):
+            QApplication.processEvents()
+            time.sleep(0.05)
+        bridge.stop()
+        assert len(errors) == 1
+        assert "exec" in errors[0][1].lower()
+
     def test_exec_start_socket_failure_does_not_crash(self, qapp) -> None:
         """If exec_start_socket raises, the bridge should not crash."""
         from src.lib.terminal_bridge import TerminalBridge
@@ -231,6 +255,42 @@ class TestOpenSessionErrorHandling:
         bridge.open_session("container-err", "project-err")
         time.sleep(0.3)
         bridge.stop()
+
+    def test_exec_start_socket_failure_emits_session_error(self, qapp) -> None:
+        """If exec_start_socket raises, session_error should be emitted."""
+        from src.lib.terminal_bridge import TerminalBridge
+        from PyQt6.QtWidgets import QApplication
+
+        dm = _make_docker_manager()
+        dm.exec_start_socket.side_effect = RuntimeError("Socket error")
+
+        bridge = TerminalBridge(dm)
+        errors = []
+        bridge.session_error.connect(lambda sid, msg: errors.append((sid, msg)))
+        bridge.start()
+        with patch("src.lib.terminal_bridge.HAS_WEBSOCKETS", True):
+            bridge.open_session("container-err", "project-err")
+        for _ in range(20):
+            QApplication.processEvents()
+            time.sleep(0.05)
+        bridge.stop()
+        assert len(errors) == 1
+        assert "socket" in errors[0][1].lower()
+
+    def test_open_session_without_websockets_emits_error(self, qapp) -> None:
+        """open_session without websockets package emits session_error."""
+        from src.lib.terminal_bridge import TerminalBridge
+
+        dm = _make_docker_manager()
+        bridge = TerminalBridge(dm)
+        bridge.start()
+        errors = []
+        bridge.session_error.connect(lambda sid, msg: errors.append((sid, msg)))
+        with patch("src.lib.terminal_bridge.HAS_WEBSOCKETS", False):
+            bridge.open_session("container-x", "project-x")
+        bridge.stop()
+        assert len(errors) == 1
+        assert "websockets" in errors[0][1].lower()
 
 
 class TestCloseSession:

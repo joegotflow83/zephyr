@@ -50,6 +50,7 @@ class _BridgeEmitter(QObject):
 
     _session_ready = pyqtSignal(str, int, str)   # session_id, ws_port, user
     _session_ended = pyqtSignal(str)              # session_id
+    _session_error = pyqtSignal(str, str)         # session_id, error_message
 
 
 class TerminalBridge(QObject):
@@ -65,6 +66,7 @@ class TerminalBridge(QObject):
 
     session_ready = pyqtSignal(str, int, str)   # session_id, ws_port, user
     session_ended = pyqtSignal(str)              # session_id
+    session_error = pyqtSignal(str, str)         # session_id, error_message
 
     def __init__(self, docker_manager, parent: QObject | None = None) -> None:  # type: ignore[type-arg]
         super().__init__(parent)
@@ -76,6 +78,9 @@ class TerminalBridge(QObject):
         )
         self._emitter._session_ended.connect(
             self._on_session_ended, Qt.ConnectionType.QueuedConnection
+        )
+        self._emitter._session_error.connect(
+            self._on_session_error, Qt.ConnectionType.QueuedConnection
         )
 
         self._loop: Optional[asyncio.AbstractEventLoop] = None
@@ -126,13 +131,19 @@ class TerminalBridge(QObject):
 
         Schedules the async session setup on the bridge loop.  When the
         session is ready, ``session_ready`` is emitted on the main thread.
+        If the session cannot be created, ``session_error`` is emitted.
 
         Args:
             container_id: Docker container identifier.
             project_name: Human-readable project name (stored in session).
         """
+        if not HAS_WEBSOCKETS:
+            logger.error("Cannot open terminal session: websockets package is not installed")
+            self.session_error.emit("", "Cannot open terminal: websockets package is not installed.")
+            return
         if self._loop is None:
             logger.warning("open_session called but bridge is not started")
+            self.session_error.emit("", "Terminal bridge is not started.")
             return
         session_id = str(uuid.uuid4())
         asyncio.run_coroutine_threadsafe(
@@ -190,6 +201,9 @@ class TerminalBridge(QObject):
             logger.warning(
                 "exec_create failed for container %s: %s", container_id, exc
             )
+            self._emitter._session_error.emit(
+                session_id, f"Failed to create exec session in container: {exc}"
+            )
             self._emitter._session_ended.emit(session_id)
             return
 
@@ -198,6 +212,9 @@ class TerminalBridge(QObject):
         except Exception as exc:  # pylint: disable=broad-except
             logger.warning(
                 "exec_start_socket failed for exec %s: %s", exec_id, exc
+            )
+            self._emitter._session_error.emit(
+                session_id, f"Failed to start exec socket: {exc}"
             )
             self._emitter._session_ended.emit(session_id)
             return
@@ -227,6 +244,9 @@ class TerminalBridge(QObject):
             raw_sock.close()
             with self._sessions_lock:
                 self._sessions.pop(session_id, None)
+            self._emitter._session_error.emit(
+                session_id, f"Failed to start WebSocket server: {exc}"
+            )
             self._emitter._session_ended.emit(session_id)
             return
 
@@ -396,3 +416,8 @@ class TerminalBridge(QObject):
     def _on_session_ended(self, session_id: str) -> None:
         """Forward the internal signal to the public session_ended signal."""
         self.session_ended.emit(session_id)
+
+    @pyqtSlot(str, str)
+    def _on_session_error(self, session_id: str, error_message: str) -> None:
+        """Forward the internal signal to the public session_error signal."""
+        self.session_error.emit(session_id, error_message)

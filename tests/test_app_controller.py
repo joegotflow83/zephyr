@@ -2214,9 +2214,11 @@ class TestTerminalBridgeWiring:
             "container123", "MyProject"
         )
 
-    def test_handle_open_terminal_no_bridge_does_not_raise(self, controller):
-        """_handle_open_terminal is safe when no bridge is configured."""
-        controller._handle_open_terminal("c1", "p1")  # Should not raise
+    @patch("src.lib.app_controller.QMessageBox")
+    def test_handle_open_terminal_no_bridge_shows_warning(self, MockMsgBox, controller):
+        """_handle_open_terminal shows a warning when no bridge is configured."""
+        controller._handle_open_terminal("c1", "p1")
+        MockMsgBox.warning.assert_called_once()
 
     def test_handle_close_terminal_calls_bridge(
         self, controller_with_bridge, mock_terminal_bridge
@@ -2245,6 +2247,23 @@ class TestTerminalBridgeWiring:
         before = main_window.terminal_tab.session_tabs.count()
         controller_with_bridge._on_session_ended("sess-2")
         assert main_window.terminal_tab.session_tabs.count() < before
+
+    @patch("src.lib.app_controller.QMessageBox")
+    def test_on_session_error_shows_warning(
+        self, MockMsgBox, controller_with_bridge
+    ):
+        """_on_session_error displays an error message box."""
+        controller_with_bridge._on_session_error("sess-err", "exec_create failed: No such container")
+        MockMsgBox.warning.assert_called_once()
+        args = MockMsgBox.warning.call_args[0]
+        assert "exec_create failed" in args[2]
+
+    def test_setup_connects_session_error_signal(
+        self, controller_with_bridge, mock_terminal_bridge
+    ):
+        """setup_connections wires bridge.session_error to the controller."""
+        controller_with_bridge.setup_connections()
+        mock_terminal_bridge.session_error.connect.assert_called_once()
 
     def test_shutdown_stops_bridge(
         self, controller_with_bridge, mock_terminal_bridge
@@ -2287,3 +2306,115 @@ class TestTerminalBridgeWiring:
         mock_docker_manager.list_running_containers.return_value = []
         controller_with_bridge.refresh_all()
         mock_docker_manager.list_running_containers.assert_called_once()
+
+
+# ---------------------------------------------------------------------------
+# Terminal tab refresh on loop start/stop and Docker health changes
+# ---------------------------------------------------------------------------
+
+
+class TestTerminalTabRefreshOnStateChanges:
+    """Verify the terminal tab container list is refreshed when state changes.
+
+    The bug: the terminal tab dropdown was only populated at startup via
+    refresh_all(). Starting/stopping loops and Docker reconnection did not
+    update the list, so users saw an empty dropdown.
+    """
+
+    def test_start_loop_refreshes_terminal_tab(
+        self, controller, mock_loop_runner, mock_docker_manager
+    ):
+        """handle_start_loop refreshes the terminal tab container list."""
+        mock_docker_manager.list_running_containers.return_value = []
+        controller.handle_start_loop("proj123")
+        mock_docker_manager.list_running_containers.assert_called()
+
+    def test_stop_loop_refreshes_terminal_tab(
+        self, controller, mock_loop_runner, mock_docker_manager
+    ):
+        """handle_stop_loop refreshes the terminal tab container list."""
+        mock_docker_manager.list_running_containers.return_value = []
+        controller.handle_stop_loop("proj123")
+        mock_docker_manager.list_running_containers.assert_called()
+
+    def test_docker_connected_refreshes_terminal_tab(
+        self, main_window, mock_docker_manager, mock_project_store,
+        mock_loop_runner, mock_credential_manager, mock_config_manager,
+    ):
+        """_on_docker_connected refreshes the terminal tab container list."""
+        mock_docker_manager.list_running_containers.return_value = [
+            {"id": "abc123", "name": "my-container"},
+        ]
+        ctrl = AppController(
+            main_window=main_window,
+            project_store=mock_project_store,
+            docker_manager=mock_docker_manager,
+            loop_runner=mock_loop_runner,
+            credential_manager=mock_credential_manager,
+            config_manager=mock_config_manager,
+        )
+        ctrl._on_docker_connected()
+        assert main_window.terminal_tab.container_combo.count() == 1
+
+    def test_docker_disconnected_refreshes_terminal_tab(
+        self, main_window, mock_docker_manager, mock_project_store,
+        mock_loop_runner, mock_credential_manager, mock_config_manager,
+    ):
+        """_on_docker_disconnected refreshes (clears) the terminal tab container list."""
+        mock_docker_manager.list_running_containers.return_value = []
+        ctrl = AppController(
+            main_window=main_window,
+            project_store=mock_project_store,
+            docker_manager=mock_docker_manager,
+            loop_runner=mock_loop_runner,
+            credential_manager=mock_credential_manager,
+            config_manager=mock_config_manager,
+        )
+        ctrl._on_docker_disconnected()
+        assert main_window.terminal_tab.container_combo.count() == 0
+
+    def test_tab_changed_to_terminal_refreshes_containers(
+        self, main_window, mock_docker_manager, mock_project_store,
+        mock_loop_runner, mock_credential_manager, mock_config_manager,
+    ):
+        """Switching to the Terminal tab refreshes the container dropdown."""
+        mock_docker_manager.list_running_containers.return_value = [
+            {"id": "abc123", "name": "container-a"},
+            {"id": "def456", "name": "container-b"},
+        ]
+        ctrl = AppController(
+            main_window=main_window,
+            project_store=mock_project_store,
+            docker_manager=mock_docker_manager,
+            loop_runner=mock_loop_runner,
+            credential_manager=mock_credential_manager,
+            config_manager=mock_config_manager,
+        )
+        ctrl.setup_connections()
+
+        # Find terminal tab index
+        terminal_idx = main_window.tab_widget.indexOf(main_window.terminal_tab)
+        main_window.tab_widget.setCurrentIndex(terminal_idx)
+
+        assert main_window.terminal_tab.container_combo.count() == 2
+
+    def test_tab_changed_to_other_tab_does_not_refresh(
+        self, main_window, mock_docker_manager, mock_project_store,
+        mock_loop_runner, mock_credential_manager, mock_config_manager,
+    ):
+        """Switching to a non-terminal tab does not call list_running_containers."""
+        ctrl = AppController(
+            main_window=main_window,
+            project_store=mock_project_store,
+            docker_manager=mock_docker_manager,
+            loop_runner=mock_loop_runner,
+            credential_manager=mock_credential_manager,
+            config_manager=mock_config_manager,
+        )
+        ctrl.setup_connections()
+        mock_docker_manager.list_running_containers.reset_mock()
+
+        # Switch to Projects tab (index 0)
+        main_window.tab_widget.setCurrentIndex(0)
+
+        mock_docker_manager.list_running_containers.assert_not_called()

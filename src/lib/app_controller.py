@@ -137,6 +137,10 @@ class AppController:
         if self._terminal_bridge is not None:
             self._terminal_bridge.session_ready.connect(self._on_session_ready)
             self._terminal_bridge.session_ended.connect(self._on_session_ended)
+            self._terminal_bridge.session_error.connect(self._on_session_error)
+
+        # Lazy-refresh terminal tab when the user switches to it
+        self._window.tab_widget.currentChanged.connect(self._on_tab_changed)
 
     def refresh_all(self) -> None:
         """Refresh all tabs from current backend state."""
@@ -265,6 +269,7 @@ class AppController:
             self._loop_runner.start_loop(project_id, LoopMode.CONTINUOUS)
             logger.info("Started loop for project: %s", project_id)
             self._refresh_loops_tab()
+            self._refresh_terminal_tab()
         except (ValueError, RuntimeError) as exc:
             QMessageBox.warning(self._window, "Start Loop", str(exc))
         except Exception as exc:
@@ -275,6 +280,7 @@ class AppController:
                 f"Failed to start loop:\n{exc}",
             )
             self._refresh_loops_tab()
+            self._refresh_terminal_tab()
 
     def handle_stop_loop(self, project_id: str) -> None:
         """Stop the running loop for the given project."""
@@ -282,6 +288,7 @@ class AppController:
             self._loop_runner.stop_loop(project_id)
             logger.info("Stopped loop for project: %s", project_id)
             self._refresh_loops_tab()
+            self._refresh_terminal_tab()
         except ValueError as exc:
             QMessageBox.warning(self._window, "Stop Loop", str(exc))
 
@@ -678,12 +685,14 @@ class AppController:
         logger.info("Docker daemon connected — updating UI status")
         self._window.set_docker_status(True)
         self._window.settings_tab.set_docker_status(True)
+        self._refresh_terminal_tab()
 
     def _on_docker_disconnected(self) -> None:
         """Update UI when Docker daemon becomes unavailable."""
         logger.warning("Docker daemon disconnected — updating UI status")
         self._window.set_docker_status(False)
         self._window.settings_tab.set_docker_status(False)
+        self._refresh_terminal_tab()
 
     def shutdown(self) -> None:
         """Stop background services managed by the controller."""
@@ -691,6 +700,14 @@ class AppController:
             self._terminal_bridge.stop()
         if self._docker_health_monitor is not None:
             self._docker_health_monitor.stop()
+
+    # -- Tab change handler -------------------------------------------------
+
+    def _on_tab_changed(self, index: int) -> None:
+        """Refresh the terminal tab's container list when it becomes active."""
+        widget = self._window.tab_widget.widget(index)
+        if widget is self._window.terminal_tab:
+            self._refresh_terminal_tab()
 
     # -- Internal refresh helpers -------------------------------------------
 
@@ -747,7 +764,12 @@ class AppController:
     def _handle_open_terminal(self, container_id: str, project_name: str) -> None:
         """Request a new terminal session via the terminal bridge."""
         if self._terminal_bridge is None:
-            logger.warning("Terminal bridge not available — cannot open terminal session")
+            QMessageBox.warning(
+                self._window,
+                "Terminal Unavailable",
+                "Terminal bridge is not available.\n"
+                "Please ensure the terminal bridge is properly initialized.",
+            )
             return
         self._terminal_bridge.open_session(container_id, project_name)
 
@@ -764,3 +786,12 @@ class AppController:
     def _on_session_ended(self, session_id: str) -> None:
         """Remove a terminal session tab when the bridge reports it has ended."""
         self._window.terminal_tab.close_session(session_id)
+
+    def _on_session_error(self, session_id: str, error_message: str) -> None:
+        """Show an error dialog when a terminal session fails to open."""
+        logger.error("Terminal session error: %s", error_message)
+        QMessageBox.warning(
+            self._window,
+            "Terminal Error",
+            f"Failed to open terminal session:\n\n{error_message}",
+        )
