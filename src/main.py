@@ -30,6 +30,7 @@ from src.lib.notifier import Notifier
 from src.lib.project_store import ProjectStore
 from src.lib.scheduler import LoopScheduler
 from src.lib.self_updater import SelfUpdater
+from src.lib.terminal_bridge import TerminalBridge
 from src.ui.main_window import MainWindow
 
 logger = logging.getLogger("zephyr.main")
@@ -85,6 +86,9 @@ def _create_services(config_manager: ConfigManager) -> dict:
     git_manager = GitManager()
     self_updater = SelfUpdater(git_manager, loop_runner)
 
+    # Terminal bridge — WebSocket-to-Docker-exec relay for embedded terminal
+    terminal_bridge = TerminalBridge(docker_manager)
+
     return {
         "config_manager": config_manager,
         "project_store": project_store,
@@ -100,6 +104,7 @@ def _create_services(config_manager: ConfigManager) -> dict:
         "login_manager": login_manager,
         "git_manager": git_manager,
         "self_updater": self_updater,
+        "terminal_bridge": terminal_bridge,
     }
 
 
@@ -163,8 +168,12 @@ def create_app(
         login_manager=services["login_manager"],
         self_updater=services["self_updater"],
         git_manager=services["git_manager"],
+        terminal_bridge=services["terminal_bridge"],
     )
     controller.setup_connections()
+
+    # Start the terminal bridge asyncio thread after controller is wired
+    services["terminal_bridge"].start()
 
     # Wire log bridge to the loops tab
     log_bridge.log_received.connect(window.loops_tab.append_log)

@@ -35,6 +35,7 @@ from src.lib.models import AppSettings
 from src.lib.notifier import Notifier
 from src.lib.project_store import ProjectStore
 from src.lib.self_updater import SelfUpdater
+from src.lib.terminal_bridge import TerminalBridge
 from src.ui.credential_dialog import CredentialDialog
 from src.ui.main_window import MainWindow
 from src.ui.project_dialog import ProjectDialog
@@ -68,6 +69,7 @@ class AppController:
         login_manager: LoginManager | None = None,
         self_updater: SelfUpdater | None = None,
         git_manager: GitManager | None = None,
+        terminal_bridge: TerminalBridge | None = None,
     ) -> None:
         self._window = main_window
         self._project_store = project_store
@@ -81,6 +83,7 @@ class AppController:
         self._login_manager = login_manager
         self._self_updater = self_updater
         self._git_manager = git_manager
+        self._terminal_bridge = terminal_bridge
 
     def setup_connections(self) -> None:
         """Connect all UI signals to their handler methods."""
@@ -125,12 +128,23 @@ class AppController:
                 self._on_docker_disconnected
             )
 
+        # Terminal tab signals
+        terminal_tab = self._window.terminal_tab
+        terminal_tab.terminal_requested.connect(self._handle_open_terminal)
+        terminal_tab.session_close_requested.connect(self._handle_close_terminal)
+
+        # Terminal bridge signals (bridge → UI)
+        if self._terminal_bridge is not None:
+            self._terminal_bridge.session_ready.connect(self._on_session_ready)
+            self._terminal_bridge.session_ended.connect(self._on_session_ended)
+
     def refresh_all(self) -> None:
         """Refresh all tabs from current backend state."""
         self._refresh_projects_tab()
         self._refresh_loops_tab()
         self._refresh_settings()
         self._refresh_docker_status()
+        self._refresh_terminal_tab()
 
     # -- Project handlers ---------------------------------------------------
 
@@ -673,6 +687,8 @@ class AppController:
 
     def shutdown(self) -> None:
         """Stop background services managed by the controller."""
+        if self._terminal_bridge is not None:
+            self._terminal_bridge.stop()
         if self._docker_health_monitor is not None:
             self._docker_health_monitor.stop()
 
@@ -716,3 +732,35 @@ class AppController:
         connected = self._docker_manager.is_docker_available()
         self._window.set_docker_status(connected)
         self._window.settings_tab.set_docker_status(connected)
+
+    def _refresh_terminal_tab(self) -> None:
+        """Reload the terminal tab's container dropdown from running containers."""
+        try:
+            containers = self._docker_manager.list_running_containers()
+        except Exception:  # pylint: disable=broad-except
+            logger.debug("Failed to list running containers for terminal tab", exc_info=True)
+            containers = []
+        self._window.terminal_tab.refresh(containers)
+
+    # -- Terminal handlers --------------------------------------------------
+
+    def _handle_open_terminal(self, container_id: str, project_name: str) -> None:
+        """Request a new terminal session via the terminal bridge."""
+        if self._terminal_bridge is None:
+            logger.warning("Terminal bridge not available — cannot open terminal session")
+            return
+        self._terminal_bridge.open_session(container_id, project_name)
+
+    def _handle_close_terminal(self, session_id: str) -> None:
+        """Close an existing terminal session via the terminal bridge."""
+        if self._terminal_bridge is None:
+            return
+        self._terminal_bridge.close_session(session_id)
+
+    def _on_session_ready(self, session_id: str, port: int, user: str) -> None:
+        """Add a new terminal session tab when the bridge reports it's ready."""
+        self._window.terminal_tab.add_session(session_id, user, port)
+
+    def _on_session_ended(self, session_id: str) -> None:
+        """Remove a terminal session tab when the bridge reports it has ended."""
+        self._window.terminal_tab.close_session(session_id)

@@ -146,8 +146,8 @@ class TestAppStartup:
             qtbot.addWidget(window)
             assert window.windowTitle() == "Zephyr Desktop"
 
-    def test_window_has_three_tabs(self, qtbot, tmp_path):
-        """After startup the main window has Projects, Running Loops, Settings tabs."""
+    def test_window_has_four_tabs(self, qtbot, tmp_path):
+        """After startup the main window has Projects, Running Loops, Settings, Terminal tabs."""
         with (
             _mock_docker_module(available=False),
             _mock_keyring(),
@@ -170,10 +170,11 @@ class TestAppStartup:
             qtbot.addWidget(window)
 
             tab_widget = window.tab_widget
-            assert tab_widget.count() == 3
+            assert tab_widget.count() == 4
             assert tab_widget.tabText(0) == "Projects"
             assert tab_widget.tabText(1) == "Running Loops"
             assert tab_widget.tabText(2) == "Settings"
+            assert tab_widget.tabText(3) == "Terminal"
 
     def test_services_stored_on_window(self, qtbot, tmp_path):
         """All backend services are accessible via window._services."""
@@ -205,6 +206,7 @@ class TestAppStartup:
                 "docker_manager",
                 "credential_manager",
                 "loop_runner",
+                "terminal_bridge",
                 "loop_scheduler",
                 "asset_injector",
                 "notifier",
@@ -414,6 +416,7 @@ class TestCreateServices:
                 "login_manager",
                 "git_manager",
                 "self_updater",
+                "terminal_bridge",
             }
             assert set(services.keys()) == expected_keys
 

@@ -2115,3 +2115,175 @@ class TestImagePullPreCheck:
         mock_loop_runner.start_loop.assert_called_once_with(
             "proj123", LoopMode.CONTINUOUS
         )
+
+
+# ---------------------------------------------------------------------------
+# TerminalBridge wiring
+# ---------------------------------------------------------------------------
+
+
+class TestTerminalBridgeWiring:
+    """Verify TerminalBridge is wired into AppController correctly.
+
+    The terminal bridge connects xterm.js terminal sessions to Docker exec
+    PTYs.  AppController must:
+    - Accept and store the terminal_bridge parameter
+    - Wire terminal_tab signals to the bridge in setup_connections()
+    - Wire bridge signals back to the UI
+    - Call bridge.stop() in shutdown()
+    - Populate the terminal_tab container dropdown via _refresh_terminal_tab()
+    """
+
+    @pytest.fixture
+    def mock_terminal_bridge(self):
+        from src.lib.terminal_bridge import TerminalBridge
+
+        bridge = MagicMock(spec=TerminalBridge)
+        # Provide real PyQt signal-like mocks for connect() calls
+        bridge.session_ready = MagicMock()
+        bridge.session_ended = MagicMock()
+        return bridge
+
+    @pytest.fixture
+    def controller_with_bridge(
+        self,
+        main_window,
+        mock_project_store,
+        mock_docker_manager,
+        mock_loop_runner,
+        mock_credential_manager,
+        mock_config_manager,
+        mock_terminal_bridge,
+    ):
+        return AppController(
+            main_window=main_window,
+            project_store=mock_project_store,
+            docker_manager=mock_docker_manager,
+            loop_runner=mock_loop_runner,
+            credential_manager=mock_credential_manager,
+            config_manager=mock_config_manager,
+            terminal_bridge=mock_terminal_bridge,
+        )
+
+    def test_terminal_bridge_stored_on_controller(
+        self, controller_with_bridge, mock_terminal_bridge
+    ):
+        """The terminal bridge is accessible via the controller."""
+        assert controller_with_bridge._terminal_bridge is mock_terminal_bridge
+
+    def test_terminal_bridge_default_is_none(self, controller):
+        """Without explicit terminal_bridge, the attribute is None."""
+        assert controller._terminal_bridge is None
+
+    def test_setup_connects_bridge_signals(
+        self, controller_with_bridge, mock_terminal_bridge
+    ):
+        """setup_connections wires session_ready and session_ended signals."""
+        controller_with_bridge.setup_connections()
+        mock_terminal_bridge.session_ready.connect.assert_called_once()
+        mock_terminal_bridge.session_ended.connect.assert_called_once()
+
+    def test_setup_no_bridge_signals_without_bridge(self, controller):
+        """When no bridge is provided, setup_connections does not fail."""
+        controller.setup_connections()  # Should not raise
+
+    def test_terminal_tab_signals_connected(
+        self, controller_with_bridge, main_window
+    ):
+        """setup_connections wires terminal_tab.terminal_requested signal."""
+        tab = main_window.terminal_tab
+        before = tab.receivers(tab.terminal_requested)
+        controller_with_bridge.setup_connections()
+        assert tab.receivers(tab.terminal_requested) > before
+
+    def test_terminal_tab_close_signal_connected(
+        self, controller_with_bridge, main_window
+    ):
+        """setup_connections wires terminal_tab.session_close_requested signal."""
+        tab = main_window.terminal_tab
+        before = tab.receivers(tab.session_close_requested)
+        controller_with_bridge.setup_connections()
+        assert tab.receivers(tab.session_close_requested) > before
+
+    def test_handle_open_terminal_calls_bridge(
+        self, controller_with_bridge, mock_terminal_bridge
+    ):
+        """_handle_open_terminal delegates to bridge.open_session."""
+        controller_with_bridge._handle_open_terminal("container123", "MyProject")
+        mock_terminal_bridge.open_session.assert_called_once_with(
+            "container123", "MyProject"
+        )
+
+    def test_handle_open_terminal_no_bridge_does_not_raise(self, controller):
+        """_handle_open_terminal is safe when no bridge is configured."""
+        controller._handle_open_terminal("c1", "p1")  # Should not raise
+
+    def test_handle_close_terminal_calls_bridge(
+        self, controller_with_bridge, mock_terminal_bridge
+    ):
+        """_handle_close_terminal delegates to bridge.close_session."""
+        controller_with_bridge._handle_close_terminal("session-abc")
+        mock_terminal_bridge.close_session.assert_called_once_with("session-abc")
+
+    def test_handle_close_terminal_no_bridge_does_not_raise(self, controller):
+        """_handle_close_terminal is safe when no bridge is configured."""
+        controller._handle_close_terminal("s1")  # Should not raise
+
+    def test_on_session_ready_adds_tab(
+        self, controller_with_bridge, main_window, qtbot
+    ):
+        """_on_session_ready adds a session to the terminal tab."""
+        before = main_window.terminal_tab.session_tabs.count()
+        controller_with_bridge._on_session_ready("sess-1", 9001, "root")
+        assert main_window.terminal_tab.session_tabs.count() > before
+
+    def test_on_session_ended_removes_tab(
+        self, controller_with_bridge, main_window, qtbot
+    ):
+        """_on_session_ended removes a session tab from the terminal tab."""
+        controller_with_bridge._on_session_ready("sess-2", 9002, "root")
+        before = main_window.terminal_tab.session_tabs.count()
+        controller_with_bridge._on_session_ended("sess-2")
+        assert main_window.terminal_tab.session_tabs.count() < before
+
+    def test_shutdown_stops_bridge(
+        self, controller_with_bridge, mock_terminal_bridge
+    ):
+        """shutdown() calls stop() on the terminal bridge."""
+        controller_with_bridge.shutdown()
+        mock_terminal_bridge.stop.assert_called_once()
+
+    def test_shutdown_without_bridge(self, controller):
+        """shutdown() is safe when no terminal bridge is provided."""
+        controller.shutdown()  # Should not raise
+
+    def test_refresh_terminal_tab_populates_containers(
+        self, controller_with_bridge, mock_docker_manager, main_window
+    ):
+        """_refresh_terminal_tab passes running containers to terminal_tab."""
+        containers = [
+            {"id": "abc123", "name": "my-container"},
+            {"id": "def456", "name": "other-container"},
+        ]
+        mock_docker_manager.list_running_containers.return_value = containers
+
+        controller_with_bridge._refresh_terminal_tab()
+
+        # Verify combo box has entries for both containers
+        combo = main_window.terminal_tab.container_combo
+        assert combo.count() == 2
+
+    def test_refresh_terminal_tab_handles_exception(
+        self, controller_with_bridge, mock_docker_manager
+    ):
+        """_refresh_terminal_tab does not crash when Docker call raises."""
+        mock_docker_manager.list_running_containers.side_effect = Exception("Docker error")
+        controller_with_bridge._refresh_terminal_tab()  # Should not raise
+
+    def test_refresh_all_includes_terminal_tab(
+        self, controller_with_bridge, mock_docker_manager
+    ):
+        """refresh_all() also calls _refresh_terminal_tab."""
+        mock_docker_manager.list_running_containers.return_value = []
+        controller_with_bridge.refresh_all()
+        mock_docker_manager.list_running_containers.assert_called_once()
