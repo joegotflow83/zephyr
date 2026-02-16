@@ -49,27 +49,23 @@ def _make_docker_manager() -> MagicMock:
 # ---------------------------------------------------------------------------
 
 class TestFindFreePort:
-    def test_returns_integer(self) -> None:
+    def test_returns_integer(self, qapp) -> None:
         from src.lib.terminal_bridge import TerminalBridge
         dm = _make_docker_manager()
-        # We need a QCoreApplication to create QObject subclasses
-        app = QCoreApplication.instance() or QCoreApplication([])
         bridge = TerminalBridge(dm)
         port = bridge._find_free_port()
         assert isinstance(port, int)
 
-    def test_port_in_valid_range(self) -> None:
+    def test_port_in_valid_range(self, qapp) -> None:
         from src.lib.terminal_bridge import TerminalBridge
-        app = QCoreApplication.instance() or QCoreApplication([])
         dm = _make_docker_manager()
         bridge = TerminalBridge(dm)
         port = bridge._find_free_port()
         assert 1024 <= port <= 65535
 
-    def test_port_is_available(self) -> None:
+    def test_port_is_available(self, qapp) -> None:
         """The port returned should be bindable (briefly free at call time)."""
         from src.lib.terminal_bridge import TerminalBridge
-        app = QCoreApplication.instance() or QCoreApplication([])
         dm = _make_docker_manager()
         bridge = TerminalBridge(dm)
         port = bridge._find_free_port()
@@ -80,16 +76,14 @@ class TestFindFreePort:
 
 
 class TestGetSessionContainerName:
-    def test_returns_empty_for_unknown_session(self) -> None:
+    def test_returns_empty_for_unknown_session(self, qapp) -> None:
         from src.lib.terminal_bridge import TerminalBridge
-        app = QCoreApplication.instance() or QCoreApplication([])
         dm = _make_docker_manager()
         bridge = TerminalBridge(dm)
         assert bridge.get_session_container_name("nonexistent") == ""
 
-    def test_returns_name_for_known_session(self) -> None:
+    def test_returns_name_for_known_session(self, qapp) -> None:
         from src.lib.terminal_bridge import TerminalBridge
-        app = QCoreApplication.instance() or QCoreApplication([])
         dm = _make_docker_manager()
         bridge = TerminalBridge(dm)
         # Manually inject a session entry
@@ -98,9 +92,8 @@ class TestGetSessionContainerName:
 
 
 class TestStartStop:
-    def test_start_creates_thread(self) -> None:
+    def test_start_creates_thread(self, qapp) -> None:
         from src.lib.terminal_bridge import TerminalBridge
-        app = QCoreApplication.instance() or QCoreApplication([])
         dm = _make_docker_manager()
         bridge = TerminalBridge(dm)
         bridge.start()
@@ -108,9 +101,8 @@ class TestStartStop:
         assert bridge._thread.is_alive()
         bridge.stop()
 
-    def test_stop_clears_thread(self) -> None:
+    def test_stop_clears_thread(self, qapp) -> None:
         from src.lib.terminal_bridge import TerminalBridge
-        app = QCoreApplication.instance() or QCoreApplication([])
         dm = _make_docker_manager()
         bridge = TerminalBridge(dm)
         bridge.start()
@@ -118,9 +110,8 @@ class TestStartStop:
         assert bridge._thread is None
         assert bridge._loop is None
 
-    def test_double_start_is_idempotent(self) -> None:
+    def test_double_start_is_idempotent(self, qapp) -> None:
         from src.lib.terminal_bridge import TerminalBridge
-        app = QCoreApplication.instance() or QCoreApplication([])
         dm = _make_docker_manager()
         bridge = TerminalBridge(dm)
         bridge.start()
@@ -129,16 +120,14 @@ class TestStartStop:
         assert bridge._thread is t1
         bridge.stop()
 
-    def test_stop_without_start_is_safe(self) -> None:
+    def test_stop_without_start_is_safe(self, qapp) -> None:
         from src.lib.terminal_bridge import TerminalBridge
-        app = QCoreApplication.instance() or QCoreApplication([])
         dm = _make_docker_manager()
         bridge = TerminalBridge(dm)
         bridge.stop()  # should not raise
 
-    def test_start_creates_asyncio_loop(self) -> None:
+    def test_start_creates_asyncio_loop(self, qapp) -> None:
         from src.lib.terminal_bridge import TerminalBridge
-        app = QCoreApplication.instance() or QCoreApplication([])
         dm = _make_docker_manager()
         bridge = TerminalBridge(dm)
         bridge.start()
@@ -148,20 +137,18 @@ class TestStartStop:
 
 
 class TestOpenSessionWithoutStart:
-    def test_open_session_without_start_logs_warning(self, caplog) -> None:
+    def test_open_session_without_start_logs_warning(self, qapp, caplog) -> None:
         """open_session before start() should warn but not raise."""
         import logging
         from src.lib.terminal_bridge import TerminalBridge
-        app = QCoreApplication.instance() or QCoreApplication([])
         dm = _make_docker_manager()
         bridge = TerminalBridge(dm)
         with caplog.at_level(logging.WARNING, logger="zephyr.terminal_bridge"):
             bridge.open_session("container-123", "my-project")
         assert "not started" in caplog.text.lower() or caplog.records  # warning was emitted
 
-    def test_close_session_without_start_is_safe(self) -> None:
+    def test_close_session_without_start_is_safe(self, qapp) -> None:
         from src.lib.terminal_bridge import TerminalBridge
-        app = QCoreApplication.instance() or QCoreApplication([])
         dm = _make_docker_manager()
         bridge = TerminalBridge(dm)
         bridge.close_session("nonexistent-session")  # should not raise
@@ -175,12 +162,11 @@ def _make_mock_websockets():
 
 
 class TestOpenSessionCallsDockerManager:
-    def test_open_session_calls_exec_create_with_root_user(self) -> None:
+    def test_open_session_calls_exec_create_with_root_user(self, qapp) -> None:
         """open_session must call exec_create with user='root'."""
         import sys
         from src.lib.terminal_bridge import TerminalBridge
 
-        app = QCoreApplication.instance() or QCoreApplication([])
         dm = _make_docker_manager()
 
         mock_ws = _make_mock_websockets()
@@ -198,12 +184,11 @@ class TestOpenSessionCallsDockerManager:
             "container-abc", ["/bin/bash"], user="root"
         )
 
-    def test_open_session_calls_exec_start_socket(self) -> None:
+    def test_open_session_calls_exec_start_socket(self, qapp) -> None:
         """open_session must call exec_start_socket after exec_create."""
         import sys
         from src.lib.terminal_bridge import TerminalBridge
 
-        app = QCoreApplication.instance() or QCoreApplication([])
         dm = _make_docker_manager()
 
         mock_ws = _make_mock_websockets()
@@ -220,11 +205,10 @@ class TestOpenSessionCallsDockerManager:
 
 
 class TestOpenSessionErrorHandling:
-    def test_exec_create_failure_does_not_crash(self) -> None:
+    def test_exec_create_failure_does_not_crash(self, qapp) -> None:
         """If exec_create raises, the bridge should not crash."""
         from src.lib.terminal_bridge import TerminalBridge
 
-        app = QCoreApplication.instance() or QCoreApplication([])
         dm = _make_docker_manager()
         dm.exec_create.side_effect = RuntimeError("Docker exec failed")
 
@@ -235,11 +219,10 @@ class TestOpenSessionErrorHandling:
         bridge.stop()
         # If we get here without crashing, the test passes
 
-    def test_exec_start_socket_failure_does_not_crash(self) -> None:
+    def test_exec_start_socket_failure_does_not_crash(self, qapp) -> None:
         """If exec_start_socket raises, the bridge should not crash."""
         from src.lib.terminal_bridge import TerminalBridge
 
-        app = QCoreApplication.instance() or QCoreApplication([])
         dm = _make_docker_manager()
         dm.exec_start_socket.side_effect = RuntimeError("Socket error")
 
@@ -251,11 +234,10 @@ class TestOpenSessionErrorHandling:
 
 
 class TestCloseSession:
-    def test_close_nonexistent_session_is_safe(self) -> None:
+    def test_close_nonexistent_session_is_safe(self, qapp) -> None:
         """close_session for unknown session_id should not raise."""
         from src.lib.terminal_bridge import TerminalBridge
 
-        app = QCoreApplication.instance() or QCoreApplication([])
         dm = _make_docker_manager()
 
         bridge = TerminalBridge(dm)
@@ -264,11 +246,10 @@ class TestCloseSession:
         time.sleep(0.1)
         bridge.stop()
 
-    def test_close_session_removes_from_sessions_dict(self) -> None:
+    def test_close_session_removes_from_sessions_dict(self, qapp) -> None:
         """After close_session, the session must no longer be in _sessions."""
         from src.lib.terminal_bridge import TerminalBridge
 
-        app = QCoreApplication.instance() or QCoreApplication([])
         dm = _make_docker_manager()
 
         bridge = TerminalBridge(dm)
@@ -291,10 +272,9 @@ class TestCloseSession:
 
 
 class TestReadSocket:
-    def test_read_socket_returns_bytes(self) -> None:
+    def test_read_socket_returns_bytes(self, qapp) -> None:
         from src.lib.terminal_bridge import TerminalBridge
 
-        app = QCoreApplication.instance() or QCoreApplication([])
         dm = _make_docker_manager()
         bridge = TerminalBridge(dm)
 
@@ -303,10 +283,9 @@ class TestReadSocket:
         result = bridge._read_socket(mock_sock)
         assert result == b"hello"
 
-    def test_read_socket_returns_empty_on_error(self) -> None:
+    def test_read_socket_returns_empty_on_error(self, qapp) -> None:
         from src.lib.terminal_bridge import TerminalBridge
 
-        app = QCoreApplication.instance() or QCoreApplication([])
         dm = _make_docker_manager()
         bridge = TerminalBridge(dm)
 
@@ -315,10 +294,9 @@ class TestReadSocket:
         result = bridge._read_socket(mock_sock)
         assert result == b""
 
-    def test_read_socket_returns_empty_on_eof(self) -> None:
+    def test_read_socket_returns_empty_on_eof(self, qapp) -> None:
         from src.lib.terminal_bridge import TerminalBridge
 
-        app = QCoreApplication.instance() or QCoreApplication([])
         dm = _make_docker_manager()
         bridge = TerminalBridge(dm)
 
@@ -329,11 +307,10 @@ class TestReadSocket:
 
 
 class TestBridgeEmitterSignals:
-    def test_session_ready_signal_forwarded(self) -> None:
+    def test_session_ready_signal_forwarded(self, qapp) -> None:
         """session_ready on _emitter must arrive at TerminalBridge.session_ready."""
         from src.lib.terminal_bridge import TerminalBridge
 
-        app = QCoreApplication.instance() or QCoreApplication([])
         dm = _make_docker_manager()
         bridge = TerminalBridge(dm)
 
@@ -348,11 +325,10 @@ class TestBridgeEmitterSignals:
         _process_events(200)
         assert received == [("sess-x", 9999, "root")]
 
-    def test_session_ended_signal_forwarded(self) -> None:
+    def test_session_ended_signal_forwarded(self, qapp) -> None:
         """session_ended on _emitter must arrive at TerminalBridge.session_ended."""
         from src.lib.terminal_bridge import TerminalBridge
 
-        app = QCoreApplication.instance() or QCoreApplication([])
         dm = _make_docker_manager()
         bridge = TerminalBridge(dm)
 
@@ -364,18 +340,16 @@ class TestBridgeEmitterSignals:
 
 
 class TestGetExecId:
-    def test_get_exec_id_returns_empty_for_unknown(self) -> None:
+    def test_get_exec_id_returns_empty_for_unknown(self, qapp) -> None:
         from src.lib.terminal_bridge import TerminalBridge
 
-        app = QCoreApplication.instance() or QCoreApplication([])
         dm = _make_docker_manager()
         bridge = TerminalBridge(dm)
         assert bridge._get_exec_id("nope") == ""
 
-    def test_get_exec_id_returns_correct_value(self) -> None:
+    def test_get_exec_id_returns_correct_value(self, qapp) -> None:
         from src.lib.terminal_bridge import TerminalBridge
 
-        app = QCoreApplication.instance() or QCoreApplication([])
         dm = _make_docker_manager()
         bridge = TerminalBridge(dm)
         bridge._sessions["s1"] = {"exec_id": "eid-abc", "tasks": []}
