@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Zephyr Terminal</title>
+<link rel="stylesheet" href="xterm/xterm.css">
+<style>
+  * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+
+  html, body {
+    width: 100%;
+    height: 100%;
+    background: #1e1e1e;
+    overflow: hidden;
+  }
+
+  #terminal-container {
+    width: 100%;
+    height: 100%;
+    padding: 4px;
+    border: 2px solid #2d8a2d;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  }
+
+  #terminal-container.root-mode {
+    border-color: #cc2222;
+    box-shadow: 0 0 8px rgba(204, 34, 34, 0.6), inset 0 0 4px rgba(204, 34, 34, 0.2);
+  }
+
+  #terminal {
+    width: 100%;
+    height: 100%;
+  }
+
+  .xterm-viewport {
+    overflow-y: auto !important;
+  }
+</style>
+</head>
+<body>
+<div id="terminal-container">
+  <div id="terminal"></div>
+</div>
+
+<script src="xterm/xterm.js"></script>
+<script src="xterm/xterm-addon-fit.js"></script>
+<script>
+(function () {
+  'use strict';
+
+  // Parse query parameters
+  var params = new URLSearchParams(window.location.search);
+  var port = params.get('port');
+  var sessionId = params.get('session');
+
+  if (!port || !sessionId) {
+    document.body.innerHTML = '<pre style="color:#cc2222;padding:1em">Error: missing port or session query parameters</pre>';
+    return;
+  }
+
+  // Initialise xterm.js
+  var term = new Terminal({
+    cursorBlink: true,
+    fontSize: 13,
+    fontFamily: '"Cascadia Code", "Fira Code", "JetBrains Mono", "Menlo", "DejaVu Sans Mono", monospace',
+    theme: {
+      background: '#1e1e1e',
+      foreground: '#d4d4d4',
+      cursor: '#d4d4d4',
+      black:   '#1e1e1e',
+      red:     '#f44747',
+      green:   '#6a9955',
+      yellow:  '#d7ba7d',
+      blue:    '#569cd6',
+      magenta: '#c678dd',
+      cyan:    '#4ec9b0',
+      white:   '#d4d4d4',
+      brightBlack:   '#808080',
+      brightRed:     '#f44747',
+      brightGreen:   '#b5cea8',
+      brightYellow:  '#dcdcaa',
+      brightBlue:    '#9cdcfe',
+      brightMagenta: '#c586c0',
+      brightCyan:    '#4fc1ff',
+      brightWhite:   '#ffffff'
+    }
+  });
+
+  var fitAddon = new FitAddon.FitAddon();
+  term.loadAddon(fitAddon);
+  term.open(document.getElementById('terminal'));
+  fitAddon.fit();
+
+  // WebSocket connection
+  var wsUrl = 'ws://127.0.0.1:' + port;
+  var ws = new WebSocket(wsUrl);
+  var connected = false;
+
+  ws.onopen = function () {
+    connected = true;
+    // Send initial resize so the server knows the terminal dimensions
+    sendResize();
+  };
+
+  ws.onmessage = function (event) {
+    try {
+      var msg = JSON.parse(event.data);
+      if (msg.type === 'data') {
+        term.write(msg.data);
+      }
+    } catch (e) {
+      // Fallback: write raw data if not JSON
+      term.write(event.data);
+    }
+  };
+
+  ws.onerror = function () {
+    term.write('\r\n\x1b[31mWebSocket error — connection failed\x1b[0m\r\n');
+  };
+
+  ws.onclose = function () {
+    connected = false;
+    term.write('\r\n\x1b[33mSession ended.\x1b[0m\r\n');
+  };
+
+  // Forward keystrokes to the server
+  term.onData(function (data) {
+    if (connected && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({ type: 'data', data: data }));
+    }
+  });
+
+  // Send resize message to server
+  function sendResize() {
+    if (connected && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({
+        type: 'resize',
+        cols: term.cols,
+        rows: term.rows
+      }));
+    }
+  }
+
+  // Fit terminal on window resize
+  var resizeTimer;
+  window.addEventListener('resize', function () {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(function () {
+      fitAddon.fit();
+      sendResize();
+    }, 100);
+  });
+
+  // Expose setUserTheme for Python to call via QWebEngineView.runJavaScript
+  window.setUserTheme = function (user) {
+    var container = document.getElementById('terminal-container');
+    if (user === 'root') {
+      container.classList.add('root-mode');
+    } else {
+      container.classList.remove('root-mode');
+    }
+  };
+
+  // Apply initial theme if needed (Python may call this after page load)
+  window._fitAddon = fitAddon;
+})();
+</script>
+</body>
+</html>
