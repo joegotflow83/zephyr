@@ -15,6 +15,7 @@ htmlcov/
 test-results.xml
 src/lib/_version.py
 loop.sh
+*.origi
 IMPLEMENTATION_PLAN.md
 AGENTS.md
 PROMPT_plan.md
