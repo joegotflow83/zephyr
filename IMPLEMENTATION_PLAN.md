@@ -4,7 +4,7 @@
 **Branch**: `electron-rewrite`
 **Goal**: Rewrite Zephyr Desktop from Python/PyQt6 to Electron + React + TypeScript, delivering a native-quality desktop application with integrated terminal (xterm.js), Docker container orchestration, and AI loop execution management.
 
-**Status**: Phase 1 complete. Phase 2.1, 2.2, and 2.3 done. Next: Phase 2.4 (import/export service).
+**Status**: Phase 1 complete. Phase 2.1, 2.2, 2.3, and 2.4 done. Next: Phase 2.5 (wire data services to IPC handlers).
 
 ## Environment Notes
 - Node.js installed via NVM: `source /home/ralph/.nvm/nvm.sh && node --version`
@@ -100,13 +100,16 @@
   - **Dependency**: Task 2.2
   - Acceptance: CRUD, duplicate detection, not-found handling tested ✓
 
-- [ ] **2.4** Implement import/export service
+- [x] **2.4** Implement import/export service
   - File: `src/services/import-export.ts`
-  - Install `archiver` and `adm-zip` (or `extract-zip`)
+  - Installed `archiver`, `adm-zip`, `@types/archiver`, `@types/adm-zip`
   - Methods: `exportConfig(outputPath)`, `importConfig(zipPath)`
-  - Tests: `tests/unit/import-export.test.ts`
+  - Includes projects.json, settings.json, custom-prompts/*.json in zip
+  - Path traversal prevention in importConfig
+  - Tests: `tests/unit/import-export.test.ts` — 15 tests, all passing
+  - **Note**: Test file uses `@vitest-environment node` (not jsdom) — adm-zip Buffer decompression is broken in jsdom environment
   - **Dependency**: Task 2.2
-  - Acceptance: Round-trip export/import preserves all data
+  - Acceptance: Round-trip export/import preserves all data ✓
 
 - [ ] **2.5** Wire data services to IPC handlers
   - File: `src/main/ipc-handlers/data-handlers.ts`
