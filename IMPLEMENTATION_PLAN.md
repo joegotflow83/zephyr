@@ -4,7 +4,7 @@
 **Branch**: `electron-rewrite`
 **Goal**: Rewrite Zephyr Desktop from Python/PyQt6 to Electron + React + TypeScript, delivering a native-quality desktop application with integrated terminal (xterm.js), Docker container orchestration, and AI loop execution management.
 
-**Status**: Phase 1 complete. Phase 2.1, 2.2, 2.3, and 2.4 done. Next: Phase 2.5 (wire data services to IPC handlers).
+**Status**: Phase 1 complete. Phase 2 complete (2.1–2.5 done). Next: Phase 3.1 (DockerManager — connection and image operations).
 
 ## Environment Notes
 - Node.js installed via NVM: `source /home/ralph/.nvm/nvm.sh && node --version`
@@ -111,14 +111,16 @@
   - **Dependency**: Task 2.2
   - Acceptance: Round-trip export/import preserves all data ✓
 
-- [ ] **2.5** Wire data services to IPC handlers
+- [x] **2.5** Wire data services to IPC handlers
   - File: `src/main/ipc-handlers/data-handlers.ts`
   - Register `ipcMain.handle()` for: `projects:list`, `projects:get`, `projects:add`, `projects:update`, `projects:remove`, `settings:load`, `settings:save`, `config:export`, `config:import`
-  - Update `src/main/preload.ts` with `window.api.projects.*` and `window.api.settings.*`
-  - Update `src/shared/ipc-channels.ts` with channel constants
-  - Tests: `tests/unit/data-handlers.test.ts` (mock IPC, verify routing)
-  - **Dependency**: Tasks 2.1-2.4, Task 1.4
-  - Acceptance: Renderer calls `window.api.projects.list()` and receives data
+  - Updated `src/main/preload.ts` with `window.api.projects.*`, `window.api.settings.*`, `window.api.config.*`
+  - Created `src/shared/ipc-channels.ts` with all channel constants as `IPC.*`
+  - Updated `src/renderer/types/global.d.ts` with full typed API surface
+  - Updated `src/main/index.ts` to instantiate services and call `registerDataHandlers()`
+  - Tests: `tests/unit/data-handlers.test.ts` — 16 tests, all passing
+  - `config:export` and `config:import` use Electron `dialog` to show native file pickers
+  - Acceptance: All 114 unit tests pass ✓
 
 ---
 
