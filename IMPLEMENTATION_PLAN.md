@@ -4,7 +4,7 @@
 **Branch**: `electron-rewrite`
 **Goal**: Rewrite Zephyr Desktop from Python/PyQt6 to Electron + React + TypeScript, delivering a native-quality desktop application with integrated terminal (xterm.js), Docker container orchestration, and AI loop execution management.
 
-**Status**: Phase 1 complete. Phase 2.1 and 2.2 done. Next: Phase 2.3 (ProjectStore).
+**Status**: Phase 1 complete. Phase 2.1, 2.2, and 2.3 done. Next: Phase 2.4 (import/export service).
 
 ## Environment Notes
 - Node.js installed via NVM: `source /home/ralph/.nvm/nvm.sh && node --version`
@@ -91,14 +91,14 @@
   - Atomic write: write to `.tmp` then `fs.renameSync` (prevents corruption on crash)
   - Note: Use `vi.hoisted()` + `vi.resetAllMocks()` pattern for fs mocking in Vitest
 
-- [ ] **2.3** Implement ProjectStore service
+- [x] **2.3** Implement ProjectStore service
   - File: `src/services/project-store.ts`
   - Constructor takes ConfigManager
   - Methods: `listProjects()`, `getProject(id)`, `addProject(config)`, `updateProject(id, partial)`, `removeProject(id)`
   - All operations through ConfigManager (`projects.json`)
-  - Tests: `tests/unit/project-store.test.ts`
+  - Tests: `tests/unit/project-store.test.ts` — 32 tests, all passing
   - **Dependency**: Task 2.2
-  - Acceptance: CRUD, duplicate detection, not-found handling tested
+  - Acceptance: CRUD, duplicate detection, not-found handling tested ✓
 
 - [ ] **2.4** Implement import/export service
   - File: `src/services/import-export.ts`
