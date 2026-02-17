@@ -4,7 +4,7 @@
 **Branch**: `electron-rewrite`
 **Goal**: Rewrite Zephyr Desktop from Python/PyQt6 to Electron + React + TypeScript, delivering a native-quality desktop application with integrated terminal (xterm.js), Docker container orchestration, and AI loop execution management.
 
-**Status**: Phase 1 scaffold in progress.
+**Status**: Phase 1 scaffold in progress. Tasks 1.1-1.6 complete.
 
 ## Environment Notes
 - Node.js installed via NVM: `source /home/ralph/.nvm/nvm.sh && node --version`
@@ -48,11 +48,11 @@
   - E2E tests skip gracefully when no display is available (headless CI)
   - Acceptance: `npm run test:unit` passes (2/2 tests)
 
-- [ ] **1.6** Configure ESLint + Prettier
-  - Install `eslint`, `@typescript-eslint/*`, `eslint-plugin-react`, `eslint-plugin-react-hooks`, `prettier`, `eslint-config-prettier`
+- [x] **1.6** Configure ESLint + Prettier
+  - Installed `prettier@3.8.1`, `eslint-config-prettier@10.1.8` (eslint, @typescript-eslint/*, eslint-plugin-react, eslint-plugin-react-hooks already present)
   - Files: `.eslintrc.cjs`, `.prettierrc`
-  - Add npm scripts: `lint`, `lint:fix`, `format`
-  - Acceptance: `npm run lint` passes on all source files
+  - npm scripts `lint`, `lint:fix`, `format` were already in package.json
+  - Acceptance: `npm run lint` passes with 0 errors/warnings
 
 - [ ] **1.7** Remove Python source files
   - Remove `src/lib/`, `src/ui/`, `src/main.py`, `src/__init__.py`
