@@ -1,0 +1,27 @@
+# AGENTS.md
+
+## Main Agent
+You are building Zephyr Desktop — an Electron + React + TypeScript desktop app for managing AI loops with Docker integration.
+
+## Runtime Environment
+- Node.js: v20.20.0 via NVM — source with: `source /home/ralph/.nvm/nvm.sh`
+- All npm/node commands require NVM sourcing first
+- No GUI/display available in CI — cannot run `npm start` (Electron needs display)
+- TypeScript 5.3.x required (4.5.x is incompatible with @types/node)
+
+## Key Commands
+- Build check: `source /home/ralph/.nvm/nvm.sh && npx tsc --noEmit`
+- Unit tests: `source /home/ralph/.nvm/nvm.sh && npm run test:unit`
+- Lint: `source /home/ralph/.nvm/nvm.sh && npm run lint`
+- Validate: `bash validate.sh` (runs lint + unit tests after Phase 1.8)
+
+## Sub-agents (when needed)
+- Docker Agent: dockerode integration, container lifecycle
+- Terminal Agent: xterm.js, PTY sessions via Docker exec
+- UI Agent: React + Tailwind components, Zustand state
+- IPC Agent: Electron main↔renderer bridge
+
+## Rules
+- All secrets through electron.safeStorage, never plaintext
+- contextIsolation: true, nodeIntegration: false always
+- All IPC channels defined as constants in src/shared/ipc-channels.ts

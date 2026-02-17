@@ -1,9 +1,8 @@
+# Python (legacy - to be removed in Phase 1.7)
 __pycache__/
 *.pyc
 *.pyo
 *.egg-info/
-dist/
-build/
 .pytest_cache/
 .env
 *.egg
@@ -14,10 +13,28 @@ venv/
 htmlcov/
 test-results.xml
 src/lib/_version.py
-loop.sh
 *.origi
-IMPLEMENTATION_PLAN.md
-AGENTS.md
+
+# Node.js / Electron
+node_modules/
+dist/
+build/
+out/
+.vite/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Testing
+test-results/
+playwright-report/
+coverage/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Private/generated
 PROMPT_plan.md
 PROMPT_build.md
-specs/*
+loop.sh
