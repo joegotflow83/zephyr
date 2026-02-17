@@ -75,13 +75,13 @@
 > **Spec**: `specs/02_data_layer_tasks.md`
 > **Dependency**: Phase 1 complete (scaffold, IPC bridge, testing)
 
-- [ ] **2.1** Define TypeScript data models
+- [x] **2.1** Define TypeScript data models
   - File: `src/shared/models.ts`
   - `ProjectConfig` interface: id, name, repo_url, jtbd, docker_image, custom_prompts, created_at, updated_at
   - `AppSettings` interface: max_concurrent_containers, notification_enabled, theme, log_level
   - Helper functions: `createDefaultSettings()`, `createProjectConfig(partial)` with UUID + timestamps
-  - Tests: `tests/unit/models.test.ts`
-  - Acceptance: Types compile, helpers produce valid objects
+  - Tests: `tests/unit/models.test.ts` — 27 tests, all passing
+  - Acceptance: Types compile, helpers produce valid objects ✓
 
 - [ ] **2.2** Implement ConfigManager service
   - File: `src/services/config-manager.ts`
