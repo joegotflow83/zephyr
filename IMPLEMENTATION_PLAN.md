@@ -4,7 +4,7 @@
 **Branch**: `electron-rewrite`
 **Goal**: Rewrite Zephyr Desktop from Python/PyQt6 to Electron + React + TypeScript, delivering a native-quality desktop application with integrated terminal (xterm.js), Docker container orchestration, and AI loop execution management.
 
-**Status**: Phase 1 scaffold in progress. Tasks 1.1-1.6 complete.
+**Status**: Phase 1 scaffold in progress. Tasks 1.1-1.7 complete. Next: 1.8 (validate.sh for Electron CI).
 
 ## Environment Notes
 - Node.js installed via NVM: `source /home/ralph/.nvm/nvm.sh && node --version`
@@ -54,15 +54,14 @@
   - npm scripts `lint`, `lint:fix`, `format` were already in package.json
   - Acceptance: `npm run lint` passes with 0 errors/warnings
 
-- [ ] **1.7** Remove Python source files
-  - Remove `src/lib/`, `src/ui/`, `src/main.py`, `src/__init__.py`
-  - Remove `tests/` Python test files
-  - Remove `pyproject.toml`, `requirements.txt`
-  - Remove `validate.sh`, `zephyr.spec`, `scripts/build.sh`, `scripts/generate_*.py`, `scripts/download_xterm.sh`
-  - Update `.gitignore` (remove Python entries, add Node entries)
-  - Keep `specs/`, `resources/icon.png`, `resources/icon.icns`
-  - **Dependency**: Tasks 1.1-1.6 must be complete first (Electron app must be functional before removing Python)
-  - Acceptance: No `.py` files in `src/` or `tests/`. `npm start` still works
+- [x] **1.7** Remove Python source files
+  - Removed `src/lib/`, `src/ui/`, `src/main.py`, `src/__init__.py`, `src/__pycache__/`
+  - Removed all Python test files from `tests/`
+  - Removed `pyproject.toml`, `requirements.txt`, `launcher.py`
+  - Removed `validate.sh` (Python CI), `zephyr.spec`, `scripts/` directory
+  - Updated `.gitignore` (removed Python entries, kept Node entries)
+  - Kept `specs/`, `resources/icon.png`, `resources/icon.icns`
+  - Unit tests still pass (2/2): `npm run test:unit`
 
 - [ ] **1.8** Create `validate.sh` for Electron CI
   - File: `validate.sh`
@@ -715,12 +714,14 @@ Phases can be parallelized where dependencies allow:
 
 ## Critical Files for Reference (Python Implementation)
 
-When porting logic to TypeScript, refer to these Python files as reference implementations:
-- `src/lib/docker_manager.py` -- Docker container lifecycle, log streaming, exec sessions
-- `src/lib/loop_runner.py` -- Loop state machine, concurrency, recovery
-- `src/lib/log_parser.py` -- Log line classification regex patterns
-- `src/lib/scheduler.py` -- Schedule expression parsing and triggering
-- `src/lib/credential_manager.py` -- Keyring-based credential storage patterns
-- `src/lib/asset_injector.py` -- Asset priority resolution logic
-- `src/lib/config_manager.py` -- Atomic JSON file operations
-- `src/lib/cleanup.py` -- Container tracking and cleanup patterns
+> **NOTE**: Python files were removed in Task 1.7. Reference logic was in:
+> - `docker_manager.py` — Docker container lifecycle, log streaming, exec sessions
+> - `loop_runner.py` — Loop state machine, concurrency, recovery
+> - `log_parser.py` — Log line classification regex patterns
+> - `scheduler.py` — Schedule expression parsing and triggering
+> - `credential_manager.py` — Keyring-based credential storage patterns
+> - `asset_injector.py` — Asset priority resolution logic
+> - `config_manager.py` — Atomic JSON file operations
+> - `cleanup.py` — Container tracking and cleanup patterns
+>
+> Use `git show cbe143e:src/lib/<file>.py` to view any file from the last Python commit (cbe143e).
