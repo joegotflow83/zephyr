@@ -4,7 +4,7 @@
 **Branch**: `electron-rewrite`
 **Goal**: Rewrite Zephyr Desktop from Python/PyQt6 to Electron + React + TypeScript, delivering a native-quality desktop application with integrated terminal (xterm.js), Docker container orchestration, and AI loop execution management.
 
-**Status**: Phase 1 scaffold in progress. Tasks 1.1-1.7 complete. Next: 1.8 (validate.sh for Electron CI).
+**Status**: Phase 1 complete. All 8 tasks done. Next: Phase 2 (Data Layer).
 
 ## Environment Notes
 - Node.js installed via NVM: `source /home/ralph/.nvm/nvm.sh && node --version`
@@ -63,12 +63,10 @@
   - Kept `specs/`, `resources/icon.png`, `resources/icon.icns`
   - Unit tests still pass (2/2): `npm run test:unit`
 
-- [ ] **1.8** Create `validate.sh` for Electron CI
-  - File: `validate.sh`
-  - Runs: `npm ci`, `npm run lint`, `npm run test:unit`
-  - Exit with non-zero on any failure
-  - **Dependency**: Tasks 1.5, 1.6
-  - Acceptance: `bash validate.sh` runs lint + unit tests and reports pass/fail
+- [x] **1.8** Create `validate.sh` for Electron CI
+  - File: `validate.sh` — sources NVM, runs `npm ci`, `npm run lint`, `npm run test:unit`
+  - Exits non-zero on any failure; reports pass/fail counts
+  - Acceptance: `bash validate.sh` — all 3 steps passed (3/0)
 
 ---
 
