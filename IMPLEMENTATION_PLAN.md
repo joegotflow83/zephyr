@@ -4,7 +4,7 @@
 **Branch**: `electron-rewrite`
 **Goal**: Rewrite Zephyr Desktop from Python/PyQt6 to Electron + React + TypeScript, delivering a native-quality desktop application with integrated terminal (xterm.js), Docker container orchestration, and AI loop execution management.
 
-**Status**: Phase 1 complete. All 8 tasks done. Next: Phase 2 (Data Layer).
+**Status**: Phase 1 complete. Phase 2.1 and 2.2 done. Next: Phase 2.3 (ProjectStore).
 
 ## Environment Notes
 - Node.js installed via NVM: `source /home/ralph/.nvm/nvm.sh && node --version`
@@ -83,12 +83,13 @@
   - Tests: `tests/unit/models.test.ts` — 27 tests, all passing
   - Acceptance: Types compile, helpers produce valid objects ✓
 
-- [ ] **2.2** Implement ConfigManager service
+- [x] **2.2** Implement ConfigManager service
   - File: `src/services/config-manager.ts`
   - Methods: `ensureConfigDir()`, `loadJson<T>(filename)`, `saveJson(filename, data)` (atomic write), `getConfigDir()`
-  - Uses `~/.zephyr/` directory
-  - Tests: `tests/unit/config-manager.test.ts`
-  - Acceptance: Unit tests for dir creation, JSON read/write, missing file handling
+  - Uses `~/.zephyr/` directory (injectable via constructor for testability)
+  - Tests: `tests/unit/config-manager.test.ts` — 22 tests, all passing
+  - Atomic write: write to `.tmp` then `fs.renameSync` (prevents corruption on crash)
+  - Note: Use `vi.hoisted()` + `vi.resetAllMocks()` pattern for fs mocking in Vitest
 
 - [ ] **2.3** Implement ProjectStore service
   - File: `src/services/project-store.ts`
