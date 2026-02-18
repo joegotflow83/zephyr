@@ -6,9 +6,13 @@ import { ProjectStore } from '../services/project-store';
 import { ImportExportService } from '../services/import-export';
 import { DockerManager } from '../services/docker-manager';
 import { DockerHealthMonitor } from '../services/docker-health';
+import { CredentialManager } from '../services/credential-manager';
+import { LoginManager } from '../services/login-manager';
 import { registerDataHandlers } from './ipc-handlers/data-handlers';
 import { registerDockerHandlers } from './ipc-handlers/docker-handlers';
+import { registerCredentialHandlers } from './ipc-handlers/credential-handlers';
 import { IPC } from '../shared/ipc-channels';
+import os from 'node:os';
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
 if (started) {
@@ -21,10 +25,15 @@ const projectStore = new ProjectStore(configManager);
 const importExport = new ImportExportService(configManager);
 const dockerManager = new DockerManager();
 const dockerHealth = new DockerHealthMonitor(dockerManager);
+const credentialManager = new CredentialManager(
+  path.join(os.homedir(), '.zephyr')
+);
+const loginManager = new LoginManager(credentialManager);
 
 // Register all IPC handlers before the window is created.
 registerDataHandlers({ configManager, projectStore, importExport });
 registerDockerHandlers({ dockerManager, dockerHealth });
+registerCredentialHandlers({ credentialManager, loginManager });
 
 // Legacy ping handler kept for backwards compatibility with existing tests.
 ipcMain.handle(IPC.PING, () => 'pong');

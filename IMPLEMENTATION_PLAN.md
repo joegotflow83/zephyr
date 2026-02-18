@@ -4,7 +4,7 @@
 **Branch**: `electron-rewrite`
 **Goal**: Rewrite Zephyr Desktop from Python/PyQt6 to Electron + React + TypeScript, delivering a native-quality desktop application with integrated terminal (xterm.js), Docker container orchestration, and AI loop execution management.
 
-**Status**: Phase 1 complete. Phase 2 complete (2.1–2.5 done). Phase 3 complete (3.1–3.6 done). Phase 4 in progress (4.1–4.2 done, 4.3 pending).
+**Status**: Phase 1 complete. Phase 2 complete (2.1–2.5 done). Phase 3 complete (3.1–3.6 done). Phase 4 complete (4.1–4.3 done).
 
 ## Environment Notes
 - Node.js installed via NVM: `source /home/ralph/.nvm/nvm.sh && node --version`
@@ -209,13 +209,14 @@
   - Acceptance: Mocked BrowserWindow flow tested; correct URLs per service ✓
   - **Completion**: 2026-02-18 — All 276 unit tests passing
 
-- [ ] **4.3** Wire credential services to IPC handlers
+- [x] **4.3** Wire credential services to IPC handlers
   - File: `src/main/ipc-handlers/credential-handlers.ts`
   - Channels: `credentials:store`, `credentials:get` (returns masked), `credentials:delete`, `credentials:list`, `credentials:login`
   - Update preload with `window.api.credentials.*`
-  - Tests: `tests/unit/credential-handlers.test.ts`
+  - Tests: `tests/unit/credential-handlers.test.ts` — 14 comprehensive tests, all passing
   - **Dependency**: Tasks 4.1, 4.2, Task 1.4
-  - Acceptance: Renderer can check stored credentials and trigger login
+  - Acceptance: Renderer can check stored credentials and trigger login ✓
+  - **Completion**: 2026-02-18 — All 290 unit tests passing
 
 ---
 

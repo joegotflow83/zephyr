@@ -10,6 +10,8 @@ import type {
   ExecResult,
   ExecCommandOpts,
 } from '../../services/docker-manager';
+import type { CredentialService } from '../../services/credential-manager';
+import type { LoginResult } from '../../services/login-manager';
 
 export {};
 
@@ -77,6 +79,19 @@ declare global {
         onPullProgress: (
           callback: (data: { image: string; progress: unknown }) => void,
         ) => () => void;
+      };
+
+      credentials: {
+        /** Store an API key for a service */
+        store: (service: CredentialService, key: string) => Promise<void>;
+        /** Get a masked API key for display. Returns null if not stored. */
+        get: (service: CredentialService) => Promise<string | null>;
+        /** Delete an API key for a service */
+        delete: (service: CredentialService) => Promise<void>;
+        /** List all services with stored credentials */
+        list: () => Promise<string[]>;
+        /** Open browser-based login window for a service */
+        login: (service: string) => Promise<LoginResult>;
       };
     };
   }

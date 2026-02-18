@@ -32,6 +32,13 @@ export const IPC = {
   DOCKER_STATUS_CHANGED: 'docker:status-changed',
   DOCKER_PULL_PROGRESS: 'docker:pull-progress',
 
+  // Credentials
+  CREDENTIALS_STORE: 'credentials:store',
+  CREDENTIALS_GET: 'credentials:get',
+  CREDENTIALS_DELETE: 'credentials:delete',
+  CREDENTIALS_LIST: 'credentials:list',
+  CREDENTIALS_LOGIN: 'credentials:login',
+
   // Misc
   PING: 'ping',
 } as const;

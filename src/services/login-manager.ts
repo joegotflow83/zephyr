@@ -83,6 +83,7 @@ export class LoginManager {
     const height = options.height || 600;
 
     return new Promise<LoginResult>((resolve) => {
+      // eslint-disable-next-line prefer-const
       let timeoutId: NodeJS.Timeout | undefined;
       let resolved = false;
 

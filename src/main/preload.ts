@@ -56,4 +56,13 @@ contextBridge.exposeInMainWorld('api', {
       return () => ipcRenderer.removeListener(IPC.DOCKER_PULL_PROGRESS, listener);
     },
   },
+
+  credentials: {
+    store: (service: string, key: string) =>
+      ipcRenderer.invoke(IPC.CREDENTIALS_STORE, service, key),
+    get: (service: string) => ipcRenderer.invoke(IPC.CREDENTIALS_GET, service),
+    delete: (service: string) => ipcRenderer.invoke(IPC.CREDENTIALS_DELETE, service),
+    list: () => ipcRenderer.invoke(IPC.CREDENTIALS_LIST),
+    login: (service: string) => ipcRenderer.invoke(IPC.CREDENTIALS_LOGIN, service),
+  },
 });
