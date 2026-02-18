@@ -4,7 +4,7 @@
 **Branch**: `electron-rewrite`
 **Goal**: Rewrite Zephyr Desktop from Python/PyQt6 to Electron + React + TypeScript, delivering a native-quality desktop application with integrated terminal (xterm.js), Docker container orchestration, and AI loop execution management.
 
-**Status**: Phase 1 complete. Phase 2 complete (2.1–2.5 done). Phase 3 complete (3.1–3.6 done). Phase 4 complete (4.1–4.3 done). Phase 5 complete (5.1–5.7 done). Phase 6 complete (6.1, 6.2, 6.3, 6.4, 6.5 done, 5 of 5 tasks complete). Phase 7 complete (7.1–7.4 done, 4 of 4 tasks complete). Phase 8 complete (8.1–8.4 done, 4 of 4 tasks complete).
+**Status**: Phase 1 complete. Phase 2 complete (2.1–2.5 done). Phase 3 complete (3.1–3.6 done). Phase 4 complete (4.1–4.3 done). Phase 5 complete (5.1–5.7 done). Phase 6 complete (6.1, 6.2, 6.3, 6.4, 6.5 done, 5 of 5 tasks complete). Phase 7 complete (7.1–7.4 done, 4 of 4 tasks complete). Phase 8 complete (8.1–8.4 done, 4 of 4 tasks complete). Phase 9 in progress (9.1 done, 1 of 5 tasks complete).
 
 ## Environment Notes
 - Node.js installed via NVM: `source /home/ralph/.nvm/nvm.sh && node --version`
@@ -461,14 +461,16 @@
 > **Spec**: `specs/04_terminal_tasks.md`
 > **Dependency**: Phase 3 (Docker exec sessions), Phase 6 (layout)
 
-- [ ] **9.1** Set up xterm.js Terminal React component
-  - Install `@xterm/xterm`, `@xterm/addon-fit`, `@xterm/addon-web-links`, `@xterm/addon-search`
+- [x] **9.1** Set up xterm.js Terminal React component
+  - Installed `@xterm/xterm`, `@xterm/addon-fit`, `@xterm/addon-web-links`, `@xterm/addon-search`
   - Files: `src/renderer/components/Terminal/Terminal.tsx`, `src/renderer/components/Terminal/terminal.css`
-  - Props: `onData(data)`, `onResize(cols, rows)`, `fontSize`, `theme`
+  - React component with xterm.js integration, FitAddon for resize, WebLinksAddon for URLs
+  - Props: `onData(data)`, `onResize(cols, rows)`, `fontSize`, `theme` (dark/light)
   - Exposes `write(data)` and `clear()` via `useImperativeHandle`
-  - FitAddon for auto-resize, WebLinksAddon for clickable URLs
-  - Tests: `tests/unit/terminal-component.test.tsx`
-  - Acceptance: Terminal renders, accepts keyboard input, displays output
+  - Tests: `tests/unit/terminal-component.test.tsx` — 18 tests, all passing
+  - All 929 unit tests passing (2 skipped)
+  - Acceptance: Component renders, accepts keyboard input, mounts/unmounts cleanly ✓
+  - Completion: 2026-02-18
 
 - [ ] **9.2** Implement TerminalManager service (main process)
   - File: `src/services/terminal-manager.ts`
