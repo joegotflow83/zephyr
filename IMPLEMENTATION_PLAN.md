@@ -4,7 +4,7 @@
 **Branch**: `electron-rewrite`
 **Goal**: Rewrite Zephyr Desktop from Python/PyQt6 to Electron + React + TypeScript, delivering a native-quality desktop application with integrated terminal (xterm.js), Docker container orchestration, and AI loop execution management.
 
-**Status**: Phase 1 complete. Phase 2 complete (2.1–2.5 done). Phase 3 Task 3.1 complete. Next: Phase 3.2 (DockerManager — container lifecycle).
+**Status**: Phase 1 complete. Phase 2 complete (2.1–2.5 done). Phase 3 Tasks 3.1–3.2 complete. Next: Phase 3.3 (DockerManager — log streaming).
 
 ## Environment Notes
 - Node.js installed via NVM: `source /home/ralph/.nvm/nvm.sh && node --version`
@@ -137,7 +137,7 @@
   - Pull image supports progress tracking with layer aggregation
   - Acceptance: Unit tests with mocked dockerode verify all methods ✓
 
-- [ ] **3.2** Implement DockerManager -- container lifecycle
+- [x] **3.2** Implement DockerManager -- container lifecycle
   - Add to `src/services/docker-manager.ts`
   - Methods: `createContainer(opts)`, `startContainer(id)`, `stopContainer(id)`, `removeContainer(id)`, `getContainerStatus(id)`, `listRunningContainers()`, `getContainerCreated(id)`
   - Applies `zephyr-managed=true` and `zephyr.project_id` labels
