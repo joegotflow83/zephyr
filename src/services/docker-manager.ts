@@ -50,6 +50,44 @@ export interface ContainerInfo {
 }
 
 /**
+ * Result of a non-interactive exec command
+ */
+export interface ExecResult {
+  exitCode: number;
+  stdout: string;
+  stderr: string;
+}
+
+/**
+ * Options for exec command execution
+ */
+export interface ExecCommandOpts {
+  user?: string;
+  workingDir?: string;
+  env?: string[];
+}
+
+/**
+ * Options for creating an interactive exec session
+ */
+export interface ExecSessionOpts {
+  shell?: string; // e.g., 'bash', 'sh', 'zsh'
+  user?: string;
+  workingDir?: string;
+  env?: string[];
+  rows?: number;
+  cols?: number;
+}
+
+/**
+ * Interactive exec session with duplex stream
+ */
+export interface ExecSession {
+  id: string;
+  stream: NodeJS.ReadWriteStream;
+}
+
+/**
  * DockerManager - handles Docker daemon connection and container lifecycle
  *
  * This service provides methods for:
@@ -423,5 +461,155 @@ export class DockerManager {
     });
 
     return abortController;
+  }
+
+  /**
+   * Execute a command in a container (non-interactive)
+   * @param containerId - Container ID to execute command in
+   * @param cmd - Command to execute (array of strings)
+   * @param opts - Optional execution options (user, workingDir, env)
+   * @returns ExecResult with exit code, stdout, and stderr
+   * @throws Error if exec creation or execution fails
+   */
+  async execCommand(containerId: string, cmd: string[], opts?: ExecCommandOpts): Promise<ExecResult> {
+    const container = this.docker.getContainer(containerId);
+
+    // Create exec instance
+    const exec = await container.exec({
+      Cmd: cmd,
+      AttachStdout: true,
+      AttachStderr: true,
+      User: opts?.user,
+      WorkingDir: opts?.workingDir,
+      Env: opts?.env,
+    });
+
+    // Start exec and get stream
+    const stream = await exec.start({ Detach: false });
+
+    // Collect stdout and stderr
+    let stdout = '';
+    let stderr = '';
+
+    return new Promise((resolve, reject) => {
+      // Docker multiplexes stdout/stderr with an 8-byte header
+      stream.on('data', (chunk: Buffer) => {
+        let offset = 0;
+        const chunkBuffer = Buffer.from(chunk);
+
+        while (offset < chunkBuffer.length) {
+          // Check if we have at least the header (8 bytes)
+          if (offset + 8 > chunkBuffer.length) {
+            break;
+          }
+
+          // Read header
+          // Byte 0: stream type (1=stdout, 2=stderr)
+          const streamType = chunkBuffer[offset];
+          // Bytes 4-7: payload size (big-endian uint32)
+          const payloadSize =
+            (chunkBuffer[offset + 4] << 24) |
+            (chunkBuffer[offset + 5] << 16) |
+            (chunkBuffer[offset + 6] << 8) |
+            chunkBuffer[offset + 7];
+
+          // Check if we have the full payload
+          if (offset + 8 + payloadSize > chunkBuffer.length) {
+            break;
+          }
+
+          // Extract payload
+          const payload = chunkBuffer.subarray(offset + 8, offset + 8 + payloadSize).toString('utf8');
+
+          // Route to stdout or stderr
+          if (streamType === 1) {
+            stdout += payload;
+          } else if (streamType === 2) {
+            stderr += payload;
+          }
+
+          offset += 8 + payloadSize;
+        }
+      });
+
+      stream.on('end', async () => {
+        try {
+          // Get exit code
+          const inspectResult = await exec.inspect();
+          resolve({
+            exitCode: inspectResult.ExitCode || 0,
+            stdout,
+            stderr,
+          });
+        } catch (error) {
+          reject(error);
+        }
+      });
+
+      stream.on('error', (error: Error) => {
+        reject(error);
+      });
+    });
+  }
+
+  /**
+   * Create an interactive exec session with PTY
+   * @param containerId - Container ID to create session in
+   * @param opts - Session options (shell, user, workingDir, env, rows, cols)
+   * @returns ExecSession with session ID and duplex stream
+   * @throws Error if exec session creation fails
+   */
+  async createExecSession(containerId: string, opts?: ExecSessionOpts): Promise<ExecSession> {
+    const container = this.docker.getContainer(containerId);
+
+    // Default shell is bash
+    const shell = opts?.shell || 'bash';
+
+    // Create exec instance with PTY
+    const exec = await container.exec({
+      Cmd: [shell],
+      AttachStdin: true,
+      AttachStdout: true,
+      AttachStderr: true,
+      Tty: true, // PTY mode
+      User: opts?.user,
+      WorkingDir: opts?.workingDir,
+      Env: opts?.env,
+    });
+
+    // Start exec and get duplex stream
+    const stream = (await exec.start({
+      Detach: false,
+      Tty: true,
+      stdin: true,
+    })) as NodeJS.ReadWriteStream;
+
+    // Resize if dimensions provided
+    if (opts?.rows && opts?.cols) {
+      try {
+        await exec.resize({ h: opts.rows, w: opts.cols });
+      } catch (error) {
+        // Resize may fail if exec not started yet, that's OK
+        console.warn('Initial resize failed:', error);
+      }
+    }
+
+    return {
+      id: exec.id,
+      stream,
+    };
+  }
+
+  /**
+   * Resize an exec session terminal
+   * @param execId - Exec session ID
+   * @param rows - Number of rows
+   * @param cols - Number of columns
+   * @throws Error if resize fails
+   */
+  async resizeExec(execId: string, rows: number, cols: number): Promise<void> {
+    // Get exec instance by ID
+    const exec = this.docker.getExec(execId);
+    await exec.resize({ h: rows, w: cols });
   }
 }
