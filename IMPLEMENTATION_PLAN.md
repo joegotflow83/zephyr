@@ -4,7 +4,7 @@
 **Branch**: `electron-rewrite`
 **Goal**: Rewrite Zephyr Desktop from Python/PyQt6 to Electron + React + TypeScript, delivering a native-quality desktop application with integrated terminal (xterm.js), Docker container orchestration, and AI loop execution management.
 
-**Status**: Phase 1 complete. Phase 2 complete (2.1–2.5 done). Phase 3 complete (3.1–3.6 done). Phase 4 complete (4.1–4.3 done). Phase 5 complete (5.1–5.7 done). Phase 6 complete (6.1, 6.2, 6.3, 6.4, 6.5 done, 5 of 5 tasks complete). Phase 7 complete (7.1–7.4 done, 4 of 4 tasks complete). Phase 8: 3 of 4 tasks complete.
+**Status**: Phase 1 complete. Phase 2 complete (2.1–2.5 done). Phase 3 complete (3.1–3.6 done). Phase 4 complete (4.1–4.3 done). Phase 5 complete (5.1–5.7 done). Phase 6 complete (6.1, 6.2, 6.3, 6.4, 6.5 done, 5 of 5 tasks complete). Phase 7 complete (7.1–7.4 done, 4 of 4 tasks complete). Phase 8 complete (8.1–8.4 done, 4 of 4 tasks complete).
 
 ## Environment Notes
 - Node.js installed via NVM: `source /home/ralph/.nvm/nvm.sh && node --version`
@@ -441,15 +441,18 @@
   - **Dependency**: Task 5.7
   - Acceptance: Single and bulk log export with correct formatting
 
-- [ ] **8.4** Implement real-time log streaming hook
+- [x] **8.4** Implement real-time log streaming hook
   - File: `src/renderer/hooks/useLogStream.ts`
-  - Subscribes to `loop:log-line` IPC events
-  - Buffers lines per project ID
+  - Subscribes to `loop:log-line` IPC events via `window.api.loops.onLogLine()`
+  - Buffers lines per project ID in memory with `useRef`
   - Returns `{ lines, clearLines }` for selected project
-  - Performance: batch DOM updates with `requestAnimationFrame`
-  - Tests: `tests/unit/use-log-stream.test.ts`
+  - Performance: batch DOM updates with `requestAnimationFrame` (prevents UI jank with high-volume logs)
+  - Handles project switching and preserves buffers for inactive projects
+  - Tests: `tests/unit/use-log-stream.test.ts` — 17 tests, all passing
+  - All 911 unit tests passing (2 skipped)
   - **Dependency**: Task 5.7
-  - Acceptance: Real-time log lines appear, no dropped lines, no UI jank
+  - Acceptance: Real-time log lines appear, no dropped lines, no UI jank ✓
+  - **Completion**: 2026-02-18
 
 ---
 
