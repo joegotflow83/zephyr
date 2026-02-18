@@ -4,7 +4,7 @@
 **Branch**: `electron-rewrite`
 **Goal**: Rewrite Zephyr Desktop from Python/PyQt6 to Electron + React + TypeScript, delivering a native-quality desktop application with integrated terminal (xterm.js), Docker container orchestration, and AI loop execution management.
 
-**Status**: Phase 1 complete. Phase 2 complete (2.1–2.5 done). Phase 3 complete (3.1–3.6 done). Phase 4 complete (4.1–4.3 done). Phase 5 complete (5.1–5.7 done).
+**Status**: Phase 1 complete. Phase 2 complete (2.1–2.5 done). Phase 3 complete (3.1–3.6 done). Phase 4 complete (4.1–4.3 done). Phase 5 complete (5.1–5.7 done). Phase 6 in progress (6.1 done, 1 of 5 tasks complete).
 
 ## Environment Notes
 - Node.js installed via NVM: `source /home/ralph/.nvm/nvm.sh && node --version`
@@ -300,12 +300,21 @@
 > **Spec**: `specs/07_ui_shell_tasks.md`
 > **Dependency**: Phase 1 (scaffold, Tailwind), Phase 2 (data services for state)
 
-- [ ] **6.1** Implement app layout and tab navigation
-  - Files: `src/renderer/App.tsx`, `src/renderer/components/TabBar/TabBar.tsx`, `src/renderer/components/Layout/Layout.tsx`
-  - Tabs: Projects, Running Loops, Terminal, Settings
-  - Keyboard shortcuts: Ctrl+1/2/3/4
-  - Tests: `tests/unit/tab-bar.test.tsx`, `tests/unit/layout.test.tsx`
-  - Acceptance: Tab switching works, keyboard shortcuts work, active tab visually distinct
+- [x] **6.1** Implement app layout and tab navigation
+  - Files created:
+    - `src/renderer/components/TabBar/TabBar.tsx` — Tabbed navigation component with badges
+    - `src/renderer/components/Layout/Layout.tsx` — Main layout wrapper
+    - `src/renderer/pages/ProjectsTab/ProjectsTab.tsx` — Projects page stub
+    - `src/renderer/pages/LoopsTab/LoopsTab.tsx` — Loops page stub
+    - `src/renderer/pages/TerminalTab/TerminalTab.tsx` — Terminal page stub
+    - `src/renderer/pages/SettingsTab/SettingsTab.tsx` — Settings page stub
+    - `tests/unit/tab-bar.test.tsx` — TabBar component tests (9 tests)
+    - `tests/unit/layout.test.tsx` — Layout component tests (11 tests)
+    - `tests/unit/app-navigation.test.tsx` — App navigation tests (12 tests)
+  - Modified: `src/renderer/App.tsx` — Integrated tabbed navigation with keyboard shortcuts (Ctrl+1/2/3/4)
+  - Modified: `tests/unit/app.test.tsx` — Updated to match new UI structure
+  - All 563 unit tests passing
+  - Acceptance: Tab switching works, keyboard shortcuts work, active tab visually distinct ✓
 
 - [ ] **6.2** Implement status bar
   - Files: `src/renderer/components/StatusBar/StatusBar.tsx`, `src/renderer/hooks/useDockerStatus.ts`
