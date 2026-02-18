@@ -2,11 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { Layout } from './components/Layout/Layout';
 import { TabBar, TabId, Tab } from './components/TabBar/TabBar';
 import { StatusBar } from './components/StatusBar/StatusBar';
+import { Toast } from './components/Toast/Toast';
 import { ProjectsTab } from './pages/ProjectsTab/ProjectsTab';
 import { LoopsTab } from './pages/LoopsTab/LoopsTab';
 import { TerminalTab } from './pages/TerminalTab/TerminalTab';
 import { SettingsTab } from './pages/SettingsTab/SettingsTab';
 import { useActiveLoops } from './hooks/useActiveLoops';
+import { useToast } from './hooks/useToast';
 
 const tabs: Tab[] = [
   { id: 'projects', label: 'Projects', icon: '📁' },
@@ -18,6 +20,7 @@ const tabs: Tab[] = [
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabId>('projects');
   const activeLoopCount = useActiveLoops();
+  const { toasts, dismissToast } = useToast();
 
   // Keyboard shortcuts: Ctrl+1/2/3/4 for tab switching
   useEffect(() => {
@@ -57,6 +60,7 @@ const App: React.FC = () => {
       statusBar={<StatusBar activeLoopCount={activeLoopCount} />}
     >
       {renderActiveTab()}
+      <Toast toasts={toasts} onDismiss={dismissToast} />
     </Layout>
   );
 };

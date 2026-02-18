@@ -4,7 +4,7 @@
 **Branch**: `electron-rewrite`
 **Goal**: Rewrite Zephyr Desktop from Python/PyQt6 to Electron + React + TypeScript, delivering a native-quality desktop application with integrated terminal (xterm.js), Docker container orchestration, and AI loop execution management.
 
-**Status**: Phase 1 complete. Phase 2 complete (2.1–2.5 done). Phase 3 complete (3.1–3.6 done). Phase 4 complete (4.1–4.3 done). Phase 5 complete (5.1–5.7 done). Phase 6 in progress (6.1, 6.2, 6.3, 6.4 done, 4 of 5 tasks complete).
+**Status**: Phase 1 complete. Phase 2 complete (2.1–2.5 done). Phase 3 complete (3.1–3.6 done). Phase 4 complete (4.1–4.3 done). Phase 5 complete (5.1–5.7 done). Phase 6 complete (6.1, 6.2, 6.3, 6.4, 6.5 done, 5 of 5 tasks complete).
 
 ## Environment Notes
 - Node.js installed via NVM: `source /home/ralph/.nvm/nvm.sh && node --version`
@@ -353,12 +353,14 @@
   - All 660 unit tests passing
   - Acceptance: Components can read/update global state; IPC events trigger updates ✓
 
-- [ ] **6.5** Implement notification toasts
+- [x] **6.5** Implement notification toasts
   - Files: `src/renderer/components/Toast/Toast.tsx`, `src/renderer/hooks/useToast.ts`
-  - Types: success, error, warning, info with auto-dismiss
-  - OS-native Notification API for background notifications
-  - Tests: `tests/unit/toast.test.tsx`
-  - Acceptance: Toasts appear for events; native notifications work when backgrounded
+  - Component features: success, error, warning, info types with auto-dismiss (default 5000ms), stacked display in bottom-right, manual close button, exit animations
+  - Hook provides: showToast(), dismissToast(), dismissAll(), plus convenience methods (success(), error(), warning(), info())
+  - Integrated into App.tsx with useToast hook
+  - Tests: `tests/unit/toast.test.tsx` (26 tests), `tests/unit/use-toast.test.tsx` (34 tests) — all passing
+  - All 720 unit tests passing
+  - Acceptance: Toasts render with correct types and auto-dismiss; manual dismiss works; convenience methods functional ✓
 
 ---
 
