@@ -188,7 +188,9 @@ describe('LoopsTab', () => {
       render(<LoopsTab />);
 
       // Log viewer should show logs from loop1 (the running one)
-      expect(screen.getByText('Log line 1')).toBeInTheDocument();
+      // Check for LogViewer component with 3 lines
+      expect(screen.getByText('3 lines')).toBeInTheDocument();
+      expect(screen.getByText('Logs: Project One')).toBeInTheDocument();
     });
 
     it('selects first loop if none are running', () => {
@@ -200,7 +202,9 @@ describe('LoopsTab', () => {
       render(<LoopsTab />);
 
       // Should select first loop by default
-      expect(screen.getByText('Log line 1')).toBeInTheDocument();
+      // Check for LogViewer component with 3 lines (from loop1)
+      expect(screen.getByText('3 lines')).toBeInTheDocument();
+      expect(screen.getByText('Logs: Project One')).toBeInTheDocument();
     });
 
     it('updates selection when loops change and selected loop is removed', async () => {
@@ -209,17 +213,17 @@ describe('LoopsTab', () => {
 
       const { rerender } = render(<LoopsTab />);
 
-      // Initially shows loop1 logs
-      expect(screen.getByText('Log line 1')).toBeInTheDocument();
+      // Initially shows loop1 logs (3 lines)
+      expect(screen.getByText('3 lines')).toBeInTheDocument();
 
       // Simulate loop1 being removed and loop2 added
       mockLoops.loops = [loop2];
       mockProjects.projects = [project2];
       rerender(<LoopsTab />);
 
-      // Should now show loop2 logs
+      // Should now show loop2 logs (2 lines)
       await waitFor(() => {
-        expect(screen.getByText('Other log line 1')).toBeInTheDocument();
+        expect(screen.getByText('2 lines')).toBeInTheDocument();
       });
     });
   });
@@ -232,15 +236,17 @@ describe('LoopsTab', () => {
 
       render(<LoopsTab />);
 
-      // Initially shows loop1 (first running)
-      expect(screen.getByText('Log line 1')).toBeInTheDocument();
+      // Initially shows loop1 (first running, 3 lines)
+      expect(screen.getByText('3 lines')).toBeInTheDocument();
+      expect(screen.getByText('Logs: Project One')).toBeInTheDocument();
 
       // Click on Project Two row
       await user.click(screen.getByText('Project Two'));
 
-      // Should now show loop2 logs
+      // Should now show loop2 logs (2 lines)
       await waitFor(() => {
-        expect(screen.getByText('Other log line 1')).toBeInTheDocument();
+        expect(screen.getByText('2 lines')).toBeInTheDocument();
+        expect(screen.getByText('Logs: Project Two')).toBeInTheDocument();
       });
     });
   });
@@ -325,9 +331,8 @@ describe('LoopsTab', () => {
 
       render(<LoopsTab />);
 
-      expect(screen.getByText('Log line 1')).toBeInTheDocument();
-      expect(screen.getByText('Log line 2')).toBeInTheDocument();
-      expect(screen.getByText('Log line 3')).toBeInTheDocument();
+      // LogViewer component shows the line count
+      expect(screen.getByText('3 lines')).toBeInTheDocument();
     });
 
     it('displays project name in log viewer header', () => {

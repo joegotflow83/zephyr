@@ -1,9 +1,68 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useLoops } from '../../hooks/useLoops';
 import { useProjects } from '../../hooks/useProjects';
 import { LoopRow } from './LoopRow';
+import { LogViewer, type ParsedLogLine } from '../../components/LogViewer/LogViewer';
 import type { LoopStartOpts } from '../../../shared/loop-types';
 import { LoopStatus, LoopMode } from '../../../shared/loop-types';
+
+/**
+ * Simple log parser to convert raw log strings to ParsedLogLine format.
+ * Matches logic from LogParser service.
+ */
+function parseLogLine(rawLine: string): ParsedLogLine {
+  const line = rawLine.trim();
+
+  // Extract ISO timestamp if present
+  const timestampMatch = line.match(/(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z?)/);
+  const timestamp = timestampMatch ? timestampMatch[1] : null;
+
+  // Detect commit lines
+  const commitShortMatch = line.match(/\[[\w/.-]+\s+([0-9a-f]{7,40})\]/);
+  const commitLongMatch = line.match(/(?:^|\s)commit\s+([0-9a-f]{7,40})\b/i);
+  const commitCreatingMatch = line.match(/creating\s+commit\s+([0-9a-f]{7,40})/i);
+
+  if (commitShortMatch || commitLongMatch || commitCreatingMatch) {
+    const commit_hash =
+      commitShortMatch?.[1] || commitLongMatch?.[1] || commitCreatingMatch?.[1];
+    return {
+      type: 'commit',
+      content: line,
+      timestamp,
+      commit_hash,
+    };
+  }
+
+  // Detect plan lines
+  if (/^\s*(?:PLAN|Plan)\s*:\s*/s.test(line)) {
+    return {
+      type: 'plan',
+      content: line,
+      timestamp,
+    };
+  }
+
+  // Detect error lines
+  if (
+    /^\s*Traceback\s+\(most recent call last\)/i.test(line) ||
+    /^\s*(?:\w+\.)*\w*(?:Error|Exception|Failure|Fatal|Interrupt|Warning|NotFound|Refused|Timeout)\b.*:\s*/i.test(
+      line
+    )
+  ) {
+    return {
+      type: 'error',
+      content: line,
+      timestamp,
+    };
+  }
+
+  // Default to info
+  return {
+    type: 'info',
+    content: line,
+    timestamp,
+  };
+}
 
 /**
  * LoopsTab page component.
@@ -36,6 +95,14 @@ export const LoopsTab: React.FC = () => {
   }, [loops, selectedLoopId]);
 
   const selectedLoop = loops.find((l) => l.projectId === selectedLoopId);
+
+  // Parse raw logs into ParsedLogLine format for LogViewer
+  const parsedLogs = useMemo(() => {
+    if (!selectedLoop || !selectedLoop.logs) {
+      return [];
+    }
+    return selectedLoop.logs.map((rawLine) => parseLogLine(rawLine));
+  }, [selectedLoop]);
 
   const handleStop = async (projectId: string) => {
     try {
@@ -161,31 +228,25 @@ export const LoopsTab: React.FC = () => {
         onMouseDown={handleMouseDown}
       />
 
-      {/* Lower panel: Log viewer placeholder */}
+      {/* Lower panel: Log viewer with LogViewer component */}
       <div
         style={{ height: `${100 - splitterPosition}%` }}
         className="flex flex-col bg-gray-900 overflow-hidden"
       >
-        <div className="p-4 border-b border-gray-700">
-          <h2 className="text-lg font-semibold text-white">
+        <div className="px-4 py-2 border-b border-gray-700 bg-gray-800">
+          <h2 className="text-sm font-semibold text-white">
             {selectedLoop
               ? `Logs: ${projects.find((p) => p.id === selectedLoop.projectId)?.name || selectedLoop.projectId}`
               : 'Logs'}
           </h2>
         </div>
-        <div className="flex-1 p-4 overflow-auto font-mono text-sm text-gray-300">
+        <div className="flex-1 overflow-hidden">
           {selectedLoop ? (
-            selectedLoop.logs.length > 0 ? (
-              <div>
-                {selectedLoop.logs.map((line, idx) => (
-                  <div key={idx}>{line}</div>
-                ))}
-              </div>
-            ) : (
-              <div className="text-gray-500">No logs yet...</div>
-            )
+            <LogViewer lines={parsedLogs} autoScroll={true} />
           ) : (
-            <div className="text-gray-500">Select a loop to view logs</div>
+            <div className="flex items-center justify-center h-full text-gray-500">
+              Select a loop to view logs
+            </div>
           )}
         </div>
       </div>

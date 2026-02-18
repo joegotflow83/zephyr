@@ -59,6 +59,7 @@
     "vitest": "^4.0.18"
   },
   "dependencies": {
+    "@tanstack/react-virtual": "^3.13.18",
     "@types/adm-zip": "^0.5.7",
     "@types/archiver": "^7.0.0",
     "@types/dockerode": "^4.0.1",
