@@ -4,7 +4,7 @@
 **Branch**: `electron-rewrite`
 **Goal**: Rewrite Zephyr Desktop from Python/PyQt6 to Electron + React + TypeScript, delivering a native-quality desktop application with integrated terminal (xterm.js), Docker container orchestration, and AI loop execution management.
 
-**Status**: Phase 1 complete. Phase 2 complete (2.1–2.5 done). Next: Phase 3.1 (DockerManager — connection and image operations).
+**Status**: Phase 1 complete. Phase 2 complete (2.1–2.5 done). Phase 3 Task 3.1 complete. Next: Phase 3.2 (DockerManager — container lifecycle).
 
 ## Environment Notes
 - Node.js installed via NVM: `source /home/ralph/.nvm/nvm.sh && node --version`
@@ -129,12 +129,13 @@
 > **Spec**: `specs/03_docker_service_tasks.md`
 > **Dependency**: Phase 1 complete
 
-- [ ] **3.1** Implement DockerManager -- connection and image operations
-  - Install `dockerode`, `@types/dockerode`
-  - File: `src/services/docker-manager.ts`
+- [x] **3.1** Implement DockerManager -- connection and image operations
+  - Installed `dockerode`, `@types/dockerode` (already present)
+  - File: `src/services/docker-manager.ts` — created with DockerInfo interface
   - Methods: `isDockerAvailable()`, `getDockerInfo()`, `isImageAvailable(image)`, `pullImage(image, onProgress?)`
-  - Tests: `tests/unit/docker-manager-connection.test.ts`
-  - Acceptance: Unit tests with mocked dockerode verify all methods
+  - Tests: `tests/unit/docker-manager-connection.test.ts` — 18 tests, all passing
+  - Pull image supports progress tracking with layer aggregation
+  - Acceptance: Unit tests with mocked dockerode verify all methods ✓
 
 - [ ] **3.2** Implement DockerManager -- container lifecycle
   - Add to `src/services/docker-manager.ts`

@@ -61,8 +61,10 @@
   "dependencies": {
     "@types/adm-zip": "^0.5.7",
     "@types/archiver": "^7.0.0",
+    "@types/dockerode": "^4.0.1",
     "adm-zip": "^0.5.16",
     "archiver": "^7.0.1",
+    "dockerode": "^4.0.9",
     "electron-squirrel-startup": "^1.0.1",
     "react": "^18.3.0",
     "react-dom": "^18.3.0"

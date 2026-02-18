@@ -22,4 +22,7 @@ Thumbs.db
 PROMPT_plan.md
 PROMPT_build.md
 loop.sh
-*.origi
+env_setup
+
+# Claude
+.claude
