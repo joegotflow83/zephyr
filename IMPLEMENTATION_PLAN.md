@@ -4,7 +4,7 @@
 **Branch**: `electron-rewrite`
 **Goal**: Rewrite Zephyr Desktop from Python/PyQt6 to Electron + React + TypeScript, delivering a native-quality desktop application with integrated terminal (xterm.js), Docker container orchestration, and AI loop execution management.
 
-**Status**: Phase 1 complete. Phase 2 complete (2.1–2.5 done). Phase 3 complete (3.1–3.5). Next: Phase 3.6 (Wire Docker services to IPC handlers).
+**Status**: Phase 1 complete. Phase 2 complete (2.1–2.5 done). Phase 3 complete (3.1–3.6 done, all tasks). Next: Phase 4 (Credential Management).
 
 ## Environment Notes
 - Node.js installed via NVM: `source /home/ralph/.nvm/nvm.sh && node --version`
@@ -171,7 +171,7 @@
   - **Dependency**: Task 3.1
   - Acceptance: Polling, state transition detection, callback invocation tested ✓
 
-- [ ] **3.6** Wire Docker services to IPC handlers
+- [x] **3.6** Wire Docker services to IPC handlers
   - File: `src/main/ipc-handlers/docker-handlers.ts`
   - Channels: `docker:status`, `docker:pull-image`, `docker:create-container`, `docker:start`, `docker:stop`, `docker:remove`, `docker:list-containers`, `docker:exec`
   - Log streaming and exec use `ipcMain.on`/`webContents.send` pattern (bidirectional)

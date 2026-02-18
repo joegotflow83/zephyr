@@ -4,7 +4,10 @@ import started from 'electron-squirrel-startup';
 import { ConfigManager } from '../services/config-manager';
 import { ProjectStore } from '../services/project-store';
 import { ImportExportService } from '../services/import-export';
+import { DockerManager } from '../services/docker-manager';
+import { DockerHealthMonitor } from '../services/docker-health';
 import { registerDataHandlers } from './ipc-handlers/data-handlers';
+import { registerDockerHandlers } from './ipc-handlers/docker-handlers';
 import { IPC } from '../shared/ipc-channels';
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
@@ -16,9 +19,12 @@ if (started) {
 const configManager = new ConfigManager();
 const projectStore = new ProjectStore(configManager);
 const importExport = new ImportExportService(configManager);
+const dockerManager = new DockerManager();
+const dockerHealth = new DockerHealthMonitor(dockerManager);
 
 // Register all IPC handlers before the window is created.
 registerDataHandlers({ configManager, projectStore, importExport });
+registerDockerHandlers({ dockerManager, dockerHealth });
 
 // Legacy ping handler kept for backwards compatibility with existing tests.
 ipcMain.handle(IPC.PING, () => 'pong');
@@ -43,9 +49,15 @@ const createWindow = () => {
   }
 };
 
-app.on('ready', createWindow);
+app.on('ready', () => {
+  createWindow();
+  // Start Docker health monitoring
+  dockerHealth.start();
+});
 
 app.on('window-all-closed', () => {
+  // Stop Docker health monitoring when app quits
+  dockerHealth.stop();
   if (process.platform !== 'darwin') {
     app.quit();
   }
