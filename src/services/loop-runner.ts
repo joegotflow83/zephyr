@@ -263,6 +263,75 @@ export class LoopRunner {
   }
 
   /**
+   * Recover loops from existing containers after app restart.
+   *
+   * This method re-attaches to running containers that survived an app restart
+   * (e.g., after a force-quit). It skips containers for deleted projects and
+   * respects the concurrency limit.
+   *
+   * @param containers - List of containers to attempt recovery from
+   * @param projectStore - ProjectStore instance to check if projects still exist
+   * @returns Array of project IDs that were successfully recovered
+   */
+  async recoverLoops(
+    containers: ContainerInfo[],
+    projectStore: { getProject: (id: string) => { id: string } | null },
+  ): Promise<string[]> {
+    const recovered: string[] = [];
+
+    for (const container of containers) {
+      let projectId: string | undefined;
+      try {
+        // Extract project ID from container info
+        projectId = container.projectId;
+        if (!projectId) {
+          continue; // Skip containers without project ID
+        }
+
+        // Skip if already tracked
+        if (this.states.has(projectId)) {
+          continue;
+        }
+
+        // Skip if project was deleted
+        const project = projectStore.getProject(projectId);
+        if (!project) {
+          continue;
+        }
+
+        // Check concurrency limit
+        const runningCount = this.listRunning().length;
+        if (runningCount >= this.maxConcurrent) {
+          break; // Stop recovering if we hit the limit
+        }
+
+        // Create loop state for the recovered container
+        // We don't know the original mode, so default to CONTINUOUS
+        const state = createLoopState(projectId, LoopMode.CONTINUOUS);
+        state.containerId = container.id;
+        state.status = LoopStatus.RUNNING;
+        state.startedAt = container.created;
+
+        this.states.set(projectId, state);
+
+        // Resume log streaming from the point the container started
+        await this.resumeLogStream(projectId, container.id, container.created);
+
+        recovered.push(projectId);
+      } catch (error) {
+        console.error(`Failed to recover container ${container.id}:`, error);
+        // Remove the failed state if we added it
+        if (projectId) {
+          this.states.delete(projectId);
+        }
+        // Continue with next container
+      }
+    }
+
+    return recovered;
+  }
+
+  /**
    * Register a callback for loop state changes.
    *
    * @param callback - Function called when any loop state changes
@@ -348,6 +417,33 @@ export class LoopRunner {
         stoppedAt: new Date().toISOString(),
       });
     }
+  }
+
+  /**
+   * Resume log streaming from a container (used during recovery).
+   *
+   * Similar to startLogStream but uses a 'since' timestamp to avoid
+   * re-processing logs from before the app restart.
+   * Throws errors to allow the caller to handle recovery failures.
+   */
+  private async resumeLogStream(
+    projectId: string,
+    containerId: string,
+    sinceTimestamp: string,
+  ): Promise<void> {
+    // Convert ISO timestamp to Unix timestamp (seconds since epoch)
+    const since = Math.floor(new Date(sinceTimestamp).getTime() / 1000);
+
+    const abortController = await this.docker.streamLogs(
+      containerId,
+      (line) => this.handleLogLine(projectId, line),
+      since,
+    );
+
+    this.logAbortControllers.set(projectId, abortController);
+
+    // Monitor container exit (assuming CONTINUOUS mode for recovered loops)
+    this.monitorContainerExit(projectId, containerId, LoopMode.CONTINUOUS);
   }
 
   /**

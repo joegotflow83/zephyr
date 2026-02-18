@@ -4,7 +4,7 @@
 **Branch**: `electron-rewrite`
 **Goal**: Rewrite Zephyr Desktop from Python/PyQt6 to Electron + React + TypeScript, delivering a native-quality desktop application with integrated terminal (xterm.js), Docker container orchestration, and AI loop execution management.
 
-**Status**: Phase 1 complete. Phase 2 complete (2.1–2.5 done). Phase 3 complete (3.1–3.6 done). Phase 4 complete (4.1–4.3 done). Phase 5 in progress (5.1–5.3 done).
+**Status**: Phase 1 complete. Phase 2 complete (2.1–2.5 done). Phase 3 complete (3.1–3.6 done). Phase 4 complete (4.1–4.3 done). Phase 5 complete (5.1–5.4 done).
 
 ## Environment Notes
 - Node.js installed via NVM: `source /home/ralph/.nvm/nvm.sh && node --version`
@@ -255,13 +255,14 @@
   - Acceptance: Start, stop, state tracking, concurrency, log streaming, callbacks tested ✓
   - **Completion**: 2026-02-18 — All 447 unit tests passing
 
-- [ ] **5.4** Implement loop recovery
+- [x] **5.4** Implement loop recovery
   - Add `recoverLoops(containers)` to `src/services/loop-runner.ts`
   - Re-registers running containers, resumes log streaming
   - Skips deleted projects and already-tracked IDs; respects concurrency
-  - Tests: `tests/unit/loop-recovery.test.ts`
+  - Tests: `tests/unit/loop-recovery.test.ts` — 14 tests, all passing
   - **Dependency**: Task 5.3
-  - Acceptance: Recovery happy path, skip deleted, skip duplicates, concurrency limit tested
+  - Acceptance: Recovery happy path, skip deleted, skip duplicates, concurrency limit tested ✓
+  - **Completion**: 2026-02-18 — All 461 unit tests passing
 
 - [ ] **5.5** Implement Scheduler service
   - File: `src/services/scheduler.ts`
