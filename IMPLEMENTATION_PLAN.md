@@ -233,15 +233,15 @@
   - Helper functions: `createLoopState()`, `isLoopTerminal()`, `isLoopActive()`, `validateLoopStartOpts()`
   - Tests: `tests/unit/loop-types.test.ts` — 63 tests, all passing
   - Acceptance: Types compile, importable from both main and renderer ✓
-  - **Completion**: 2026-02-18 — All 353 unit tests passing
+  - **Completion**: 2026-02-18 — All 411 unit tests passing
 
-- [ ] **5.2** Implement LogParser service
+- [x] **5.2** Implement LogParser service
   - File: `src/services/log-parser.ts`
-  - Method: `parseLine(line)` returns `ParsedLogLine` (type: commit/plan/error/info)
-  - Method: `detectIteration(line)` extracts iteration number
+  - Methods: `parseLine(line)` returns `ParsedLogLine` (type: commit/plan/error/info), `parseIterationBoundary(line)` extracts iteration number
   - Regex patterns for git commits, error traces, plan markers, iteration boundaries
-  - Tests: `tests/unit/log-parser.test.ts` (port all 58+ test cases from Python)
-  - Acceptance: All log line classifications match Python version
+  - Tests: `tests/unit/log-parser.test.ts` — 58 tests, all passing
+  - **Completion**: 2026-02-18 — All 411 unit tests passing
+  - Acceptance: All log line classifications match Python version ✓
 
 - [ ] **5.3** Implement LoopRunner service
   - File: `src/services/loop-runner.ts`
