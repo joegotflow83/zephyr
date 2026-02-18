@@ -124,6 +124,34 @@ export const LoopsTab: React.FC = () => {
     }
   };
 
+  const handleExport = async () => {
+    if (!selectedLoop) return;
+
+    try {
+      const result = await window.api.logs.export(selectedLoop.projectId, 'text');
+      if (result.success) {
+        console.log('Log exported successfully to:', result.path);
+      } else {
+        console.error('Export failed:', result.error);
+      }
+    } catch (err) {
+      console.error('Failed to export log:', err);
+    }
+  };
+
+  const handleExportAll = async () => {
+    try {
+      const result = await window.api.logs.exportAll('text');
+      if (result.success) {
+        console.log('All logs exported successfully to:', result.path);
+      } else {
+        console.error('Export all failed:', result.error);
+      }
+    } catch (err) {
+      console.error('Failed to export all logs:', err);
+    }
+  };
+
   // Splitter drag handling
   const handleMouseDown = () => {
     setIsDragging(true);
@@ -158,8 +186,16 @@ export const LoopsTab: React.FC = () => {
     >
       {/* Upper panel: Loops table */}
       <div style={{ height: `${splitterPosition}%` }} className="flex flex-col overflow-hidden">
-        <div className="p-6 pb-2">
-          <h1 className="text-2xl font-bold mb-4">Running Loops</h1>
+        <div className="p-6 pb-2 flex items-center justify-between">
+          <h1 className="text-2xl font-bold">Running Loops</h1>
+          <button
+            onClick={handleExportAll}
+            disabled={loops.length === 0}
+            className="px-3 py-1.5 text-sm bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded transition-colors"
+            title="Export all loop logs"
+          >
+            Export All
+          </button>
         </div>
 
         {loading && (
@@ -242,7 +278,7 @@ export const LoopsTab: React.FC = () => {
         </div>
         <div className="flex-1 overflow-hidden">
           {selectedLoop ? (
-            <LogViewer lines={parsedLogs} autoScroll={true} />
+            <LogViewer lines={parsedLogs} autoScroll={true} onExport={handleExport} />
           ) : (
             <div className="flex items-center justify-center h-full text-gray-500">
               Select a loop to view logs

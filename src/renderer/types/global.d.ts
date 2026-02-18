@@ -127,6 +127,18 @@ declare global {
           callback: (projectId: string, line: ParsedLogLine) => void,
         ) => () => void;
       };
+
+      logs: {
+        /** Export a single loop's logs. Opens save dialog. Returns result with success status and path. */
+        export: (
+          projectId: string,
+          format?: 'text' | 'json',
+        ) => Promise<{ success: boolean; path?: string; error?: string }>;
+        /** Export all loop logs to a zip file. Opens save dialog. Returns result with success status and path. */
+        exportAll: (
+          format?: 'text' | 'json',
+        ) => Promise<{ success: boolean; path?: string; error?: string }>;
+      };
     };
   }
 }

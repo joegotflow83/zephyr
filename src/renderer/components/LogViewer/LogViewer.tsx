@@ -12,6 +12,7 @@ export interface LogViewerProps {
   lines: ParsedLogLine[];
   autoScroll?: boolean;
   onClear?: () => void;
+  onExport?: () => void;
   className?: string;
 }
 
@@ -33,6 +34,7 @@ export const LogViewer: React.FC<LogViewerProps> = ({
   lines,
   autoScroll: autoScrollProp = true,
   onClear,
+  onExport,
   className = '',
 }) => {
   const parentRef = useRef<HTMLDivElement>(null);
@@ -173,6 +175,17 @@ export const LogViewer: React.FC<LogViewerProps> = ({
         >
           ↓ Bottom
         </button>
+
+        {/* Export button */}
+        {onExport && (
+          <button
+            onClick={onExport}
+            className="px-2 py-1 text-xs bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded hover:bg-gray-50 dark:hover:bg-gray-600"
+            title="Export logs"
+          >
+            Export
+          </button>
+        )}
 
         {/* Clear button */}
         {onClear && (

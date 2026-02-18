@@ -93,4 +93,11 @@ contextBridge.exposeInMainWorld('api', {
       return () => ipcRenderer.removeListener(IPC.LOOP_LOG_LINE, listener);
     },
   },
+
+  logs: {
+    export: (projectId: string, format?: 'text' | 'json') =>
+      ipcRenderer.invoke(IPC.LOGS_EXPORT, projectId, format),
+    exportAll: (format?: 'text' | 'json') =>
+      ipcRenderer.invoke(IPC.LOGS_EXPORT_ALL, format),
+  },
 });

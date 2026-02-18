@@ -4,7 +4,7 @@
 **Branch**: `electron-rewrite`
 **Goal**: Rewrite Zephyr Desktop from Python/PyQt6 to Electron + React + TypeScript, delivering a native-quality desktop application with integrated terminal (xterm.js), Docker container orchestration, and AI loop execution management.
 
-**Status**: Phase 1 complete. Phase 2 complete (2.1–2.5 done). Phase 3 complete (3.1–3.6 done). Phase 4 complete (4.1–4.3 done). Phase 5 complete (5.1–5.7 done). Phase 6 complete (6.1, 6.2, 6.3, 6.4, 6.5 done, 5 of 5 tasks complete). Phase 7 complete (7.1–7.4 done, 4 of 4 tasks complete). Phase 8: 2 of 4 tasks complete.
+**Status**: Phase 1 complete. Phase 2 complete (2.1–2.5 done). Phase 3 complete (3.1–3.6 done). Phase 4 complete (4.1–4.3 done). Phase 5 complete (5.1–5.7 done). Phase 6 complete (6.1, 6.2, 6.3, 6.4, 6.5 done, 5 of 5 tasks complete). Phase 7 complete (7.1–7.4 done, 4 of 4 tasks complete). Phase 8: 3 of 4 tasks complete.
 
 ## Environment Notes
 - Node.js installed via NVM: `source /home/ralph/.nvm/nvm.sh && node --version`
@@ -432,7 +432,7 @@
   - Acceptance: Handles 10k+ lines without lag, auto-scroll works, color coding applied ✓
   - **Completion**: 2026-02-18 — LogViewer fully implemented with virtualization and syntax highlighting
 
-- [ ] **8.3** Implement log export functionality
+- [x] **8.3** Implement log export functionality
   - File: `src/services/log-exporter.ts` (main process)
   - Methods: `exportLoopLog(projectId, outputPath)`, `exportAllLogs(outputPath)` (zip)
   - IPC handlers: `logs:export`, `logs:export-all`

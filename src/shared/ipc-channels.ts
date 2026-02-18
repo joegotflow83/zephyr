@@ -53,6 +53,10 @@ export const IPC = {
   LOOP_STATE_CHANGED: 'loop:state-changed',
   LOOP_LOG_LINE: 'loop:log-line',
 
+  // Log export
+  LOGS_EXPORT: 'logs:export',
+  LOGS_EXPORT_ALL: 'logs:export-all',
+
   // Misc
   PING: 'ping',
 } as const;
