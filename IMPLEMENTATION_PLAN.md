@@ -225,13 +225,15 @@
 > **Spec**: `specs/05_loop_execution_tasks.md`
 > **Dependency**: Phase 3 (DockerManager), Phase 2 (models, ProjectStore)
 
-- [ ] **5.1** Define loop execution types
+- [x] **5.1** Define loop execution types
   - File: `src/shared/loop-types.ts`
   - `LoopMode` enum: SINGLE, CONTINUOUS, SCHEDULED
   - `LoopStatus` enum: IDLE, STARTING, RUNNING, PAUSED, STOPPING, STOPPED, FAILED, COMPLETED
   - `LoopState` interface, `LoopStartOpts` interface
-  - Tests: `tests/unit/loop-types.test.ts`
-  - Acceptance: Types compile, importable from both main and renderer
+  - Helper functions: `createLoopState()`, `isLoopTerminal()`, `isLoopActive()`, `validateLoopStartOpts()`
+  - Tests: `tests/unit/loop-types.test.ts` — 63 tests, all passing
+  - Acceptance: Types compile, importable from both main and renderer ✓
+  - **Completion**: 2026-02-18 — All 353 unit tests passing
 
 - [ ] **5.2** Implement LogParser service
   - File: `src/services/log-parser.ts`
