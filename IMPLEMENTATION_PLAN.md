@@ -4,7 +4,7 @@
 **Branch**: `electron-rewrite`
 **Goal**: Rewrite Zephyr Desktop from Python/PyQt6 to Electron + React + TypeScript, delivering a native-quality desktop application with integrated terminal (xterm.js), Docker container orchestration, and AI loop execution management.
 
-**Status**: Phase 1 complete. Phase 2 complete (2.1–2.5 done). Phase 3 complete (3.1–3.6 done). Phase 4 complete (4.1–4.3 done). Phase 5 complete (5.1–5.7 done). Phase 6 complete (6.1, 6.2, 6.3, 6.4, 6.5 done, 5 of 5 tasks complete). Phase 7 in progress (7.1 done, 1 of 4 tasks complete).
+**Status**: Phase 1 complete. Phase 2 complete (2.1–2.5 done). Phase 3 complete (3.1–3.6 done). Phase 4 complete (4.1–4.3 done). Phase 5 complete (5.1–5.7 done). Phase 6 complete (6.1, 6.2, 6.3, 6.4, 6.5 done, 5 of 5 tasks complete). Phase 7 in progress (7.1, 7.2 done, 2 of 4 tasks complete).
 
 ## Environment Notes
 - Node.js installed via NVM: `source /home/ralph/.nvm/nvm.sh && node --version`
@@ -375,14 +375,16 @@
   - All 757 unit tests passing
   - Acceptance: Projects table displays, action buttons trigger callbacks, empty state renders ✓
 
-- [ ] **7.2** Implement ProjectDialog modal
+- [x] **7.2** Implement ProjectDialog modal
   - Files: `src/renderer/components/ProjectDialog/ProjectDialog.tsx`, `src/renderer/components/ProjectDialog/PromptEditor.tsx`
   - Fields: Name, Repo URL, JTBD, Docker Image
   - Modes: add (empty) / edit (pre-populated)
   - Validation: Name required, Repo URL format check
   - Custom prompt editor sub-component
-  - Tests: `tests/unit/project-dialog.test.tsx`
-  - Acceptance: Add/edit/prompt management works; validation prevents empty names
+  - Tests: `tests/unit/project-dialog.test.tsx` (23 tests, all passing)
+  - Integrated into ProjectsTab via action button callbacks
+  - All 780 unit tests passing
+  - Acceptance: Add/edit/prompt management works; validation prevents empty names ✓
 
 - [ ] **7.3** Implement ConfirmDialog (reusable)
   - File: `src/renderer/components/ConfirmDialog/ConfirmDialog.tsx`

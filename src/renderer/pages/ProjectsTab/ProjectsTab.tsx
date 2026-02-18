@@ -1,7 +1,8 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { ProjectRow } from './ProjectRow';
 import { useProjects } from '../../hooks/useProjects';
 import { useLoops } from '../../hooks/useLoops';
+import { ProjectDialog } from '../../components/ProjectDialog/ProjectDialog';
 import type { ProjectConfig } from '../../../shared/models';
 
 interface ProjectsTabProps {
@@ -14,7 +15,11 @@ interface ProjectsTabProps {
  */
 export const ProjectsTab: React.FC<ProjectsTabProps> = ({ onRunProject }) => {
   const { projects, loading, error, refresh } = useProjects();
-  const { loops, get: getLoop } = useLoops();
+  const { get: getLoop } = useLoops();
+
+  // Dialog state
+  const [dialogMode, setDialogMode] = useState<'add' | 'edit' | null>(null);
+  const [editingProject, setEditingProject] = useState<ProjectConfig | undefined>(undefined);
 
   // Load projects on mount
   useEffect(() => {
@@ -22,26 +27,38 @@ export const ProjectsTab: React.FC<ProjectsTabProps> = ({ onRunProject }) => {
   }, [refresh]);
 
   const handleAdd = () => {
-    // TODO: Open ProjectDialog in add mode (Task 7.2)
-    console.log('Add project clicked');
+    setDialogMode('add');
+    setEditingProject(undefined);
   };
 
   const handleEdit = (project: ProjectConfig) => {
-    // TODO: Open ProjectDialog in edit mode (Task 7.2)
-    console.log('Edit project clicked:', project.id);
+    setDialogMode('edit');
+    setEditingProject(project);
   };
 
   const handleDelete = (project: ProjectConfig) => {
     // TODO: Show ConfirmDialog then delete (Task 7.3)
-    console.log('Delete project clicked:', project.id);
+    void project; // Will be implemented in Task 7.3
   };
 
   const handleRun = (project: ProjectConfig) => {
     // TODO: Start loop and switch to Loops tab (Task 7.4)
-    console.log('Run project clicked:', project.id);
     if (onRunProject) {
       onRunProject(project.id);
     }
+  };
+
+  const handleDialogSave = (config: ProjectConfig) => {
+    // Note: Actual IPC calls will be wired in Task 7.4
+    void config; // Will be implemented in Task 7.4
+    setDialogMode(null);
+    setEditingProject(undefined);
+    refresh();
+  };
+
+  const handleDialogClose = () => {
+    setDialogMode(null);
+    setEditingProject(undefined);
   };
 
   // Empty state
@@ -135,6 +152,16 @@ export const ProjectsTab: React.FC<ProjectsTabProps> = ({ onRunProject }) => {
             </tbody>
           </table>
         </div>
+      )}
+
+      {/* Project Dialog */}
+      {dialogMode && (
+        <ProjectDialog
+          mode={dialogMode}
+          project={editingProject}
+          onSave={handleDialogSave}
+          onClose={handleDialogClose}
+        />
       )}
     </div>
   );
