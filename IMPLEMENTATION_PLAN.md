@@ -4,7 +4,7 @@
 **Branch**: `electron-rewrite`
 **Goal**: Rewrite Zephyr Desktop from Python/PyQt6 to Electron + React + TypeScript, delivering a native-quality desktop application with integrated terminal (xterm.js), Docker container orchestration, and AI loop execution management.
 
-**Status**: Phase 1 complete. Phase 2 complete (2.1–2.5 done). Phase 3 complete (3.1–3.6 done, all tasks). Next: Phase 4 (Credential Management).
+**Status**: Phase 1 complete. Phase 2 complete (2.1–2.5 done). Phase 3 complete (3.1–3.6 done). Phase 4 in progress (4.1 done, 4.2–4.3 pending).
 
 ## Environment Notes
 - Node.js installed via NVM: `source /home/ralph/.nvm/nvm.sh && node --version`
@@ -187,13 +187,14 @@
 > **Spec**: `specs/06_credential_tasks.md`
 > **Dependency**: Phase 1 (IPC bridge)
 
-- [ ] **4.1** Implement CredentialManager service
+- [x] **4.1** Implement CredentialManager service
   - File: `src/services/credential-manager.ts`
   - Uses `electron.safeStorage` for encryption (or `keytar` fallback)
   - Methods: `storeApiKey(service, key)`, `getApiKey(service)`, `deleteApiKey(service)`, `listStoredServices()`
   - Maintains JSON index file for enumeration
-  - Tests: `tests/unit/credential-manager.test.ts`
-  - Acceptance: Store, retrieve, delete, list tested; encryption verified
+  - Tests: `tests/unit/credential-manager.test.ts` — 26 comprehensive tests, all passing
+  - Acceptance: Store, retrieve, delete, list tested; encryption verified ✓
+  - **Completion**: 2026-02-18 — All 257 unit tests passing
 
 - [ ] **4.2** Implement LoginManager service
   - File: `src/services/login-manager.ts`
