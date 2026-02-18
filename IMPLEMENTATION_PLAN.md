@@ -4,7 +4,7 @@
 **Branch**: `electron-rewrite`
 **Goal**: Rewrite Zephyr Desktop from Python/PyQt6 to Electron + React + TypeScript, delivering a native-quality desktop application with integrated terminal (xterm.js), Docker container orchestration, and AI loop execution management.
 
-**Status**: Phase 1 complete. Phase 2 complete (2.1–2.5 done). Phase 3 complete (3.1–3.6 done). Phase 4 complete (4.1–4.3 done). Phase 5 complete (5.1–5.7 done). Phase 6 in progress (6.1, 6.2, 6.3 done, 3 of 5 tasks complete).
+**Status**: Phase 1 complete. Phase 2 complete (2.1–2.5 done). Phase 3 complete (3.1–3.6 done). Phase 4 complete (4.1–4.3 done). Phase 5 complete (5.1–5.7 done). Phase 6 in progress (6.1, 6.2, 6.3, 6.4 done, 4 of 5 tasks complete).
 
 ## Environment Notes
 - Node.js installed via NVM: `source /home/ralph/.nvm/nvm.sh && node --version`
@@ -344,13 +344,14 @@
   - All 633 unit tests passing (15 new tests for menu)
   - Acceptance: Menu bar renders with all items, keyboard shortcuts work, About dialog shows version ✓
 
-- [ ] **6.4** Implement global state management (Zustand)
-  - Install `zustand`
+- [x] **6.4** Implement global state management (Zustand)
+  - Installed `zustand`
   - Files: `src/renderer/stores/app-store.ts`, `src/renderer/hooks/useProjects.ts`, `src/renderer/hooks/useLoops.ts`, `src/renderer/hooks/useSettings.ts`
   - Stores: projects list, loop states, app settings, Docker status
-  - IPC event listeners update store automatically
-  - Tests: `tests/unit/app-store.test.ts`
-  - Acceptance: Components read/update global state; IPC events trigger updates
+  - IPC event listeners update store automatically via `initializeStoreListeners()`
+  - Tests: `tests/unit/app-store.test.ts` — 27 tests, all passing
+  - All 660 unit tests passing
+  - Acceptance: Components can read/update global state; IPC events trigger updates ✓
 
 - [ ] **6.5** Implement notification toasts
   - Files: `src/renderer/components/Toast/Toast.tsx`, `src/renderer/hooks/useToast.ts`
