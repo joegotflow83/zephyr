@@ -3,23 +3,44 @@ import { ProjectRow } from './ProjectRow';
 import { useProjects } from '../../hooks/useProjects';
 import { useLoops } from '../../hooks/useLoops';
 import { ProjectDialog } from '../../components/ProjectDialog/ProjectDialog';
+import { ConfirmDialog } from '../../components/ConfirmDialog/ConfirmDialog';
 import type { ProjectConfig } from '../../../shared/models';
+import { LoopMode } from '../../../shared/loop-types';
+
+interface ToastMethods {
+  success: (message: string) => void;
+  error: (message: string) => void;
+  warning: (message: string) => void;
+  info: (message: string) => void;
+}
 
 interface ProjectsTabProps {
-  onRunProject?: (projectId: string) => void;
+  onRunProject?: () => void;
+  toast: ToastMethods;
 }
 
 /**
  * Projects tab page component.
  * Displays a table of all configured projects with CRUD actions.
  */
-export const ProjectsTab: React.FC<ProjectsTabProps> = ({ onRunProject }) => {
+export const ProjectsTab: React.FC<ProjectsTabProps> = ({ onRunProject, toast }) => {
   const { projects, loading, error, refresh } = useProjects();
   const { get: getLoop } = useLoops();
 
   // Dialog state
   const [dialogMode, setDialogMode] = useState<'add' | 'edit' | null>(null);
   const [editingProject, setEditingProject] = useState<ProjectConfig | undefined>(undefined);
+
+  // Confirm dialog state
+  const [confirmDialog, setConfirmDialog] = useState<{
+    project: ProjectConfig;
+    show: boolean;
+  } | null>(null);
+
+  // Action loading states
+  const [actionLoading, setActionLoading] = useState<{
+    [key: string]: boolean;
+  }>({});
 
   // Load projects on mount
   useEffect(() => {
@@ -37,23 +58,76 @@ export const ProjectsTab: React.FC<ProjectsTabProps> = ({ onRunProject }) => {
   };
 
   const handleDelete = (project: ProjectConfig) => {
-    // TODO: Show ConfirmDialog then delete (Task 7.3)
-    void project; // Will be implemented in Task 7.3
+    setConfirmDialog({ project, show: true });
   };
 
-  const handleRun = (project: ProjectConfig) => {
-    // TODO: Start loop and switch to Loops tab (Task 7.4)
-    if (onRunProject) {
-      onRunProject(project.id);
+  const handleConfirmDelete = async () => {
+    if (!confirmDialog) return;
+
+    const { project } = confirmDialog;
+    setActionLoading({ ...actionLoading, [`delete-${project.id}`]: true });
+
+    try {
+      await window.api.projects.remove(project.id);
+      toast.success(`Project "${project.name}" deleted successfully`);
+      setConfirmDialog(null);
+      refresh();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      toast.error(`Failed to delete project: ${message}`);
+    } finally {
+      setActionLoading({ ...actionLoading, [`delete-${project.id}`]: false });
     }
   };
 
-  const handleDialogSave = (config: ProjectConfig) => {
-    // Note: Actual IPC calls will be wired in Task 7.4
-    void config; // Will be implemented in Task 7.4
-    setDialogMode(null);
-    setEditingProject(undefined);
-    refresh();
+  const handleCancelDelete = () => {
+    setConfirmDialog(null);
+  };
+
+  const handleRun = async (project: ProjectConfig) => {
+    setActionLoading({ ...actionLoading, [`run-${project.id}`]: true });
+
+    try {
+      await window.api.loops.start({
+        projectId: project.id,
+        dockerImage: project.docker_image,
+        mode: LoopMode.SINGLE,
+      });
+      toast.success(`Loop started for "${project.name}"`);
+      if (onRunProject) {
+        onRunProject();
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      toast.error(`Failed to start loop: ${message}`);
+    } finally {
+      setActionLoading({ ...actionLoading, [`run-${project.id}`]: false });
+    }
+  };
+
+  const handleDialogSave = async (config: ProjectConfig) => {
+    const isEdit = dialogMode === 'edit';
+    const actionKey = isEdit ? `edit-${config.id}` : 'add';
+    setActionLoading({ ...actionLoading, [actionKey]: true });
+
+    try {
+      if (isEdit) {
+        await window.api.projects.update(config.id, config);
+        toast.success(`Project "${config.name}" updated successfully`);
+      } else {
+        await window.api.projects.add(config);
+        toast.success(`Project "${config.name}" added successfully`);
+      }
+
+      setDialogMode(null);
+      setEditingProject(undefined);
+      refresh();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      toast.error(`Failed to ${isEdit ? 'update' : 'add'} project: ${message}`);
+    } finally {
+      setActionLoading({ ...actionLoading, [actionKey]: false });
+    }
   };
 
   const handleDialogClose = () => {
@@ -161,6 +235,19 @@ export const ProjectsTab: React.FC<ProjectsTabProps> = ({ onRunProject }) => {
           project={editingProject}
           onSave={handleDialogSave}
           onClose={handleDialogClose}
+        />
+      )}
+
+      {/* Confirm Delete Dialog */}
+      {confirmDialog?.show && (
+        <ConfirmDialog
+          title="Delete Project"
+          message={`Are you sure you want to delete "${confirmDialog.project.name}"? This action cannot be undone.`}
+          confirmLabel="Delete"
+          cancelLabel="Cancel"
+          variant="danger"
+          onConfirm={handleConfirmDelete}
+          onCancel={handleCancelDelete}
         />
       )}
     </div>

@@ -20,7 +20,7 @@ const tabs: Tab[] = [
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabId>('projects');
   const activeLoopCount = useActiveLoops();
-  const { toasts, dismissToast } = useToast();
+  const { toasts, dismissToast, success, error, warning, info } = useToast();
 
   // Keyboard shortcuts: Ctrl+1/2/3/4 for tab switching
   useEffect(() => {
@@ -40,9 +40,11 @@ const App: React.FC = () => {
   }, []);
 
   const renderActiveTab = () => {
+    const toastMethods = { success, error, warning, info };
+
     switch (activeTab) {
       case 'projects':
-        return <ProjectsTab />;
+        return <ProjectsTab onRunProject={() => setActiveTab('loops')} toast={toastMethods} />;
       case 'loops':
         return <LoopsTab />;
       case 'terminal':
@@ -50,7 +52,7 @@ const App: React.FC = () => {
       case 'settings':
         return <SettingsTab />;
       default:
-        return <ProjectsTab />;
+        return <ProjectsTab onRunProject={() => setActiveTab('loops')} toast={toastMethods} />;
     }
   };
 
