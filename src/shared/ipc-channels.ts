@@ -39,6 +39,20 @@ export const IPC = {
   CREDENTIALS_LIST: 'credentials:list',
   CREDENTIALS_LOGIN: 'credentials:login',
 
+  // Loop execution
+  LOOP_START: 'loop:start',
+  LOOP_STOP: 'loop:stop',
+  LOOP_LIST: 'loop:list',
+  LOOP_GET: 'loop:get',
+  LOOP_REMOVE: 'loop:remove',
+  LOOP_SCHEDULE: 'loop:schedule',
+  LOOP_CANCEL_SCHEDULE: 'loop:cancel-schedule',
+  LOOP_LIST_SCHEDULED: 'loop:list-scheduled',
+
+  // Loop events (outbound from main to renderer)
+  LOOP_STATE_CHANGED: 'loop:state-changed',
+  LOOP_LOG_LINE: 'loop:log-line',
+
   // Misc
   PING: 'ping',
 } as const;

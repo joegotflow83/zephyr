@@ -8,9 +8,13 @@ import { DockerManager } from '../services/docker-manager';
 import { DockerHealthMonitor } from '../services/docker-health';
 import { CredentialManager } from '../services/credential-manager';
 import { LoginManager } from '../services/login-manager';
+import { LogParser } from '../services/log-parser';
+import { LoopRunner } from '../services/loop-runner';
+import { LoopScheduler } from '../services/scheduler';
 import { registerDataHandlers } from './ipc-handlers/data-handlers';
 import { registerDockerHandlers } from './ipc-handlers/docker-handlers';
 import { registerCredentialHandlers } from './ipc-handlers/credential-handlers';
+import { registerLoopHandlers } from './ipc-handlers/loop-handlers';
 import { IPC } from '../shared/ipc-channels';
 import os from 'node:os';
 
@@ -29,11 +33,15 @@ const credentialManager = new CredentialManager(
   path.join(os.homedir(), '.zephyr')
 );
 const loginManager = new LoginManager(credentialManager);
+const logParser = new LogParser();
+const loopRunner = new LoopRunner(dockerManager, logParser, 3); // Default max 3 concurrent
+const scheduler = new LoopScheduler(loopRunner);
 
 // Register all IPC handlers before the window is created.
 registerDataHandlers({ configManager, projectStore, importExport });
 registerDockerHandlers({ dockerManager, dockerHealth });
 registerCredentialHandlers({ credentialManager, loginManager });
+registerLoopHandlers({ loopRunner, scheduler });
 
 // Legacy ping handler kept for backwards compatibility with existing tests.
 ipcMain.handle(IPC.PING, () => 'pong');

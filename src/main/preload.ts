@@ -65,4 +65,32 @@ contextBridge.exposeInMainWorld('api', {
     list: () => ipcRenderer.invoke(IPC.CREDENTIALS_LIST),
     login: (service: string) => ipcRenderer.invoke(IPC.CREDENTIALS_LOGIN, service),
   },
+
+  loops: {
+    start: (opts: unknown) => ipcRenderer.invoke(IPC.LOOP_START, opts),
+    stop: (projectId: string) => ipcRenderer.invoke(IPC.LOOP_STOP, projectId),
+    list: () => ipcRenderer.invoke(IPC.LOOP_LIST),
+    get: (projectId: string) => ipcRenderer.invoke(IPC.LOOP_GET, projectId),
+    remove: (projectId: string) => ipcRenderer.invoke(IPC.LOOP_REMOVE, projectId),
+    schedule: (projectId: string, schedule: string, loopOpts: unknown) =>
+      ipcRenderer.invoke(IPC.LOOP_SCHEDULE, projectId, schedule, loopOpts),
+    cancelSchedule: (projectId: string) =>
+      ipcRenderer.invoke(IPC.LOOP_CANCEL_SCHEDULE, projectId),
+    listScheduled: () => ipcRenderer.invoke(IPC.LOOP_LIST_SCHEDULED),
+
+    // Event listeners
+    onStateChanged: (callback: (state: unknown) => void) => {
+      const listener = (_event: unknown, state: unknown) => callback(state);
+      ipcRenderer.on(IPC.LOOP_STATE_CHANGED, listener);
+      // Return cleanup function
+      return () => ipcRenderer.removeListener(IPC.LOOP_STATE_CHANGED, listener);
+    },
+    onLogLine: (callback: (projectId: string, line: unknown) => void) => {
+      const listener = (_event: unknown, projectId: string, line: unknown) =>
+        callback(projectId, line);
+      ipcRenderer.on(IPC.LOOP_LOG_LINE, listener);
+      // Return cleanup function
+      return () => ipcRenderer.removeListener(IPC.LOOP_LOG_LINE, listener);
+    },
+  },
 });

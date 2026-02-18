@@ -12,6 +12,9 @@ import type {
 } from '../../services/docker-manager';
 import type { CredentialService } from '../../services/credential-manager';
 import type { LoginResult } from '../../services/login-manager';
+import type { LoopState, LoopStartOpts } from '../../shared/loop-types';
+import type { ScheduledLoop } from '../../services/scheduler';
+import type { ParsedLogLine } from '../../services/log-parser';
 
 export {};
 
@@ -92,6 +95,37 @@ declare global {
         list: () => Promise<string[]>;
         /** Open browser-based login window for a service */
         login: (service: string) => Promise<LoginResult>;
+      };
+
+      loops: {
+        /** Start a new loop execution */
+        start: (opts: LoopStartOpts) => Promise<LoopState>;
+        /** Stop a running loop */
+        stop: (projectId: string) => Promise<void>;
+        /** List all loop states (running and terminal) */
+        list: () => Promise<LoopState[]>;
+        /** Get a single loop state by project ID */
+        get: (projectId: string) => Promise<LoopState | null>;
+        /** Remove a loop from tracking (only terminal states) */
+        remove: (projectId: string) => Promise<void>;
+        /** Schedule a loop for recurring execution */
+        schedule: (
+          projectId: string,
+          schedule: string,
+          loopOpts: Omit<LoopStartOpts, 'mode'>,
+        ) => Promise<void>;
+        /** Cancel a scheduled loop */
+        cancelSchedule: (projectId: string) => Promise<void>;
+        /** List all scheduled loops */
+        listScheduled: () => Promise<ScheduledLoop[]>;
+
+        // Event listeners
+        /** Listen for loop state changes. Returns cleanup function. */
+        onStateChanged: (callback: (state: LoopState) => void) => () => void;
+        /** Listen for parsed log lines. Returns cleanup function. */
+        onLogLine: (
+          callback: (projectId: string, line: ParsedLogLine) => void,
+        ) => () => void;
       };
     };
   }
