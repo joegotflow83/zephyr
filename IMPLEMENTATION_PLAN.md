@@ -4,7 +4,7 @@
 **Branch**: `electron-rewrite`
 **Goal**: Rewrite Zephyr Desktop from Python/PyQt6 to Electron + React + TypeScript, delivering a native-quality desktop application with integrated terminal (xterm.js), Docker container orchestration, and AI loop execution management.
 
-**Status**: Phase 1 complete. Phase 2 complete (2.1–2.5 done). Phase 3 Tasks 3.1–3.2 complete. Next: Phase 3.3 (DockerManager — log streaming).
+**Status**: Phase 1 complete. Phase 2 complete (2.1–2.5 done). Phase 3 Tasks 3.1–3.3 complete. Next: Phase 3.4 (DockerManager — exec sessions).
 
 ## Environment Notes
 - Node.js installed via NVM: `source /home/ralph/.nvm/nvm.sh && node --version`
@@ -145,13 +145,15 @@
   - **Dependency**: Task 3.1
   - Acceptance: Create, start, stop, remove, status, label filtering tested
 
-- [ ] **3.3** Implement DockerManager -- log streaming
-  - Add to `src/services/docker-manager.ts`
-  - Method: `streamLogs(containerId, onLine)` returning AbortController
-  - Supports `since` timestamp for resumed streaming
-  - Tests: `tests/unit/docker-manager-logs.test.ts`
+- [x] **3.3** Implement DockerManager -- log streaming
+  - File: `src/services/docker-manager.ts` (added `streamLogs` method)
+  - Method: `streamLogs(containerId, onLine, since?)` returning `Promise<AbortController>`
+  - Handles Docker's multiplexed stream format (8-byte header per frame)
+  - Supports optional `since` timestamp for resumed streaming
+  - Buffers incomplete lines across frames
+  - Tests: `tests/unit/docker-manager-logs.test.ts` — 11 tests, all passing
   - **Dependency**: Task 3.1
-  - Acceptance: Line-by-line callback delivery and abort tested
+  - Acceptance: Line-by-line callback delivery, abort functionality, multi-frame handling, and since timestamp tested ✓
 
 - [ ] **3.4** Implement DockerManager -- exec sessions
   - Add to `src/services/docker-manager.ts`

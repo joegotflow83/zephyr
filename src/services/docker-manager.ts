@@ -307,4 +307,121 @@ export class DockerManager {
       return null;
     }
   }
+
+  /**
+   * Stream logs from a container
+   * @param containerId - Container ID to stream logs from
+   * @param onLine - Callback function called for each log line
+   * @param since - Optional Unix timestamp to stream logs since (for resuming)
+   * @returns AbortController to stop the stream
+   * @throws Error if log streaming fails to start
+   */
+  async streamLogs(
+    containerId: string,
+    onLine: (line: string) => void,
+    since?: number
+  ): Promise<AbortController> {
+    const container = this.docker.getContainer(containerId);
+    const abortController = new AbortController();
+
+    // Build log options
+    const logOptions: {
+      follow: boolean;
+      stdout: boolean;
+      stderr: boolean;
+      timestamps: boolean;
+      since?: number;
+    } = {
+      follow: true,
+      stdout: true,
+      stderr: true,
+      timestamps: true,
+    };
+
+    if (since !== undefined) {
+      logOptions.since = since;
+    }
+
+    // Start streaming logs
+    const stream = (await container.logs(logOptions)) as NodeJS.ReadableStream;
+
+    // Buffer for incomplete lines
+    let buffer = '';
+
+    // Handle data events
+    stream.on('data', (chunk: Buffer) => {
+      if (abortController.signal.aborted) {
+        return;
+      }
+
+      // Docker multiplexes stdout/stderr with an 8-byte header
+      // Format: [STREAM_TYPE, 0, 0, 0, SIZE1, SIZE2, SIZE3, SIZE4, ...PAYLOAD...]
+      let offset = 0;
+      const chunkBuffer = Buffer.from(chunk);
+
+      while (offset < chunkBuffer.length) {
+        // Check if we have at least the header (8 bytes)
+        if (offset + 8 > chunkBuffer.length) {
+          break;
+        }
+
+        // Read header
+        // Byte 0: stream type (1=stdout, 2=stderr)
+        // Bytes 4-7: payload size (big-endian uint32)
+        const payloadSize =
+          (chunkBuffer[offset + 4] << 24) |
+          (chunkBuffer[offset + 5] << 16) |
+          (chunkBuffer[offset + 6] << 8) |
+          chunkBuffer[offset + 7];
+
+        // Check if we have the full payload
+        if (offset + 8 + payloadSize > chunkBuffer.length) {
+          break;
+        }
+
+        // Extract payload
+        const payload = chunkBuffer.subarray(offset + 8, offset + 8 + payloadSize).toString('utf8');
+
+        // Add to buffer
+        buffer += payload;
+
+        // Process complete lines
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || ''; // Keep incomplete line in buffer
+
+        for (const line of lines) {
+          if (line.trim() && !abortController.signal.aborted) {
+            onLine(line);
+          }
+        }
+
+        offset += 8 + payloadSize;
+      }
+    });
+
+    // Handle stream end
+    stream.on('end', () => {
+      // Process any remaining buffered data
+      if (buffer.trim() && !abortController.signal.aborted) {
+        onLine(buffer);
+      }
+      stream.destroy();
+    });
+
+    // Handle errors
+    stream.on('error', (error: Error) => {
+      if (!abortController.signal.aborted) {
+        // Log error but don't throw - let the stream end naturally
+        console.error(`Log stream error for container ${containerId}:`, error);
+      }
+      stream.destroy();
+    });
+
+    // Set up abort handling
+    abortController.signal.addEventListener('abort', () => {
+      stream.destroy();
+    });
+
+    return abortController;
+  }
 }
