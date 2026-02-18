@@ -4,7 +4,7 @@
 **Branch**: `electron-rewrite`
 **Goal**: Rewrite Zephyr Desktop from Python/PyQt6 to Electron + React + TypeScript, delivering a native-quality desktop application with integrated terminal (xterm.js), Docker container orchestration, and AI loop execution management.
 
-**Status**: Phase 1 complete. Phase 2 complete (2.1–2.5 done). Phase 3 complete (3.1–3.6 done). Phase 4 complete (4.1–4.3 done).
+**Status**: Phase 1 complete. Phase 2 complete (2.1–2.5 done). Phase 3 complete (3.1–3.6 done). Phase 4 complete (4.1–4.3 done). Phase 5 in progress (5.1–5.3 done).
 
 ## Environment Notes
 - Node.js installed via NVM: `source /home/ralph/.nvm/nvm.sh && node --version`
@@ -243,14 +243,17 @@
   - **Completion**: 2026-02-18 — All 411 unit tests passing
   - Acceptance: All log line classifications match Python version ✓
 
-- [ ] **5.3** Implement LoopRunner service
+- [x] **5.3** Implement LoopRunner service
   - File: `src/services/loop-runner.ts`
-  - Constructor takes DockerManager, LogParser
-  - Methods: `startLoop(opts)`, `stopLoop(projectId)`, `getLoopState(projectId)`, `listRunning()`, `onStateChange(cb)`, `onLogLine(cb)`
+  - Constructor takes DockerManager, LogParser, maxConcurrent
+  - Methods: `startLoop(opts)`, `stopLoop(projectId)`, `getLoopState(projectId)`, `listRunning()`, `listAll()`, `removeLoop(projectId)`, `onStateChange(cb)`, `onLogLine(cb)`, `setMaxConcurrent(max)`
   - Tracks state in `Map<string, LoopState>`, enforces concurrency limit
-  - Tests: `tests/unit/loop-runner.test.ts`
+  - Real-time log parsing with commit detection, error counting, iteration tracking
+  - Container exit monitoring with mode-based status transitions (COMPLETED for SINGLE, FAILED for others)
+  - Tests: `tests/unit/loop-runner.test.ts` — 36 tests, all passing
   - **Dependency**: Tasks 3.1-3.3, 5.1, 5.2
-  - Acceptance: Start, stop, state tracking, concurrency, log streaming tested
+  - Acceptance: Start, stop, state tracking, concurrency, log streaming, callbacks tested ✓
+  - **Completion**: 2026-02-18 — All 447 unit tests passing
 
 - [ ] **5.4** Implement loop recovery
   - Add `recoverLoops(containers)` to `src/services/loop-runner.ts`
