@@ -4,7 +4,7 @@
 **Branch**: `electron-rewrite`
 **Goal**: Rewrite Zephyr Desktop from Python/PyQt6 to Electron + React + TypeScript, delivering a native-quality desktop application with integrated terminal (xterm.js), Docker container orchestration, and AI loop execution management.
 
-**Status**: Phase 1 complete. Phase 2 complete (2.1–2.5 done). Phase 3 complete (3.1–3.6 done). Phase 4 complete (4.1–4.3 done). Phase 5 complete (5.1–5.7 done). Phase 6 complete (6.1, 6.2, 6.3, 6.4, 6.5 done, 5 of 5 tasks complete). Phase 7 in progress (7.1, 7.2 done, 2 of 4 tasks complete).
+**Status**: Phase 1 complete. Phase 2 complete (2.1–2.5 done). Phase 3 complete (3.1–3.6 done). Phase 4 complete (4.1–4.3 done). Phase 5 complete (5.1–5.7 done). Phase 6 complete (6.1, 6.2, 6.3, 6.4, 6.5 done, 5 of 5 tasks complete). Phase 7 in progress (7.1, 7.2, 7.3 done, 3 of 4 tasks complete).
 
 ## Environment Notes
 - Node.js installed via NVM: `source /home/ralph/.nvm/nvm.sh && node --version`
@@ -386,11 +386,11 @@
   - All 780 unit tests passing
   - Acceptance: Add/edit/prompt management works; validation prevents empty names ✓
 
-- [ ] **7.3** Implement ConfirmDialog (reusable)
+- [x] **7.3** Implement ConfirmDialog (reusable)
   - File: `src/renderer/components/ConfirmDialog/ConfirmDialog.tsx`
   - Props: title, message, confirmLabel, variant (danger/default), onConfirm, onCancel
-  - Tests: `tests/unit/confirm-dialog.test.tsx`
-  - Acceptance: Confirm calls onConfirm, cancel calls onCancel, danger variant styles red
+  - Tests: `tests/unit/confirm-dialog.test.tsx` (18 tests, all passing)
+  - Acceptance: Confirm calls onConfirm, cancel calls onCancel, danger variant styles red ✓
 
 - [ ] **7.4** Wire project actions to services and toasts
   - Integrate in ProjectsTab: Add -> ProjectDialog -> `window.api.projects.add()`, Edit -> `window.api.projects.update()`, Delete -> ConfirmDialog -> `window.api.projects.remove()`, Run -> `window.api.loops.start()` + switch to Loops tab
