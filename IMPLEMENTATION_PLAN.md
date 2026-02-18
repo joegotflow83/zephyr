@@ -4,7 +4,7 @@
 **Branch**: `electron-rewrite`
 **Goal**: Rewrite Zephyr Desktop from Python/PyQt6 to Electron + React + TypeScript, delivering a native-quality desktop application with integrated terminal (xterm.js), Docker container orchestration, and AI loop execution management.
 
-**Status**: Phase 1 complete. Phase 2 complete (2.1–2.5 done). Phase 3 Tasks 3.1–3.4 complete. Next: Phase 3.5 (DockerHealthMonitor service).
+**Status**: Phase 1 complete. Phase 2 complete (2.1–2.5 done). Phase 3 complete (3.1–3.5). Next: Phase 3.6 (Wire Docker services to IPC handlers).
 
 ## Environment Notes
 - Node.js installed via NVM: `source /home/ralph/.nvm/nvm.sh && node --version`
@@ -162,14 +162,14 @@
   - **Dependency**: Task 3.1
   - Acceptance: Exec creation, stream handling, resize tested
 
-- [ ] **3.5** Implement DockerHealthMonitor service
+- [x] **3.5** Implement DockerHealthMonitor service
   - File: `src/services/docker-health.ts`
-  - Methods: `start(intervalMs?)`, `stop()`, `onStatusChange(callback)`
-  - Only fires on state transitions
-  - Emits events via `webContents.send()`
-  - Tests: `tests/unit/docker-health.test.ts`
+  - Methods: `start(intervalMs?)`, `stop()`, `onStatusChange(callback)`, `removeCallback(callback)`, `getLastKnownStatus()`, `isRunning()`
+  - Only fires callbacks on state transitions
+  - Tests: `tests/unit/docker-health.test.ts` — 34 tests, all passing
+  - Uses fake timers for deterministic testing
   - **Dependency**: Task 3.1
-  - Acceptance: Polling, state transition detection, callback invocation tested
+  - Acceptance: Polling, state transition detection, callback invocation tested ✓
 
 - [ ] **3.6** Wire Docker services to IPC handlers
   - File: `src/main/ipc-handlers/docker-handlers.ts`
