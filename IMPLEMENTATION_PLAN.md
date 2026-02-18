@@ -4,7 +4,7 @@
 **Branch**: `electron-rewrite`
 **Goal**: Rewrite Zephyr Desktop from Python/PyQt6 to Electron + React + TypeScript, delivering a native-quality desktop application with integrated terminal (xterm.js), Docker container orchestration, and AI loop execution management.
 
-**Status**: Phase 1 complete. Phase 2 complete (2.1–2.5 done). Phase 3 complete (3.1–3.6 done). Phase 4 complete (4.1–4.3 done). Phase 5 complete (5.1–5.4 done).
+**Status**: Phase 1 complete. Phase 2 complete (2.1–2.5 done). Phase 3 complete (3.1–3.6 done). Phase 4 complete (4.1–4.3 done). Phase 5 complete (5.1–5.5 done).
 
 ## Environment Notes
 - Node.js installed via NVM: `source /home/ralph/.nvm/nvm.sh && node --version`
@@ -264,14 +264,15 @@
   - Acceptance: Recovery happy path, skip deleted, skip duplicates, concurrency limit tested ✓
   - **Completion**: 2026-02-18 — All 461 unit tests passing
 
-- [ ] **5.5** Implement Scheduler service
+- [x] **5.5** Implement Scheduler service
   - File: `src/services/scheduler.ts`
   - Method: `parseSchedule(expr)` for `"*/5 minutes"`, `"every 2 hours"`, `"daily 14:30"`
   - Class methods: `scheduleLoop(projectId, schedule)`, `cancelSchedule(projectId)`, `listScheduled()`, `isScheduled(projectId)`
   - Uses `setInterval`/`setTimeout`; calls `LoopRunner.startLoop()` on trigger
-  - Tests: `tests/unit/scheduler.test.ts` (fake timers)
+  - Tests: `tests/unit/scheduler.test.ts` — 41 tests, all passing
   - **Dependency**: Task 5.3
-  - Acceptance: Schedule parsing, trigger firing, cancel, list tested
+  - Acceptance: Schedule parsing, trigger firing, cancel, list tested ✓
+  - **Completion**: 2026-02-18 — All 502 unit tests passing
 
 - [ ] **5.6** Implement AssetInjector service
   - File: `src/services/asset-injector.ts`
