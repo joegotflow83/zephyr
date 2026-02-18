@@ -4,7 +4,7 @@
 **Branch**: `electron-rewrite`
 **Goal**: Rewrite Zephyr Desktop from Python/PyQt6 to Electron + React + TypeScript, delivering a native-quality desktop application with integrated terminal (xterm.js), Docker container orchestration, and AI loop execution management.
 
-**Status**: Phase 1 complete. Phase 2 complete (2.1–2.5 done). Phase 3 complete (3.1–3.6 done). Phase 4 in progress (4.1 done, 4.2–4.3 pending).
+**Status**: Phase 1 complete. Phase 2 complete (2.1–2.5 done). Phase 3 complete (3.1–3.6 done). Phase 4 in progress (4.1–4.2 done, 4.3 pending).
 
 ## Environment Notes
 - Node.js installed via NVM: `source /home/ralph/.nvm/nvm.sh && node --version`
@@ -196,15 +196,18 @@
   - Acceptance: Store, retrieve, delete, list tested; encryption verified ✓
   - **Completion**: 2026-02-18 — All 257 unit tests passing
 
-- [ ] **4.2** Implement LoginManager service
+- [x] **4.2** Implement LoginManager service
   - File: `src/services/login-manager.ts`
-  - Method: `openLoginSession(service)` -- opens BrowserWindow to service login URL
-  - Captures session cookies/tokens, stores via CredentialManager
+  - Method: `openLoginSession(service, options?)` -- opens BrowserWindow to service login URL
+  - Captures session cookies/tokens, stores via CredentialManager with `session:` prefix
   - `LoginResult` type: `{ success, service, error? }`
-  - No Playwright dependency -- Electron IS the browser
-  - Tests: `tests/unit/login-manager.test.ts`
+  - No Playwright dependency -- Electron BrowserWindow IS the browser
+  - Services supported: Anthropic, OpenAI with known URLs and cookie domains
+  - Features: Timeout handling, navigation detection, error handling, multiple resolution prevention
+  - Tests: `tests/unit/login-manager.test.ts` — 19 comprehensive tests, all passing
   - **Dependency**: Task 4.1
-  - Acceptance: Mocked BrowserWindow flow tested; correct URLs per service
+  - Acceptance: Mocked BrowserWindow flow tested; correct URLs per service ✓
+  - **Completion**: 2026-02-18 — All 276 unit tests passing
 
 - [ ] **4.3** Wire credential services to IPC handlers
   - File: `src/main/ipc-handlers/credential-handlers.ts`
