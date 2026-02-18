@@ -31,7 +31,7 @@ export function useActiveLoops(): number {
       });
 
     // Subscribe to loop state changes
-    const cleanup = window.api.loops.onStateChanged((state: LoopState) => {
+    const cleanup = window.api.loops.onStateChanged((_state: LoopState) => {
       if (isMounted) {
         // Re-query all loops to get accurate count
         window.api.loops

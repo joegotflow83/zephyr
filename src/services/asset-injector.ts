@@ -161,7 +161,7 @@ export class AssetInjector {
    * Ensures PROMPT_build.md exists in injection directory.
    * Writes default content if not already present.
    */
-  private async ensurePromptBuild(injectionDir: string, project: ProjectConfig): Promise<void> {
+  private async ensurePromptBuild(injectionDir: string, _project: ProjectConfig): Promise<void> {
     const target = path.join(injectionDir, 'PROMPT_build.md');
 
     // Check if already written via custom_prompts

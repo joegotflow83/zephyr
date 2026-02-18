@@ -57,7 +57,7 @@ export class LoopRunner {
    * @param parser - LogParser instance for log classification
    * @param maxConcurrent - Maximum number of concurrent loops (default: 3)
    */
-  constructor(docker: DockerManager, parser: LogParser, maxConcurrent: number = 3) {
+  constructor(docker: DockerManager, parser: LogParser, maxConcurrent = 3) {
     this.docker = docker;
     this.parser = parser;
     this.maxConcurrent = maxConcurrent;

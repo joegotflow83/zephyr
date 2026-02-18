@@ -48,7 +48,7 @@ export class LogParser {
   private static readonly RE_TRACEBACK = /^\s*Traceback\s+\(most recent call last\)/i;
   private static readonly RE_EXCEPTION =
     /^\s*(?:\w+\.)*\w*(?:Error|Exception|Failure|Fatal|Interrupt|Warning|NotFound|Refused|Timeout)\b.*:\s*/i;
-  private static readonly RE_ERROR_PREFIX = /^\s*(?:ERROR|Error|error)\s*[:\[]/i;
+  private static readonly RE_ERROR_PREFIX = /^\s*(?:ERROR|Error|error)\s*[:[]/i;
   private static readonly RE_PYTEST_FAIL = /^\s*(?:FAILED|ERRORS?)\s+/i;
 
   private static readonly ERROR_PATTERNS = [
