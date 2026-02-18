@@ -4,7 +4,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import App from '../../src/renderer/App';
 
 beforeEach(() => {
-  // Mock window.api for StatusBar and useActiveLoops
+  // Mock window.api for StatusBar, useActiveLoops, and useProjects
   global.window.api = {
     docker: {
       status: vi.fn().mockResolvedValue({
@@ -16,6 +16,17 @@ beforeEach(() => {
     loops: {
       list: vi.fn().mockResolvedValue([]),
       onStateChanged: vi.fn(() => vi.fn()),
+    },
+    projects: {
+      list: vi.fn().mockResolvedValue([]),
+    },
+    settings: {
+      load: vi.fn().mockResolvedValue({
+        max_concurrent_containers: 5,
+        notification_enabled: true,
+        theme: 'system',
+        log_level: 'INFO',
+      }),
     },
   } as any;
 });
@@ -38,7 +49,7 @@ describe('App', () => {
 
   it('renders the StatusBar component', () => {
     render(<App />);
-    // StatusBar should be present (check for Docker status text)
-    expect(screen.getByText(/Docker/i)).toBeInTheDocument();
+    // StatusBar should be present (check for Docker status text - always shown)
+    expect(screen.getByText(/Docker (Connected|Disconnected)/i)).toBeInTheDocument();
   });
 });

@@ -4,7 +4,7 @@
 **Branch**: `electron-rewrite`
 **Goal**: Rewrite Zephyr Desktop from Python/PyQt6 to Electron + React + TypeScript, delivering a native-quality desktop application with integrated terminal (xterm.js), Docker container orchestration, and AI loop execution management.
 
-**Status**: Phase 1 complete. Phase 2 complete (2.1–2.5 done). Phase 3 complete (3.1–3.6 done). Phase 4 complete (4.1–4.3 done). Phase 5 complete (5.1–5.7 done). Phase 6 complete (6.1, 6.2, 6.3, 6.4, 6.5 done, 5 of 5 tasks complete).
+**Status**: Phase 1 complete. Phase 2 complete (2.1–2.5 done). Phase 3 complete (3.1–3.6 done). Phase 4 complete (4.1–4.3 done). Phase 5 complete (5.1–5.7 done). Phase 6 complete (6.1, 6.2, 6.3, 6.4, 6.5 done, 5 of 5 tasks complete). Phase 7 in progress (7.1 done, 1 of 4 tasks complete).
 
 ## Environment Notes
 - Node.js installed via NVM: `source /home/ralph/.nvm/nvm.sh && node --version`
@@ -369,13 +369,11 @@
 > **Spec**: `specs/08_projects_ui_tasks.md`
 > **Dependency**: Phase 6 (layout, state), Phase 2 (data IPC)
 
-- [ ] **7.1** Implement ProjectsTab page component
+- [x] **7.1** Implement ProjectsTab page component
   - Files: `src/renderer/pages/ProjectsTab/ProjectsTab.tsx`, `src/renderer/pages/ProjectsTab/ProjectRow.tsx`
-  - Add Project button, table with Name/Repo URL/Docker Image/Status/Actions columns
-  - Empty state with CTA
-  - Uses `useProjects()` hook
-  - Tests: `tests/unit/projects-tab.test.tsx`
-  - Acceptance: Projects display, buttons trigger callbacks, empty state renders
+  - Tests: `tests/unit/projects-tab.test.tsx` (14 tests), `tests/unit/project-row.test.tsx` (23 tests)
+  - All 757 unit tests passing
+  - Acceptance: Projects table displays, action buttons trigger callbacks, empty state renders ✓
 
 - [ ] **7.2** Implement ProjectDialog modal
   - Files: `src/renderer/components/ProjectDialog/ProjectDialog.tsx`, `src/renderer/components/ProjectDialog/PromptEditor.tsx`
