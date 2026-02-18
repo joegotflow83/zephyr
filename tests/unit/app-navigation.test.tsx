@@ -4,8 +4,20 @@ import App from '../../src/renderer/App';
 
 describe('App Navigation', () => {
   beforeEach(() => {
-    // Mock window.api if needed
-    window.api = {} as any;
+    // Mock window.api for StatusBar and useActiveLoops
+    global.window.api = {
+      docker: {
+        status: vi.fn().mockResolvedValue({
+          available: true,
+          info: { version: '24.0.7', containers: 0, images: 0 },
+        }),
+        onStatusChanged: vi.fn(() => vi.fn()),
+      },
+      loops: {
+        list: vi.fn().mockResolvedValue([]),
+        onStateChanged: vi.fn(() => vi.fn()),
+      },
+    } as any;
   });
 
   it('renders with Projects tab active by default', () => {

@@ -4,7 +4,7 @@
 **Branch**: `electron-rewrite`
 **Goal**: Rewrite Zephyr Desktop from Python/PyQt6 to Electron + React + TypeScript, delivering a native-quality desktop application with integrated terminal (xterm.js), Docker container orchestration, and AI loop execution management.
 
-**Status**: Phase 1 complete. Phase 2 complete (2.1–2.5 done). Phase 3 complete (3.1–3.6 done). Phase 4 complete (4.1–4.3 done). Phase 5 complete (5.1–5.7 done). Phase 6 in progress (6.1 done, 1 of 5 tasks complete).
+**Status**: Phase 1 complete. Phase 2 complete (2.1–2.5 done). Phase 3 complete (3.1–3.6 done). Phase 4 complete (4.1–4.3 done). Phase 5 complete (5.1–5.7 done). Phase 6 in progress (6.1, 6.2 done, 2 of 5 tasks complete).
 
 ## Environment Notes
 - Node.js installed via NVM: `source /home/ralph/.nvm/nvm.sh && node --version`
@@ -316,13 +316,22 @@
   - All 563 unit tests passing
   - Acceptance: Tab switching works, keyboard shortcuts work, active tab visually distinct ✓
 
-- [ ] **6.2** Implement status bar
-  - Files: `src/renderer/components/StatusBar/StatusBar.tsx`, `src/renderer/hooks/useDockerStatus.ts`
-  - Docker indicator (green/red dot), version display, active loop count
-  - Subscribes to `docker:status-changed` IPC events
-  - Tests: `tests/unit/status-bar.test.tsx`
-  - **Dependency**: Task 3.5 (DockerHealthMonitor for events)
-  - Acceptance: Real-time Docker connection state shown
+- [x] **6.2** Implement status bar
+  - Files created:
+    - `src/renderer/components/StatusBar/StatusBar.tsx` — Status bar component with Docker health indicator and active loop counter
+    - `src/renderer/hooks/useDockerStatus.ts` — Hook for subscribing to Docker status changes via IPC
+    - `src/renderer/hooks/useActiveLoops.ts` — Hook for counting active loops from LoopRunner state
+  - Modified: `src/renderer/components/Layout/Layout.tsx` — Integrated StatusBar component
+  - Modified: `src/renderer/App.tsx` — Passed necessary props to Layout for status bar integration
+  - Features:
+    - Real-time Docker connection indicator (green dot = running, red dot = stopped/unavailable)
+    - Active loop counter displaying number of running loops
+    - Subscribes to `docker:status-changed` IPC events for status updates
+    - Subscribes to `loop:state-changed` IPC events for loop count updates
+  - Tests: `tests/unit/status-bar.test.tsx` (8 tests), `tests/unit/use-docker-status.test.tsx` (12 tests), `tests/unit/use-active-loops.test.tsx` (10 tests) — all passing
+  - All 618 unit tests passing
+  - **Dependency**: Task 3.5 (DockerHealthMonitor for events), Task 5.7 (LoopRunner for state events)
+  - Acceptance: Real-time Docker connection state shown, active loop count updates dynamically ✓
 
 - [ ] **6.3** Implement menu bar
   - File: `src/main/menu.ts`
