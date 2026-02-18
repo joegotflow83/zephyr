@@ -44,7 +44,7 @@ describe('App Navigation', () => {
     const loopsButton = screen.getByRole('button', { name: /running loops/i });
     fireEvent.click(loopsButton);
 
-    expect(screen.getByText('Loop monitoring interface coming soon...')).toBeInTheDocument();
+    expect(screen.getByText(/no active or recent loops/i)).toBeInTheDocument();
     expect(loopsButton).toHaveClass('text-blue-400');
   });
 
@@ -88,7 +88,7 @@ describe('App Navigation', () => {
       window.dispatchEvent(new KeyboardEvent('keydown', { key: '2', ctrlKey: true }));
     });
 
-    expect(screen.getByText('Loop monitoring interface coming soon...')).toBeInTheDocument();
+    expect(screen.getByText(/no active or recent loops/i)).toBeInTheDocument();
     const loopsButton = screen.getByRole('button', { name: /running loops/i });
     expect(loopsButton).toHaveClass('text-blue-400');
   });

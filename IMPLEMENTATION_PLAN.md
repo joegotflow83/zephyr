@@ -4,7 +4,7 @@
 **Branch**: `electron-rewrite`
 **Goal**: Rewrite Zephyr Desktop from Python/PyQt6 to Electron + React + TypeScript, delivering a native-quality desktop application with integrated terminal (xterm.js), Docker container orchestration, and AI loop execution management.
 
-**Status**: Phase 1 complete. Phase 2 complete (2.1–2.5 done). Phase 3 complete (3.1–3.6 done). Phase 4 complete (4.1–4.3 done). Phase 5 complete (5.1–5.7 done). Phase 6 complete (6.1, 6.2, 6.3, 6.4, 6.5 done, 5 of 5 tasks complete). Phase 7 complete (7.1–7.4 done, 4 of 4 tasks complete).
+**Status**: Phase 1 complete. Phase 2 complete (2.1–2.5 done). Phase 3 complete (3.1–3.6 done). Phase 4 complete (4.1–4.3 done). Phase 5 complete (5.1–5.7 done). Phase 6 complete (6.1, 6.2, 6.3, 6.4, 6.5 done, 5 of 5 tasks complete). Phase 7 complete (7.1–7.4 done, 4 of 4 tasks complete). Phase 8: 1 of 4 tasks complete.
 
 ## Environment Notes
 - Node.js installed via NVM: `source /home/ralph/.nvm/nvm.sh && node --version`
@@ -409,14 +409,16 @@
 > **Spec**: `specs/09_loops_ui_tasks.md`
 > **Dependency**: Phase 6 (layout, state), Phase 5 (loop IPC)
 
-- [ ] **8.1** Implement LoopsTab page component
-  - Files: `src/renderer/pages/LoopsTab/LoopsTab.tsx`, `src/renderer/pages/LoopsTab/LoopRow.tsx`
+- [x] **8.1** Implement LoopsTab page component
+  - Files created: `src/renderer/pages/LoopsTab/LoopRow.tsx`, `src/renderer/pages/LoopsTab/LoopsTab.tsx` (updated)
   - Split layout: upper table + lower log viewer (resizable)
   - Table: Project Name, Status (badge), Mode, Iteration, Started, Actions (Stop/Start)
   - Row selection shows logs in lower panel
   - Status badges: running=green, starting=blue, failed=red, completed=gray, stopping=yellow
-  - Tests: `tests/unit/loops-tab.test.tsx`
-  - Acceptance: Loop table displays, status badges correct, row selection works
+  - Tests: `tests/unit/loop-row.test.tsx` (28 tests), `tests/unit/loops-tab.test.tsx` (22 tests)
+  - Modified: `tests/unit/app-navigation.test.tsx` (updated)
+  - All 846 unit tests passing (2 skipped)
+  - Acceptance: Loop table displays, status badges correct, row selection works ✓
 
 - [ ] **8.2** Implement LogViewer component
   - File: `src/renderer/components/LogViewer/LogViewer.tsx`
