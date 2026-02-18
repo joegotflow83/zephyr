@@ -4,7 +4,7 @@
 **Branch**: `electron-rewrite`
 **Goal**: Rewrite Zephyr Desktop from Python/PyQt6 to Electron + React + TypeScript, delivering a native-quality desktop application with integrated terminal (xterm.js), Docker container orchestration, and AI loop execution management.
 
-**Status**: Phase 1 complete. Phase 2 complete (2.1–2.5 done). Phase 3 complete (3.1–3.6 done). Phase 4 complete (4.1–4.3 done). Phase 5 complete (5.1–5.5 done).
+**Status**: Phase 1 complete. Phase 2 complete (2.1–2.5 done). Phase 3 complete (3.1–3.6 done). Phase 4 complete (4.1–4.3 done). Phase 5 nearly complete (5.1–5.6 done; 5.7 pending).
 
 ## Environment Notes
 - Node.js installed via NVM: `source /home/ralph/.nvm/nvm.sh && node --version`
@@ -274,13 +274,14 @@
   - Acceptance: Schedule parsing, trigger firing, cancel, list tested ✓
   - **Completion**: 2026-02-18 — All 502 unit tests passing
 
-- [ ] **5.6** Implement AssetInjector service
+- [x] **5.6** Implement AssetInjector service
   - File: `src/services/asset-injector.ts`
   - Method: `prepareInjectionDir(project)` creates temp dir with AGENTS.md, custom prompts
   - Method: `cleanup(dir)` removes temp directory
   - Priority resolution: project override > app default > built-in default
-  - Tests: `tests/unit/asset-injector.test.ts`
+  - Tests: `tests/unit/asset-injector.test.ts` — 18 comprehensive tests, all passing
   - Acceptance: Directory creation, file contents, priority resolution tested
+  - **Completion**: 2026-02-18 — All 520 unit tests passing
 
 - [ ] **5.7** Wire loop services to IPC handlers
   - File: `src/main/ipc-handlers/loop-handlers.ts`
