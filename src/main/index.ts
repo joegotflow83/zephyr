@@ -15,6 +15,7 @@ import { registerDataHandlers } from './ipc-handlers/data-handlers';
 import { registerDockerHandlers } from './ipc-handlers/docker-handlers';
 import { registerCredentialHandlers } from './ipc-handlers/credential-handlers';
 import { registerLoopHandlers } from './ipc-handlers/loop-handlers';
+import { buildApplicationMenu } from './menu';
 import { IPC } from '../shared/ipc-channels';
 import os from 'node:os';
 
@@ -68,6 +69,8 @@ const createWindow = () => {
 
 app.on('ready', () => {
   createWindow();
+  // Build the application menu bar
+  buildApplicationMenu();
   // Start Docker health monitoring
   dockerHealth.start();
 });
