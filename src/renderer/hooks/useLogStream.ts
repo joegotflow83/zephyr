@@ -85,10 +85,12 @@ export function useLogStream(projectId: string | null | undefined): UseLogStream
     // Log line callback
     const handleLogLine = (pid: string, line: ParsedLogLine) => {
       // Add to pending updates
-      if (!pendingUpdatesRef.current.has(pid)) {
-        pendingUpdatesRef.current.set(pid, []);
+      const existing = pendingUpdatesRef.current.get(pid);
+      if (existing) {
+        existing.push(line);
+      } else {
+        pendingUpdatesRef.current.set(pid, [line]);
       }
-      pendingUpdatesRef.current.get(pid)!.push(line);
 
       // Schedule batch update
       scheduleBatchUpdate();
