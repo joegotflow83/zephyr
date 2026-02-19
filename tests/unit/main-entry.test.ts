@@ -95,12 +95,29 @@ const {
   };
 });
 
+// ── Mock electron-updater ───────────────────────────────────────────────────
+
+vi.mock('electron-updater', () => ({
+  autoUpdater: {
+    autoDownload: false,
+    autoInstallOnAppQuit: true,
+    currentVersion: { version: '0.1.0' },
+    checkForUpdates: vi.fn(),
+    downloadUpdate: vi.fn(),
+    quitAndInstall: vi.fn(),
+    on: vi.fn(),
+  },
+}));
+
 // ── Mock electron ────────────────────────────────────────────────────────────
 
 vi.mock('electron', () => ({
   app: mockApp,
   BrowserWindow: BrowserWindowConstructor,
   ipcMain: mockIpcMain,
+  dialog: {
+    showMessageBox: vi.fn(),
+  },
 }));
 
 vi.mock('node:path', () => ({

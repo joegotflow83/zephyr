@@ -21,6 +21,19 @@ const config: ForgeConfig = {
     appVersion: '0.1.0',
   },
   rebuildConfig: {},
+  publishers: [
+    {
+      name: '@electron-forge/publisher-github',
+      config: {
+        repository: {
+          owner: 'joegotflow83',
+          name: 'zephyr',
+        },
+        prerelease: false,
+        draft: true,
+      },
+    },
+  ],
   makers: [
     // Windows
     new MakerSquirrel({

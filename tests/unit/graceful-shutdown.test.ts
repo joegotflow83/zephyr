@@ -34,6 +34,19 @@ const mockConfigManagerInstance = {
   loadJson: vi.fn().mockResolvedValue({ log_level: 'INFO' }),
 };
 
+// Mock electron-updater before electron
+vi.mock('electron-updater', () => ({
+  autoUpdater: {
+    autoDownload: false,
+    autoInstallOnAppQuit: true,
+    currentVersion: { version: '0.1.0' },
+    checkForUpdates: vi.fn(),
+    downloadUpdate: vi.fn(),
+    quitAndInstall: vi.fn(),
+    on: vi.fn(),
+  },
+}));
+
 // Mock electron module
 vi.mock('electron', () => ({
   app: {

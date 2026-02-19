@@ -68,9 +68,17 @@ export const IPC = {
   TERMINAL_CLOSED: 'terminal:closed',
   TERMINAL_ERROR: 'terminal:error',
 
-  // Updates
+  // Updates (self-updater)
   UPDATES_CHECK: 'updates:check',
   UPDATES_APPLY: 'updates:apply',
+
+  // Auto-update
+  AUTO_UPDATE_GET_STATE: 'auto-update:get-state',
+  AUTO_UPDATE_CHECK: 'auto-update:check',
+  AUTO_UPDATE_DOWNLOAD: 'auto-update:download',
+  AUTO_UPDATE_INSTALL: 'auto-update:install',
+  AUTO_UPDATE_STATE_CHANGED: 'auto-update:state-changed',
+  AUTO_UPDATE_DOWNLOAD_PROGRESS: 'auto-update:download-progress',
 
   // Misc
   PING: 'ping',

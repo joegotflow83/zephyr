@@ -21,6 +21,15 @@
   "keywords": [],
   "author": "ralph",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/joegotflow83/zephyr.git"
+  },
+  "publish": {
+    "provider": "github",
+    "owner": "joegotflow83",
+    "repo": "zephyr"
+  },
   "devDependencies": {
     "@electron-forge/cli": "^7.11.1",
     "@electron-forge/maker-deb": "^7.11.1",
@@ -76,6 +85,7 @@
     "dockerode": "^4.0.9",
     "electron-log": "^5.4.3",
     "electron-squirrel-startup": "^1.0.1",
+    "electron-updater": "^6.8.3",
     "react": "^18.3.0",
     "react-dom": "^18.3.0",
     "simple-git": "^3.31.1",

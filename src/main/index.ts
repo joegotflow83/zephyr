@@ -16,6 +16,7 @@ import { TerminalManager } from '../services/terminal-manager';
 import { GitManager } from '../services/git-manager';
 import { SelfUpdater } from '../services/self-updater';
 import { CleanupManager } from '../services/cleanup-manager';
+import { getAutoUpdater } from '../services/auto-updater';
 import { setupLogging, getLogger, setLogLevel, type LogLevel } from '../services/logging';
 import { registerDataHandlers } from './ipc-handlers/data-handlers';
 import { registerDockerHandlers } from './ipc-handlers/docker-handlers';
@@ -24,6 +25,7 @@ import { registerLoopHandlers } from './ipc-handlers/loop-handlers';
 import { registerLogHandlers } from './ipc-handlers/log-handlers';
 import { registerTerminalHandlers } from './ipc-handlers/terminal-handlers';
 import { registerUpdateHandlers } from './ipc-handlers/update-handlers';
+import { registerAutoUpdateHandlers } from './ipc-handlers/auto-update-handlers';
 import { buildApplicationMenu } from './menu';
 import { IPC } from '../shared/ipc-channels';
 import os from 'node:os';
@@ -68,6 +70,7 @@ const terminalManager = new TerminalManager(dockerManager);
 const gitManager = new GitManager();
 const selfUpdater = new SelfUpdater(gitManager, loopRunner, app.getAppPath());
 const cleanupManager = new CleanupManager(dockerManager);
+const autoUpdater = getAutoUpdater();
 
 // Register all IPC handlers before the window is created.
 registerDataHandlers({ configManager, projectStore, importExport });
@@ -77,6 +80,7 @@ registerLoopHandlers({ loopRunner, scheduler, cleanupManager });
 registerLogHandlers({ logExporter, loopRunner });
 registerTerminalHandlers({ terminalManager });
 registerUpdateHandlers({ selfUpdater });
+registerAutoUpdateHandlers({ autoUpdater });
 
 // Legacy ping handler kept for backwards compatibility with existing tests.
 ipcMain.handle(IPC.PING, () => 'pong');
@@ -95,6 +99,9 @@ const createWindow = () => {
   // Set the webContents for terminal output streaming
   terminalManager.setWebContents(mainWindow.webContents);
 
+  // Set the main window for auto-updater notifications
+  autoUpdater.setMainWindow(mainWindow);
+
   if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
     mainWindow.loadURL(MAIN_WINDOW_VITE_DEV_SERVER_URL);
   } else {
@@ -102,6 +109,8 @@ const createWindow = () => {
       path.join(__dirname, `../renderer/${MAIN_WINDOW_VITE_NAME}/index.html`),
     );
   }
+
+  return mainWindow;
 };
 
 /**
@@ -172,6 +181,8 @@ app.on('ready', async () => {
   await recoverLoops();
   // Start Docker health monitoring
   dockerHealth.start();
+  // Check for updates on startup (with delay)
+  autoUpdater.checkForUpdatesOnStartup();
 
   logger.info('Application started successfully');
 });
