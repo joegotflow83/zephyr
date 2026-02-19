@@ -9,6 +9,18 @@ import type { ProjectStore } from '../../services/project-store';
 import type { ImportExportService } from '../../services/import-export';
 import type { AppSettings, ProjectConfig } from '../../shared/models';
 import { createDefaultSettings } from '../../shared/models';
+import { setLogLevel, getLogger, type LogLevel } from '../../services/logging';
+
+// Map AppSettings log levels to electron-log levels
+function mapLogLevel(appLevel: 'DEBUG' | 'INFO' | 'WARNING' | 'ERROR'): LogLevel {
+  const mapping: Record<string, LogLevel> = {
+    DEBUG: 'debug',
+    INFO: 'info',
+    WARNING: 'warn',
+    ERROR: 'error',
+  };
+  return mapping[appLevel] || 'info';
+}
 
 export interface DataServices {
   configManager: ConfigManager;
@@ -18,6 +30,7 @@ export interface DataServices {
 
 export function registerDataHandlers(services: DataServices): void {
   const { configManager, projectStore, importExport } = services;
+  const logger = getLogger('ipc');
 
   // ── Projects ──────────────────────────────────────────────────────────────
 
@@ -68,6 +81,13 @@ export function registerDataHandlers(services: DataServices): void {
     IPC.SETTINGS_SAVE,
     async (_event, settings: AppSettings): Promise<void> => {
       await configManager.saveJson('settings.json', settings);
+
+      // Update log level if it changed
+      if (settings.log_level) {
+        const mappedLevel = mapLogLevel(settings.log_level);
+        setLogLevel(mappedLevel);
+        logger.info('Log level updated from settings', { level: mappedLevel });
+      }
     },
   );
 

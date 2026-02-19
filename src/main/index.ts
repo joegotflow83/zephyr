@@ -13,6 +13,7 @@ import { LoopRunner } from '../services/loop-runner';
 import { LoopScheduler } from '../services/scheduler';
 import { LogExporter } from '../services/log-exporter';
 import { TerminalManager } from '../services/terminal-manager';
+import { setupLogging, getLogger, setLogLevel, type LogLevel } from '../services/logging';
 import { registerDataHandlers } from './ipc-handlers/data-handlers';
 import { registerDockerHandlers } from './ipc-handlers/docker-handlers';
 import { registerCredentialHandlers } from './ipc-handlers/credential-handlers';
@@ -22,11 +23,27 @@ import { registerTerminalHandlers } from './ipc-handlers/terminal-handlers';
 import { buildApplicationMenu } from './menu';
 import { IPC } from '../shared/ipc-channels';
 import os from 'node:os';
+import type { AppSettings } from '../shared/models';
+
+// Map AppSettings log levels to electron-log levels
+function mapLogLevel(appLevel: 'DEBUG' | 'INFO' | 'WARNING' | 'ERROR'): LogLevel {
+  const mapping: Record<string, LogLevel> = {
+    DEBUG: 'debug',
+    INFO: 'info',
+    WARNING: 'warn',
+    ERROR: 'error',
+  };
+  return mapping[appLevel] || 'info';
+}
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
 if (started) {
   app.quit();
 }
+
+// Initialize logging first, before any other services
+setupLogging('info');
+const logger = getLogger('main');
 
 // Instantiate services once at startup.
 const configManager = new ConfigManager();
@@ -78,12 +95,28 @@ const createWindow = () => {
   }
 };
 
-app.on('ready', () => {
+app.on('ready', async () => {
+  logger.info('Application starting');
+
+  // Load settings to configure log level
+  try {
+    const settings: AppSettings = await configManager.loadJson('settings.json');
+    if (settings.log_level) {
+      const mappedLevel = mapLogLevel(settings.log_level);
+      setLogLevel(mappedLevel);
+      logger.info('Log level set from settings', { level: mappedLevel });
+    }
+  } catch (error) {
+    logger.warn('Could not load settings, using default log level', { error });
+  }
+
   createWindow();
   // Build the application menu bar
   buildApplicationMenu();
   // Start Docker health monitoring
   dockerHealth.start();
+
+  logger.info('Application started successfully');
 });
 
 app.on('window-all-closed', () => {
