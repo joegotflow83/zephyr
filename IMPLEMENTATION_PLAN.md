@@ -658,16 +658,20 @@
   - Acceptance: Register, unregister, cleanup flow tested ✓
   - **Completion**: 2026-02-19
 
-- [ ] **12.2** Implement main process entry point
-  - File: `src/main/index.ts` (finalize)
+- [x] **12.2** Implement main process entry point
+  - File: `src/main/index.ts` (finalized)
   - `createServices()`: instantiate all services
   - `registerIpcHandlers()`: wire all handler modules
   - `createWindow()`: BrowserWindow with security settings
   - `app.whenReady()` flow: setup logging -> create services -> register IPC -> create window -> recover loops -> start health monitor
   - `app.on('window-all-closed')`: quit on non-macOS
-  - Tests: `tests/unit/main-entry.test.ts`
-  - **Dependency**: All service phases (2-5, 11)
-  - Acceptance: App starts, creates window, all services available via IPC
+  - Features implemented:
+    - CleanupManager instantiation and integration
+    - Comprehensive integration tests for main entry point
+  - Tests: `tests/unit/main-entry.test.ts` — 39 tests, all passing
+  - Test count updated to 1,291 passing (28 skipped)
+  - Acceptance: App starts, creates window, all services available via IPC ✓
+  - **Completion**: 2026-02-19
 
 - [ ] **12.3** Implement graceful shutdown
   - Add to `src/main/index.ts`:

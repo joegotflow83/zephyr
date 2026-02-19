@@ -15,6 +15,7 @@ import { LogExporter } from '../services/log-exporter';
 import { TerminalManager } from '../services/terminal-manager';
 import { GitManager } from '../services/git-manager';
 import { SelfUpdater } from '../services/self-updater';
+import { CleanupManager } from '../services/cleanup-manager';
 import { setupLogging, getLogger, setLogLevel, type LogLevel } from '../services/logging';
 import { registerDataHandlers } from './ipc-handlers/data-handlers';
 import { registerDockerHandlers } from './ipc-handlers/docker-handlers';
@@ -65,6 +66,7 @@ const logExporter = new LogExporter();
 const terminalManager = new TerminalManager(dockerManager);
 const gitManager = new GitManager();
 const selfUpdater = new SelfUpdater(gitManager, loopRunner, app.getAppPath());
+const cleanupManager = new CleanupManager(dockerManager);
 
 // Register all IPC handlers before the window is created.
 registerDataHandlers({ configManager, projectStore, importExport });

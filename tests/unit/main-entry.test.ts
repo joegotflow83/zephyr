@@ -1,0 +1,798 @@
+/**
+ * Unit tests for src/main/index.ts
+ *
+ * Verifies that the main entry point correctly:
+ * - Instantiates all services with proper dependencies
+ * - Registers all IPC handler modules
+ * - Creates windows with security settings
+ * - Handles app lifecycle events (ready, window-all-closed, activate)
+ * - Sets up logging and Docker health monitoring
+ *
+ * Why we test the entry point: The main entry point is the orchestration layer
+ * that wires together all services and handlers. Testing this ensures all
+ * dependencies are correctly instantiated and connected, catching integration
+ * issues early without needing a full Electron instance.
+ */
+
+import { describe, it, expect, vi } from 'vitest';
+import type { BrowserWindow as BrowserWindowType } from 'electron';
+
+// ── Hoisted mocks ────────────────────────────────────────────────────────────
+
+const {
+  handlerRegistry,
+  appEventListeners,
+  mockWebContents,
+  mockBrowserWindow,
+  BrowserWindowConstructor,
+  mockApp,
+  mockIpcMain,
+  mockPath,
+  mockOs,
+} = vi.hoisted(() => {
+  // Track registered handlers and event listeners
+  const handlerRegistry: Record<string, (...args: unknown[]) => unknown> = {};
+  const appEventListeners: Record<string, ((...args: unknown[]) => unknown)[]> = {};
+
+  // Mock BrowserWindow instance
+  const mockWebContents = {
+    send: vi.fn(),
+  };
+
+  const mockBrowserWindow = {
+    loadURL: vi.fn().mockResolvedValue(undefined),
+    loadFile: vi.fn().mockResolvedValue(undefined),
+    webContents: mockWebContents,
+  };
+
+  // Mock BrowserWindow constructor
+  const BrowserWindowConstructor = vi.fn(function() { return mockBrowserWindow; });
+  BrowserWindowConstructor.getAllWindows = vi.fn(() => []);
+
+  // Mock app
+  const mockApp = {
+    quit: vi.fn(),
+    on: vi.fn((event: string, handler: (...args: unknown[]) => unknown) => {
+      if (!appEventListeners[event]) {
+        appEventListeners[event] = [];
+      }
+      appEventListeners[event].push(handler);
+    }),
+    getAppPath: vi.fn(() => '/mock/app/path'),
+    getPath: vi.fn((name: string) => {
+      if (name === 'logs') return '/mock/logs';
+      return '/mock';
+    }),
+  };
+
+  // Mock ipcMain
+  const mockIpcMain = {
+    handle: vi.fn((channel: string, handler: (...args: unknown[]) => unknown) => {
+      handlerRegistry[channel] = handler;
+    }),
+  };
+
+  // Mock path
+  const mockPath = {
+    join: vi.fn((...args: string[]) => args.join('/')),
+  };
+
+  // Mock os
+  const mockOs = {
+    homedir: vi.fn(() => '/mock/home'),
+  };
+
+  return {
+    handlerRegistry,
+    appEventListeners,
+    mockWebContents,
+    mockBrowserWindow,
+    BrowserWindowConstructor,
+    mockApp,
+    mockIpcMain,
+    mockPath,
+    mockOs,
+  };
+});
+
+// ── Mock electron ────────────────────────────────────────────────────────────
+
+vi.mock('electron', () => ({
+  app: mockApp,
+  BrowserWindow: BrowserWindowConstructor,
+  ipcMain: mockIpcMain,
+}));
+
+vi.mock('node:path', () => ({
+  default: mockPath,
+}));
+
+vi.mock('node:os', () => ({
+  default: mockOs,
+}));
+
+vi.mock('electron-squirrel-startup', () => ({
+  default: false,
+}));
+
+// ── Mock services ────────────────────────────────────────────────────────────
+
+const {
+  mockConfigManager,
+  mockProjectStore,
+  mockImportExport,
+  mockDockerManager,
+  mockDockerHealth,
+  mockCredentialManager,
+  mockLoginManager,
+  mockLogParser,
+  mockLoopRunner,
+  mockScheduler,
+  mockLogExporter,
+  mockTerminalManager,
+  mockGitManager,
+  mockSelfUpdater,
+  mockCleanupManager,
+  MockConfigManager,
+  MockProjectStore,
+  MockImportExportService,
+  MockDockerManager,
+  MockDockerHealthMonitor,
+  MockCredentialManager,
+  MockLoginManager,
+  MockLogParser,
+  MockLoopRunner,
+  MockLoopScheduler,
+  MockLogExporter,
+  MockTerminalManager,
+  MockGitManager,
+  MockSelfUpdater,
+  MockCleanupManager,
+} = vi.hoisted(() => {
+  const mockConfigManager = {
+    loadJson: vi.fn(),
+    saveJson: vi.fn(),
+    ensureConfigDir: vi.fn(),
+    getConfigDir: vi.fn(() => '/mock/config'),
+  };
+
+  const mockProjectStore = {
+    listProjects: vi.fn(),
+    getProject: vi.fn(),
+    addProject: vi.fn(),
+    updateProject: vi.fn(),
+    removeProject: vi.fn(),
+  };
+
+  const mockImportExport = {
+    exportConfig: vi.fn(),
+    importConfig: vi.fn(),
+  };
+
+  const mockDockerManager = {
+    getStatus: vi.fn(),
+    pullImage: vi.fn(),
+    createContainer: vi.fn(),
+    startContainer: vi.fn(),
+    stopContainer: vi.fn(),
+    removeContainer: vi.fn(),
+    listContainers: vi.fn(),
+    exec: vi.fn(),
+    getContainerStatus: vi.fn(),
+  };
+
+  const mockDockerHealth = {
+    start: vi.fn(),
+    stop: vi.fn(),
+    getStatus: vi.fn(),
+  };
+
+  const mockCredentialManager = {
+    store: vi.fn(),
+    get: vi.fn(),
+    delete: vi.fn(),
+    list: vi.fn(),
+  };
+
+  const mockLoginManager = {
+    login: vi.fn(),
+    logout: vi.fn(),
+    isLoggedIn: vi.fn(),
+  };
+
+  const mockLogParser = {
+    parse: vi.fn(),
+    parseStream: vi.fn(),
+  };
+
+  const mockLoopRunner = {
+    start: vi.fn(),
+    stop: vi.fn(),
+    list: vi.fn(),
+    get: vi.fn(),
+    remove: vi.fn(),
+  };
+
+  const mockScheduler = {
+    schedule: vi.fn(),
+    cancel: vi.fn(),
+    list: vi.fn(),
+  };
+
+  const mockLogExporter = {
+    export: vi.fn(),
+    exportAll: vi.fn(),
+  };
+
+  const mockTerminalManager = {
+    open: vi.fn(),
+    close: vi.fn(),
+    write: vi.fn(),
+    resize: vi.fn(),
+    setWebContents: vi.fn(),
+  };
+
+  const mockGitManager = {
+    clone: vi.fn(),
+    pull: vi.fn(),
+    getCurrentBranch: vi.fn(),
+  };
+
+  const mockSelfUpdater = {
+    checkForUpdates: vi.fn(),
+    applyUpdate: vi.fn(),
+  };
+
+  const mockCleanupManager = {
+    registerContainer: vi.fn(),
+    unregisterContainer: vi.fn(),
+    getTrackedContainers: vi.fn(),
+    cleanupAll: vi.fn(),
+  };
+
+  // ── Mock service constructors ──────────────────────────────────────────────
+
+  const MockConfigManager = vi.fn(function() { return mockConfigManager; });
+  const MockProjectStore = vi.fn(function() { return mockProjectStore; });
+  const MockImportExportService = vi.fn(function() { return mockImportExport; });
+  const MockDockerManager = vi.fn(function() { return mockDockerManager; });
+  const MockDockerHealthMonitor = vi.fn(function() { return mockDockerHealth; });
+  const MockCredentialManager = vi.fn(function() { return mockCredentialManager; });
+  const MockLoginManager = vi.fn(function() { return mockLoginManager; });
+  const MockLogParser = vi.fn(function() { return mockLogParser; });
+  const MockLoopRunner = vi.fn(function() { return mockLoopRunner; });
+  const MockLoopScheduler = vi.fn(function() { return mockScheduler; });
+  const MockLogExporter = vi.fn(function() { return mockLogExporter; });
+  const MockTerminalManager = vi.fn(function() { return mockTerminalManager; });
+  const MockGitManager = vi.fn(function() { return mockGitManager; });
+  const MockSelfUpdater = vi.fn(function() { return mockSelfUpdater; });
+  const MockCleanupManager = vi.fn(function() { return mockCleanupManager; });
+
+  return {
+    mockConfigManager,
+    mockProjectStore,
+    mockImportExport,
+    mockDockerManager,
+    mockDockerHealth,
+    mockCredentialManager,
+    mockLoginManager,
+    mockLogParser,
+    mockLoopRunner,
+    mockScheduler,
+    mockLogExporter,
+    mockTerminalManager,
+    mockGitManager,
+    mockSelfUpdater,
+    mockCleanupManager,
+    MockConfigManager,
+    MockProjectStore,
+    MockImportExportService,
+    MockDockerManager,
+    MockDockerHealthMonitor,
+    MockCredentialManager,
+    MockLoginManager,
+    MockLogParser,
+    MockLoopRunner,
+    MockLoopScheduler,
+    MockLogExporter,
+    MockTerminalManager,
+    MockGitManager,
+    MockSelfUpdater,
+    MockCleanupManager,
+  };
+});
+
+vi.mock('../../src/services/config-manager', () => ({
+  ConfigManager: MockConfigManager,
+}));
+
+vi.mock('../../src/services/project-store', () => ({
+  ProjectStore: MockProjectStore,
+}));
+
+vi.mock('../../src/services/import-export', () => ({
+  ImportExportService: MockImportExportService,
+}));
+
+vi.mock('../../src/services/docker-manager', () => ({
+  DockerManager: MockDockerManager,
+}));
+
+vi.mock('../../src/services/docker-health', () => ({
+  DockerHealthMonitor: MockDockerHealthMonitor,
+}));
+
+vi.mock('../../src/services/credential-manager', () => ({
+  CredentialManager: MockCredentialManager,
+}));
+
+vi.mock('../../src/services/login-manager', () => ({
+  LoginManager: MockLoginManager,
+}));
+
+vi.mock('../../src/services/log-parser', () => ({
+  LogParser: MockLogParser,
+}));
+
+vi.mock('../../src/services/loop-runner', () => ({
+  LoopRunner: MockLoopRunner,
+}));
+
+vi.mock('../../src/services/scheduler', () => ({
+  LoopScheduler: MockLoopScheduler,
+}));
+
+vi.mock('../../src/services/log-exporter', () => ({
+  LogExporter: MockLogExporter,
+}));
+
+vi.mock('../../src/services/terminal-manager', () => ({
+  TerminalManager: MockTerminalManager,
+}));
+
+vi.mock('../../src/services/git-manager', () => ({
+  GitManager: MockGitManager,
+}));
+
+vi.mock('../../src/services/self-updater', () => ({
+  SelfUpdater: MockSelfUpdater,
+}));
+
+vi.mock('../../src/services/cleanup-manager', () => ({
+  CleanupManager: MockCleanupManager,
+}));
+
+// ── Mock logging ─────────────────────────────────────────────────────────────
+
+const {
+  mockLogger,
+  mockSetupLogging,
+  mockGetLogger,
+  mockSetLogLevel,
+} = vi.hoisted(() => {
+  const mockLogger = {
+    info: vi.fn(),
+    error: vi.fn(),
+    warn: vi.fn(),
+    debug: vi.fn(),
+    verbose: vi.fn(),
+    silly: vi.fn(),
+  };
+
+  const mockSetupLogging = vi.fn();
+  const mockGetLogger = vi.fn(() => mockLogger);
+  const mockSetLogLevel = vi.fn();
+
+  return {
+    mockLogger,
+    mockSetupLogging,
+    mockGetLogger,
+    mockSetLogLevel,
+  };
+});
+
+vi.mock('../../src/services/logging', () => ({
+  setupLogging: mockSetupLogging,
+  getLogger: mockGetLogger,
+  setLogLevel: mockSetLogLevel,
+}));
+
+// ── Mock IPC handlers ────────────────────────────────────────────────────────
+
+const {
+  mockRegisterDataHandlers,
+  mockRegisterDockerHandlers,
+  mockRegisterCredentialHandlers,
+  mockRegisterLoopHandlers,
+  mockRegisterLogHandlers,
+  mockRegisterTerminalHandlers,
+  mockRegisterUpdateHandlers,
+} = vi.hoisted(() => {
+  const mockRegisterDataHandlers = vi.fn();
+  const mockRegisterDockerHandlers = vi.fn();
+  const mockRegisterCredentialHandlers = vi.fn();
+  const mockRegisterLoopHandlers = vi.fn();
+  const mockRegisterLogHandlers = vi.fn();
+  const mockRegisterTerminalHandlers = vi.fn();
+  const mockRegisterUpdateHandlers = vi.fn();
+
+  return {
+    mockRegisterDataHandlers,
+    mockRegisterDockerHandlers,
+    mockRegisterCredentialHandlers,
+    mockRegisterLoopHandlers,
+    mockRegisterLogHandlers,
+    mockRegisterTerminalHandlers,
+    mockRegisterUpdateHandlers,
+  };
+});
+
+vi.mock('../../src/main/ipc-handlers/data-handlers', () => ({
+  registerDataHandlers: mockRegisterDataHandlers,
+}));
+
+vi.mock('../../src/main/ipc-handlers/docker-handlers', () => ({
+  registerDockerHandlers: mockRegisterDockerHandlers,
+}));
+
+vi.mock('../../src/main/ipc-handlers/credential-handlers', () => ({
+  registerCredentialHandlers: mockRegisterCredentialHandlers,
+}));
+
+vi.mock('../../src/main/ipc-handlers/loop-handlers', () => ({
+  registerLoopHandlers: mockRegisterLoopHandlers,
+}));
+
+vi.mock('../../src/main/ipc-handlers/log-handlers', () => ({
+  registerLogHandlers: mockRegisterLogHandlers,
+}));
+
+vi.mock('../../src/main/ipc-handlers/terminal-handlers', () => ({
+  registerTerminalHandlers: mockRegisterTerminalHandlers,
+}));
+
+vi.mock('../../src/main/ipc-handlers/update-handlers', () => ({
+  registerUpdateHandlers: mockRegisterUpdateHandlers,
+}));
+
+// ── Mock menu ────────────────────────────────────────────────────────────────
+
+const { mockBuildApplicationMenu } = vi.hoisted(() => {
+  const mockBuildApplicationMenu = vi.fn();
+  return { mockBuildApplicationMenu };
+});
+
+vi.mock('../../src/main/menu', () => ({
+  buildApplicationMenu: mockBuildApplicationMenu,
+}));
+
+// ── Mock globals ─────────────────────────────────────────────────────────────
+
+// @ts-expect-error - global declaration for Vite dev server URL
+global.MAIN_WINDOW_VITE_DEV_SERVER_URL = undefined;
+// @ts-expect-error - global declaration for Vite name
+global.MAIN_WINDOW_VITE_NAME = 'main_window';
+
+// ── Helper to trigger app events ─────────────────────────────────────────────
+
+async function triggerAppReady() {
+  const readyHandlers = appEventListeners['ready'] || [];
+  for (const handler of readyHandlers) {
+    await handler();
+  }
+}
+
+function triggerWindowAllClosed() {
+  const handlers = appEventListeners['window-all-closed'] || [];
+  for (const handler of handlers) {
+    handler();
+  }
+}
+
+function triggerActivate() {
+  const handlers = appEventListeners['activate'] || [];
+  for (const handler of handlers) {
+    handler();
+  }
+}
+
+// ── Setup ─────────────────────────────────────────────────────────────────────
+
+// Import the main entry point at module level
+// This triggers all service instantiation and IPC handler registration
+import '../../src/main/index';
+
+describe('Main Entry Point', () => {
+  describe('Service Instantiation', () => {
+    it('should instantiate ConfigManager', () => {
+      expect(MockConfigManager).toHaveBeenCalled();
+    });
+
+    it('should instantiate ProjectStore with ConfigManager', () => {
+      expect(MockProjectStore).toHaveBeenCalledWith(mockConfigManager);
+    });
+
+    it('should instantiate ImportExportService with ConfigManager', () => {
+      expect(MockImportExportService).toHaveBeenCalledWith(mockConfigManager);
+    });
+
+    it('should instantiate DockerManager', () => {
+      expect(MockDockerManager).toHaveBeenCalled();
+    });
+
+    it('should instantiate DockerHealthMonitor with DockerManager', () => {
+      expect(MockDockerHealthMonitor).toHaveBeenCalledWith(mockDockerManager);
+    });
+
+    it('should instantiate CredentialManager with zephyr config dir', () => {
+      expect(MockCredentialManager).toHaveBeenCalledWith('/mock/home/.zephyr');
+    });
+
+    it('should instantiate LoginManager with CredentialManager', () => {
+      expect(MockLoginManager).toHaveBeenCalledWith(mockCredentialManager);
+    });
+
+    it('should instantiate LogParser', () => {
+      expect(MockLogParser).toHaveBeenCalled();
+    });
+
+    it('should instantiate LoopRunner with DockerManager, LogParser, and max concurrent 3', () => {
+      expect(MockLoopRunner).toHaveBeenCalledWith(mockDockerManager, mockLogParser, 3);
+    });
+
+    it('should instantiate LoopScheduler with LoopRunner', () => {
+      expect(MockLoopScheduler).toHaveBeenCalledWith(mockLoopRunner);
+    });
+
+    it('should instantiate LogExporter', () => {
+      expect(MockLogExporter).toHaveBeenCalled();
+    });
+
+    it('should instantiate TerminalManager with DockerManager', () => {
+      expect(MockTerminalManager).toHaveBeenCalledWith(mockDockerManager);
+    });
+
+    it('should instantiate GitManager', () => {
+      expect(MockGitManager).toHaveBeenCalled();
+    });
+
+    it('should instantiate SelfUpdater with GitManager, LoopRunner, and app path', () => {
+      expect(MockSelfUpdater).toHaveBeenCalledWith(mockGitManager, mockLoopRunner, '/mock/app/path');
+    });
+
+    it('should instantiate CleanupManager with DockerManager', () => {
+      expect(MockCleanupManager).toHaveBeenCalledWith(mockDockerManager);
+    });
+  });
+
+  describe('IPC Handler Registration', () => {
+    it('should register data handlers with ConfigManager, ProjectStore, and ImportExport', () => {
+      expect(mockRegisterDataHandlers).toHaveBeenCalledWith({
+        configManager: mockConfigManager,
+        projectStore: mockProjectStore,
+        importExport: mockImportExport,
+      });
+    });
+
+    it('should register docker handlers with DockerManager and DockerHealthMonitor', () => {
+      expect(mockRegisterDockerHandlers).toHaveBeenCalledWith({
+        dockerManager: mockDockerManager,
+        dockerHealth: mockDockerHealth,
+      });
+    });
+
+    it('should register credential handlers with CredentialManager and LoginManager', () => {
+      expect(mockRegisterCredentialHandlers).toHaveBeenCalledWith({
+        credentialManager: mockCredentialManager,
+        loginManager: mockLoginManager,
+      });
+    });
+
+    it('should register loop handlers with LoopRunner and Scheduler', () => {
+      expect(mockRegisterLoopHandlers).toHaveBeenCalledWith({
+        loopRunner: mockLoopRunner,
+        scheduler: mockScheduler,
+      });
+    });
+
+    it('should register log handlers with LogExporter and LoopRunner', () => {
+      expect(mockRegisterLogHandlers).toHaveBeenCalledWith({
+        logExporter: mockLogExporter,
+        loopRunner: mockLoopRunner,
+      });
+    });
+
+    it('should register terminal handlers with TerminalManager', () => {
+      expect(mockRegisterTerminalHandlers).toHaveBeenCalledWith({
+        terminalManager: mockTerminalManager,
+      });
+    });
+
+    it('should register update handlers with SelfUpdater', () => {
+      expect(mockRegisterUpdateHandlers).toHaveBeenCalledWith({
+        selfUpdater: mockSelfUpdater,
+      });
+    });
+
+    it('should register legacy ping handler', async () => {
+      expect(handlerRegistry['ping']).toBeDefined();
+      const result = await handlerRegistry['ping']();
+      expect(result).toBe('pong');
+    });
+  });
+
+  describe('Window Creation', () => {
+    it('should create BrowserWindow with correct dimensions', async () => {
+      mockConfigManager.loadJson.mockResolvedValue({});
+      vi.clearAllMocks();
+      await triggerAppReady();
+
+      expect(BrowserWindowConstructor).toHaveBeenCalledWith(
+        expect.objectContaining({
+          width: 1200,
+          height: 800,
+        })
+      );
+    });
+
+    it('should create BrowserWindow with security settings', async () => {
+      mockConfigManager.loadJson.mockResolvedValue({});
+      vi.clearAllMocks();
+      await triggerAppReady();
+
+      expect(BrowserWindowConstructor).toHaveBeenCalledWith(
+        expect.objectContaining({
+          webPreferences: expect.objectContaining({
+            contextIsolation: true,
+            nodeIntegration: false,
+            preload: expect.stringContaining('preload.js'),
+          }),
+        })
+      );
+    });
+
+    it('should set TerminalManager webContents after window creation', async () => {
+      mockConfigManager.loadJson.mockResolvedValue({});
+      vi.clearAllMocks();
+      await triggerAppReady();
+
+      expect(mockTerminalManager.setWebContents).toHaveBeenCalledWith(mockWebContents);
+    });
+
+    it('should load static file in production', async () => {
+      mockConfigManager.loadJson.mockResolvedValue({});
+      vi.clearAllMocks();
+      await triggerAppReady();
+
+      expect(mockBrowserWindow.loadFile).toHaveBeenCalledWith(
+        expect.stringContaining('renderer/main_window/index.html')
+      );
+    });
+  });
+
+  describe('App Lifecycle - ready', () => {
+    it('should log application starting', async () => {
+      mockConfigManager.loadJson.mockResolvedValue({});
+      vi.clearAllMocks();
+      await triggerAppReady();
+
+      expect(mockLogger.info).toHaveBeenCalledWith('Application starting');
+    });
+
+    it('should load settings and set log level', async () => {
+      mockConfigManager.loadJson.mockResolvedValue({ log_level: 'DEBUG' });
+      vi.clearAllMocks();
+      await triggerAppReady();
+
+      expect(mockConfigManager.loadJson).toHaveBeenCalledWith('settings.json');
+      expect(mockSetLogLevel).toHaveBeenCalledWith('debug');
+      expect(mockLogger.info).toHaveBeenCalledWith('Log level set from settings', { level: 'debug' });
+    });
+
+    it('should handle missing settings gracefully', async () => {
+      mockConfigManager.loadJson.mockResolvedValue(null);
+      vi.clearAllMocks();
+      await triggerAppReady();
+
+      expect(mockLogger.warn).toHaveBeenCalledWith(
+        'Could not load settings, using default log level',
+        expect.anything()
+      );
+    });
+
+    it('should build application menu', async () => {
+      mockConfigManager.loadJson.mockResolvedValue({});
+      vi.clearAllMocks();
+      await triggerAppReady();
+
+      expect(mockBuildApplicationMenu).toHaveBeenCalled();
+    });
+
+    it('should start Docker health monitoring', async () => {
+      mockConfigManager.loadJson.mockResolvedValue({});
+      vi.clearAllMocks();
+      await triggerAppReady();
+
+      expect(mockDockerHealth.start).toHaveBeenCalled();
+    });
+
+    it('should log successful startup', async () => {
+      mockConfigManager.loadJson.mockResolvedValue({});
+      vi.clearAllMocks();
+      await triggerAppReady();
+
+      expect(mockLogger.info).toHaveBeenCalledWith('Application started successfully');
+    });
+  });
+
+  describe('App Lifecycle - window-all-closed', () => {
+    it('should stop Docker health monitoring', () => {
+      vi.clearAllMocks();
+      triggerWindowAllClosed();
+
+      expect(mockDockerHealth.stop).toHaveBeenCalled();
+    });
+
+    it('should quit app on non-macOS platforms', () => {
+      const originalPlatform = process.platform;
+      Object.defineProperty(process, 'platform', { value: 'win32', writable: true });
+
+      vi.clearAllMocks();
+      triggerWindowAllClosed();
+
+      expect(mockApp.quit).toHaveBeenCalled();
+
+      // Restore
+      Object.defineProperty(process, 'platform', { value: originalPlatform, writable: true });
+    });
+
+    it('should not quit app on macOS', () => {
+      const originalPlatform = process.platform;
+      Object.defineProperty(process, 'platform', { value: 'darwin', writable: true });
+
+      vi.clearAllMocks();
+      triggerWindowAllClosed();
+
+      expect(mockApp.quit).not.toHaveBeenCalled();
+
+      // Restore
+      Object.defineProperty(process, 'platform', { value: originalPlatform, writable: true });
+    });
+  });
+
+  describe('App Lifecycle - activate', () => {
+    it('should create window if none exist', async () => {
+      BrowserWindowConstructor.getAllWindows = vi.fn(() => []);
+      mockConfigManager.loadJson.mockResolvedValue({});
+      vi.clearAllMocks();
+
+      triggerActivate();
+
+      // Wait for async operations
+      await new Promise(resolve => setTimeout(resolve, 0));
+
+      expect(BrowserWindowConstructor).toHaveBeenCalled();
+    });
+
+    it('should not create window if one already exists', () => {
+      BrowserWindowConstructor.getAllWindows = vi.fn(() => [mockBrowserWindow as unknown as BrowserWindowType]);
+
+      vi.clearAllMocks();
+
+      triggerActivate();
+
+      expect(BrowserWindowConstructor).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('Integration', () => {
+    it('should register all app lifecycle handlers', () => {
+      expect(appEventListeners['ready']).toBeDefined();
+      expect(appEventListeners['ready'].length).toBeGreaterThan(0);
+      expect(appEventListeners['window-all-closed']).toBeDefined();
+      expect(appEventListeners['window-all-closed'].length).toBeGreaterThan(0);
+      expect(appEventListeners['activate']).toBeDefined();
+      expect(appEventListeners['activate'].length).toBeGreaterThan(0);
+    });
+  });
+});
