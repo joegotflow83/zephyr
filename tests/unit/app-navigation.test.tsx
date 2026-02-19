@@ -4,7 +4,7 @@ import App from '../../src/renderer/App';
 
 describe('App Navigation', () => {
   beforeEach(() => {
-    // Mock window.api for StatusBar and useActiveLoops
+    // Mock window.api for StatusBar, useActiveLoops, and TerminalTab
     global.window.api = {
       docker: {
         status: vi.fn().mockResolvedValue({
@@ -12,10 +12,20 @@ describe('App Navigation', () => {
           info: { version: '24.0.7', containers: 0, images: 0 },
         }),
         onStatusChanged: vi.fn(() => vi.fn()),
+        listContainers: vi.fn().mockResolvedValue([]),
       },
       loops: {
         list: vi.fn().mockResolvedValue([]),
         onStateChanged: vi.fn(() => vi.fn()),
+      },
+      terminal: {
+        open: vi.fn(),
+        close: vi.fn(),
+        write: vi.fn(),
+        resize: vi.fn(),
+        onData: vi.fn(() => vi.fn()),
+        onClosed: vi.fn(() => vi.fn()),
+        onError: vi.fn(() => vi.fn()),
       },
     } as any;
   });
@@ -54,7 +64,9 @@ describe('App Navigation', () => {
     const terminalButton = screen.getByRole('button', { name: /terminal/i });
     fireEvent.click(terminalButton);
 
-    expect(screen.getByText('Terminal interface coming soon...')).toBeInTheDocument();
+    // TerminalTab is now implemented, so check for actual content
+    expect(screen.getByText('Container')).toBeInTheDocument();
+    expect(screen.getByText('Open Terminal')).toBeInTheDocument();
     expect(terminalButton).toHaveClass('text-blue-400');
   });
 
@@ -101,9 +113,13 @@ describe('App Navigation', () => {
       window.dispatchEvent(new KeyboardEvent('keydown', { key: '3', ctrlKey: true }));
     });
 
-    expect(screen.getByText('Terminal interface coming soon...')).toBeInTheDocument();
-    const terminalButton = screen.getByRole('button', { name: /terminal/i });
-    expect(terminalButton).toHaveClass('text-blue-400');
+    // TerminalTab is now implemented, so check for actual content
+    expect(screen.getByText('Container')).toBeInTheDocument();
+    expect(screen.getByText('Open Terminal')).toBeInTheDocument();
+    // Get the tab button specifically (the one with emoji 💻)
+    const terminalButtons = screen.getAllByRole('button', { name: /terminal/i });
+    const terminalTabButton = terminalButtons.find(btn => btn.getAttribute('aria-current') === 'page');
+    expect(terminalTabButton).toHaveClass('text-blue-400');
   });
 
   it('switches tabs with Ctrl+4 keyboard shortcut', () => {
