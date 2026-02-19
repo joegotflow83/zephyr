@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useSettings } from '../../hooks/useSettings';
 import { CredentialsSection } from './CredentialsSection';
+import { DockerSection } from './DockerSection';
+import { GeneralSection } from './GeneralSection';
 
 interface SettingsSectionProps {
   title: string;
@@ -117,13 +119,7 @@ export const SettingsTab: React.FC = () => {
           title="Docker"
           description="Configure Docker connection and container settings"
         >
-          <div className="text-gray-400">
-            <p>Docker settings coming soon...</p>
-            <p className="text-sm mt-2">
-              Will show: connection status, max concurrent containers, Docker
-              daemon info.
-            </p>
-          </div>
+          <DockerSection />
         </SettingsSection>
 
         {/* General Section */}
@@ -131,19 +127,7 @@ export const SettingsTab: React.FC = () => {
           title="General"
           description="Application preferences and appearance"
         >
-          <div className="text-gray-400">
-            <p>General settings coming soon...</p>
-            {settings && (
-              <div className="mt-2 space-y-1 text-sm">
-                <p>Current theme: {settings.theme}</p>
-                <p>Log level: {settings.log_level}</p>
-                <p>
-                  Notifications:{' '}
-                  {settings.notification_enabled ? 'enabled' : 'disabled'}
-                </p>
-              </div>
-            )}
-          </div>
+          <GeneralSection />
         </SettingsSection>
 
         {/* Updates Section */}

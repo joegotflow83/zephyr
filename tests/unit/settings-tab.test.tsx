@@ -3,10 +3,14 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { SettingsTab } from '../../src/renderer/pages/SettingsTab/SettingsTab';
 import * as useSettingsModule from '../../src/renderer/hooks/useSettings';
+import * as useDockerStatusModule from '../../src/renderer/hooks/useDockerStatus';
 import type { AppSettings } from '../../src/shared/models';
 
 // Mock the useSettings hook
 vi.mock('../../src/renderer/hooks/useSettings');
+
+// Mock the useDockerStatus hook
+vi.mock('../../src/renderer/hooks/useDockerStatus');
 
 // Mock window.api.credentials for CredentialsSection
 const mockCredentials = {
@@ -17,10 +21,17 @@ const mockCredentials = {
   login: vi.fn().mockResolvedValue({ success: true, service: 'anthropic' }),
 };
 
+// Mock window.api.docker for DockerSection
+const mockDocker = {
+  status: vi.fn().mockResolvedValue({ available: false, info: undefined }),
+  onStatusChanged: vi.fn().mockReturnValue(() => {}),
+};
+
 // @ts-expect-error - mocking window.api
 globalThis.window.api = {
   ...globalThis.window.api,
   credentials: mockCredentials,
+  docker: mockDocker,
 };
 
 describe('SettingsTab', () => {
@@ -47,10 +58,16 @@ describe('SettingsTab', () => {
     vi.clearAllMocks();
     mockCredentials.list.mockResolvedValue([]);
     mockCredentials.get.mockResolvedValue(null);
+    mockDocker.status.mockResolvedValue({ available: false, info: undefined });
+    mockDocker.onStatusChanged.mockReturnValue(() => {});
     vi.clearAllMocks();
     vi.spyOn(useSettingsModule, 'useSettings').mockReturnValue(
       defaultUseSettingsReturn
     );
+    vi.spyOn(useDockerStatusModule, 'useDockerStatus').mockReturnValue({
+      isConnected: false,
+      dockerInfo: undefined,
+    });
   });
 
   describe('Basic Rendering', () => {
@@ -107,15 +124,12 @@ describe('SettingsTab', () => {
 
     it('should render other sections collapsed by default', () => {
       render(<SettingsTab />);
-      expect(
-        screen.queryByText('Docker settings coming soon...')
-      ).not.toBeInTheDocument();
-      expect(
-        screen.queryByText('General settings coming soon...')
-      ).not.toBeInTheDocument();
-      expect(
-        screen.queryByText('Update management coming soon...')
-      ).not.toBeInTheDocument();
+      // Docker section content should not be visible
+      expect(screen.queryByText('Connection Status')).not.toBeInTheDocument();
+      // General section content should not be visible
+      expect(screen.queryByText('Desktop Notifications')).not.toBeInTheDocument();
+      // Updates section content should not be visible
+      expect(screen.queryByText('Update management coming soon...')).not.toBeInTheDocument();
     });
 
     it('should expand a section when clicked', async () => {
@@ -123,9 +137,7 @@ describe('SettingsTab', () => {
       render(<SettingsTab />);
 
       // Docker section should be collapsed initially
-      expect(
-        screen.queryByText('Docker settings coming soon...')
-      ).not.toBeInTheDocument();
+      expect(screen.queryByText('Connection Status')).not.toBeInTheDocument();
 
       // Click the Docker section header
       const dockerHeader = screen.getByText('Docker').closest('button');
@@ -133,9 +145,7 @@ describe('SettingsTab', () => {
       await user.click(dockerHeader!);
 
       // Docker section should now be visible
-      expect(
-        screen.getByText('Docker settings coming soon...')
-      ).toBeInTheDocument();
+      expect(screen.getByText('Connection Status')).toBeInTheDocument();
     });
 
     it('should collapse an expanded section when clicked', async () => {
@@ -176,12 +186,8 @@ describe('SettingsTab', () => {
       expect(
         screen.getByText(/Store API keys or use browser login/)
       ).toBeInTheDocument();
-      expect(
-        screen.getByText('Docker settings coming soon...')
-      ).toBeInTheDocument();
-      expect(
-        screen.getByText('General settings coming soon...')
-      ).toBeInTheDocument();
+      expect(screen.getByText('Connection Status')).toBeInTheDocument();
+      expect(screen.getByText('Desktop Notifications')).toBeInTheDocument();
     });
 
     it('should have correct aria-expanded attribute', async () => {
@@ -200,34 +206,32 @@ describe('SettingsTab', () => {
   });
 
   describe('Settings Data Display', () => {
-    it('should display current settings in General section', async () => {
+    it('should display Docker section content when expanded', async () => {
       const user = userEvent.setup();
       render(<SettingsTab />);
 
-      // Expand General section
-      const generalHeader = screen.getByText('General').closest('button');
-      await user.click(generalHeader!);
+      // Expand Docker section
+      const dockerHeader = screen.getByText('Docker').closest('button');
+      await user.click(dockerHeader!);
 
-      // Check that settings are displayed
-      expect(screen.getByText(/Current theme: dark/i)).toBeInTheDocument();
-      expect(screen.getByText(/Log level: INFO/i)).toBeInTheDocument();
-      expect(screen.getByText(/Notifications: enabled/i)).toBeInTheDocument();
+      // Check that Docker section content is displayed
+      expect(screen.getByText('Connection Status')).toBeInTheDocument();
+      expect(screen.getByText('Max Concurrent Containers')).toBeInTheDocument();
     });
 
-    it('should display disabled notifications correctly', async () => {
+    it('should display General section content when expanded', async () => {
       const user = userEvent.setup();
-      vi.spyOn(useSettingsModule, 'useSettings').mockReturnValue({
-        ...defaultUseSettingsReturn,
-        settings: { ...mockSettings, notification_enabled: false },
-      });
-
       render(<SettingsTab />);
 
       // Expand General section
       const generalHeader = screen.getByText('General').closest('button');
       await user.click(generalHeader!);
 
-      expect(screen.getByText(/Notifications: disabled/i)).toBeInTheDocument();
+      // Check that General section content is displayed
+      expect(screen.getByText('Desktop Notifications')).toBeInTheDocument();
+      expect(screen.getByText('Log Level')).toBeInTheDocument();
+      expect(screen.getByText('Theme')).toBeInTheDocument();
+      expect(screen.getByText('Application Version')).toBeInTheDocument();
     });
   });
 

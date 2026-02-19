@@ -4,7 +4,7 @@
 **Branch**: `electron-rewrite`
 **Goal**: Rewrite Zephyr Desktop from Python/PyQt6 to Electron + React + TypeScript, delivering a native-quality desktop application with integrated terminal (xterm.js), Docker container orchestration, and AI loop execution management.
 
-**Status**: Phase 1 complete. Phase 2 complete (2.1–2.5 done). Phase 3 complete (3.1–3.6 done). Phase 4 complete (4.1–4.3 done). Phase 5 complete (5.1–5.7 done). Phase 6 complete (6.1, 6.2, 6.3, 6.4, 6.5 done, 5 of 5 tasks complete). Phase 7 complete (7.1–7.4 done, 4 of 4 tasks complete). Phase 8 complete (8.1–8.4 done, 4 of 4 tasks complete). Phase 9 complete (9.1–9.4 done, 4 of 4 tasks complete, all tests passing). Phase 10 in progress (10.1, 10.2 done, 2 of 4 tasks complete).
+**Status**: Phase 1 complete. Phase 2 complete (2.1–2.5 done). Phase 3 complete (3.1–3.6 done). Phase 4 complete (4.1–4.3 done). Phase 5 complete (5.1–5.7 done). Phase 6 complete (6.1, 6.2, 6.3, 6.4, 6.5 done, 5 of 5 tasks complete). Phase 7 complete (7.1–7.4 done, 4 of 4 tasks complete). Phase 8 complete (8.1–8.4 done, 4 of 4 tasks complete). Phase 9 complete (9.1–9.4 done, 4 of 4 tasks complete, all tests passing). Phase 10 in progress (10.1, 10.2, 10.3 done, 3 of 4 tasks complete).
 
 ## Environment Notes
 - Node.js installed via NVM: `source /home/ralph/.nvm/nvm.sh && node --version`
@@ -550,14 +550,16 @@
   - Acceptance: Add/update API keys, see stored status, toggle browser login mode ✓
   - **Completion**: 2026-02-19 — CredentialsSection + CredentialDialog fully implemented with 45 new tests
 
-- [ ] **10.3** Implement Docker and general settings sections
+- [x] **10.3** Implement Docker and general settings sections
   - Files: `src/renderer/pages/SettingsTab/DockerSection.tsx`, `src/renderer/pages/SettingsTab/GeneralSection.tsx`
   - Docker: connection status indicator, max concurrent containers spinner, Docker info
   - General: notifications toggle, log level dropdown, theme toggle, app version
   - Changes call `window.api.settings.save()` with debounce
-  - Tests: `tests/unit/docker-section.test.tsx`, `tests/unit/general-section.test.tsx`
+  - Tests: `tests/unit/docker-section.test.tsx` (18 tests), `tests/unit/general-section.test.tsx` (21 tests)
+  - All 1075 unit tests passing (28 skipped)
   - **Dependency**: Tasks 3.6, 2.5
-  - Acceptance: Settings save and persist across restarts; Docker status real-time
+  - Acceptance: Settings save and persist across restarts; Docker status real-time ✓
+  - **Completion**: 2026-02-19 — DockerSection + GeneralSection fully implemented with 39 new tests
 
 - [ ] **10.4** Implement updates section
   - File: `src/renderer/pages/SettingsTab/UpdatesSection.tsx`
