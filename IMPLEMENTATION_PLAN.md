@@ -4,7 +4,7 @@
 **Branch**: `electron-rewrite`
 **Goal**: Rewrite Zephyr Desktop from Python/PyQt6 to Electron + React + TypeScript, delivering a native-quality desktop application with integrated terminal (xterm.js), Docker container orchestration, and AI loop execution management.
 
-**Status**: Phase 1 complete. Phase 2 complete (2.1–2.5 done). Phase 3 complete (3.1–3.6 done). Phase 4 complete (4.1–4.3 done). Phase 5 complete (5.1–5.7 done). Phase 6 complete (6.1, 6.2, 6.3, 6.4, 6.5 done, 5 of 5 tasks complete). Phase 7 complete (7.1–7.4 done, 4 of 4 tasks complete). Phase 8 complete (8.1–8.4 done, 4 of 4 tasks complete). Phase 9 complete (9.1–9.4 done, 4 of 4 tasks complete, all tests passing). Phase 10 complete (10.1, 10.2, 10.3, 10.4 done, 4 of 4 tasks complete). Phase 11 in progress (11.1 status unclear, 11.2, 11.3 done, 3 of 4 tasks).
+**Status**: Phase 1 complete. Phase 2 complete (2.1–2.5 done). Phase 3 complete (3.1–3.6 done). Phase 4 complete (4.1–4.3 done). Phase 5 complete (5.1–5.7 done). Phase 6 complete (6.1, 6.2, 6.3, 6.4, 6.5 done, 5 of 5 tasks complete). Phase 7 complete (7.1–7.4 done, 4 of 4 tasks complete). Phase 8 complete (8.1–8.4 done, 4 of 4 tasks complete). Phase 9 complete (9.1–9.4 done, 4 of 4 tasks complete, all tests passing). Phase 10 complete (10.1, 10.2, 10.3, 10.4 done, 4 of 4 tasks complete). Phase 11 in progress (11.1, 11.2, 11.3 done, 3 of 4 tasks).
 
 ## Environment Notes
 - Node.js installed via NVM: `source /home/ralph/.nvm/nvm.sh && node --version`
@@ -579,12 +579,14 @@
 > **Spec**: `specs/11_monitoring_tasks.md`
 > **Dependency**: Phase 1 (scaffold)
 
-- [ ] **11.1** Implement DiskChecker service
+- [x] **11.1** Implement DiskChecker service
   - File: `src/services/disk-checker.ts`
-  - Install `check-disk-space`
+  - Installed `check-disk-space`
   - Methods: `getAvailableSpace(path)`, `checkRepoSize(path)`, `warnIfLow(path, thresholdBytes?)`
-  - Tests: `tests/unit/disk-checker.test.ts`
-  - Acceptance: Space checking, size calculation, warning threshold tested
+  - Tests: `tests/unit/disk-checker.test.ts` — 19 tests, all passing
+  - Total test count: 1180 passing (28 skipped)
+  - Acceptance: Space checking, size calculation, warning threshold tested ✓
+  - **Completion**: 2026-02-19
 
 - [x] **11.2** Implement GitManager service
   - Install `simple-git`
