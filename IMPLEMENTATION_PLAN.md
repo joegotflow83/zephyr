@@ -4,7 +4,7 @@
 **Branch**: `electron-rewrite`
 **Goal**: Rewrite Zephyr Desktop from Python/PyQt6 to Electron + React + TypeScript, delivering a native-quality desktop application with integrated terminal (xterm.js), Docker container orchestration, and AI loop execution management.
 
-**Status**: Phase 1 complete. Phase 2 complete (2.1–2.5 done). Phase 3 complete (3.1–3.6 done). Phase 4 complete (4.1–4.3 done). Phase 5 complete (5.1–5.7 done). Phase 6 complete (6.1, 6.2, 6.3, 6.4, 6.5 done, 5 of 5 tasks complete). Phase 7 complete (7.1–7.4 done, 4 of 4 tasks complete). Phase 8 complete (8.1–8.4 done, 4 of 4 tasks complete). Phase 9 complete (9.1–9.5 done, 5 of 5 tasks complete, all tests passing). Phase 10 complete (10.1, 10.2, 10.3, 10.4 done, 4 of 4 tasks complete). Phase 11 complete (11.1, 11.2, 11.3, 11.4 done, 4 of 4 tasks complete). Phase 12 complete (12.1, 12.2, 12.3, 12.4 done, 4 of 4 tasks complete). Phase 13 complete (13.1, 13.2, 13.3, 13.4 done, 4 of 4 tasks complete).
+**Status**: Phase 1 complete. Phase 2 complete (2.1–2.5 done). Phase 3 complete (3.1–3.6 done). Phase 4 complete (4.1–4.3 done). Phase 5 complete (5.1–5.7 done). Phase 6 complete (6.1, 6.2, 6.3, 6.4, 6.5 done, 5 of 5 tasks complete). Phase 7 complete (7.1–7.4 done, 4 of 4 tasks complete). Phase 8 complete (8.1–8.4 done, 4 of 4 tasks complete). Phase 9 complete (9.1–9.5 done, 5 of 5 tasks complete, all tests passing). Phase 10 complete (10.1, 10.2, 10.3, 10.4 done, 4 of 4 tasks complete). Phase 11 complete (11.1, 11.2, 11.3, 11.4 done, 4 of 4 tasks complete). Phase 12 complete (12.1, 12.2, 12.3, 12.4 done, 4 of 4 tasks complete). Phase 13 complete (13.1, 13.2, 13.3, 13.4 done, 4 of 4 tasks complete). Phase 14 complete (14.1, 14.2, 14.3, 14.4 done, 4 of 4 tasks complete).
 
 ## Environment Notes
 - Node.js installed via NVM: `source /home/ralph/.nvm/nvm.sh && node --version`
@@ -840,12 +840,21 @@ All warnings are acceptable (console.log statements, any types in Terminal compo
   - Acceptance: E2E tests interact with real Electron UI and verify user flows ✓
   - **Completion**: 2026-02-19
 
-- [ ] **14.4** Terminal E2E tests (requires Docker)
-  - File: `tests/e2e/terminal.test.ts`
-  - Skip if Docker unavailable
-  - Tests: create container, open terminal, type command (`echo hello`), verify output, resize, close, multiple sessions
-  - **Dependency**: Phase 9
-  - Acceptance: Terminal interaction works end-to-end with real Docker container
+- [x] **14.4** Terminal E2E tests (requires Docker)
+  - File: `tests/e2e/terminal.test.ts` — 18 comprehensive tests, all implemented
+  - Launch Electron with Playwright's `_electron.launch()`
+  - Test suites implemented:
+    - Container creation and terminal opening (4 tests): creates test container, navigates to Terminal tab, displays container in selector, opens terminal session
+    - Terminal interaction (4 tests): echo command, pwd command, ls command, multiline input
+    - Terminal resizing (2 tests): window resize, terminal responds to resize with correct dimensions
+    - Session management (3 tests): closes terminal session, opens multiple sessions, switches between sessions
+    - Terminal user mode selection (1 test): can select root user mode
+    - Terminal keyboard shortcuts (3 tests): copy/paste (Ctrl+Shift+C/V), font size (Ctrl+=/Ctrl+-), search (Ctrl+Shift+F)
+    - Error handling (1 test): handles disconnected container gracefully
+  - Tests gracefully skip if Docker unavailable or in headless environments (no DISPLAY)
+  - **Dependency**: Phase 9 ✓
+  - Acceptance: Terminal interaction works end-to-end with real Docker container ✓
+  - **Completion**: 2026-02-19
 
 ---
 
