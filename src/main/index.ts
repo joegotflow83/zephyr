@@ -13,6 +13,8 @@ import { LoopRunner } from '../services/loop-runner';
 import { LoopScheduler } from '../services/scheduler';
 import { LogExporter } from '../services/log-exporter';
 import { TerminalManager } from '../services/terminal-manager';
+import { GitManager } from '../services/git-manager';
+import { SelfUpdater } from '../services/self-updater';
 import { setupLogging, getLogger, setLogLevel, type LogLevel } from '../services/logging';
 import { registerDataHandlers } from './ipc-handlers/data-handlers';
 import { registerDockerHandlers } from './ipc-handlers/docker-handlers';
@@ -20,6 +22,7 @@ import { registerCredentialHandlers } from './ipc-handlers/credential-handlers';
 import { registerLoopHandlers } from './ipc-handlers/loop-handlers';
 import { registerLogHandlers } from './ipc-handlers/log-handlers';
 import { registerTerminalHandlers } from './ipc-handlers/terminal-handlers';
+import { registerUpdateHandlers } from './ipc-handlers/update-handlers';
 import { buildApplicationMenu } from './menu';
 import { IPC } from '../shared/ipc-channels';
 import os from 'node:os';
@@ -60,6 +63,8 @@ const loopRunner = new LoopRunner(dockerManager, logParser, 3); // Default max 3
 const scheduler = new LoopScheduler(loopRunner);
 const logExporter = new LogExporter();
 const terminalManager = new TerminalManager(dockerManager);
+const gitManager = new GitManager();
+const selfUpdater = new SelfUpdater(gitManager, loopRunner, app.getAppPath());
 
 // Register all IPC handlers before the window is created.
 registerDataHandlers({ configManager, projectStore, importExport });
@@ -68,6 +73,7 @@ registerCredentialHandlers({ credentialManager, loginManager });
 registerLoopHandlers({ loopRunner, scheduler });
 registerLogHandlers({ logExporter, loopRunner });
 registerTerminalHandlers({ terminalManager });
+registerUpdateHandlers({ selfUpdater });
 
 // Legacy ping handler kept for backwards compatibility with existing tests.
 ipcMain.handle(IPC.PING, () => 'pong');

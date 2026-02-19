@@ -625,6 +625,8 @@
   - Acceptance: Logs written to file with rotation; level configurable at runtime ✓
   - **Completion**: 2026-02-19
 
+**Phase 11 Integration Complete**: All Phase 11 services (DiskChecker, GitManager, SelfUpdater, LoggingConfiguration) are now fully wired into the main entry point (`src/main/index.ts`). Services are instantiated on startup and update handlers are registered with IPC. All 1,208 unit tests passing (28 skipped).
+
 ---
 
 ## Phase 12: App Lifecycle and Shutdown
