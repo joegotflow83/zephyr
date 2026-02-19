@@ -1,10 +1,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, fireEvent, act } from '@testing-library/react';
+import { render, screen, fireEvent, act, waitFor } from '@testing-library/react';
 import App from '../../src/renderer/App';
 
 describe('App Navigation', () => {
   beforeEach(() => {
-    // Mock window.api for StatusBar, useActiveLoops, and TerminalTab
+    // Mock window.api for StatusBar, useActiveLoops, TerminalTab, and SettingsTab
     global.window.api = {
       docker: {
         status: vi.fn().mockResolvedValue({
@@ -26,6 +26,15 @@ describe('App Navigation', () => {
         onData: vi.fn(() => vi.fn()),
         onClosed: vi.fn(() => vi.fn()),
         onError: vi.fn(() => vi.fn()),
+      },
+      settings: {
+        load: vi.fn().mockResolvedValue({
+          max_concurrent_containers: 3,
+          notification_enabled: true,
+          theme: 'dark',
+          log_level: 'INFO',
+        }),
+        save: vi.fn().mockResolvedValue(undefined),
       },
     } as any;
   });
@@ -70,14 +79,20 @@ describe('App Navigation', () => {
     expect(terminalButton).toHaveClass('text-blue-400');
   });
 
-  it('switches to Settings tab when clicked', () => {
+  it('switches to Settings tab when clicked', async () => {
     render(<App />);
 
-    const settingsButton = screen.getByRole('button', { name: /settings/i });
-    fireEvent.click(settingsButton);
+    // Get the tab button specifically (not the section header buttons)
+    const settingsButtons = screen.getAllByRole('button', { name: /settings/i });
+    const settingsTabButton = settingsButtons.find(btn => !btn.getAttribute('aria-current'));
+    fireEvent.click(settingsTabButton!);
 
-    expect(screen.getByText('Settings interface coming soon...')).toBeInTheDocument();
-    expect(settingsButton).toHaveClass('text-blue-400');
+    await waitFor(() => {
+      expect(screen.getByText('Configure credentials, Docker, application preferences, and updates')).toBeInTheDocument();
+    });
+
+    const activeSettingsButton = settingsButtons.find(btn => btn.getAttribute('aria-current') === 'page');
+    expect(activeSettingsButton).toHaveClass('text-blue-400');
   });
 
   it('switches tabs with Ctrl+1 keyboard shortcut', () => {
@@ -130,9 +145,11 @@ describe('App Navigation', () => {
       window.dispatchEvent(new KeyboardEvent('keydown', { key: '4', ctrlKey: true }));
     });
 
-    expect(screen.getByText('Settings interface coming soon...')).toBeInTheDocument();
-    const settingsButton = screen.getByRole('button', { name: /settings/i });
-    expect(settingsButton).toHaveClass('text-blue-400');
+    expect(screen.getByText('Configure credentials, Docker, application preferences, and updates')).toBeInTheDocument();
+    // Get the tab button specifically (the one with aria-current='page')
+    const settingsButtons = screen.getAllByRole('button', { name: /settings/i });
+    const settingsTabButton = settingsButtons.find(btn => btn.getAttribute('aria-current') === 'page');
+    expect(settingsTabButton).toHaveClass('text-blue-400');
   });
 
   it('ignores keyboard shortcuts without Ctrl key', () => {
