@@ -584,13 +584,17 @@
   - Tests: `tests/unit/disk-checker.test.ts`
   - Acceptance: Space checking, size calculation, warning threshold tested
 
-- [ ] **11.2** Implement GitManager service
+- [x] **11.2** Implement GitManager service
   - Install `simple-git`
   - File: `src/services/git-manager.ts`
   - Methods: `cloneRepo(url, dest, onProgress?)`, `validateRepo(path)`, `getRepoInfo(path)`, `getRecentCommits(path, count?)`
   - Types: `RepoInfo`, `Commit`
   - Tests: `tests/unit/git-manager.test.ts`
   - Acceptance: All operations tested with mocked simple-git
+  - File created: src/services/git-manager.ts (236 lines)
+  - Tests: tests/unit/git-manager.test.ts (35 tests, all passing)
+  - Total test count: 1110 passing (28 skipped)
+  - **Completion**: 2026-02-19
 
 - [ ] **11.3** Implement SelfUpdater service
   - File: `src/services/self-updater.ts`
