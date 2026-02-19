@@ -808,13 +808,22 @@ All warnings are acceptable (console.log statements, any types in Terminal compo
   - Acceptance: All tests pass with real filesystem I/O (temp dirs cleaned up after) ✓
   - **Completion**: 2026-02-19 — All 1,371 unit tests + 11 integration tests passing
 
-- [ ] **14.2** Loop execution integration tests
-  - File: `tests/integration/loop-workflow.test.ts`
-  - Uses mocked DockerManager (no real Docker)
-  - Tests: start loop -> state changes -> log lines -> stop -> STOPPED state
-  - Recovery flow, scheduler integration, concurrency limit
-  - **Dependency**: Phase 5
-  - Acceptance: Full loop lifecycle tested without Docker dependency
+- [x] **14.2** Loop execution integration tests
+  - File: `tests/integration/loop-workflow.test.ts` — 17 comprehensive tests, all passing
+  - Uses mocked DockerManager (no real Docker required for integration tests)
+  - Uses real LogParser, LoopRunner, LoopScheduler, and ProjectStore services
+  - Tests implemented:
+    - Basic loop lifecycle: start → state transitions → stop → STOPPED state
+    - Log parsing and state updates (iteration tracking, log buffer)
+    - Commit and error tracking from parsed logs
+    - Concurrency limit enforcement (default 2, dynamic updates)
+    - Loop recovery from existing containers (skips deleted projects, respects limits)
+    - Scheduler integration (schedule parsing, trigger firing, cancellation, listing)
+    - List and query methods (running vs. all loops, removal in terminal state)
+    - Error handling (container creation failure, duplicate loops, non-existent loops)
+  - **Dependency**: Phase 5 (LoopRunner, LogParser, Scheduler) ✓
+  - Acceptance: Full loop lifecycle tested without Docker dependency ✓
+  - **Completion**: 2026-02-19 — All 1,371 unit tests + 28 integration tests passing (11 project + 17 loop)
 
 - [ ] **14.3** E2E tests with Playwright -- app UI
   - File: `tests/e2e/app.test.ts`
