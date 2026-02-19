@@ -726,11 +726,12 @@ describe('Main Entry Point', () => {
   });
 
   describe('App Lifecycle - window-all-closed', () => {
-    it('should stop Docker health monitoring', () => {
+    it('should not stop Docker health monitoring (moved to before-quit)', () => {
       vi.clearAllMocks();
       triggerWindowAllClosed();
 
-      expect(mockDockerHealth.stop).toHaveBeenCalled();
+      // Docker health monitoring is now stopped in before-quit, not window-all-closed
+      expect(mockDockerHealth.stop).not.toHaveBeenCalled();
     });
 
     it('should quit app on non-macOS platforms', () => {

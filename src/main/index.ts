@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain } from 'electron';
+import { app, BrowserWindow, ipcMain, dialog } from 'electron';
 import path from 'node:path';
 import started from 'electron-squirrel-startup';
 import { ConfigManager } from '../services/config-manager';
@@ -28,6 +28,7 @@ import { buildApplicationMenu } from './menu';
 import { IPC } from '../shared/ipc-channels';
 import os from 'node:os';
 import type { AppSettings } from '../shared/models';
+import { isLoopActive } from '../shared/loop-types';
 
 // Map AppSettings log levels to electron-log levels
 function mapLogLevel(appLevel: 'DEBUG' | 'INFO' | 'WARNING' | 'ERROR'): LogLevel {
@@ -127,16 +128,154 @@ app.on('ready', async () => {
   logger.info('Application started successfully');
 });
 
+// Track if shutdown is already in progress to prevent double execution
+let isShuttingDown = false;
+
+/**
+ * Graceful shutdown handler - cleans up all resources before app exits
+ */
+async function gracefulShutdown(): Promise<void> {
+  if (isShuttingDown) {
+    logger.debug('Shutdown already in progress, skipping');
+    return;
+  }
+
+  isShuttingDown = true;
+  logger.info('Starting graceful shutdown');
+
+  try {
+    // 1. Stop all running loops
+    const runningLoops = loopRunner.listRunning();
+    if (runningLoops.length > 0) {
+      logger.info(`Stopping ${runningLoops.length} running loop(s)`);
+      await Promise.all(
+        runningLoops.map(async (loop) => {
+          try {
+            await loopRunner.stopLoop(loop.projectId);
+          } catch (error) {
+            logger.error('Error stopping loop during shutdown', {
+              projectId: loop.projectId,
+              error,
+            });
+          }
+        })
+      );
+    }
+
+    // 2. Cancel all scheduled loops
+    const scheduled = scheduler.listScheduled();
+    if (scheduled.length > 0) {
+      logger.info(`Cancelling ${scheduled.length} scheduled loop(s)`);
+      scheduled.forEach((projectId) => {
+        try {
+          scheduler.cancelSchedule(projectId);
+        } catch (error) {
+          logger.error('Error cancelling schedule during shutdown', {
+            projectId,
+            error,
+          });
+        }
+      });
+    }
+
+    // 3. Stop Docker health monitor
+    logger.debug('Stopping Docker health monitor');
+    dockerHealth.stop();
+
+    // 4. Close all terminal sessions
+    logger.debug('Closing all terminal sessions');
+    await terminalManager.closeAllSessions();
+
+    // 5. Run cleanup manager to stop tracked containers
+    logger.debug('Running cleanup manager');
+    await cleanupManager.cleanupAll();
+
+    logger.info('Graceful shutdown complete');
+  } catch (error) {
+    logger.error('Error during graceful shutdown', { error });
+  } finally {
+    isShuttingDown = false;
+  }
+}
+
+/**
+ * Check if user confirmation is needed before quitting
+ * @returns true if app should quit, false to cancel quit
+ */
+async function confirmQuitIfNeeded(): Promise<boolean> {
+  const activeLoops = loopRunner
+    .listAll()
+    .filter((loop) => isLoopActive(loop.status));
+
+  if (activeLoops.length === 0) {
+    return true; // No active loops, safe to quit
+  }
+
+  // Show confirmation dialog
+  const mainWindow = BrowserWindow.getAllWindows()[0];
+  if (!mainWindow) {
+    // No window available, proceed with quit
+    return true;
+  }
+
+  const response = await dialog.showMessageBox(mainWindow, {
+    type: 'warning',
+    title: 'Quit Zephyr Desktop',
+    message: `${activeLoops.length} loop(s) are still running.`,
+    detail: 'Quitting will stop all running loops and clean up containers. Are you sure?',
+    buttons: ['Cancel', 'Quit Anyway'],
+    defaultId: 0,
+    cancelId: 0,
+  });
+
+  return response.response === 1; // Quit if user clicked "Quit Anyway"
+}
+
 app.on('window-all-closed', () => {
-  // Stop Docker health monitoring when app quits
-  dockerHealth.stop();
+  // On macOS, don't quit when windows close (stay in dock)
   if (process.platform !== 'darwin') {
     app.quit();
   }
+});
+
+app.on('before-quit', async (event) => {
+  if (isShuttingDown) {
+    // Shutdown already in progress, allow quit to proceed
+    return;
+  }
+
+  // Prevent immediate quit to allow graceful shutdown
+  event.preventDefault();
+
+  // Check if user confirmation is needed
+  const shouldQuit = await confirmQuitIfNeeded();
+  if (!shouldQuit) {
+    logger.info('User cancelled quit');
+    return;
+  }
+
+  // Run graceful shutdown
+  await gracefulShutdown();
+
+  // Now allow the quit to proceed
+  app.quit();
 });
 
 app.on('activate', () => {
   if (BrowserWindow.getAllWindows().length === 0) {
     createWindow();
   }
+});
+
+// Handle SIGINT and SIGTERM for graceful shutdown on Unix systems
+process.on('SIGINT', async () => {
+  logger.info('Received SIGINT signal');
+  await gracefulShutdown();
+  process.exit(0);
+});
+
+process.on('SIGTERM', async () => {
+  logger.info('Received SIGTERM signal');
+  await gracefulShutdown();
+  process.exit(0);
 });

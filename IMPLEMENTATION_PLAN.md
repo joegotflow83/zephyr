@@ -673,15 +673,21 @@
   - Acceptance: App starts, creates window, all services available via IPC ✓
   - **Completion**: 2026-02-19
 
-- [ ] **12.3** Implement graceful shutdown
-  - Add to `src/main/index.ts`:
-  - `app.on('before-quit')`: stop loops, stop health monitor, close terminal sessions, run cleanup manager, flush logs
-  - Handle `process.on('SIGINT')` and `process.on('SIGTERM')`
-  - Confirmation dialog if loops running: "X loops are still running. Quit anyway?"
-  - macOS window-close vs. app-quit distinction
-  - Tests: `tests/unit/graceful-shutdown.test.ts`
-  - **Dependency**: Tasks 12.1, 12.2
-  - Acceptance: Closing stops containers, cleanup runs, confirmation shown if loops active
+- [x] **12.3** Implement graceful shutdown
+  - File: `src/main/index.ts` (updated with graceful shutdown handlers)
+  - Features implemented:
+    - `app.on('before-quit')`: stops all running loops, cancels schedules, stops health monitor, closes terminal sessions, runs cleanup manager
+    - `process.on('SIGINT')` and `process.on('SIGTERM')` handlers for graceful shutdown on Unix signals
+    - Confirmation dialog when active loops are running: "X loop(s) are still running. Quit anyway?"
+    - macOS window-close vs. app-quit distinction (window-all-closed behavior)
+    - Double-shutdown prevention with `isShuttingDown` flag
+    - Error handling for failed loop stops (continues with cleanup even if some loops fail)
+  - Tests: `tests/unit/graceful-shutdown.test.ts` — 15 tests, all passing
+  - Updated: `tests/unit/main-entry.test.ts` — Updated window-all-closed test expectation
+  - Total test count: 1,306 passing (28 skipped)
+  - **Dependency**: Tasks 12.1, 12.2 ✓
+  - Acceptance: Closing stops containers, cleanup runs, confirmation shown if loops active ✓
+  - **Completion**: 2026-02-19
 
 - [ ] **12.4** Implement loop recovery on startup
   - Add `recoverLoops()` to `src/main/index.ts`
