@@ -645,11 +645,18 @@
 > **Spec**: `specs/12_lifecycle_tasks.md`
 > **Dependency**: Phases 3, 5 (Docker + Loop services)
 
-- [ ] **12.1** Implement CleanupManager
+- [x] **12.1** Implement CleanupManager
   - File: `src/services/cleanup-manager.ts`
   - Methods: `registerContainer(id)`, `unregisterContainer(id)`, `cleanupAll()`, `getTrackedContainers()`
-  - Tests: `tests/unit/cleanup-manager.test.ts`
-  - Acceptance: Register, unregister, cleanup flow tested
+  - Tests: `tests/unit/cleanup-manager.test.ts` — 25 tests, all passing
+  - Features implemented:
+    - Container registration and tracking via in-memory Set
+    - Automatic container cleanup on app shutdown
+    - Graceful error handling for already-stopped containers
+    - Full lifecycle management (register, unregister, cleanup)
+  - Test count updated to 1,252 passing (28 skipped)
+  - Acceptance: Register, unregister, cleanup flow tested ✓
+  - **Completion**: 2026-02-19
 
 - [ ] **12.2** Implement main process entry point
   - File: `src/main/index.ts` (finalize)
