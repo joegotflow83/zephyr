@@ -135,12 +135,7 @@ export class TerminalManager {
     this.sessions.delete(sessionId);
 
     // End the stream (this may trigger 'end' event, but session already removed)
-    try {
-      state.stream.end();
-    } catch (error) {
-      // Re-throw error, but session is already removed from map
-      throw error;
-    }
+    state.stream.end();
   }
 
   /**

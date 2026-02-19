@@ -100,4 +100,37 @@ contextBridge.exposeInMainWorld('api', {
     exportAll: (format?: 'text' | 'json') =>
       ipcRenderer.invoke(IPC.LOGS_EXPORT_ALL, format),
   },
+
+  terminal: {
+    open: (containerId: string, opts?: unknown) =>
+      ipcRenderer.invoke(IPC.TERMINAL_OPEN, containerId, opts),
+    close: (sessionId: string) =>
+      ipcRenderer.invoke(IPC.TERMINAL_CLOSE, sessionId),
+    write: (sessionId: string, data: string) =>
+      ipcRenderer.send(IPC.TERMINAL_WRITE, sessionId, data),
+    resize: (sessionId: string, cols: number, rows: number) =>
+      ipcRenderer.invoke(IPC.TERMINAL_RESIZE, sessionId, cols, rows),
+
+    // Event listeners
+    onData: (callback: (sessionId: string, data: string) => void) => {
+      const listener = (_event: unknown, sessionId: string, data: string) =>
+        callback(sessionId, data);
+      ipcRenderer.on(IPC.TERMINAL_DATA, listener);
+      // Return cleanup function
+      return () => ipcRenderer.removeListener(IPC.TERMINAL_DATA, listener);
+    },
+    onClosed: (callback: (sessionId: string) => void) => {
+      const listener = (_event: unknown, sessionId: string) => callback(sessionId);
+      ipcRenderer.on(IPC.TERMINAL_CLOSED, listener);
+      // Return cleanup function
+      return () => ipcRenderer.removeListener(IPC.TERMINAL_CLOSED, listener);
+    },
+    onError: (callback: (sessionId: string, error: string) => void) => {
+      const listener = (_event: unknown, sessionId: string, error: string) =>
+        callback(sessionId, error);
+      ipcRenderer.on(IPC.TERMINAL_ERROR, listener);
+      // Return cleanup function
+      return () => ipcRenderer.removeListener(IPC.TERMINAL_ERROR, listener);
+    },
+  },
 });

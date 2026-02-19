@@ -12,11 +12,13 @@ import { LogParser } from '../services/log-parser';
 import { LoopRunner } from '../services/loop-runner';
 import { LoopScheduler } from '../services/scheduler';
 import { LogExporter } from '../services/log-exporter';
+import { TerminalManager } from '../services/terminal-manager';
 import { registerDataHandlers } from './ipc-handlers/data-handlers';
 import { registerDockerHandlers } from './ipc-handlers/docker-handlers';
 import { registerCredentialHandlers } from './ipc-handlers/credential-handlers';
 import { registerLoopHandlers } from './ipc-handlers/loop-handlers';
 import { registerLogHandlers } from './ipc-handlers/log-handlers';
+import { registerTerminalHandlers } from './ipc-handlers/terminal-handlers';
 import { buildApplicationMenu } from './menu';
 import { IPC } from '../shared/ipc-channels';
 import os from 'node:os';
@@ -40,6 +42,7 @@ const logParser = new LogParser();
 const loopRunner = new LoopRunner(dockerManager, logParser, 3); // Default max 3 concurrent
 const scheduler = new LoopScheduler(loopRunner);
 const logExporter = new LogExporter();
+const terminalManager = new TerminalManager(dockerManager);
 
 // Register all IPC handlers before the window is created.
 registerDataHandlers({ configManager, projectStore, importExport });
@@ -47,6 +50,7 @@ registerDockerHandlers({ dockerManager, dockerHealth });
 registerCredentialHandlers({ credentialManager, loginManager });
 registerLoopHandlers({ loopRunner, scheduler });
 registerLogHandlers({ logExporter, loopRunner });
+registerTerminalHandlers({ terminalManager });
 
 // Legacy ping handler kept for backwards compatibility with existing tests.
 ipcMain.handle(IPC.PING, () => 'pong');
@@ -61,6 +65,9 @@ const createWindow = () => {
       nodeIntegration: false,
     },
   });
+
+  // Set the webContents for terminal output streaming
+  terminalManager.setWebContents(mainWindow.webContents);
 
   if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
     mainWindow.loadURL(MAIN_WINDOW_VITE_DEV_SERVER_URL);

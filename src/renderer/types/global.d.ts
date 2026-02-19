@@ -15,6 +15,7 @@ import type { LoginResult } from '../../services/login-manager';
 import type { LoopState, LoopStartOpts } from '../../shared/loop-types';
 import type { ScheduledLoop } from '../../services/scheduler';
 import type { ParsedLogLine } from '../../services/log-parser';
+import type { TerminalSession, TerminalSessionOpts } from '../../services/terminal-manager';
 
 export {};
 
@@ -138,6 +139,32 @@ declare global {
         exportAll: (
           format?: 'text' | 'json',
         ) => Promise<{ success: boolean; path?: string; error?: string }>;
+      };
+
+      terminal: {
+        /** Open a new terminal session to a container */
+        open: (
+          containerId: string,
+          opts?: TerminalSessionOpts,
+        ) => Promise<{ success: boolean; session?: TerminalSession; error?: string }>;
+        /** Close a terminal session */
+        close: (sessionId: string) => Promise<{ success: boolean; error?: string }>;
+        /** Write data to a terminal session (fire-and-forget, no return value) */
+        write: (sessionId: string, data: string) => void;
+        /** Resize a terminal session PTY */
+        resize: (
+          sessionId: string,
+          cols: number,
+          rows: number,
+        ) => Promise<{ success: boolean; error?: string }>;
+
+        // Event listeners
+        /** Listen for terminal output data. Returns cleanup function. */
+        onData: (callback: (sessionId: string, data: string) => void) => () => void;
+        /** Listen for terminal session close events. Returns cleanup function. */
+        onClosed: (callback: (sessionId: string) => void) => () => void;
+        /** Listen for terminal session errors. Returns cleanup function. */
+        onError: (callback: (sessionId: string, error: string) => void) => () => void;
       };
     };
   }

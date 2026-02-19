@@ -4,7 +4,7 @@
 **Branch**: `electron-rewrite`
 **Goal**: Rewrite Zephyr Desktop from Python/PyQt6 to Electron + React + TypeScript, delivering a native-quality desktop application with integrated terminal (xterm.js), Docker container orchestration, and AI loop execution management.
 
-**Status**: Phase 1 complete. Phase 2 complete (2.1–2.5 done). Phase 3 complete (3.1–3.6 done). Phase 4 complete (4.1–4.3 done). Phase 5 complete (5.1–5.7 done). Phase 6 complete (6.1, 6.2, 6.3, 6.4, 6.5 done, 5 of 5 tasks complete). Phase 7 complete (7.1–7.4 done, 4 of 4 tasks complete). Phase 8 complete (8.1–8.4 done, 4 of 4 tasks complete). Phase 9 in progress (9.1, 9.2 done, 2 of 5 tasks complete).
+**Status**: Phase 1 complete. Phase 2 complete (2.1–2.5 done). Phase 3 complete (3.1–3.6 done). Phase 4 complete (4.1–4.3 done). Phase 5 complete (5.1–5.7 done). Phase 6 complete (6.1, 6.2, 6.3, 6.4, 6.5 done, 5 of 5 tasks complete). Phase 7 complete (7.1–7.4 done, 4 of 4 tasks complete). Phase 8 complete (8.1–8.4 done, 4 of 4 tasks complete). Phase 9 in progress (9.1, 9.2, 9.3 done, 3 of 5 tasks complete).
 
 ## Environment Notes
 - Node.js installed via NVM: `source /home/ralph/.nvm/nvm.sh && node --version`
@@ -480,20 +480,21 @@
   - Forwards exec stdout to renderer via `webContents.send('terminal:data', sessionId, data)`
   - Handles stream end and error events with `terminal:closed` and `terminal:error` events
   - Tests: `tests/unit/terminal-manager.test.ts` — 28 tests, all passing
-  - All 957 unit tests passing (3 failed in unrelated project-dialog.test.tsx, 2 skipped)
+  - All 971 unit tests passing (2 skipped)
   - **Dependency**: Task 3.4 (Docker exec sessions) ✓
   - Acceptance: Session open/close/write/resize lifecycle tested, concurrent sessions work, error handling verified ✓
   - **Completion**: 2026-02-18
 
-- [ ] **9.3** Wire terminal IPC channels
+- [x] **9.3** Wire terminal IPC channels
   - File: `src/main/ipc-handlers/terminal-handlers.ts`
   - Channels: `terminal:open`, `terminal:close`, `terminal:write` (fire-and-forget via `ipcMain.on`), `terminal:resize`
   - Outbound: `terminal:data` (exec output to renderer)
   - Update preload with `window.api.terminal.*`
   - `terminal:write` uses `ipcRenderer.send` (not `invoke`) for performance
-  - Tests: `tests/unit/terminal-handlers.test.ts`
+  - Tests: `tests/unit/terminal-handlers.test.ts` — 14 tests, all passing
   - **Dependency**: Tasks 9.2, 1.4
-  - Acceptance: Data flows keyboard -> IPC -> Docker exec stdin -> stdout -> IPC -> renderer
+  - Acceptance: Data flows keyboard -> IPC -> Docker exec stdin -> stdout -> IPC -> renderer ✓
+  - **Completion**: 2026-02-19
 
 - [ ] **9.4** Build TerminalTab page component
   - Files: `src/renderer/pages/TerminalTab/TerminalTab.tsx`, `src/renderer/pages/TerminalTab/TerminalSession.tsx`

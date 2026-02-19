@@ -57,6 +57,17 @@ export const IPC = {
   LOGS_EXPORT: 'logs:export',
   LOGS_EXPORT_ALL: 'logs:export-all',
 
+  // Terminal operations
+  TERMINAL_OPEN: 'terminal:open',
+  TERMINAL_CLOSE: 'terminal:close',
+  TERMINAL_WRITE: 'terminal:write',
+  TERMINAL_RESIZE: 'terminal:resize',
+
+  // Terminal events (outbound from main to renderer)
+  TERMINAL_DATA: 'terminal:data',
+  TERMINAL_CLOSED: 'terminal:closed',
+  TERMINAL_ERROR: 'terminal:error',
+
   // Misc
   PING: 'ping',
 } as const;
