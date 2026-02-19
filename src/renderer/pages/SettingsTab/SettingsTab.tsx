@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useSettings } from '../../hooks/useSettings';
+import { CredentialsSection } from './CredentialsSection';
 
 interface SettingsSectionProps {
   title: string;
@@ -108,13 +109,7 @@ export const SettingsTab: React.FC = () => {
           description="Manage API keys and login sessions for AI services"
           defaultExpanded={true}
         >
-          <div className="text-gray-400">
-            <p>Credentials management coming soon...</p>
-            <p className="text-sm mt-2">
-              Will support: Anthropic, OpenAI, GitHub with API keys and browser
-              login modes.
-            </p>
-          </div>
+          <CredentialsSection />
         </SettingsSection>
 
         {/* Docker Section */}

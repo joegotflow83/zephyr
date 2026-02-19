@@ -8,6 +8,21 @@ import type { AppSettings } from '../../src/shared/models';
 // Mock the useSettings hook
 vi.mock('../../src/renderer/hooks/useSettings');
 
+// Mock window.api.credentials for CredentialsSection
+const mockCredentials = {
+  list: vi.fn().mockResolvedValue([]),
+  get: vi.fn().mockResolvedValue(null),
+  store: vi.fn().mockResolvedValue(undefined),
+  delete: vi.fn().mockResolvedValue(undefined),
+  login: vi.fn().mockResolvedValue({ success: true, service: 'anthropic' }),
+};
+
+// @ts-expect-error - mocking window.api
+globalThis.window.api = {
+  ...globalThis.window.api,
+  credentials: mockCredentials,
+};
+
 describe('SettingsTab', () => {
   const mockRefresh = vi.fn();
   const mockUpdate = vi.fn();
@@ -28,6 +43,10 @@ describe('SettingsTab', () => {
   };
 
   beforeEach(() => {
+    // Reset credential mocks
+    vi.clearAllMocks();
+    mockCredentials.list.mockResolvedValue([]);
+    mockCredentials.get.mockResolvedValue(null);
     vi.clearAllMocks();
     vi.spyOn(useSettingsModule, 'useSettings').mockReturnValue(
       defaultUseSettingsReturn
@@ -76,11 +95,14 @@ describe('SettingsTab', () => {
   });
 
   describe('Section Collapsing', () => {
-    it('should render Credentials section expanded by default', () => {
+    it('should render Credentials section expanded by default', async () => {
       render(<SettingsTab />);
-      expect(
-        screen.getByText('Credentials management coming soon...')
-      ).toBeInTheDocument();
+      // Wait for async data to load
+      await waitFor(() => {
+        expect(
+          screen.getByText(/Store API keys or use browser login/)
+        ).toBeInTheDocument();
+      });
     });
 
     it('should render other sections collapsed by default', () => {
@@ -120,10 +142,12 @@ describe('SettingsTab', () => {
       const user = userEvent.setup();
       render(<SettingsTab />);
 
-      // Credentials section should be expanded initially
-      expect(
-        screen.getByText('Credentials management coming soon...')
-      ).toBeInTheDocument();
+      // Credentials section should be expanded initially (wait for async load)
+      await waitFor(() => {
+        expect(
+          screen.getByText(/Store API keys or use browser login/)
+        ).toBeInTheDocument();
+      });
 
       // Click the Credentials section header
       const credentialsHeader = screen.getByText('Credentials').closest('button');
@@ -132,7 +156,7 @@ describe('SettingsTab', () => {
 
       // Credentials section should now be collapsed
       expect(
-        screen.queryByText('Credentials management coming soon...')
+        screen.queryByText(/Store API keys or use browser login/)
       ).not.toBeInTheDocument();
     });
 
@@ -150,7 +174,7 @@ describe('SettingsTab', () => {
 
       // Both should be visible along with initially expanded Credentials
       expect(
-        screen.getByText('Credentials management coming soon...')
+        screen.getByText(/Store API keys or use browser login/)
       ).toBeInTheDocument();
       expect(
         screen.getByText('Docker settings coming soon...')
@@ -258,10 +282,12 @@ describe('SettingsTab', () => {
   describe('Section Icons', () => {
     it('should render chevron icon for each section', () => {
       render(<SettingsTab />);
-      const buttons = screen.getAllByRole('button');
+      const sectionButtons = screen.getAllByRole('button').filter(
+        (btn) => btn.getAttribute('aria-expanded') !== null
+      );
       // We have 4 section headers
-      expect(buttons).toHaveLength(4);
-      buttons.forEach((button) => {
+      expect(sectionButtons).toHaveLength(4);
+      sectionButtons.forEach((button) => {
         const svg = button.querySelector('svg');
         expect(svg).toBeInTheDocument();
       });
