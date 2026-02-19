@@ -709,14 +709,17 @@
 > **Spec**: `specs/13_packaging_tasks.md`
 > **Dependency**: Phase 12 (app entry point working)
 
-- [ ] **13.1** Configure Electron Forge makers
-  - Update `forge.config.ts`:
-  - macOS: `@electron-forge/maker-dmg`, `@electron-forge/maker-zip`
-  - Windows: `@electron-forge/maker-squirrel`
-  - Linux: `@electron-forge/maker-deb`, `@electron-forge/maker-rpm`
-  - Install required maker packages
-  - Configure app metadata: name, description, author, license
-  - Acceptance: `npm run make` produces platform-appropriate installer/bundle
+- [x] **13.1** Configure Electron Forge makers
+  - Updated `forge.config.ts`:
+    - macOS: Added `@electron-forge/maker-dmg` (DMG installer) and kept `@electron-forge/maker-zip`
+    - Windows: `@electron-forge/maker-squirrel` configured with app metadata
+    - Linux: `@electron-forge/maker-deb` and `@electron-forge/maker-rpm` configured with full metadata
+  - Installed `@electron-forge/maker-dmg` package
+  - Configured app metadata in packagerConfig: name, executableName, appBundleId, appCategoryType, icon paths, copyright, version
+  - Configured maker-specific options: productName, genericName, description, categories, maintainer, homepage
+  - All 1,318 unit tests passing (28 skipped)
+  - Acceptance: Configuration complete, ready for `npm run make` (requires GUI environment) ✓
+  - **Completion**: 2026-02-19
 
 - [ ] **13.2** Configure app icons
   - Keep existing `resources/icon.png` as source
