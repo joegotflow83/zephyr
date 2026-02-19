@@ -1,18 +1,21 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Terminal,
   TerminalHandle,
 } from '../../components/Terminal/Terminal';
 import type { ContainerInfo } from '../../../services/docker-manager';
 import type { TerminalSession } from '../../../services/terminal-manager';
+import { useAppStore } from '../../stores/app-store';
 
 interface OpenTerminalSession extends TerminalSession {
   containerId: string;
   containerName: string;
   terminalRef: React.RefObject<TerminalHandle>;
+  disconnected?: boolean;
 }
 
 export const TerminalTab: React.FC = () => {
+  const { settings } = useAppStore();
   const [containers, setContainers] = useState<ContainerInfo[]>([]);
   const [selectedContainerId, setSelectedContainerId] = useState<string>('');
   const [selectedUser, setSelectedUser] = useState<string>('default');
@@ -20,6 +23,10 @@ export const TerminalTab: React.FC = () => {
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [fontSize, setFontSize] = useState<number>(14);
+
+  // Determine theme from settings
+  const theme = settings?.theme === 'light' ? 'light' : 'dark';
 
   // Load running containers on mount
   useEffect(() => {
@@ -53,8 +60,10 @@ export const TerminalTab: React.FC = () => {
     });
 
     const cleanupClosed = window.api.terminal.onClosed((sessionId) => {
-      setSessions((prev) => prev.filter((s) => s.id !== sessionId));
-      setActiveSessionId((prev) => (prev === sessionId ? null : prev));
+      // Mark session as disconnected instead of removing it
+      setSessions((prev) =>
+        prev.map((s) => (s.id === sessionId ? { ...s, disconnected: true } : s))
+      );
     });
 
     const cleanupError = window.api.terminal.onError((sessionId, errorMsg) => {
@@ -144,6 +153,118 @@ export const TerminalTab: React.FC = () => {
     }
   };
 
+  const reconnectSession = useCallback(
+    async (session: OpenTerminalSession) => {
+      setLoading(true);
+      setError(null);
+
+      try {
+        const opts = {
+          user: session.user === 'root' ? 'root' : undefined,
+          shell: 'bash',
+          rows: 24,
+          cols: 80,
+        };
+
+        const result = await window.api.terminal.open(session.containerId, opts);
+
+        if (!result.success || !result.session) {
+          throw new Error(result.error || 'Failed to reconnect terminal session');
+        }
+
+        // Update the session with new session ID and clear disconnected flag
+        setSessions((prev) =>
+          prev.map((s) =>
+            s.id === session.id
+              ? {
+                  ...s,
+                  id: result.session.id,
+                  disconnected: false,
+                  createdAt: result.session.createdAt,
+                }
+              : s
+          )
+        );
+
+        // Update active session ID if this was the active one
+        if (activeSessionId === session.id) {
+          setActiveSessionId(result.session.id);
+        }
+      } catch (err) {
+        console.error('Failed to reconnect terminal:', err);
+        setError(err instanceof Error ? err.message : 'Failed to reconnect terminal');
+      } finally {
+        setLoading(false);
+      }
+    },
+    [activeSessionId]
+  );
+
+  const removeSession = useCallback((sessionId: string) => {
+    setSessions((prev) => prev.filter((s) => s.id !== sessionId));
+    if (activeSessionId === sessionId) {
+      const remainingSessions = sessions.filter((s) => s.id !== sessionId);
+      setActiveSessionId(
+        remainingSessions.length > 0 ? remainingSessions[0].id : null
+      );
+    }
+  }, [activeSessionId, sessions]);
+
+  // Keyboard shortcuts handler
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const activeSession = sessions.find((s) => s.id === activeSessionId);
+      if (!activeSession || activeSession.disconnected) return;
+
+      const terminal = activeSession.terminalRef.current;
+      if (!terminal) return;
+
+      // Ctrl+Shift+F: Search
+      if (e.ctrlKey && e.shiftKey && e.key === 'F') {
+        e.preventDefault();
+        terminal.search();
+      }
+
+      // Ctrl+Shift+C: Copy
+      if (e.ctrlKey && e.shiftKey && e.key === 'C') {
+        e.preventDefault();
+        terminal.copy();
+      }
+
+      // Ctrl+Shift+V: Paste
+      if (e.ctrlKey && e.shiftKey && e.key === 'V') {
+        e.preventDefault();
+        navigator.clipboard.readText().then((text) => {
+          terminal.paste(text);
+        });
+      }
+
+      // Ctrl+=: Increase font size
+      if (e.ctrlKey && e.key === '=') {
+        e.preventDefault();
+        terminal.increaseFontSize();
+        setFontSize(terminal.getCurrentFontSize());
+      }
+
+      // Ctrl+-: Decrease font size
+      if (e.ctrlKey && e.key === '-') {
+        e.preventDefault();
+        terminal.decreaseFontSize();
+        setFontSize(terminal.getCurrentFontSize());
+      }
+
+      // Ctrl+0: Reset font size
+      if (e.ctrlKey && e.key === '0') {
+        e.preventDefault();
+        terminal.resetFontSize();
+        setFontSize(terminal.getCurrentFontSize());
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [sessions, activeSessionId]);
+
   return (
     <div className="flex flex-col h-full">
       {/* Toolbar */}
@@ -211,27 +332,29 @@ export const TerminalTab: React.FC = () => {
         )}
       </div>
 
-      {/* Session tabs */}
+      {/* Session tabs and controls */}
       {sessions.length > 0 && (
-        <div className="flex items-center gap-2 px-4 py-2 bg-gray-800 border-b border-gray-700 overflow-x-auto">
-          {sessions.map((session) => (
+        <div className="flex items-center justify-between px-4 py-2 bg-gray-800 border-b border-gray-700">
+          <div className="flex items-center gap-2 overflow-x-auto">
+            {sessions.map((session) => (
             <div
               key={session.id}
               className={`flex items-center gap-2 px-3 py-1 rounded cursor-pointer transition-colors ${
                 activeSessionId === session.id
                   ? 'bg-blue-600 text-white'
                   : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-              }`}
+              } ${session.disconnected ? 'opacity-60' : ''}`}
               onClick={() => setActiveSessionId(session.id)}
             >
               <span className="text-sm">
                 {session.containerName}
                 {session.user && ` (${session.user})`}
+                {session.disconnected && ' [Disconnected]'}
               </span>
               <button
                 onClick={(e) => {
                   e.stopPropagation();
-                  closeSession(session.id);
+                  removeSession(session.id);
                 }}
                 className="text-gray-400 hover:text-white"
                 aria-label="Close session"
@@ -240,6 +363,14 @@ export const TerminalTab: React.FC = () => {
               </button>
             </div>
           ))}
+          </div>
+          <div className="flex items-center gap-2 text-xs text-gray-400">
+            <span>Font: {fontSize}px</span>
+            <span className="text-gray-600">|</span>
+            <span title="Search: Ctrl+Shift+F">🔍</span>
+            <span title="Copy: Ctrl+Shift+C">📋</span>
+            <span title="Zoom: Ctrl+/-/0">🔍±</span>
+          </div>
         </div>
       )}
 
@@ -262,15 +393,42 @@ export const TerminalTab: React.FC = () => {
                 activeSessionId === session.id ? 'block' : 'hidden'
               }`}
             >
-              <Terminal
-                ref={session.terminalRef}
-                onData={(data) => handleTerminalData(session.id, data)}
-                onResize={(cols, rows) =>
-                  handleTerminalResize(session.id, cols, rows)
-                }
-                fontSize={14}
-                theme="dark"
-              />
+              {session.disconnected ? (
+                <div className="flex items-center justify-center h-full bg-gray-900 text-gray-400">
+                  <div className="text-center">
+                    <p className="text-lg mb-4">Session Disconnected</p>
+                    <p className="text-sm mb-6">
+                      The terminal session has ended. You can reconnect or close
+                      this session.
+                    </p>
+                    <div className="flex gap-4 justify-center">
+                      <button
+                        onClick={() => reconnectSession(session)}
+                        disabled={loading}
+                        className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed transition-colors"
+                      >
+                        {loading ? 'Reconnecting...' : 'Reconnect'}
+                      </button>
+                      <button
+                        onClick={() => removeSession(session.id)}
+                        className="px-4 py-2 bg-gray-700 text-white rounded hover:bg-gray-600 transition-colors"
+                      >
+                        Close Session
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <Terminal
+                  ref={session.terminalRef}
+                  onData={(data) => handleTerminalData(session.id, data)}
+                  onResize={(cols, rows) =>
+                    handleTerminalResize(session.id, cols, rows)
+                  }
+                  fontSize={fontSize}
+                  theme={theme}
+                />
+              )}
             </div>
           ))
         )}

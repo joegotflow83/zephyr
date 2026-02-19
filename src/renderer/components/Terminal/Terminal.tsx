@@ -7,6 +7,7 @@ import React, {
 import { Terminal as XTerm } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { WebLinksAddon } from '@xterm/addon-web-links';
+import { SearchAddon } from '@xterm/addon-search';
 import '@xterm/xterm/css/xterm.css';
 import './terminal.css';
 
@@ -15,18 +16,29 @@ export interface TerminalProps {
   onResize?: (cols: number, rows: number) => void;
   fontSize?: number;
   theme?: 'dark' | 'light';
+  onCopy?: (text: string) => void;
 }
 
 export interface TerminalHandle {
   write: (data: string) => void;
   clear: () => void;
+  search: () => void;
+  copy: () => void;
+  paste: (text: string) => void;
+  increaseFontSize: () => void;
+  decreaseFontSize: () => void;
+  resetFontSize: () => void;
+  getCurrentFontSize: () => number;
 }
 
 export const Terminal = forwardRef<TerminalHandle, TerminalProps>(
-  ({ onData, onResize, fontSize = 14, theme = 'dark' }, ref) => {
+  ({ onData, onResize, fontSize = 14, theme = 'dark', onCopy }, ref) => {
     const containerRef = useRef<HTMLDivElement>(null);
     const xtermRef = useRef<XTerm | null>(null);
     const fitAddonRef = useRef<FitAddon | null>(null);
+    const searchAddonRef = useRef<SearchAddon | null>(null);
+    const currentFontSizeRef = useRef<number>(fontSize);
+    const defaultFontSizeRef = useRef<number>(fontSize);
 
     useImperativeHandle(ref, () => ({
       write: (data: string) => {
@@ -35,6 +47,50 @@ export const Terminal = forwardRef<TerminalHandle, TerminalProps>(
       clear: () => {
         xtermRef.current?.clear();
       },
+      search: () => {
+        if (searchAddonRef.current && xtermRef.current) {
+          const searchTerm = prompt('Search terminal:');
+          if (searchTerm) {
+            searchAddonRef.current.findNext(searchTerm, { incremental: false });
+          }
+        }
+      },
+      copy: () => {
+        const selection = xtermRef.current?.getSelection();
+        if (selection) {
+          navigator.clipboard.writeText(selection).catch(console.error);
+          if (onCopy) {
+            onCopy(selection);
+          }
+        }
+      },
+      paste: (text: string) => {
+        if (onData) {
+          onData(text);
+        }
+      },
+      increaseFontSize: () => {
+        if (xtermRef.current) {
+          currentFontSizeRef.current = Math.min(currentFontSizeRef.current + 2, 32);
+          xtermRef.current.options.fontSize = currentFontSizeRef.current;
+          fitAddonRef.current?.fit();
+        }
+      },
+      decreaseFontSize: () => {
+        if (xtermRef.current) {
+          currentFontSizeRef.current = Math.max(currentFontSizeRef.current - 2, 8);
+          xtermRef.current.options.fontSize = currentFontSizeRef.current;
+          fitAddonRef.current?.fit();
+        }
+      },
+      resetFontSize: () => {
+        if (xtermRef.current) {
+          currentFontSizeRef.current = defaultFontSizeRef.current;
+          xtermRef.current.options.fontSize = currentFontSizeRef.current;
+          fitAddonRef.current?.fit();
+        }
+      },
+      getCurrentFontSize: () => currentFontSizeRef.current,
     }));
 
     useEffect(() => {
@@ -101,6 +157,10 @@ export const Terminal = forwardRef<TerminalHandle, TerminalProps>(
       terminal.loadAddon(fitAddon);
       terminal.loadAddon(new WebLinksAddon());
 
+      const searchAddon = new SearchAddon();
+      searchAddonRef.current = searchAddon;
+      terminal.loadAddon(searchAddon);
+
       // Attach to DOM
       terminal.open(containerRef.current);
 
@@ -131,15 +191,19 @@ export const Terminal = forwardRef<TerminalHandle, TerminalProps>(
       return () => {
         (terminal as any)._dataDisposable?.dispose();
         (terminal as any)._resizeDisposable?.dispose();
+        searchAddon.dispose();
         terminal.dispose();
         xtermRef.current = null;
         fitAddonRef.current = null;
+        searchAddonRef.current = null;
       };
     }, []); // Only run on mount
 
     // Handle fontSize changes
     useEffect(() => {
       if (xtermRef.current) {
+        currentFontSizeRef.current = fontSize;
+        defaultFontSizeRef.current = fontSize;
         xtermRef.current.options.fontSize = fontSize;
         fitAddonRef.current?.fit();
       }

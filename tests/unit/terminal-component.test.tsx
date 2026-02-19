@@ -159,7 +159,7 @@ describe('Terminal Component', () => {
 
       await waitFor(() => {
         const mockInstance = (XTermConstructor as any).mock.results[0].value;
-        expect(mockInstance.loadAddon).toHaveBeenCalledTimes(2); // FitAddon + WebLinksAddon
+        expect(mockInstance.loadAddon).toHaveBeenCalledTimes(3); // FitAddon + WebLinksAddon + SearchAddon
       });
     });
 
