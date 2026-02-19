@@ -4,7 +4,7 @@
 **Branch**: `electron-rewrite`
 **Goal**: Rewrite Zephyr Desktop from Python/PyQt6 to Electron + React + TypeScript, delivering a native-quality desktop application with integrated terminal (xterm.js), Docker container orchestration, and AI loop execution management.
 
-**Status**: Phase 1 complete. Phase 2 complete (2.1–2.5 done). Phase 3 complete (3.1–3.6 done). Phase 4 complete (4.1–4.3 done). Phase 5 complete (5.1–5.7 done). Phase 6 complete (6.1, 6.2, 6.3, 6.4, 6.5 done, 5 of 5 tasks complete). Phase 7 complete (7.1–7.4 done, 4 of 4 tasks complete). Phase 8 complete (8.1–8.4 done, 4 of 4 tasks complete). Phase 9 complete (9.1–9.5 done, 5 of 5 tasks complete, all tests passing). Phase 10 complete (10.1, 10.2, 10.3, 10.4 done, 4 of 4 tasks complete). Phase 11 complete (11.1, 11.2, 11.3, 11.4 done, 4 of 4 tasks complete). Phase 12 complete (12.1, 12.2, 12.3, 12.4 done, 4 of 4 tasks complete). Phase 13 in progress (13.1, 13.2, 13.3 done, 3 of 4 tasks complete).
+**Status**: Phase 1 complete. Phase 2 complete (2.1–2.5 done). Phase 3 complete (3.1–3.6 done). Phase 4 complete (4.1–4.3 done). Phase 5 complete (5.1–5.7 done). Phase 6 complete (6.1, 6.2, 6.3, 6.4, 6.5 done, 5 of 5 tasks complete). Phase 7 complete (7.1–7.4 done, 4 of 4 tasks complete). Phase 8 complete (8.1–8.4 done, 4 of 4 tasks complete). Phase 9 complete (9.1–9.5 done, 5 of 5 tasks complete, all tests passing). Phase 10 complete (10.1, 10.2, 10.3, 10.4 done, 4 of 4 tasks complete). Phase 11 complete (11.1, 11.2, 11.3, 11.4 done, 4 of 4 tasks complete). Phase 12 complete (12.1, 12.2, 12.3, 12.4 done, 4 of 4 tasks complete). Phase 13 complete (13.1, 13.2, 13.3, 13.4 done, 4 of 4 tasks complete).
 
 ## Environment Notes
 - Node.js installed via NVM: `source /home/ralph/.nvm/nvm.sh && node --version`
@@ -761,12 +761,21 @@
   - Acceptance: App detects and installs updates from GitHub Releases ✓
   - **Completion**: 2026-02-19
 
-- [ ] **13.4** Create build scripts and CI configuration
-  - File: `scripts/build.sh` -- runs `npm ci`, `npm run lint`, `npm test`, `npm run make`
-  - Platform detection for correct maker
-  - File: `.github/workflows/build.yml` (template) -- matrix build (macOS/Windows/Linux), test, build, upload artifacts
-  - File: `scripts/notarize.js` (macOS Apple notarization hook)
-  - Acceptance: `bash scripts/build.sh` produces distributable artifacts
+- [x] **13.4** Create build scripts and CI configuration
+  - Files created:
+    - `scripts/build.sh` — executable shell script for automated builds with platform detection
+    - `scripts/notarize.js` — macOS notarization hook for Electron Forge
+  - Files updated:
+    - `.github/workflows/ci.yml` — Electron-based CI with Node.js 20 installed
+    - `.github/workflows/release.yml` — Electron Forge builds for macOS/Linux/Windows
+  - Tests created:
+    - `tests/unit/build-script.test.ts` — 8 tests, all passing (validates build script logic)
+    - `tests/unit/notarize-script.test.ts` — 7 tests, all passing (validates notarization logic)
+  - Build artifacts available for all platforms after successful CI run
+  - All 1,371 unit tests passing (28 skipped)
+  - Total test count: 1,399 tests (1,371 passing, 28 skipped)
+  - Acceptance: `bash scripts/build.sh` produces distributable artifacts ✓
+  - **Completion**: 2026-02-19
 
 ---
 
