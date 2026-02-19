@@ -133,4 +133,10 @@ contextBridge.exposeInMainWorld('api', {
       return () => ipcRenderer.removeListener(IPC.TERMINAL_ERROR, listener);
     },
   },
+
+  updates: {
+    check: () => ipcRenderer.invoke(IPC.UPDATES_CHECK),
+    apply: (dockerImage: string, envVars?: Record<string, string>) =>
+      ipcRenderer.invoke(IPC.UPDATES_APPLY, dockerImage, envVars),
+  },
 });

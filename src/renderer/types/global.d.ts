@@ -16,6 +16,7 @@ import type { LoopState, LoopStartOpts } from '../../shared/loop-types';
 import type { ScheduledLoop } from '../../services/scheduler';
 import type { ParsedLogLine } from '../../services/log-parser';
 import type { TerminalSession, TerminalSessionOpts } from '../../services/terminal-manager';
+import type { UpdateInfo } from '../../services/self-updater';
 
 export {};
 
@@ -165,6 +166,13 @@ declare global {
         onClosed: (callback: (sessionId: string) => void) => () => void;
         /** Listen for terminal session errors. Returns cleanup function. */
         onError: (callback: (sessionId: string, error: string) => void) => () => void;
+      };
+
+      updates: {
+        /** Check for available application updates */
+        check: () => Promise<UpdateInfo>;
+        /** Apply an update by starting a self-update loop */
+        apply: (dockerImage: string, envVars?: Record<string, string>) => Promise<void>;
       };
     };
   }

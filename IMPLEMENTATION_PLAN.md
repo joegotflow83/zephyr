@@ -4,7 +4,7 @@
 **Branch**: `electron-rewrite`
 **Goal**: Rewrite Zephyr Desktop from Python/PyQt6 to Electron + React + TypeScript, delivering a native-quality desktop application with integrated terminal (xterm.js), Docker container orchestration, and AI loop execution management.
 
-**Status**: Phase 1 complete. Phase 2 complete (2.1–2.5 done). Phase 3 complete (3.1–3.6 done). Phase 4 complete (4.1–4.3 done). Phase 5 complete (5.1–5.7 done). Phase 6 complete (6.1, 6.2, 6.3, 6.4, 6.5 done, 5 of 5 tasks complete). Phase 7 complete (7.1–7.4 done, 4 of 4 tasks complete). Phase 8 complete (8.1–8.4 done, 4 of 4 tasks complete). Phase 9 complete (9.1–9.4 done, 4 of 4 tasks complete, all tests passing). Phase 10 in progress (10.1, 10.2, 10.3 done, 3 of 4 tasks complete).
+**Status**: Phase 1 complete. Phase 2 complete (2.1–2.5 done). Phase 3 complete (3.1–3.6 done). Phase 4 complete (4.1–4.3 done). Phase 5 complete (5.1–5.7 done). Phase 6 complete (6.1, 6.2, 6.3, 6.4, 6.5 done, 5 of 5 tasks complete). Phase 7 complete (7.1–7.4 done, 4 of 4 tasks complete). Phase 8 complete (8.1–8.4 done, 4 of 4 tasks complete). Phase 9 complete (9.1–9.4 done, 4 of 4 tasks complete, all tests passing). Phase 10 in progress (10.1, 10.2, 10.3 done, 3 of 4 tasks complete). Phase 11 in progress (11.1 status unclear, 11.2, 11.3 done, 3 of 4 tasks).
 
 ## Environment Notes
 - Node.js installed via NVM: `source /home/ralph/.nvm/nvm.sh && node --version`
@@ -596,14 +596,21 @@
   - Total test count: 1110 passing (28 skipped)
   - **Completion**: 2026-02-19
 
-- [ ] **11.3** Implement SelfUpdater service
-  - File: `src/services/self-updater.ts`
+- [x] **11.3** Implement SelfUpdater service
+  - File: `src/services/self-updater.ts` (187 lines)
   - Methods: `checkForUpdates()`, `startSelfUpdate()` (uses reserved project ID `"zephyr-self-update"`)
   - Type: `UpdateInfo { available, currentVersion, latestVersion, changelog? }`
   - Wire to IPC: `updates:check`, `updates:apply`
-  - Tests: `tests/unit/self-updater.test.ts`
+  - File created: src/main/ipc-handlers/update-handlers.ts (142 lines)
+  - Tests: tests/unit/self-updater.test.ts (23 tests, all passing)
+  - Tests: tests/unit/update-handlers.test.ts (7 tests, all passing)
+  - Updated IPC channels: UPDATES_CHECK, UPDATES_APPLY
+  - Updated preload: window.api.updates.*
+  - Updated global types: UpdateInfo interface exposed
+  - Total test count: 1140 passing (28 skipped)
   - **Dependency**: Task 11.2 (GitManager for version comparison)
-  - Acceptance: Update check logic and trigger tested
+  - Acceptance: Update check logic and trigger tested ✓
+  - **Completion**: 2026-02-19
 
 - [ ] **11.4** Implement logging configuration
   - Install `electron-log` (or `winston`)

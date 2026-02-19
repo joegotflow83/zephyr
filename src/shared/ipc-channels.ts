@@ -68,6 +68,10 @@ export const IPC = {
   TERMINAL_CLOSED: 'terminal:closed',
   TERMINAL_ERROR: 'terminal:error',
 
+  // Updates
+  UPDATES_CHECK: 'updates:check',
+  UPDATES_APPLY: 'updates:apply',
+
   // Misc
   PING: 'ping',
 } as const;
