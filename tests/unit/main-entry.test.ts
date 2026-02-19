@@ -588,10 +588,11 @@ describe('Main Entry Point', () => {
       });
     });
 
-    it('should register loop handlers with LoopRunner and Scheduler', () => {
+    it('should register loop handlers with LoopRunner, Scheduler, and CleanupManager', () => {
       expect(mockRegisterLoopHandlers).toHaveBeenCalledWith({
         loopRunner: mockLoopRunner,
         scheduler: mockScheduler,
+        cleanupManager: mockCleanupManager,
       });
     });
 

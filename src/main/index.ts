@@ -73,7 +73,7 @@ const cleanupManager = new CleanupManager(dockerManager);
 registerDataHandlers({ configManager, projectStore, importExport });
 registerDockerHandlers({ dockerManager, dockerHealth });
 registerCredentialHandlers({ credentialManager, loginManager });
-registerLoopHandlers({ loopRunner, scheduler });
+registerLoopHandlers({ loopRunner, scheduler, cleanupManager });
 registerLogHandlers({ logExporter, loopRunner });
 registerTerminalHandlers({ terminalManager });
 registerUpdateHandlers({ selfUpdater });
@@ -104,6 +104,52 @@ const createWindow = () => {
   }
 };
 
+/**
+ * Recover running loops on startup (best-effort).
+ *
+ * After a crash or force-quit, re-attach to any Docker containers that are still running.
+ * This function never throws - recovery failures are logged but don't block startup.
+ */
+async function recoverLoops(): Promise<void> {
+  try {
+    logger.info('Attempting to recover running loops');
+
+    // 1. Check if Docker is available
+    const dockerAvailable = await dockerManager.isDockerAvailable();
+    if (!dockerAvailable) {
+      logger.info('Docker not available, skipping loop recovery');
+      return;
+    }
+
+    // 2. List running containers with zephyr-managed label
+    const containers = await dockerManager.listRunningContainers();
+    if (containers.length === 0) {
+      logger.info('No running containers found, nothing to recover');
+      return;
+    }
+
+    logger.info(`Found ${containers.length} running container(s), attempting recovery`);
+
+    // 3. Recover loops via LoopRunner
+    const recoveredIds = await loopRunner.recoverLoops(containers, projectStore);
+
+    // 4. Register recovered containers with cleanup manager
+    for (const projectId of recoveredIds) {
+      const state = loopRunner.getLoopState(projectId);
+      if (state?.containerId) {
+        cleanupManager.registerContainer(state.containerId);
+      }
+    }
+
+    logger.info(`Successfully recovered ${recoveredIds.length} loop(s)`, {
+      projectIds: recoveredIds,
+    });
+  } catch (error) {
+    // Log error but don't throw - recovery is best-effort
+    logger.error('Error during loop recovery (non-fatal)', { error });
+  }
+}
+
 app.on('ready', async () => {
   logger.info('Application starting');
 
@@ -122,6 +168,8 @@ app.on('ready', async () => {
   createWindow();
   // Build the application menu bar
   buildApplicationMenu();
+  // Recover any loops that survived a crash or force-quit
+  await recoverLoops();
   // Start Docker health monitoring
   dockerHealth.start();
 

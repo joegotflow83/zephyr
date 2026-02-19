@@ -12,17 +12,23 @@ import type { ScheduledLoop } from '../../services/scheduler';
 export interface LoopServices {
   loopRunner: LoopRunner;
   scheduler: LoopScheduler;
+  cleanupManager?: { registerContainer: (id: string) => void };
 }
 
 export function registerLoopHandlers(services: LoopServices): void {
-  const { loopRunner, scheduler } = services;
+  const { loopRunner, scheduler, cleanupManager } = services;
 
   // ── Loop lifecycle ────────────────────────────────────────────────────────
 
   ipcMain.handle(
     IPC.LOOP_START,
     async (_event, opts: LoopStartOpts): Promise<LoopState> => {
-      return loopRunner.startLoop(opts);
+      const state = await loopRunner.startLoop(opts);
+      // Register container with cleanup manager for automatic cleanup on shutdown
+      if (cleanupManager && state.containerId) {
+        cleanupManager.registerContainer(state.containerId);
+      }
+      return state;
     },
   );
 

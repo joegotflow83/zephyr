@@ -80,6 +80,10 @@ const mockScheduler = {
   listScheduled: vi.fn(),
 };
 
+const mockCleanupManager = {
+  registerContainer: vi.fn(),
+};
+
 // ── Setup ─────────────────────────────────────────────────────────────────────
 
 describe('registerLoopHandlers', () => {
@@ -92,13 +96,14 @@ describe('registerLoopHandlers', () => {
     registerLoopHandlers({
       loopRunner: mockLoopRunner as never,
       scheduler: mockScheduler as never,
+      cleanupManager: mockCleanupManager as never,
     });
   });
 
   // ── Loop lifecycle tests ────────────────────────────────────────────────────
 
   describe('loop:start', () => {
-    it('should route to loopRunner.startLoop()', async () => {
+    it('should route to loopRunner.startLoop() and register container with cleanup manager', async () => {
       const opts = {
         projectId: 'test-project',
         dockerImage: 'test-image',
@@ -123,6 +128,76 @@ describe('registerLoopHandlers', () => {
       const result = await invoke(IPC.LOOP_START, opts);
 
       expect(mockLoopRunner.startLoop).toHaveBeenCalledWith(opts);
+      expect(mockCleanupManager.registerContainer).toHaveBeenCalledWith('abc123');
+      expect(result).toEqual(expectedState);
+    });
+
+    it('should not register container if startLoop fails', async () => {
+      const opts = {
+        projectId: 'test-project',
+        dockerImage: 'test-image',
+        mode: LoopMode.SINGLE,
+      };
+      const failedState = {
+        projectId: 'test-project',
+        containerId: null,
+        mode: LoopMode.SINGLE,
+        status: LoopStatus.FAILED,
+        iteration: 0,
+        startedAt: new Date().toISOString(),
+        stoppedAt: new Date().toISOString(),
+        logs: [],
+        commits: [],
+        errors: 0,
+        error: 'Failed to create container',
+      };
+
+      mockLoopRunner.startLoop.mockResolvedValue(failedState);
+
+      const result = await invoke(IPC.LOOP_START, opts);
+
+      expect(mockLoopRunner.startLoop).toHaveBeenCalledWith(opts);
+      expect(mockCleanupManager.registerContainer).not.toHaveBeenCalled();
+      expect(result).toEqual(failedState);
+    });
+
+    it('should handle cleanup manager not being provided', async () => {
+      // Re-register without cleanup manager
+      vi.resetAllMocks();
+      for (const key of Object.keys(handlerRegistry)) {
+        delete handlerRegistry[key];
+      }
+      registerLoopHandlers({
+        loopRunner: mockLoopRunner as never,
+        scheduler: mockScheduler as never,
+        // cleanupManager intentionally omitted
+      });
+
+      const opts = {
+        projectId: 'test-project',
+        dockerImage: 'test-image',
+        mode: LoopMode.SINGLE,
+      };
+      const expectedState = {
+        projectId: 'test-project',
+        containerId: 'abc123',
+        mode: LoopMode.SINGLE,
+        status: LoopStatus.RUNNING,
+        iteration: 0,
+        startedAt: new Date().toISOString(),
+        stoppedAt: null,
+        logs: [],
+        commits: [],
+        errors: 0,
+        error: null,
+      };
+
+      mockLoopRunner.startLoop.mockResolvedValue(expectedState);
+
+      const result = await invoke(IPC.LOOP_START, opts);
+
+      expect(mockLoopRunner.startLoop).toHaveBeenCalledWith(opts);
+      expect(mockCleanupManager.registerContainer).not.toHaveBeenCalled();
       expect(result).toEqual(expectedState);
     });
   });
