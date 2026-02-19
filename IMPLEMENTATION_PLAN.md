@@ -753,6 +753,25 @@
 
 ---
 
+## Known Issues
+
+### Lint Errors (Pre-existing, needs resolution)
+
+The following lint errors exist in the codebase and need to be fixed:
+
+**src/renderer/pages/SettingsTab/UpdatesSection.tsx**:
+- 6 errors: Unescaped quotes in JSX (lines 130, 153, 162, 171)
+  - Use &apos; for single quotes or &quot; for double quotes in JSX text
+
+**src/renderer/pages/TerminalTab/TerminalTab.tsx**:
+- 1 error: Unused variable 'closeSession' (line 124)
+  - Prefix with underscore if intentionally unused: _closeSession
+
+Total: 7 errors, 48 warnings
+Status: Does not block functionality but should be resolved before production release
+
+---
+
 ## Phase 14: Integration and E2E Testing
 
 > **Spec**: `specs/14_integration_testing_tasks.md`
