@@ -797,13 +797,16 @@ All warnings are acceptable (console.log statements, any types in Terminal compo
 > **Spec**: `specs/14_integration_testing_tasks.md`
 > **Dependency**: All previous phases
 
-- [ ] **14.1** Service integration tests -- project workflow
-  - File: `tests/integration/project-workflow.test.ts`
-  - Uses real ConfigManager + ProjectStore with temp directories
-  - Tests: create, list, update, delete, persistence across restart, import/export round-trip
-  - Verify JSON file contents on disk
-  - **Dependency**: Phase 2
-  - Acceptance: Tests pass with real filesystem I/O (temp dirs, cleaned up after)
+- [x] **14.1** Service integration tests -- project workflow
+  - File: `tests/integration/project-workflow.test.ts` — 11 comprehensive tests, all passing
+  - Created `vitest.integration.config.ts` for integration test configuration
+  - Added `npm run test:integration` script to package.json
+  - Uses real ConfigManager + ProjectStore with temp directories (no mocking)
+  - Tests: create, list, update, delete, persistence across restart, import/export round-trip, concurrent writes
+  - Verifies JSON file contents on disk and atomic write cleanup
+  - **Dependency**: Phase 2 ✓
+  - Acceptance: All tests pass with real filesystem I/O (temp dirs cleaned up after) ✓
+  - **Completion**: 2026-02-19 — All 1,371 unit tests + 11 integration tests passing
 
 - [ ] **14.2** Loop execution integration tests
   - File: `tests/integration/loop-workflow.test.ts`
