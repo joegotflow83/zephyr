@@ -27,7 +27,8 @@ const config: ForgeConfig = {
       name: 'zephyr-desktop',
       authors: 'ralph',
       description: 'Zephyr Desktop - AI loop execution manager with Docker integration',
-      // iconUrl and setupIcon will be added in Task 13.2 when icon.ico is generated
+      setupIcon: './resources/icon.ico',
+      iconUrl: 'https://raw.githubusercontent.com/ralph/zephyr-desktop/master/resources/icon.ico',
     }),
     // macOS
     new MakerDMG({

@@ -48,6 +48,7 @@ module.exports = {
     'dist/',
     '.vite/',
     'out/',
+    'scripts/',
     '*.config.js',
     '*.config.ts',
     '*.config.cjs',

@@ -15,7 +15,8 @@
     "format": "prettier --write src",
     "test": "npm run test:unit",
     "test:unit": "vitest run",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "generate-icons": "node scripts/generate-icons.js"
   },
   "keywords": [],
   "author": "ralph",
@@ -52,6 +53,7 @@
     "eslint-plugin-react": "^7.37.0",
     "eslint-plugin-react-hooks": "^4.6.0",
     "jsdom": "^28.1.0",
+    "png2icons": "^2.0.1",
     "postcss": "^8.5.6",
     "prettier": "^3.8.1",
     "tailwindcss": "^3.4.19",
