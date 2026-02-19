@@ -3,6 +3,7 @@ import { useSettings } from '../../hooks/useSettings';
 import { CredentialsSection } from './CredentialsSection';
 import { DockerSection } from './DockerSection';
 import { GeneralSection } from './GeneralSection';
+import { UpdatesSection } from './UpdatesSection';
 
 interface SettingsSectionProps {
   title: string;
@@ -135,12 +136,7 @@ export const SettingsTab: React.FC = () => {
           title="Updates"
           description="Check for and install application updates"
         >
-          <div className="text-gray-400">
-            <p>Update management coming soon...</p>
-            <p className="text-sm mt-2">
-              Will support: version checking, self-update with progress display.
-            </p>
-          </div>
+          <UpdatesSection />
         </SettingsSection>
       </div>
     </div>

@@ -4,7 +4,7 @@
 **Branch**: `electron-rewrite`
 **Goal**: Rewrite Zephyr Desktop from Python/PyQt6 to Electron + React + TypeScript, delivering a native-quality desktop application with integrated terminal (xterm.js), Docker container orchestration, and AI loop execution management.
 
-**Status**: Phase 1 complete. Phase 2 complete (2.1–2.5 done). Phase 3 complete (3.1–3.6 done). Phase 4 complete (4.1–4.3 done). Phase 5 complete (5.1–5.7 done). Phase 6 complete (6.1, 6.2, 6.3, 6.4, 6.5 done, 5 of 5 tasks complete). Phase 7 complete (7.1–7.4 done, 4 of 4 tasks complete). Phase 8 complete (8.1–8.4 done, 4 of 4 tasks complete). Phase 9 complete (9.1–9.4 done, 4 of 4 tasks complete, all tests passing). Phase 10 in progress (10.1, 10.2, 10.3 done, 3 of 4 tasks complete). Phase 11 in progress (11.1 status unclear, 11.2, 11.3 done, 3 of 4 tasks).
+**Status**: Phase 1 complete. Phase 2 complete (2.1–2.5 done). Phase 3 complete (3.1–3.6 done). Phase 4 complete (4.1–4.3 done). Phase 5 complete (5.1–5.7 done). Phase 6 complete (6.1, 6.2, 6.3, 6.4, 6.5 done, 5 of 5 tasks complete). Phase 7 complete (7.1–7.4 done, 4 of 4 tasks complete). Phase 8 complete (8.1–8.4 done, 4 of 4 tasks complete). Phase 9 complete (9.1–9.4 done, 4 of 4 tasks complete, all tests passing). Phase 10 complete (10.1, 10.2, 10.3, 10.4 done, 4 of 4 tasks complete). Phase 11 in progress (11.1 status unclear, 11.2, 11.3 done, 3 of 4 tasks).
 
 ## Environment Notes
 - Node.js installed via NVM: `source /home/ralph/.nvm/nvm.sh && node --version`
@@ -561,14 +561,16 @@
   - Acceptance: Settings save and persist across restarts; Docker status real-time ✓
   - **Completion**: 2026-02-19 — DockerSection + GeneralSection fully implemented with 39 new tests
 
-- [ ] **10.4** Implement updates section
+- [x] **10.4** Implement updates section
   - File: `src/renderer/pages/SettingsTab/UpdatesSection.tsx`
-  - "Check for Updates" button, current vs. available version display
-  - "Update App" button with progress/status display
-  - Wire to `window.api.updates.check()` and `window.api.updates.apply()`
-  - Tests: `tests/unit/updates-section.test.tsx`
-  - **Dependency**: Task 11.3 (SelfUpdater)
-  - Acceptance: Can check for and trigger updates with status display
+  - "Check for Updates" button with version checking
+  - "Update App" button triggers self-update loop
+  - Update status display with changelog support
+  - Tests: `tests/unit/updates-section.test.tsx` — 21 tests, all passing
+  - All 1161 unit tests passing (28 skipped)
+  - **Dependency**: Task 11.3 (SelfUpdater) ✓
+  - Acceptance: Can check for and trigger updates with status display ✓
+  - **Completion**: 2026-02-19 — UpdatesSection fully implemented with 21 new tests
 
 ---
 
