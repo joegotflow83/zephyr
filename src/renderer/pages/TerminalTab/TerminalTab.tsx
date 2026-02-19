@@ -200,15 +200,10 @@ export const TerminalTab: React.FC = () => {
     [activeSessionId]
   );
 
-  const removeSession = useCallback((sessionId: string) => {
-    setSessions((prev) => prev.filter((s) => s.id !== sessionId));
-    if (activeSessionId === sessionId) {
-      const remainingSessions = sessions.filter((s) => s.id !== sessionId);
-      setActiveSessionId(
-        remainingSessions.length > 0 ? remainingSessions[0].id : null
-      );
-    }
-  }, [activeSessionId, sessions]);
+  const removeSession = useCallback(async (sessionId: string) => {
+    // Close the session via IPC and remove from state
+    await closeSession(sessionId);
+  }, []);
 
   // Keyboard shortcuts handler
   useEffect(() => {

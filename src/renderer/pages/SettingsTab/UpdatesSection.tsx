@@ -127,7 +127,7 @@ export const UpdatesSection: React.FC = () => {
               {updateInfo.changelog && (
                 <div className="space-y-2">
                   <label className="block text-sm font-medium text-gray-300">
-                    What's New:
+                    What&apos;s New:
                   </label>
                   <div
                     className="p-3 bg-gray-800 border border-gray-700 rounded text-sm text-gray-300 whitespace-pre-wrap max-h-48 overflow-y-auto"
@@ -150,7 +150,7 @@ export const UpdatesSection: React.FC = () => {
 
               {/* Update Note */}
               <p className="text-sm text-gray-400">
-                Note: Clicking "Update App" will start a self-update loop. You can monitor
+                Note: Clicking &quot;Update App&quot; will start a self-update loop. You can monitor
                 the progress in the Loops tab.
               </p>
             </div>
@@ -159,7 +159,7 @@ export const UpdatesSection: React.FC = () => {
               className="p-4 bg-gray-800 border border-gray-700 rounded text-gray-300"
               data-testid="no-update"
             >
-              You're running the latest version of Zephyr Desktop.
+              You&apos;re running the latest version of Zephyr Desktop.
             </div>
           )}
         </div>
@@ -168,7 +168,7 @@ export const UpdatesSection: React.FC = () => {
       {/* Initial State Message */}
       {!updateInfo && !error && !isChecking && (
         <div className="text-sm text-gray-400" data-testid="initial-message">
-          Click "Check for Updates" to see if a newer version is available.
+          Click &quot;Check for Updates&quot; to see if a newer version is available.
         </div>
       )}
     </div>

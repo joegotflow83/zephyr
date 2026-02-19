@@ -781,20 +781,14 @@
 
 ## Known Issues
 
-### Lint Errors (Pre-existing, needs resolution)
+### Lint Status (Updated 2026-02-19)
 
-The following lint errors exist in the codebase and need to be fixed:
+All lint errors have been resolved:
+- Fixed 6 unescaped quotes in UpdatesSection.tsx (used &apos; and &quot; entities)
+- Fixed unused 'closeSession' in TerminalTab.tsx (now called by removeSession)
 
-**src/renderer/pages/SettingsTab/UpdatesSection.tsx**:
-- 6 errors: Unescaped quotes in JSX (lines 130, 153, 162, 171)
-  - Use &apos; for single quotes or &quot; for double quotes in JSX text
-
-**src/renderer/pages/TerminalTab/TerminalTab.tsx**:
-- 1 error: Unused variable 'closeSession' (line 124)
-  - Prefix with underscore if intentionally unused: _closeSession
-
-Total: 7 errors, 48 warnings
-Status: Does not block functionality but should be resolved before production release
+Current status: 0 errors, 49 warnings
+All warnings are acceptable (console.log statements, any types in Terminal component)
 
 ---
 
