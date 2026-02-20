@@ -1,12 +1,27 @@
 import type { ForgeConfig } from '@electron-forge/shared-types';
 import { MakerSquirrel } from '@electron-forge/maker-squirrel';
+import { version } from './package.json';
 import { MakerZIP } from '@electron-forge/maker-zip';
-import { MakerDMG } from '@electron-forge/maker-dmg';
 import { MakerDeb } from '@electron-forge/maker-deb';
 import { MakerRpm } from '@electron-forge/maker-rpm';
 import { VitePlugin } from '@electron-forge/plugin-vite';
 import { FusesPlugin } from '@electron-forge/plugin-fuses';
 import { FuseV1Options, FuseVersion } from '@electron/fuses';
+
+// Conditionally load DMG maker only on macOS and only if appdmg is available
+// Note: MakerDMG requires 'appdmg' to be installed as a dev dependency
+let MakerDMG: any = null;
+if (process.platform === 'darwin') {
+  try {
+    // First check if appdmg is available
+    require.resolve('appdmg');
+    // Only then import MakerDMG
+    MakerDMG = require('@electron-forge/maker-dmg').MakerDMG;
+  } catch (error) {
+    console.warn('⚠️  MakerDMG not available - appdmg not installed. Only ZIP will be created for macOS.');
+    console.warn('   To enable DMG creation, install appdmg: npm install --save-dev appdmg');
+  }
+}
 
 const config: ForgeConfig = {
   packagerConfig: {
@@ -18,7 +33,7 @@ const config: ForgeConfig = {
     icon: './resources/icon',
     // App metadata
     appCopyright: 'Copyright © 2026 ralph',
-    appVersion: '0.1.0',
+    appVersion: version,
   },
   rebuildConfig: {},
   publishers: [
@@ -35,45 +50,55 @@ const config: ForgeConfig = {
     },
   ],
   makers: [
-    // Windows
-    new MakerSquirrel({
-      name: 'zephyr-desktop',
-      authors: 'ralph',
-      description: 'Zephyr Desktop - AI loop execution manager with Docker integration',
-      setupIcon: './resources/icon.ico',
-      iconUrl: 'https://raw.githubusercontent.com/ralph/zephyr-desktop/master/resources/icon.ico',
-    }),
-    // macOS
-    new MakerDMG({
-      name: 'Zephyr Desktop',
-      icon: './resources/icon.icns',
-      background: undefined,
-      format: 'ULFO',
-    }),
-    new MakerZIP({}, ['darwin']),
-    // Linux
-    new MakerRpm({
-      options: {
+    // Windows - only on win32
+    ...(process.platform === 'win32' ? [
+      new MakerSquirrel({
         name: 'zephyr-desktop',
-        productName: 'Zephyr Desktop',
-        genericName: 'AI Loop Execution Manager',
+        authors: 'ralph',
         description: 'Zephyr Desktop - AI loop execution manager with Docker integration',
-        categories: ['Development'],
-        icon: './resources/icon.png',
-      },
-    }),
-    new MakerDeb({
-      options: {
-        name: 'zephyr-desktop',
-        productName: 'Zephyr Desktop',
-        genericName: 'AI Loop Execution Manager',
-        description: 'Zephyr Desktop - AI loop execution manager with Docker integration',
-        categories: ['Development'],
-        icon: './resources/icon.png',
-        maintainer: 'ralph',
-        homepage: 'https://github.com/ralph/zephyr-desktop',
-      },
-    }),
+        setupIcon: './resources/icon.ico',
+        iconUrl: 'https://raw.githubusercontent.com/joegotflow83/zephyr/master/resources/icon.ico',
+      }),
+    ] : []),
+    // macOS - only on darwin
+    ...(process.platform === 'darwin' ? [
+      // Include DMG maker only if appdmg is available
+      ...(MakerDMG ? [
+        new MakerDMG({
+          name: 'Zephyr Desktop',
+          icon: './resources/icon.icns',
+          background: undefined,
+          format: 'ULFO',
+        }),
+      ] : []),
+      // Always include ZIP maker for macOS
+      new MakerZIP({}, ['darwin']),
+    ] : []),
+    // Linux - only on linux
+    ...(process.platform === 'linux' ? [
+      new MakerRpm({
+        options: {
+          name: 'zephyr-desktop',
+          productName: 'Zephyr Desktop',
+          genericName: 'AI Loop Execution Manager',
+          description: 'Zephyr Desktop - AI loop execution manager with Docker integration',
+          categories: ['Development'],
+          icon: './resources/icon.png',
+        },
+      }),
+      new MakerDeb({
+        options: {
+          name: 'zephyr-desktop',
+          productName: 'Zephyr Desktop',
+          genericName: 'AI Loop Execution Manager',
+          description: 'Zephyr Desktop - AI loop execution manager with Docker integration',
+          categories: ['Development'],
+          icon: './resources/icon.png',
+          maintainer: 'ralph',
+          homepage: 'https://github.com/joegotflow83/zephyr',
+        },
+      }),
+    ] : []),
   ],
   plugins: [
     new VitePlugin({

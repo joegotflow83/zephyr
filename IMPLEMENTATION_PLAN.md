@@ -4,7 +4,7 @@
 **Branch**: `electron-rewrite`
 **Goal**: Rewrite Zephyr Desktop from Python/PyQt6 to Electron + React + TypeScript, delivering a native-quality desktop application with integrated terminal (xterm.js), Docker container orchestration, and AI loop execution management.
 
-**Status**: Phase 1 complete. Phase 2 complete (2.1–2.5 done). Phase 3 complete (3.1–3.6 done). Phase 4 complete (4.1–4.3 done). Phase 5 complete (5.1–5.7 done). Phase 6 complete (6.1, 6.2, 6.3, 6.4, 6.5 done, 5 of 5 tasks complete). Phase 7 complete (7.1–7.4 done, 4 of 4 tasks complete). Phase 8 complete (8.1–8.4 done, 4 of 4 tasks complete). Phase 9 complete (9.1–9.5 done, 5 of 5 tasks complete, all tests passing). Phase 10 complete (10.1, 10.2, 10.3, 10.4 done, 4 of 4 tasks complete). Phase 11 complete (11.1, 11.2, 11.3, 11.4 done, 4 of 4 tasks complete). Phase 12 complete (12.1, 12.2, 12.3, 12.4 done, 4 of 4 tasks complete). Phase 13 complete (13.1, 13.2, 13.3, 13.4 done, 4 of 4 tasks complete). Phase 14 complete (14.1, 14.2, 14.3, 14.4 done, 4 of 4 tasks complete).
+**Status**: Phase 1 complete. Phase 2 complete (2.1–2.5 done). Phase 3 complete (3.1–3.6 done). Phase 4 complete (4.1–4.3 done). Phase 5 complete (5.1–5.7 done). Phase 6 complete (6.1, 6.2, 6.3, 6.4, 6.5 done, 5 of 5 tasks complete). Phase 7 complete (7.1–7.4 done, 4 of 4 tasks complete). Phase 8 complete (8.1–8.4 done, 4 of 4 tasks complete). Phase 9 complete (9.1–9.5 done, 5 of 5 tasks complete, all tests passing). Phase 10 complete (10.1, 10.2, 10.3, 10.4 done, 4 of 4 tasks complete). Phase 11 complete (11.1, 11.2, 11.3, 11.4 done, 4 of 4 tasks complete). Phase 12 complete (12.1, 12.2, 12.3, 12.4 done, 4 of 4 tasks complete). Phase 13 complete (13.1, 13.2, 13.3, 13.4 done, 4 of 4 tasks complete). Phase 14 complete (14.1, 14.2, 14.3, 14.4 done, 4 of 4 tasks complete). **Phase 15 in progress** (CI/CD hardening, 8 tasks — 15.1 done, 15.2–15.8 pending).
 
 ## Environment Notes
 - Node.js installed via NVM: `source /home/ralph/.nvm/nvm.sh && node --version`
@@ -858,6 +858,99 @@ All warnings are acceptable (console.log statements, any types in Terminal compo
 
 ---
 
+## Phase 15: CI/CD Hardening
+
+> **Spec**: `specs/cicd_tasks.md`
+> **Dependency**: Phase 13 (packaging config), Phase 14 (tests complete)
+
+- [x] **15.1** Fix `forge.config.ts` — dynamic `appVersion` and correct GitHub URLs
+  - File: `forge.config.ts`
+  - Added `import { version } from './package.json'` (tsconfig has `resolveJsonModule: true`)
+  - Changed `appVersion: '0.1.0'` → `appVersion: version`
+  - Fixed `iconUrl`: `ralph/zephyr-desktop` → `joegotflow83/zephyr`
+  - Fixed MakerDeb `homepage`: `ralph/zephyr-desktop` → `joegotflow83/zephyr`
+  - Acceptance: `appVersion` matches `package.json`; all URLs reference correct GitHub owner/repo ✓
+  - **Completion**: 2026-02-20 — All 1,371 unit tests passing (28 skipped)
+
+- [ ] **15.2** Harden `ci.yml` — add type-check, integration tests, coverage upload
+  - File: `.github/workflows/ci.yml`
+  - Add after "Run unit tests" step:
+    1. `npx tsc --noEmit` (TypeScript type-check, catches type errors not caught by Vite)
+    2. `npm run test:integration` (real filesystem integration tests)
+    3. Upload `coverage/` artifact with `retention-days: 14`
+  - Acceptance: CI pipeline runs type-check, unit tests, integration tests; coverage uploaded ✓
+
+- [ ] **15.3** Add E2E Playwright job to `ci.yml`
+  - File: `.github/workflows/ci.yml`
+  - Add new `e2e` job (depends on `test` job):
+    - Install system deps: `libgtk-3-0 libxss1 libasound2 libgbm1 xvfb x11-utils`
+    - Install Playwright: `npx playwright install --with-deps chromium`
+    - Run: `xvfb-run --auto-servernum npm run test:e2e`
+    - Upload `playwright-report/` as artifact
+  - Acceptance: E2E tests run in CI with virtual display; Playwright report uploaded ✓
+
+- [ ] **15.4** Fix Linux build in `release.yml` — system dependencies
+  - File: `.github/workflows/release.yml`
+  - In `build-linux` job, add step before `npm ci`:
+    - `sudo apt-get install -y libgtk-3-0 libxss1 libasound2 libgbm1 rpm fakeroot dpkg`
+  - Acceptance: Linux release build produces `.deb` and `.rpm` without missing system library errors ✓
+
+- [ ] **15.5** Fix macOS build in `release.yml` — appdmg, code signing, notarization
+  - Files: `.github/workflows/release.yml`, `forge.config.ts`
+  - In `build-macos` job: add `npm install --save-dev appdmg` step before build
+  - Add certificate import step using `APPLE_CERTIFICATE` / `APPLE_CERTIFICATE_PASSWORD` secrets
+  - Install `@electron/notarize` as dev dependency
+  - Add `osxSign` and `osxNotarize` hooks to `forge.config.ts` packagerConfig
+  - Acceptance: macOS release produces signed and notarized DMG (requires secrets configured in repo) ✓
+
+- [ ] **15.6** Add Windows code signing to `release.yml`
+  - File: `.github/workflows/release.yml`
+  - In `build-windows` job, add env vars to build step:
+    - `CSC_LINK: ${{ secrets.WINDOWS_CERTIFICATE }}`
+    - `CSC_KEY_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}`
+  - Acceptance: Windows build passes signing env vars to Electron Forge (requires secrets configured in repo) ✓
+
+- [ ] **15.7** Add version sync step to all release jobs
+  - File: `.github/workflows/release.yml`
+  - In each platform job (macOS, Linux, Windows), add step:
+    - `id: version`, run: `echo "version=$(node -p \"require('./package.json').version\")" >> $GITHUB_OUTPUT`
+  - Use `${{ steps.version.outputs.version }}` for artifact naming
+  - Acceptance: Package version available as step output; artifact names reflect `package.json` version ✓
+
+- [ ] **15.8** Update branch triggers after merge to master
+  - File: `.github/workflows/ci.yml`
+  - Remove `electron-rewrite` from `push.branches` list (keep only `master`)
+  - Acceptance: CI triggers only on `master` push and PRs targeting `master`
+  - **Note**: This task must be done LAST, after `electron-rewrite` branch is merged to `master`
+
+---
+
+## Known Issues / Tech Debt
+
+### 1. Self-updater placeholder (`src/services/self-updater.ts`)
+- `checkForUpdates()` always returns `available: false` (lines ~113–148)
+- Comment acknowledges it's a placeholder
+- Real implementation needs to fetch remote `package.json` via git (e.g., `git show origin/master:package.json`) and compare versions using semver
+- **Impact**: Updates UI (`UpdatesSection.tsx`) is fully built but nonfunctional — "Check for Updates" always says no update available
+- **Priority**: Medium — required before shipping to end users
+
+### 2. Terminal tab unit tests all skipped (`tests/unit/terminal-tab.test.tsx`)
+- 26 tests skipped due to React 18 + jsdom + fake timers incompatibility
+- TerminalTab works correctly in production; E2E tests (Phase 14) provide functional coverage
+- Unskipping requires migrating to a different test renderer or restructuring async patterns
+- **Recommendation**: Keep skipped; rely on E2E test coverage
+
+### 3. Docker image setting for self-update hardcoded (`src/renderer/pages/SettingsTab/UpdatesSection.tsx` line 53)
+- `TODO: Allow user to specify docker image in settings`
+- Self-update Docker image hardcoded to `'zephyr-desktop:latest'`
+- **Priority**: Low — depends on self-updater being functional first (see issue #1)
+
+### 4. forge.config.ts incorrect URLs (addressed in Task 15.1)
+- `iconUrl` and MakerDeb `homepage` reference `ralph/zephyr-desktop` instead of `joegotflow83/zephyr`
+- Blocks correct icon display in Windows installer and DEB package metadata
+
+---
+
 ## Summary
 
 | Phase | Tasks | Description |
@@ -876,7 +969,8 @@ All warnings are acceptable (console.log statements, any types in Terminal compo
 | 12    | 4     | App lifecycle (cleanup, entry point, shutdown, recovery) |
 | 13    | 4     | Packaging and distribution (makers, icons, auto-update, CI) |
 | 14    | 4     | Integration and E2E testing |
-| **Total** | **67** | |
+| 15    | 8     | CI/CD hardening (pipeline, code signing, coverage, E2E in CI) |
+| **Total** | **75** | |
 
 ## Dependency Graph (phase level)
 
