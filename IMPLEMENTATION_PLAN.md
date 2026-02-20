@@ -4,7 +4,7 @@
 **Branch**: `electron-rewrite`
 **Goal**: Rewrite Zephyr Desktop from Python/PyQt6 to Electron + React + TypeScript, delivering a native-quality desktop application with integrated terminal (xterm.js), Docker container orchestration, and AI loop execution management.
 
-**Status**: Phase 1 complete. Phase 2 complete (2.1–2.5 done). Phase 3 complete (3.1–3.6 done). Phase 4 complete (4.1–4.3 done). Phase 5 complete (5.1–5.7 done). Phase 6 complete (6.1, 6.2, 6.3, 6.4, 6.5 done, 5 of 5 tasks complete). Phase 7 complete (7.1–7.4 done, 4 of 4 tasks complete). Phase 8 complete (8.1–8.4 done, 4 of 4 tasks complete). Phase 9 complete (9.1–9.5 done, 5 of 5 tasks complete, all tests passing). Phase 10 complete (10.1, 10.2, 10.3, 10.4 done, 4 of 4 tasks complete). Phase 11 complete (11.1, 11.2, 11.3, 11.4 done, 4 of 4 tasks complete). Phase 12 complete (12.1, 12.2, 12.3, 12.4 done, 4 of 4 tasks complete). Phase 13 complete (13.1, 13.2, 13.3, 13.4 done, 4 of 4 tasks complete). Phase 14 complete (14.1, 14.2, 14.3, 14.4 done, 4 of 4 tasks complete). **Phase 15 in progress** (CI/CD hardening, 8 tasks — 15.1 done, 15.2–15.8 pending).
+**Status**: Phase 1 complete. Phase 2 complete (2.1–2.5 done). Phase 3 complete (3.1–3.6 done). Phase 4 complete (4.1–4.3 done). Phase 5 complete (5.1–5.7 done). Phase 6 complete (6.1, 6.2, 6.3, 6.4, 6.5 done, 5 of 5 tasks complete). Phase 7 complete (7.1–7.4 done, 4 of 4 tasks complete). Phase 8 complete (8.1–8.4 done, 4 of 4 tasks complete). Phase 9 complete (9.1–9.5 done, 5 of 5 tasks complete, all tests passing). Phase 10 complete (10.1, 10.2, 10.3, 10.4 done, 4 of 4 tasks complete). Phase 11 complete (11.1, 11.2, 11.3, 11.4 done, 4 of 4 tasks complete). Phase 12 complete (12.1, 12.2, 12.3, 12.4 done, 4 of 4 tasks complete). Phase 13 complete (13.1, 13.2, 13.3, 13.4 done, 4 of 4 tasks complete). Phase 14 complete (14.1, 14.2, 14.3, 14.4 done, 4 of 4 tasks complete). **Phase 15 in progress** (CI/CD hardening, 8 tasks — 15.1 done, 15.2 done, 15.3 done, 15.4–15.8 pending).
 
 ## Environment Notes
 - Node.js installed via NVM: `source /home/ralph/.nvm/nvm.sh && node --version`
@@ -872,22 +872,24 @@ All warnings are acceptable (console.log statements, any types in Terminal compo
   - Acceptance: `appVersion` matches `package.json`; all URLs reference correct GitHub owner/repo ✓
   - **Completion**: 2026-02-20 — All 1,371 unit tests passing (28 skipped)
 
-- [ ] **15.2** Harden `ci.yml` — add type-check, integration tests, coverage upload
+- [x] **15.2** Harden `ci.yml` — add type-check, integration tests, coverage upload
   - File: `.github/workflows/ci.yml`
   - Add after "Run unit tests" step:
     1. `npx tsc --noEmit` (TypeScript type-check, catches type errors not caught by Vite)
     2. `npm run test:integration` (real filesystem integration tests)
     3. Upload `coverage/` artifact with `retention-days: 14`
   - Acceptance: CI pipeline runs type-check, unit tests, integration tests; coverage uploaded ✓
+  - **Completion**: 2026-02-20 — All 1,371 unit tests + 28 integration tests passing; TypeScript type-check passes with 0 errors
 
-- [ ] **15.3** Add E2E Playwright job to `ci.yml`
+- [x] **15.3** Add E2E Playwright job to `ci.yml`
   - File: `.github/workflows/ci.yml`
-  - Add new `e2e` job (depends on `test` job):
-    - Install system deps: `libgtk-3-0 libxss1 libasound2 libgbm1 xvfb x11-utils`
-    - Install Playwright: `npx playwright install --with-deps chromium`
-    - Run: `xvfb-run --auto-servernum npm run test:e2e`
-    - Upload `playwright-report/` as artifact
+  - Added new `e2e` job (depends on `test` job):
+    - Installs system deps: `libgtk-3-0 libxss1 libasound2 libgbm1 xvfb x11-utils`
+    - Installs Playwright: `npx playwright install --with-deps chromium`
+    - Runs: `xvfb-run --auto-servernum npm run test:e2e`
+    - Uploads `playwright-report/` as artifact (retention 7 days)
   - Acceptance: E2E tests run in CI with virtual display; Playwright report uploaded ✓
+  - **Completion**: 2026-02-20 — All 1,371 unit tests passing (28 skipped)
 
 - [ ] **15.4** Fix Linux build in `release.yml` — system dependencies
   - File: `.github/workflows/release.yml`
@@ -944,10 +946,6 @@ All warnings are acceptable (console.log statements, any types in Terminal compo
 - `TODO: Allow user to specify docker image in settings`
 - Self-update Docker image hardcoded to `'zephyr-desktop:latest'`
 - **Priority**: Low — depends on self-updater being functional first (see issue #1)
-
-### 4. forge.config.ts incorrect URLs (addressed in Task 15.1)
-- `iconUrl` and MakerDeb `homepage` reference `ralph/zephyr-desktop` instead of `joegotflow83/zephyr`
-- Blocks correct icon display in Windows installer and DEB package metadata
 
 ---
 
