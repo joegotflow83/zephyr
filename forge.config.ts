@@ -34,6 +34,17 @@ const config: ForgeConfig = {
     // App metadata
     appCopyright: 'Copyright © 2026 ralph',
     appVersion: version,
+    // macOS code signing and notarization (only in CI when APPLE_ID env var is set)
+    ...(process.platform === 'darwin' && process.env.APPLE_ID
+      ? {
+          osxSign: {} as unknown as true,
+          osxNotarize: {
+            appleId: process.env.APPLE_ID,
+            appleIdPassword: process.env.APPLE_ID_PASSWORD!,
+            teamId: process.env.APPLE_TEAM_ID!,
+          },
+        }
+      : {}),
   },
   rebuildConfig: {},
   publishers: [
