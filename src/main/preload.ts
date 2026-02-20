@@ -43,8 +43,8 @@ contextBridge.exposeInMainWorld('api', {
       ipcRenderer.invoke(IPC.DOCKER_EXEC, containerId, cmd, opts),
 
     // Event listeners
-    onStatusChanged: (callback: (isAvailable: boolean) => void) => {
-      const listener = (_event: unknown, isAvailable: boolean) => callback(isAvailable);
+    onStatusChanged: (callback: (isAvailable: boolean, info?: unknown) => void) => {
+      const listener = (_event: unknown, isAvailable: boolean, info?: unknown) => callback(isAvailable, info);
       ipcRenderer.on(IPC.DOCKER_STATUS_CHANGED, listener);
       // Return cleanup function
       return () => ipcRenderer.removeListener(IPC.DOCKER_STATUS_CHANGED, listener);

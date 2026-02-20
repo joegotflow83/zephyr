@@ -39,12 +39,9 @@ describe('LogExporter', () => {
     return {
       ...createLoopState(projectId),
       logs,
-      startedAt: Date.now(),
+      startedAt: new Date().toISOString(),
       status: LoopStatus.RUNNING,
       mode: LoopMode.CONTINUOUS,
-      currentIteration: 1,
-      commitCount: 0,
-      errorCount: 0,
       ...overrides,
     };
   }
@@ -118,9 +115,9 @@ describe('LogExporter', () => {
 
     it('should include iteration, commit, and error counts', async () => {
       const loopState = createMockLoopState('metrics-project', ['log line'], {
-        currentIteration: 5,
-        commitCount: 3,
-        errorCount: 2,
+        iteration: 5,
+        commits: ['abc1234', 'def5678', 'ghi9012'],
+        errors: 2,
       });
 
       const outputPath = path.join(tempDir, 'metrics.txt');
@@ -276,14 +273,14 @@ describe('LogExporter', () => {
     it('should list all loop details in summary', async () => {
       const loopStates: LoopState[] = [
         createMockLoopState('detailed-project-1', ['log1', 'log2'], {
-          currentIteration: 3,
-          commitCount: 5,
-          errorCount: 1,
+          iteration: 3,
+          commits: ['a', 'b', 'c', 'd', 'e'],
+          errors: 1,
         }),
         createMockLoopState('detailed-project-2', ['log'], {
-          currentIteration: 1,
-          commitCount: 0,
-          errorCount: 2,
+          iteration: 1,
+          commits: [],
+          errors: 2,
         }),
       ];
 

@@ -1,4 +1,5 @@
 import Dockerode from 'dockerode';
+import { Readable } from 'stream';
 
 /**
  * Docker information returned by getDockerInfo
@@ -364,7 +365,7 @@ export class DockerManager {
 
     // Build log options
     const logOptions: {
-      follow: boolean;
+      follow: true;
       stdout: boolean;
       stderr: boolean;
       timestamps: boolean;
@@ -381,7 +382,7 @@ export class DockerManager {
     }
 
     // Start streaming logs
-    const stream = (await container.logs(logOptions)) as NodeJS.ReadableStream;
+    const stream = (await container.logs(logOptions)) as unknown as Readable;
 
     // Buffer for incomplete lines
     let buffer = '';

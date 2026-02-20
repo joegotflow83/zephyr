@@ -574,7 +574,7 @@ describe('Main Entry Point', () => {
     });
 
     it('should instantiate SelfUpdater with GitManager, LoopRunner, and app path', () => {
-      expect(MockSelfUpdater).toHaveBeenCalledWith(mockGitManager, mockLoopRunner, '/mock/app/path');
+      expect(MockSelfUpdater).toHaveBeenCalledWith(mockGitManager, '/mock/app/path', mockLoopRunner);
     });
 
     it('should instantiate CleanupManager with DockerManager', () => {

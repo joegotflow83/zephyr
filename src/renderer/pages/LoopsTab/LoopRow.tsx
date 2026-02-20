@@ -38,7 +38,7 @@ export const LoopRow: React.FC<LoopRowProps> = ({
   const getStatusBadge = () => {
     let bgColor = 'bg-gray-700';
     let textColor = 'text-gray-300';
-    let label = loop.status;
+    let label: string = loop.status;
 
     switch (loop.status) {
       case LoopStatus.STARTING:

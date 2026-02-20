@@ -105,10 +105,10 @@ export class LogExporter {
       lines.push(`Mode: ${loopState.mode}`);
       lines.push(`Container: ${loopState.containerId || 'N/A'}`);
       lines.push(`Started: ${loopState.startedAt ? new Date(loopState.startedAt).toISOString() : 'N/A'}`);
-      lines.push(`Completed: ${loopState.completedAt ? new Date(loopState.completedAt).toISOString() : 'N/A'}`);
-      lines.push(`Iteration: ${loopState.currentIteration}`);
-      lines.push(`Commits: ${loopState.commitCount}`);
-      lines.push(`Errors: ${loopState.errorCount}`);
+      lines.push(`Completed: ${loopState.stoppedAt ? new Date(loopState.stoppedAt).toISOString() : 'N/A'}`);
+      lines.push(`Iteration: ${loopState.iteration}`);
+      lines.push(`Commits: ${loopState.commits.length}`);
+      lines.push(`Errors: ${loopState.errors}`);
       lines.push('='.repeat(80));
       lines.push('');
     }
@@ -130,10 +130,10 @@ export class LogExporter {
         mode: loopState.mode,
         containerId: loopState.containerId,
         startedAt: loopState.startedAt,
-        completedAt: loopState.completedAt,
-        currentIteration: loopState.currentIteration,
-        commitCount: loopState.commitCount,
-        errorCount: loopState.errorCount,
+        stoppedAt: loopState.stoppedAt,
+        iteration: loopState.iteration,
+        commitCount: loopState.commits.length,
+        errorCount: loopState.errors,
         logs: loopState.logs,
       };
     } else {
@@ -189,9 +189,9 @@ export class LogExporter {
       lines.push(`  Status: ${loop.status}`);
       lines.push(`  Mode: ${loop.mode}`);
       lines.push(`  Started: ${loop.startedAt ? new Date(loop.startedAt).toISOString() : 'N/A'}`);
-      lines.push(`  Iteration: ${loop.currentIteration}`);
-      lines.push(`  Commits: ${loop.commitCount}`);
-      lines.push(`  Errors: ${loop.errorCount}`);
+      lines.push(`  Iteration: ${loop.iteration}`);
+      lines.push(`  Commits: ${loop.commits.length}`);
+      lines.push(`  Errors: ${loop.errors}`);
       lines.push(`  Log Lines: ${loop.logs.length}`);
       lines.push('');
     }

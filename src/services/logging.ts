@@ -8,7 +8,7 @@ import path from 'path';
 import { app } from 'electron';
 
 export type LogLevel = 'error' | 'warn' | 'info' | 'verbose' | 'debug' | 'silly';
-export type Subsystem = 'docker' | 'loop' | 'terminal' | 'ui' | 'main' | 'ipc';
+export type Subsystem = 'docker' | 'loop' | 'terminal' | 'ui' | 'main' | 'ipc' | 'updater' | 'cleanup';
 
 export interface Logger {
   error(message: string, ...args: unknown[]): void;

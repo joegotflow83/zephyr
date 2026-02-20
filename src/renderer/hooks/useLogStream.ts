@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import type { ParsedLogLine } from '../../shared/loop-types';
+import type { ParsedLogLine } from '../../services/log-parser';
 
 interface LogBuffer {
   [projectId: string]: ParsedLogLine[];

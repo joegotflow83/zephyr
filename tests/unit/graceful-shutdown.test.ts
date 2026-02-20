@@ -306,7 +306,10 @@ describe('Graceful Shutdown', () => {
     });
 
     it('should cancel all scheduled loops during shutdown', async () => {
-      mockSchedulerInstance.listScheduled.mockReturnValue(['proj1', 'proj2']);
+      mockSchedulerInstance.listScheduled.mockReturnValue([
+        { projectId: 'proj1', schedule: null, loopOpts: null, timerId: null, nextRun: null },
+        { projectId: 'proj2', schedule: null, loopOpts: null, timerId: null, nextRun: null },
+      ]);
 
       await loadMainModule();
 

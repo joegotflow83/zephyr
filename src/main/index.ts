@@ -68,7 +68,7 @@ const scheduler = new LoopScheduler(loopRunner);
 const logExporter = new LogExporter();
 const terminalManager = new TerminalManager(dockerManager);
 const gitManager = new GitManager();
-const selfUpdater = new SelfUpdater(gitManager, loopRunner, app.getAppPath());
+const selfUpdater = new SelfUpdater(gitManager, app.getAppPath(), loopRunner);
 const cleanupManager = new CleanupManager(dockerManager);
 const autoUpdater = getAutoUpdater();
 
@@ -225,12 +225,12 @@ async function gracefulShutdown(): Promise<void> {
     const scheduled = scheduler.listScheduled();
     if (scheduled.length > 0) {
       logger.info(`Cancelling ${scheduled.length} scheduled loop(s)`);
-      scheduled.forEach((projectId) => {
+      scheduled.forEach((scheduledLoop) => {
         try {
-          scheduler.cancelSchedule(projectId);
+          scheduler.cancelSchedule(scheduledLoop.projectId);
         } catch (error) {
           logger.error('Error cancelling schedule during shutdown', {
-            projectId,
+            projectId: scheduledLoop.projectId,
             error,
           });
         }

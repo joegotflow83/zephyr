@@ -47,7 +47,7 @@ export const ProjectRow: React.FC<ProjectRowProps> = ({
     // Active states
     let bgColor = 'bg-gray-700';
     let textColor = 'text-gray-300';
-    let label = loop.status;
+    let label: string = loop.status;
 
     switch (loop.status) {
       case LoopStatus.STARTING:

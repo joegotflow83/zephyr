@@ -277,6 +277,7 @@ describe('LoopsTab', () => {
       expect(mockLoops.start).toHaveBeenCalledWith({
         projectId: project1.id,
         mode: LoopMode.CONTINUOUS,
+        dockerImage: project1.docker_image,
       });
     });
 

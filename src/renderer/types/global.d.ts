@@ -79,7 +79,7 @@ declare global {
 
         // Event listeners
         /** Listen for Docker availability changes. Returns cleanup function. */
-        onStatusChanged: (callback: (isAvailable: boolean) => void) => () => void;
+        onStatusChanged: (callback: (isAvailable: boolean, info?: DockerInfo) => void) => () => void;
         /** Listen for image pull progress. Returns cleanup function. */
         onPullProgress: (
           callback: (data: { image: string; progress: unknown }) => void,

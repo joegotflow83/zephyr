@@ -28,7 +28,7 @@ export function useDockerStatus(): DockerStatus {
         if (isMounted) {
           setStatus({
             isConnected: result.available,
-            dockerInfo: result.info,
+            dockerInfo: result.available ? result.info : undefined,
           });
         }
       })
@@ -44,7 +44,7 @@ export function useDockerStatus(): DockerStatus {
       if (isMounted) {
         setStatus({
           isConnected: available,
-          dockerInfo: info,
+          dockerInfo: available ? (info as DockerInfo | undefined) : undefined,
         });
       }
     });

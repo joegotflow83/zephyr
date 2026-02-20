@@ -114,9 +114,11 @@ export const LoopsTab: React.FC = () => {
 
   const handleStart = async (projectId: string) => {
     try {
+      const project = projects.find((p) => p.id === projectId);
       const opts: LoopStartOpts = {
         projectId,
         mode: LoopMode.CONTINUOUS,
+        dockerImage: project?.docker_image || '',
       };
       await start(opts);
     } catch (err) {
