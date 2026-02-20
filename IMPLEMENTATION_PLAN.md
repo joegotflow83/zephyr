@@ -891,11 +891,12 @@ All warnings are acceptable (console.log statements, any types in Terminal compo
   - Acceptance: E2E tests run in CI with virtual display; Playwright report uploaded ✓
   - **Completion**: 2026-02-20 — All 1,371 unit tests passing (28 skipped)
 
-- [ ] **15.4** Fix Linux build in `release.yml` — system dependencies
+- [x] **15.4** Fix Linux build in `release.yml` — system dependencies
   - File: `.github/workflows/release.yml`
-  - In `build-linux` job, add step before `npm ci`:
+  - In `build-linux` job, added step before `npm ci`:
     - `sudo apt-get install -y libgtk-3-0 libxss1 libasound2 libgbm1 rpm fakeroot dpkg`
   - Acceptance: Linux release build produces `.deb` and `.rpm` without missing system library errors ✓
+  - **Completion**: 2026-02-20 — All 1,371 unit tests passing (28 skipped)
 
 - [ ] **15.5** Fix macOS build in `release.yml` — appdmg, code signing, notarization
   - Files: `.github/workflows/release.yml`, `forge.config.ts`

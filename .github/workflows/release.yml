@@ -66,6 +66,9 @@ jobs:
         id: version
         run: echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
 
+      - name: Install system dependencies
+        run: sudo apt-get install -y libgtk-3-0 libxss1 libasound2 libgbm1 rpm fakeroot dpkg
+
       - name: Install dependencies
         run: npm ci
 
