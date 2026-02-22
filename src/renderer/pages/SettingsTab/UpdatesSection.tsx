@@ -1,4 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useSettings } from '../../hooks/useSettings';
+
+const DEFAULT_DOCKER_IMAGE = 'zephyr-desktop:latest';
 
 /**
  * UpdateInfo type (matches src/services/self-updater.ts)
@@ -14,18 +17,46 @@ interface UpdateInfo {
  * UpdatesSection component for Settings tab
  *
  * Displays:
+ * - Docker image input for self-update (configurable by user)
  * - "Check for Updates" button
  * - Current version vs. available version
  * - "Update App" button (triggers self-update loop)
  * - Update progress/status display
  *
  * Wired to window.api.updates.check() and window.api.updates.apply()
+ * Docker image persisted via window.api.settings (AppSettings.self_update_docker_image)
  */
 export const UpdatesSection: React.FC = () => {
+  const { settings, update } = useSettings();
   const [isChecking, setIsChecking] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
   const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [dockerImage, setDockerImage] = useState(DEFAULT_DOCKER_IMAGE);
+
+  // Sync docker image from persisted settings
+  useEffect(() => {
+    if (settings?.self_update_docker_image) {
+      setDockerImage(settings.self_update_docker_image);
+    }
+  }, [settings]);
+
+  const handleDockerImageChange = (value: string) => {
+    setDockerImage(value);
+  };
+
+  const handleDockerImageBlur = () => {
+    const trimmed = dockerImage.trim() || DEFAULT_DOCKER_IMAGE;
+    if (trimmed !== dockerImage) {
+      setDockerImage(trimmed);
+    }
+    const effective = trimmed;
+    if (effective !== (settings?.self_update_docker_image ?? DEFAULT_DOCKER_IMAGE)) {
+      update({ self_update_docker_image: effective }).catch((err) => {
+        console.error('Failed to save Docker image setting:', err);
+      });
+    }
+  };
 
   const handleCheckForUpdates = async () => {
     setIsChecking(true);
@@ -48,10 +79,10 @@ export const UpdatesSection: React.FC = () => {
     setIsUpdating(true);
     setError(null);
 
+    const image = dockerImage.trim() || DEFAULT_DOCKER_IMAGE;
+
     try {
-      // Use default docker image for self-update
-      // TODO: Allow user to specify docker image in settings
-      await window.api.updates.apply('zephyr-desktop:latest');
+      await window.api.updates.apply(image);
       // Note: The actual update is triggered as a loop in the Loops tab
       // This just starts the self-update process
     } catch (err) {
@@ -64,6 +95,30 @@ export const UpdatesSection: React.FC = () => {
 
   return (
     <div className="space-y-6">
+      {/* Docker Image Configuration */}
+      <div className="space-y-2">
+        <label
+          htmlFor="self-update-docker-image"
+          className="block text-sm font-medium text-gray-300"
+        >
+          Self-Update Docker Image
+        </label>
+        <input
+          id="self-update-docker-image"
+          type="text"
+          value={dockerImage}
+          onChange={(e) => handleDockerImageChange(e.target.value)}
+          onBlur={handleDockerImageBlur}
+          placeholder={DEFAULT_DOCKER_IMAGE}
+          className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded text-gray-200 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          data-testid="docker-image-input"
+        />
+        <p className="text-xs text-gray-500">
+          Docker image used when running the self-update loop. Defaults to{' '}
+          <code className="text-gray-400">{DEFAULT_DOCKER_IMAGE}</code>.
+        </p>
+      </div>
+
       {/* Check for Updates Button */}
       <div>
         <button

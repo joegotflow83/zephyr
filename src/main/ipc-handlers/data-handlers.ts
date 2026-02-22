@@ -7,6 +7,7 @@ import { IPC } from '../../shared/ipc-channels';
 import type { ConfigManager } from '../../services/config-manager';
 import type { ProjectStore } from '../../services/project-store';
 import type { ImportExportService } from '../../services/import-export';
+import type { PreValidationStore } from '../../services/pre-validation-store';
 import type { AppSettings, ProjectConfig } from '../../shared/models';
 import { createDefaultSettings } from '../../shared/models';
 import { setLogLevel, getLogger, type LogLevel } from '../../services/logging';
@@ -26,10 +27,11 @@ export interface DataServices {
   configManager: ConfigManager;
   projectStore: ProjectStore;
   importExport: ImportExportService;
+  preValidationStore: PreValidationStore;
 }
 
 export function registerDataHandlers(services: DataServices): void {
-  const { configManager, projectStore, importExport } = services;
+  const { configManager, projectStore, importExport, preValidationStore } = services;
   const logger = getLogger('ipc');
 
   // ── Projects ──────────────────────────────────────────────────────────────
@@ -113,5 +115,26 @@ export function registerDataHandlers(services: DataServices): void {
     if (result.canceled || result.filePaths.length === 0) return false;
     await importExport.importConfig(result.filePaths[0]);
     return true;
+  });
+
+  // ── Pre-validation scripts ─────────────────────────────────────────────────
+
+  ipcMain.handle(IPC.PRE_VALIDATION_LIST, async () => {
+    return preValidationStore.listScripts();
+  });
+
+  ipcMain.handle(IPC.PRE_VALIDATION_GET, async (_event, filename: string) => {
+    return preValidationStore.getScript(filename);
+  });
+
+  ipcMain.handle(
+    IPC.PRE_VALIDATION_ADD,
+    async (_event, filename: string, content: string): Promise<void> => {
+      await preValidationStore.addScript(filename, content);
+    },
+  );
+
+  ipcMain.handle(IPC.PRE_VALIDATION_REMOVE, async (_event, filename: string): Promise<boolean> => {
+    return preValidationStore.removeScript(filename);
   });
 }

@@ -4,15 +4,15 @@
 You are building Zephyr Desktop — an Electron + React + TypeScript desktop app for managing AI loops with Docker integration.
 
 ## Runtime Environment
-- Node.js: v20.20.0 via NVM — source with: `source /home/ralph/.nvm/nvm.sh`
-- All npm/node commands require NVM sourcing first
+- Node.js: v24.13.1 system-installed at /usr/bin/node (NVM not present in this environment)
+- npm/node commands work directly without NVM sourcing
 - No GUI/display available in CI — cannot run `npm start` (Electron needs display)
 - TypeScript 5.3.x required (4.5.x is incompatible with @types/node)
 
 ## Key Commands
-- Build check: `source /home/ralph/.nvm/nvm.sh && npx tsc --noEmit`
-- Unit tests: `source /home/ralph/.nvm/nvm.sh && npm run test:unit`
-- Lint: `source /home/ralph/.nvm/nvm.sh && npm run lint`
+- Build check: `npx tsc --noEmit`
+- Unit tests: `npm run test:unit`
+- Lint: `npm run lint`
 - Validate: `bash validate.sh` (runs lint + unit tests after Phase 1.8)
 
 ## Sub-agents (when needed)

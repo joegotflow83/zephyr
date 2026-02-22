@@ -26,6 +26,10 @@ import { registerLogHandlers } from './ipc-handlers/log-handlers';
 import { registerTerminalHandlers } from './ipc-handlers/terminal-handlers';
 import { registerUpdateHandlers } from './ipc-handlers/update-handlers';
 import { registerAutoUpdateHandlers } from './ipc-handlers/auto-update-handlers';
+import { registerImageHandlers } from './ipc-handlers/image-handlers';
+import { ImageStore } from '../services/image-store';
+import { ImageBuilder } from '../services/image-builder';
+import { PreValidationStore } from '../services/pre-validation-store';
 import { buildApplicationMenu } from './menu';
 import { IPC } from '../shared/ipc-channels';
 import os from 'node:os';
@@ -71,9 +75,12 @@ const gitManager = new GitManager();
 const selfUpdater = new SelfUpdater(gitManager, app.getAppPath(), loopRunner);
 const cleanupManager = new CleanupManager(dockerManager);
 const autoUpdater = getAutoUpdater();
+const imageStore = new ImageStore(configManager);
+const imageBuilder = new ImageBuilder(dockerManager, imageStore);
+const preValidationStore = new PreValidationStore(configManager);
 
 // Register all IPC handlers before the window is created.
-registerDataHandlers({ configManager, projectStore, importExport });
+registerDataHandlers({ configManager, projectStore, importExport, preValidationStore });
 registerDockerHandlers({ dockerManager, dockerHealth });
 registerCredentialHandlers({ credentialManager, loginManager });
 registerLoopHandlers({ loopRunner, scheduler, cleanupManager });
@@ -81,6 +88,7 @@ registerLogHandlers({ logExporter, loopRunner });
 registerTerminalHandlers({ terminalManager });
 registerUpdateHandlers({ selfUpdater });
 registerAutoUpdateHandlers({ autoUpdater });
+registerImageHandlers({ imageStore, imageBuilder });
 
 // Legacy ping handler kept for backwards compatibility with existing tests.
 ipcMain.handle(IPC.PING, () => 'pong');

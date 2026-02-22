@@ -18,6 +18,14 @@ describe('App Navigation', () => {
         list: vi.fn().mockResolvedValue([]),
         onStateChanged: vi.fn(() => vi.fn()),
       },
+      images: {
+        list: vi.fn().mockResolvedValue([]),
+        get: vi.fn().mockResolvedValue(null),
+        build: vi.fn().mockResolvedValue({}),
+        rebuild: vi.fn().mockResolvedValue({}),
+        delete: vi.fn().mockResolvedValue(true),
+        onBuildProgress: vi.fn(() => vi.fn()),
+      },
       terminal: {
         open: vi.fn(),
         close: vi.fn(),
@@ -48,12 +56,13 @@ describe('App Navigation', () => {
     expect(projectsButton).toHaveClass('text-blue-400');
   });
 
-  it('renders all four tabs', () => {
+  it('renders all five tabs', () => {
     render(<App />);
 
     expect(screen.getByRole('button', { name: /projects/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /running loops/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /terminal/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /images/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /settings/i })).toBeInTheDocument();
   });
 
@@ -145,7 +154,22 @@ describe('App Navigation', () => {
       window.dispatchEvent(new KeyboardEvent('keydown', { key: '4', ctrlKey: true }));
     });
 
-    expect(screen.getByText('Configure credentials, Docker, application preferences, and updates')).toBeInTheDocument();
+    // Ctrl+4 now navigates to the Images tab
+    const imagesButton = screen.getByRole('button', { name: /images/i });
+    expect(imagesButton).toHaveClass('text-blue-400');
+  });
+
+  it('switches tabs with Ctrl+5 keyboard shortcut', async () => {
+    render(<App />);
+
+    // Dispatch event directly to window wrapped in act
+    act(() => {
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: '5', ctrlKey: true }));
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText('Configure credentials, Docker, application preferences, and updates')).toBeInTheDocument();
+    });
     // Get the tab button specifically (the one with aria-current='page')
     const settingsButtons = screen.getAllByRole('button', { name: /settings/i });
     const settingsTabButton = settingsButtons.find(btn => btn.getAttribute('aria-current') === 'page');
@@ -170,7 +194,7 @@ describe('App Navigation', () => {
 
     // Dispatch event directly to window wrapped in act
     act(() => {
-      window.dispatchEvent(new KeyboardEvent('keydown', { key: '5', ctrlKey: true }));
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: '6', ctrlKey: true }));
     });
 
     // Should still be on Projects tab

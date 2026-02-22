@@ -2,6 +2,16 @@ import Dockerode from 'dockerode';
 import { Readable } from 'stream';
 
 /**
+ * A single event emitted during a docker image build.
+ */
+export interface BuildProgressEvent {
+  stream?: string;
+  error?: string;
+  status?: string;
+  progress?: string;
+}
+
+/**
  * Docker information returned by getDockerInfo
  */
 export interface DockerInfo {
@@ -612,5 +622,58 @@ export class DockerManager {
     // Get exec instance by ID
     const exec = this.docker.getExec(execId);
     await exec.resize({ h: rows, w: cols });
+  }
+
+  /**
+   * Build a Docker image from a context directory containing a Dockerfile.
+   *
+   * Uses dockerode's ImageBuildContext to pass the directory and file list
+   * directly, avoiding manual tar creation. Progress events are streamed
+   * line-by-line to the optional callback.
+   *
+   * @param contextDir - Absolute path to the build context directory (must contain a Dockerfile)
+   * @param tag - Docker image tag (e.g. "zephyr-python-dev:latest")
+   * @param buildArgs - Optional build-time ARG values (e.g. { HOST_UID: "1000" })
+   * @param onProgress - Optional callback receiving each build progress event
+   * @throws Error if the build fails
+   */
+  async buildImage(
+    contextDir: string,
+    tag: string,
+    buildArgs?: Record<string, string>,
+    onProgress?: (event: BuildProgressEvent) => void
+  ): Promise<void> {
+    const context: Dockerode.ImageBuildContext = {
+      context: contextDir,
+      src: ['Dockerfile'],
+    };
+
+    const options: Dockerode.ImageBuildOptions = {
+      t: tag,
+      ...(buildArgs ? { buildargs: buildArgs } : {}),
+    };
+
+    const stream = await this.docker.buildImage(context, options);
+
+    return new Promise((resolve, reject) => {
+      this.docker.modem.followProgress(
+        stream,
+        (err: Error | null, _output: unknown[]) => {
+          if (err) {
+            reject(err);
+          } else {
+            resolve();
+          }
+        },
+        (event: BuildProgressEvent) => {
+          if (event.error) {
+            // Surface build errors surfaced in the stream as real errors
+            reject(new Error(event.error));
+          } else if (onProgress) {
+            onProgress(event);
+          }
+        }
+      );
+    });
   }
 }

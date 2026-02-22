@@ -21,8 +21,20 @@ Thumbs.db
 # Private/generated
 PROMPT_plan.md
 PROMPT_build.md
+IMPLEMENTATION_PLAN.md
 loop.sh
 env_setup
 
 # Claude
 .claude
+install_claude.sh
+
+# Local dev
+docker-compose.yml
+setup_mcp
+.mcp.json
+.mcp.json.backup
+
+# Plans
+specs/*
+IMPLEMENTATION_PLAN.md

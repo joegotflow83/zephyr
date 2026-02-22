@@ -59,14 +59,12 @@ describe('LoopsTab', () => {
     name: 'Project One',
     repo_url: 'https://github.com/user/repo1',
     docker_image: 'ubuntu:22.04',
-    jtbd: 'Test JTBD',
   });
 
   const project2 = createProjectConfig({
     name: 'Project Two',
     repo_url: 'https://github.com/user/repo2',
     docker_image: 'ubuntu:22.04',
-    jtbd: 'Test JTBD',
   });
 
   const loop1 = {

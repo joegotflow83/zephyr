@@ -43,7 +43,6 @@ describe('Project Workflow Integration', () => {
     const project = await projectStore.addProject({
       name: 'Test Project',
       repo_url: 'https://github.com/test/repo',
-      jtbd: 'Test JTBD',
       docker_image: 'node:20',
     });
 
@@ -73,7 +72,6 @@ describe('Project Workflow Integration', () => {
     const project = await projectStore.addProject({
       name: 'Original Name',
       repo_url: 'https://github.com/original/repo',
-      jtbd: 'Original JTBD',
       docker_image: 'node:18',
     });
 
@@ -85,11 +83,9 @@ describe('Project Workflow Integration', () => {
     // Update the project
     const updated = projectStore.updateProject(project.id, {
       name: 'Updated Name',
-      jtbd: 'Updated JTBD',
     });
 
     expect(updated.name).toBe('Updated Name');
-    expect(updated.jtbd).toBe('Updated JTBD');
     expect(updated.repo_url).toBe('https://github.com/original/repo'); // unchanged
     expect(updated.updated_at).not.toBe(originalUpdatedAt); // timestamp changed
 
@@ -98,7 +94,6 @@ describe('Project Workflow Integration', () => {
     const fileContent = readFileSync(projectsFile, 'utf-8');
     const parsed = JSON.parse(fileContent) as ProjectConfig[];
     expect(parsed[0].name).toBe('Updated Name');
-    expect(parsed[0].jtbd).toBe('Updated JTBD');
   });
 
   it('should delete projects', async () => {
@@ -148,14 +143,12 @@ describe('Project Workflow Integration', () => {
     await projectStore.addProject({
       name: 'Export Test 1',
       repo_url: 'https://github.com/export/test1',
-      jtbd: 'Test export functionality',
       docker_image: 'python:3.12',
       custom_prompts: { test: 'prompt content' },
     });
     await projectStore.addProject({
       name: 'Export Test 2',
       repo_url: 'https://github.com/export/test2',
-      jtbd: 'Another export test',
       docker_image: 'node:20',
     });
 
@@ -255,7 +248,6 @@ describe('Project Workflow Integration', () => {
     const fullProject = await projectStore.addProject({
       name: 'Full Project',
       repo_url: 'https://github.com/full/project',
-      jtbd: 'Complex JTBD description',
       docker_image: 'custom:image:v1.2.3',
       custom_prompts: {
         planning: 'Custom planning prompt',
@@ -269,7 +261,6 @@ describe('Project Workflow Integration', () => {
     // All fields should match
     expect(retrieved.name).toBe('Full Project');
     expect(retrieved.repo_url).toBe('https://github.com/full/project');
-    expect(retrieved.jtbd).toBe('Complex JTBD description');
     expect(retrieved.docker_image).toBe('custom:image:v1.2.3');
     expect(retrieved.custom_prompts).toEqual({
       planning: 'Custom planning prompt',

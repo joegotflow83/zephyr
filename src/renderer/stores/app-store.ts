@@ -12,7 +12,7 @@
  */
 
 import { create } from 'zustand';
-import type { ProjectConfig, AppSettings } from '../../shared/models';
+import type { ProjectConfig, AppSettings, ZephyrImage, ImageBuildConfig } from '../../shared/models';
 import type { LoopState } from '../../shared/loop-types';
 import type { DockerInfo } from '../../services/docker-manager';
 
@@ -34,6 +34,13 @@ export interface AppState {
   settings: AppSettings | null;
   settingsLoading: boolean;
   settingsError: string | null;
+
+  // Images
+  images: ZephyrImage[];
+  imagesLoading: boolean;
+  imagesError: string | null;
+  imageBuildProgress: string | null;
+  imageBuildActive: boolean;
 
   // Docker status
   dockerConnected: boolean;
@@ -61,6 +68,16 @@ export interface AppState {
   updateSettings: (updates: Partial<AppSettings>) => Promise<void>;
   refreshSettings: () => Promise<void>;
 
+  setImages: (images: ZephyrImage[]) => void;
+  setImagesLoading: (loading: boolean) => void;
+  setImagesError: (error: string | null) => void;
+  setImageBuildProgress: (progress: string | null) => void;
+  setImageBuildActive: (active: boolean) => void;
+  refreshImages: () => Promise<void>;
+  buildImage: (config: ImageBuildConfig) => Promise<void>;
+  deleteImage: (id: string) => Promise<void>;
+  rebuildImage: (id: string) => Promise<void>;
+
   setDockerStatus: (connected: boolean, info?: DockerInfo) => void;
 }
 
@@ -81,6 +98,12 @@ export const useAppStore = create<AppState>((set, get) => ({
   settings: null,
   settingsLoading: false,
   settingsError: null,
+
+  images: [],
+  imagesLoading: false,
+  imagesError: null,
+  imageBuildProgress: null,
+  imageBuildActive: false,
 
   dockerConnected: false,
   dockerInfo: undefined,
@@ -198,6 +221,51 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
   },
 
+  // Image actions
+  setImages: (images) => set({ images, imagesError: null }),
+  setImagesLoading: (loading) => set({ imagesLoading: loading }),
+  setImagesError: (error) => set({ imagesError: error }),
+  setImageBuildProgress: (progress) => set({ imageBuildProgress: progress }),
+  setImageBuildActive: (active) => set({ imageBuildActive: active }),
+
+  refreshImages: async () => {
+    set({ imagesLoading: true, imagesError: null });
+    try {
+      const images = await window.api.images.list();
+      set({ images, imagesLoading: false });
+    } catch (error) {
+      set({
+        imagesError: error instanceof Error ? error.message : 'Unknown error',
+        imagesLoading: false,
+      });
+    }
+  },
+
+  buildImage: async (config) => {
+    set({ imageBuildActive: true, imageBuildProgress: null });
+    try {
+      await window.api.images.build(config);
+      await get().refreshImages();
+    } finally {
+      set({ imageBuildActive: false });
+    }
+  },
+
+  deleteImage: async (id) => {
+    await window.api.images.delete(id);
+    await get().refreshImages();
+  },
+
+  rebuildImage: async (id) => {
+    set({ imageBuildActive: true, imageBuildProgress: null });
+    try {
+      await window.api.images.rebuild(id);
+      await get().refreshImages();
+    } finally {
+      set({ imageBuildActive: false });
+    }
+  },
+
   // Docker actions
   setDockerStatus: (connected, info) =>
     set({ dockerConnected: connected, dockerInfo: info }),
@@ -231,10 +299,16 @@ export function initializeStoreListeners() {
     useAppStore.getState().updateLoop(state);
   });
 
+  // Image build progress
+  window.api.images.onBuildProgress((line) => {
+    useAppStore.getState().setImageBuildProgress(line);
+  });
+
   // Initial data load
   useAppStore.getState().refreshProjects();
   useAppStore.getState().refreshLoops();
   useAppStore.getState().refreshSettings();
+  useAppStore.getState().refreshImages();
 
   // Initial Docker status
   window.api.docker

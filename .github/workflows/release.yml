@@ -24,6 +24,12 @@ jobs:
         id: version
         run: echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
 
+      - name: Get package version
+        id: pkg_version
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          echo "VERSION=$VERSION" >> "$GITHUB_OUTPUT"
+
       - name: Install dependencies
         run: npm ci
 
@@ -57,14 +63,14 @@ jobs:
       - name: Upload DMG artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Zephyr-macOS-${{ steps.version.outputs.VERSION }}-dmg
+          name: Zephyr-macOS-${{ steps.pkg_version.outputs.VERSION }}-dmg
           path: out/make/*.dmg
           if-no-files-found: warn
 
       - name: Upload ZIP artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Zephyr-macOS-${{ steps.version.outputs.VERSION }}-zip
+          name: Zephyr-macOS-${{ steps.pkg_version.outputs.VERSION }}-zip
           path: out/make/zip/darwin/**/*.zip
           if-no-files-found: warn
 
@@ -83,6 +89,12 @@ jobs:
         id: version
         run: echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
 
+      - name: Get package version
+        id: pkg_version
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          echo "VERSION=$VERSION" >> "$GITHUB_OUTPUT"
+
       - name: Install system dependencies
         run: sudo apt-get install -y libgtk-3-0 libxss1 libasound2 libgbm1 rpm fakeroot dpkg
 
@@ -98,14 +110,14 @@ jobs:
       - name: Upload DEB artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Zephyr-Linux-${{ steps.version.outputs.VERSION }}-deb
+          name: Zephyr-Linux-${{ steps.pkg_version.outputs.VERSION }}-deb
           path: out/make/deb/**/*.deb
           if-no-files-found: warn
 
       - name: Upload RPM artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Zephyr-Linux-${{ steps.version.outputs.VERSION }}-rpm
+          name: Zephyr-Linux-${{ steps.pkg_version.outputs.VERSION }}-rpm
           path: out/make/rpm/**/*.rpm
           if-no-files-found: warn
 
@@ -125,6 +137,13 @@ jobs:
         shell: bash
         run: echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
 
+      - name: Get package version
+        id: pkg_version
+        shell: bash
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          echo "VERSION=$VERSION" >> "$GITHUB_OUTPUT"
+
       - name: Install dependencies
         run: npm ci
 
@@ -132,12 +151,15 @@ jobs:
         run: npm run test:unit
 
       - name: Build with Electron Forge
+        env:
+          CSC_LINK: ${{ secrets.WINDOWS_CERTIFICATE }}
+          CSC_KEY_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
         run: npm run make
 
       - name: Upload Windows artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Zephyr-Windows-${{ steps.version.outputs.VERSION }}
+          name: Zephyr-Windows-${{ steps.pkg_version.outputs.VERSION }}
           path: out/make/squirrel.windows/**/*
           if-no-files-found: warn
 

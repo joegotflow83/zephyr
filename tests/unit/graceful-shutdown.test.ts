@@ -32,6 +32,7 @@ const mockCleanupManagerInstance = {
 
 const mockConfigManagerInstance = {
   loadJson: vi.fn().mockResolvedValue({ log_level: 'INFO' }),
+  getConfigDir: vi.fn(() => '/tmp/zephyr-test'),
 };
 
 // Mock electron-updater before electron

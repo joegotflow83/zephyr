@@ -44,7 +44,19 @@ describe('ProjectsTab', () => {
   };
 
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
+
+    // Set up window.api mock (must use global.window.api, never replace global.window)
+    global.window.api = {
+      loops: {
+        start: vi.fn().mockResolvedValue({}),
+      },
+      projects: {
+        remove: vi.fn().mockResolvedValue(undefined),
+        add: vi.fn().mockResolvedValue(undefined),
+        update: vi.fn().mockResolvedValue(undefined),
+      },
+    } as any;
 
     // Default mock implementations
     vi.mocked(useProjects).mockReturnValue({
@@ -371,21 +383,10 @@ describe('ProjectsTab', () => {
       expect(runButton).toBeDisabled();
     });
 
-    it.skip('calls onRunProject callback when Run is clicked', async () => {
+    it('calls onRunProject callback when Run is clicked', async () => {
       const user = userEvent.setup();
       const onRunProject = vi.fn();
       const project = createProjectConfig({ name: 'Test Project' });
-
-      // Mock window.api for this test
-      (global as any).window = {
-        ...global.window,
-        api: {
-          ...((global as any).window?.api || {}),
-          loops: {
-            start: vi.fn().mockResolvedValue({}),
-          },
-        },
-      };
 
       vi.mocked(useProjects).mockReturnValue({
         projects: [project],
@@ -410,7 +411,7 @@ describe('ProjectsTab', () => {
   });
 
   describe('Lifecycle', () => {
-    it.skip('calls refresh on mount', async () => {
+    it('calls refresh on mount', async () => {
       render(<ProjectsTab toast={mockToast} />);
 
       await waitFor(() => {

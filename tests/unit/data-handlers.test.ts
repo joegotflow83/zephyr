@@ -76,6 +76,13 @@ const mockImportExport = {
   importConfig: vi.fn(),
 };
 
+const mockPreValidationStore = {
+  listScripts: vi.fn(),
+  getScript: vi.fn(),
+  addScript: vi.fn(),
+  removeScript: vi.fn(),
+};
+
 // ── Setup ─────────────────────────────────────────────────────────────────────
 
 describe('registerDataHandlers', () => {
@@ -89,6 +96,7 @@ describe('registerDataHandlers', () => {
       configManager: mockConfigManager as never,
       projectStore: mockProjectStore as never,
       importExport: mockImportExport as never,
+      preValidationStore: mockPreValidationStore as never,
     });
   });
 
@@ -128,7 +136,7 @@ describe('registerDataHandlers', () => {
 
   describe('projects:add', () => {
     it('passes config to projectStore.addProject() and returns saved project', async () => {
-      const input = { name: 'Gamma', repo_url: 'https://github.com/x/y', jtbd: '', docker_image: 'ubuntu', custom_prompts: {} };
+      const input = { name: 'Gamma', repo_url: 'https://github.com/x/y', docker_image: 'ubuntu', pre_validation_scripts: [], custom_prompts: {} };
       const saved = createProjectConfig(input);
       mockProjectStore.addProject.mockResolvedValue(saved);
       const result = await invoke(IPC.PROJECTS_ADD, input);
@@ -229,6 +237,56 @@ describe('registerDataHandlers', () => {
     });
   });
 
+  // ── Pre-validation scripts ─────────────────────────────────────────────────
+
+  describe('pre-validation:list', () => {
+    it('delegates to preValidationStore.listScripts()', async () => {
+      const scripts = [{ filename: 'test.sh', name: 'Test', description: '', content: '', isBuiltIn: false }];
+      mockPreValidationStore.listScripts.mockResolvedValue(scripts);
+      const result = await invoke(IPC.PRE_VALIDATION_LIST);
+      expect(mockPreValidationStore.listScripts).toHaveBeenCalledOnce();
+      expect(result).toEqual(scripts);
+    });
+  });
+
+  describe('pre-validation:get', () => {
+    it('delegates to preValidationStore.getScript() with filename', async () => {
+      mockPreValidationStore.getScript.mockResolvedValue('#!/bin/bash\necho hi');
+      const result = await invoke(IPC.PRE_VALIDATION_GET, 'my-check.sh');
+      expect(mockPreValidationStore.getScript).toHaveBeenCalledWith('my-check.sh');
+      expect(result).toBe('#!/bin/bash\necho hi');
+    });
+
+    it('returns null when script not found', async () => {
+      mockPreValidationStore.getScript.mockResolvedValue(null);
+      const result = await invoke(IPC.PRE_VALIDATION_GET, 'missing.sh');
+      expect(result).toBeNull();
+    });
+  });
+
+  describe('pre-validation:add', () => {
+    it('delegates to preValidationStore.addScript() with filename and content', async () => {
+      mockPreValidationStore.addScript.mockResolvedValue(undefined);
+      await invoke(IPC.PRE_VALIDATION_ADD, 'new.sh', '#!/bin/bash\necho done');
+      expect(mockPreValidationStore.addScript).toHaveBeenCalledWith('new.sh', '#!/bin/bash\necho done');
+    });
+  });
+
+  describe('pre-validation:remove', () => {
+    it('delegates to preValidationStore.removeScript() with filename', async () => {
+      mockPreValidationStore.removeScript.mockResolvedValue(true);
+      const result = await invoke(IPC.PRE_VALIDATION_REMOVE, 'old.sh');
+      expect(mockPreValidationStore.removeScript).toHaveBeenCalledWith('old.sh');
+      expect(result).toBe(true);
+    });
+
+    it('returns false when script not found', async () => {
+      mockPreValidationStore.removeScript.mockResolvedValue(false);
+      const result = await invoke(IPC.PRE_VALIDATION_REMOVE, 'missing.sh');
+      expect(result).toBe(false);
+    });
+  });
+
   // ── Channel registration ───────────────────────────────────────────────────
 
   describe('channel registration', () => {
@@ -243,6 +301,10 @@ describe('registerDataHandlers', () => {
         IPC.SETTINGS_SAVE,
         IPC.CONFIG_EXPORT,
         IPC.CONFIG_IMPORT,
+        IPC.PRE_VALIDATION_LIST,
+        IPC.PRE_VALIDATION_GET,
+        IPC.PRE_VALIDATION_ADD,
+        IPC.PRE_VALIDATION_REMOVE,
       ];
       for (const channel of expected) {
         expect(handlerRegistry[channel], `Missing handler for ${channel}`).toBeDefined();

@@ -7,6 +7,7 @@ import { ProjectsTab } from './pages/ProjectsTab/ProjectsTab';
 import { LoopsTab } from './pages/LoopsTab/LoopsTab';
 import { TerminalTab } from './pages/TerminalTab/TerminalTab';
 import { SettingsTab } from './pages/SettingsTab/SettingsTab';
+import { ImagesTab } from './pages/ImagesTab/ImagesTab';
 import { useActiveLoops } from './hooks/useActiveLoops';
 import { useToast } from './hooks/useToast';
 
@@ -14,6 +15,7 @@ const tabs: Tab[] = [
   { id: 'projects', label: 'Projects', icon: '📁' },
   { id: 'loops', label: 'Running Loops', icon: '🔄' },
   { id: 'terminal', label: 'Terminal', icon: '💻' },
+  { id: 'images', label: 'Images', icon: '🖼️' },
   { id: 'settings', label: 'Settings', icon: '⚙️' },
 ];
 
@@ -22,10 +24,10 @@ const App: React.FC = () => {
   const activeLoopCount = useActiveLoops();
   const { toasts, dismissToast, success, error, warning, info } = useToast();
 
-  // Keyboard shortcuts: Ctrl+1/2/3/4 for tab switching
+  // Keyboard shortcuts: Ctrl+1/2/3/4/5 for tab switching
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.ctrlKey && e.key >= '1' && e.key <= '4') {
+      if (e.ctrlKey && e.key >= '1' && e.key <= '5') {
         e.preventDefault();
         const tabIndex = parseInt(e.key, 10) - 1;
         const newTab = tabs[tabIndex];
@@ -49,6 +51,8 @@ const App: React.FC = () => {
         return <LoopsTab />;
       case 'terminal':
         return <TerminalTab />;
+      case 'images':
+        return <ImagesTab />;
       case 'settings':
         return <SettingsTab />;
       default:

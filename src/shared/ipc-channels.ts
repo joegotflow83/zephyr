@@ -80,6 +80,20 @@ export const IPC = {
   AUTO_UPDATE_STATE_CHANGED: 'auto-update:state-changed',
   AUTO_UPDATE_DOWNLOAD_PROGRESS: 'auto-update:download-progress',
 
+  // Image library
+  IMAGE_LIST: 'image:list',
+  IMAGE_GET: 'image:get',
+  IMAGE_BUILD: 'image:build',
+  IMAGE_REBUILD: 'image:rebuild',
+  IMAGE_DELETE: 'image:delete',
+  IMAGE_BUILD_PROGRESS: 'image:build-progress',
+
+  // Pre-validation scripts
+  PRE_VALIDATION_LIST: 'pre-validation:list',
+  PRE_VALIDATION_GET: 'pre-validation:get',
+  PRE_VALIDATION_ADD: 'pre-validation:add',
+  PRE_VALIDATION_REMOVE: 'pre-validation:remove',
+
   // Misc
   PING: 'ping',
 } as const;

@@ -129,9 +129,14 @@ describe('createProjectConfig', () => {
       expect(project.repo_url).toBe('');
     });
 
-    it('defaults jtbd to empty string', () => {
+    it('defaults pre_validation_scripts to an empty array', () => {
       const project = createProjectConfig();
-      expect(project.jtbd).toBe('');
+      expect(project.pre_validation_scripts).toEqual([]);
+    });
+
+    it('defaults image_id to undefined', () => {
+      const project = createProjectConfig();
+      expect(project.image_id).toBeUndefined();
     });
 
     it('defaults docker_image to "ubuntu:24.04"', () => {
@@ -172,8 +177,8 @@ describe('createProjectConfig', () => {
         id: 'aaaaaaaa-aaaa-4aaa-aaaa-aaaaaaaaaaaa',
         name: 'Full Project',
         repo_url: 'git@github.com:org/full.git',
-        jtbd: 'Refactor the codebase',
         docker_image: 'python:3.12',
+        pre_validation_scripts: ['lint.sh'],
         custom_prompts: { 'task.md': 'Refactor everything' },
         created_at: '2024-01-01T00:00:00.000Z',
         updated_at: '2024-06-01T00:00:00.000Z',
@@ -197,8 +202,8 @@ describe('createProjectConfig', () => {
           'id',
           'name',
           'repo_url',
-          'jtbd',
           'docker_image',
+          'pre_validation_scripts',
           'custom_prompts',
           'created_at',
           'updated_at',

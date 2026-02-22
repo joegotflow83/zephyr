@@ -25,7 +25,6 @@ describe('ProjectRow', () => {
     name: 'Test Project',
     repo_url: 'https://github.com/user/repo',
     docker_image: 'ubuntu:22.04',
-    jtbd: 'Test JTBD',
   });
 
   beforeEach(() => {

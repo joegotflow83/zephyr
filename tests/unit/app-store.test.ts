@@ -6,7 +6,7 @@
 
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { useAppStore, initializeStoreListeners } from '../../src/renderer/stores/app-store';
-import type { ProjectConfig, AppSettings } from '../../src/shared/models';
+import type { ProjectConfig, AppSettings, ZephyrImage, ImageBuildConfig } from '../../src/shared/models';
 import type { LoopState } from '../../src/shared/loop-types';
 import { LoopStatus, LoopMode } from '../../src/shared/loop-types';
 import type { DockerInfo } from '../../src/services/docker-manager';
@@ -39,6 +39,14 @@ const mockApi = {
     onStatusChanged: vi.fn(() => vi.fn()),
     onPullProgress: vi.fn(() => vi.fn()),
   },
+  images: {
+    list: vi.fn(),
+    get: vi.fn(),
+    build: vi.fn(),
+    rebuild: vi.fn(),
+    delete: vi.fn(),
+    onBuildProgress: vi.fn(() => vi.fn()),
+  },
 };
 
 (global as any).window = { api: mockApi };
@@ -58,6 +66,11 @@ describe('useAppStore', () => {
       settingsError: null,
       dockerConnected: false,
       dockerInfo: undefined,
+      images: [],
+      imagesLoading: false,
+      imagesError: null,
+      imageBuildProgress: null,
+      imageBuildActive: false,
     });
     vi.clearAllMocks();
   });
@@ -76,8 +89,8 @@ describe('useAppStore', () => {
           id: '1',
           name: 'Test Project',
           repo_url: 'https://github.com/test/repo',
-          jtbd: 'Test JTBD',
           docker_image: 'ubuntu:24.04',
+          pre_validation_scripts: [],
           custom_prompts: {},
           created_at: '2024-01-01T00:00:00Z',
           updated_at: '2024-01-01T00:00:00Z',
@@ -93,8 +106,8 @@ describe('useAppStore', () => {
         id: '1',
         name: 'New Project',
         repo_url: 'https://github.com/test/new',
-        jtbd: 'New JTBD',
         docker_image: 'ubuntu:24.04',
+        pre_validation_scripts: [],
         custom_prompts: {},
         created_at: '2024-01-01T00:00:00Z',
         updated_at: '2024-01-01T00:00:00Z',
@@ -109,8 +122,8 @@ describe('useAppStore', () => {
         id: '1',
         name: 'Original Name',
         repo_url: 'https://github.com/test/repo',
-        jtbd: 'Original JTBD',
         docker_image: 'ubuntu:24.04',
+        pre_validation_scripts: [],
         custom_prompts: {},
         created_at: '2024-01-01T00:00:00Z',
         updated_at: '2024-01-01T00:00:00Z',
@@ -125,8 +138,8 @@ describe('useAppStore', () => {
         id: '1',
         name: 'Test Project',
         repo_url: 'https://github.com/test/repo',
-        jtbd: 'Test JTBD',
         docker_image: 'ubuntu:24.04',
+        pre_validation_scripts: [],
         custom_prompts: {},
         created_at: '2024-01-01T00:00:00Z',
         updated_at: '2024-01-01T00:00:00Z',
@@ -142,8 +155,8 @@ describe('useAppStore', () => {
           id: '1',
           name: 'Test Project',
           repo_url: 'https://github.com/test/repo',
-          jtbd: 'Test JTBD',
           docker_image: 'ubuntu:24.04',
+          pre_validation_scripts: [],
           custom_prompts: {},
           created_at: '2024-01-01T00:00:00Z',
           updated_at: '2024-01-01T00:00:00Z',
@@ -431,6 +444,7 @@ describe('useAppStore', () => {
         loopStateCallback = callback;
         return vi.fn();
       });
+      mockApi.images.onBuildProgress.mockImplementation(() => vi.fn());
       mockApi.docker.status.mockResolvedValue({ available: false });
       mockApi.projects.list.mockResolvedValue([]);
       mockApi.loops.list.mockResolvedValue([]);
@@ -440,6 +454,7 @@ describe('useAppStore', () => {
         theme: 'system',
         log_level: 'INFO',
       });
+      mockApi.images.list.mockResolvedValue([]);
     });
 
     it('should register Docker status listener', async () => {
@@ -497,6 +512,137 @@ describe('useAppStore', () => {
       expect(mockApi.loops.list).toHaveBeenCalled();
       expect(mockApi.settings.load).toHaveBeenCalled();
       expect(mockApi.docker.status).toHaveBeenCalled();
+    });
+  });
+
+  describe('images', () => {
+    const sampleImage: ZephyrImage = {
+      id: 'img-1',
+      name: 'my-python-image',
+      dockerTag: 'zephyr-my-python-image:latest',
+      languages: [{ languageId: 'python', version: '3.12' }],
+      buildConfig: { name: 'my-python-image', languages: [{ languageId: 'python', version: '3.12' }] },
+      builtAt: '2024-01-01T00:00:00Z',
+    };
+
+    it('should initialize with empty images list', () => {
+      const state = useAppStore.getState();
+      expect(state.images).toEqual([]);
+      expect(state.imagesLoading).toBe(false);
+      expect(state.imagesError).toBe(null);
+      expect(state.imageBuildProgress).toBe(null);
+      expect(state.imageBuildActive).toBe(false);
+    });
+
+    it('should refresh images from API', async () => {
+      mockApi.images.list.mockResolvedValue([sampleImage]);
+
+      await useAppStore.getState().refreshImages();
+
+      expect(mockApi.images.list).toHaveBeenCalled();
+      expect(useAppStore.getState().images).toEqual([sampleImage]);
+      expect(useAppStore.getState().imagesLoading).toBe(false);
+    });
+
+    it('should set imagesLoading true then false during refresh', async () => {
+      let resolveList: (v: ZephyrImage[]) => void;
+      const listPromise = new Promise<ZephyrImage[]>((res) => { resolveList = res; });
+      mockApi.images.list.mockReturnValue(listPromise);
+
+      const refreshPromise = useAppStore.getState().refreshImages();
+      expect(useAppStore.getState().imagesLoading).toBe(true);
+
+      resolveList!([sampleImage]);
+      await refreshPromise;
+      expect(useAppStore.getState().imagesLoading).toBe(false);
+    });
+
+    it('should set imagesError on refresh failure', async () => {
+      mockApi.images.list.mockRejectedValue(new Error('Image list failed'));
+
+      await useAppStore.getState().refreshImages();
+
+      expect(useAppStore.getState().imagesError).toBe('Image list failed');
+      expect(useAppStore.getState().imagesLoading).toBe(false);
+    });
+
+    it('should set imageBuildProgress via setImageBuildProgress', () => {
+      useAppStore.getState().setImageBuildProgress('Step 1/5: FROM ubuntu:24.04');
+      expect(useAppStore.getState().imageBuildProgress).toBe('Step 1/5: FROM ubuntu:24.04');
+
+      useAppStore.getState().setImageBuildProgress(null);
+      expect(useAppStore.getState().imageBuildProgress).toBe(null);
+    });
+
+    it('should set imageBuildActive and refresh on buildImage complete', async () => {
+      mockApi.images.build.mockResolvedValue(undefined);
+      mockApi.images.list.mockResolvedValue([sampleImage]);
+
+      const config: ImageBuildConfig = { name: 'my-python-image', languages: [{ languageId: 'python', version: '3.12' }] };
+      await useAppStore.getState().buildImage(config);
+
+      expect(mockApi.images.build).toHaveBeenCalledWith(config);
+      expect(mockApi.images.list).toHaveBeenCalled();
+      expect(useAppStore.getState().images).toEqual([sampleImage]);
+      expect(useAppStore.getState().imageBuildActive).toBe(false);
+    });
+
+    it('should call API and refresh on deleteImage', async () => {
+      mockApi.images.delete.mockResolvedValue(undefined);
+      mockApi.images.list.mockResolvedValue([]);
+
+      await useAppStore.getState().deleteImage('img-1');
+
+      expect(mockApi.images.delete).toHaveBeenCalledWith('img-1');
+      expect(mockApi.images.list).toHaveBeenCalled();
+    });
+
+    it('should set imageBuildActive and refresh on rebuildImage complete', async () => {
+      mockApi.images.rebuild.mockResolvedValue(undefined);
+      mockApi.images.list.mockResolvedValue([sampleImage]);
+
+      await useAppStore.getState().rebuildImage('img-1');
+
+      expect(mockApi.images.rebuild).toHaveBeenCalledWith('img-1');
+      expect(mockApi.images.list).toHaveBeenCalled();
+      expect(useAppStore.getState().imageBuildActive).toBe(false);
+    });
+  });
+
+  describe('initializeStoreListeners — image build progress', () => {
+    let buildProgressCallback: (line: string) => void;
+
+    beforeEach(() => {
+      mockApi.docker.onStatusChanged.mockImplementation(() => vi.fn());
+      mockApi.loops.onStateChanged.mockImplementation(() => vi.fn());
+      mockApi.images.onBuildProgress.mockImplementation((callback) => {
+        buildProgressCallback = callback;
+        return vi.fn();
+      });
+      mockApi.docker.status.mockResolvedValue({ available: false });
+      mockApi.projects.list.mockResolvedValue([]);
+      mockApi.loops.list.mockResolvedValue([]);
+      mockApi.settings.load.mockResolvedValue({
+        max_concurrent_containers: 5,
+        notification_enabled: true,
+        theme: 'system',
+        log_level: 'INFO',
+      });
+      mockApi.images.list.mockResolvedValue([]);
+    });
+
+    it('should register build progress listener and update imageBuildProgress', () => {
+      initializeStoreListeners();
+      expect(mockApi.images.onBuildProgress).toHaveBeenCalled();
+
+      buildProgressCallback('Step 2/5: RUN apt-get install');
+      expect(useAppStore.getState().imageBuildProgress).toBe('Step 2/5: RUN apt-get install');
+    });
+
+    it('should call refreshImages during initial data load', async () => {
+      initializeStoreListeners();
+      await new Promise((resolve) => setTimeout(resolve, 10));
+      expect(mockApi.images.list).toHaveBeenCalled();
     });
   });
 });

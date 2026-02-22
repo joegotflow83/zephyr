@@ -150,6 +150,7 @@ const {
   mockGitManager,
   mockSelfUpdater,
   mockCleanupManager,
+  mockPreValidationStore,
   MockConfigManager,
   MockProjectStore,
   MockImportExportService,
@@ -165,6 +166,7 @@ const {
   MockGitManager,
   MockSelfUpdater,
   MockCleanupManager,
+  MockPreValidationStore,
 } = vi.hoisted(() => {
   const mockConfigManager = {
     loadJson: vi.fn(),
@@ -285,6 +287,9 @@ const {
   const MockSelfUpdater = vi.fn(function() { return mockSelfUpdater; });
   const MockCleanupManager = vi.fn(function() { return mockCleanupManager; });
 
+  const mockPreValidationStore = {};
+  const MockPreValidationStore = vi.fn(function() { return mockPreValidationStore; });
+
   return {
     mockConfigManager,
     mockProjectStore,
@@ -301,6 +306,7 @@ const {
     mockGitManager,
     mockSelfUpdater,
     mockCleanupManager,
+    mockPreValidationStore,
     MockConfigManager,
     MockProjectStore,
     MockImportExportService,
@@ -316,6 +322,7 @@ const {
     MockGitManager,
     MockSelfUpdater,
     MockCleanupManager,
+    MockPreValidationStore,
   };
 });
 
@@ -377,6 +384,10 @@ vi.mock('../../src/services/self-updater', () => ({
 
 vi.mock('../../src/services/cleanup-manager', () => ({
   CleanupManager: MockCleanupManager,
+}));
+
+vi.mock('../../src/services/pre-validation-store', () => ({
+  PreValidationStore: MockPreValidationStore,
 }));
 
 // ── Mock logging ─────────────────────────────────────────────────────────────
@@ -583,11 +594,12 @@ describe('Main Entry Point', () => {
   });
 
   describe('IPC Handler Registration', () => {
-    it('should register data handlers with ConfigManager, ProjectStore, and ImportExport', () => {
+    it('should register data handlers with ConfigManager, ProjectStore, ImportExport, and PreValidationStore', () => {
       expect(mockRegisterDataHandlers).toHaveBeenCalledWith({
         configManager: mockConfigManager,
         projectStore: mockProjectStore,
         importExport: mockImportExport,
+        preValidationStore: mockPreValidationStore,
       });
     });
 

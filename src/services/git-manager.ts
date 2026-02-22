@@ -194,6 +194,80 @@ export class GitManager {
   }
 
   /**
+   * Fetch the latest changes from a remote.
+   *
+   * @param repoPath - Root of a Git repository
+   * @param remote - Remote name to fetch from (default: 'origin')
+   * @throws Error if the path is not a valid Git repository
+   * @throws Error if the fetch operation fails (network, auth, etc.)
+   */
+  async fetchRemote(repoPath: string, remote = 'origin'): Promise<void> {
+    const gitDir = path.resolve(repoPath);
+
+    if (!existsSync(gitDir)) {
+      throw new Error(`Repository path does not exist: ${gitDir}`);
+    }
+
+    const repo = simpleGit(gitDir);
+
+    try {
+      await repo.revparse('--git-dir');
+    } catch {
+      throw new Error(`Not a valid Git repository: ${gitDir}`);
+    }
+
+    try {
+      await repo.fetch(remote);
+    } catch (error) {
+      throw new Error(
+        `Failed to fetch from remote '${remote}': ${(error as Error).message}`
+      );
+    }
+  }
+
+  /**
+   * Get the contents of a file at a specific git ref.
+   *
+   * Uses `git show <ref>:<filePath>` to retrieve file content from any
+   * tree-ish reference (branch, tag, commit hash, or remote ref).
+   *
+   * @param repoPath - Root of a Git repository
+   * @param ref - Git ref to read from (e.g., 'origin/HEAD', 'main', 'v1.2.3')
+   * @param filePath - Path to the file relative to the repository root
+   * @returns File content as a string
+   * @throws Error if the path is not a valid Git repository
+   * @throws Error if the file does not exist at the given ref
+   */
+  async getRemoteFileContent(
+    repoPath: string,
+    ref: string,
+    filePath: string
+  ): Promise<string> {
+    const gitDir = path.resolve(repoPath);
+
+    if (!existsSync(gitDir)) {
+      throw new Error(`Repository path does not exist: ${gitDir}`);
+    }
+
+    const repo = simpleGit(gitDir);
+
+    try {
+      await repo.revparse('--git-dir');
+    } catch {
+      throw new Error(`Not a valid Git repository: ${gitDir}`);
+    }
+
+    try {
+      const content = await repo.raw(['show', `${ref}:${filePath}`]);
+      return content;
+    } catch (error) {
+      throw new Error(
+        `Failed to read '${filePath}' at ref '${ref}': ${(error as Error).message}`
+      );
+    }
+  }
+
+  /**
    * Return the count most recent commits from HEAD.
    *
    * @param repoPath - Root of a Git repository

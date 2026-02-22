@@ -267,10 +267,11 @@ export const TerminalTab: React.FC = () => {
         <div className="flex items-center gap-4">
           {/* Container selector */}
           <div className="flex-1">
-            <label className="block text-sm text-gray-400 mb-1">
+            <label htmlFor="container-select" className="block text-sm text-gray-400 mb-1">
               Container
             </label>
             <select
+              id="container-select"
               value={selectedContainerId}
               onChange={(e) => setSelectedContainerId(e.target.value)}
               className="w-full bg-gray-700 text-white px-3 py-2 rounded border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -287,8 +288,9 @@ export const TerminalTab: React.FC = () => {
 
           {/* User selector */}
           <div className="w-40">
-            <label className="block text-sm text-gray-400 mb-1">User</label>
+            <label htmlFor="user-select" className="block text-sm text-gray-400 mb-1">User</label>
             <select
+              id="user-select"
               value={selectedUser}
               onChange={(e) => setSelectedUser(e.target.value)}
               className="w-full bg-gray-700 text-white px-3 py-2 rounded border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"

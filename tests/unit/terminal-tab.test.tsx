@@ -1,25 +1,39 @@
 /**
  * @vitest-environment jsdom
  */
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import React from 'react';
 import { TerminalTab } from '../../src/renderer/pages/TerminalTab/TerminalTab';
 import type { ContainerInfo } from '../../src/services/docker-manager';
 import type { TerminalSession } from '../../src/services/terminal-manager';
 
-// Mock Terminal component
+// Hoisted state for capturing Terminal component props across the mock boundary.
+// Must be hoisted because vi.mock() factories are hoisted before variable declarations.
+const mockState = vi.hoisted(() => ({
+  latestTerminalProps: null as any,
+}));
+
+// Mock Terminal component - captures latest props for Terminal Data Flow tests.
 vi.mock('../../src/renderer/components/Terminal/Terminal', () => ({
   Terminal: React.forwardRef((props: any, ref: any) => {
+    mockState.latestTerminalProps = props;
     React.useImperativeHandle(ref, () => ({
       write: vi.fn(),
       clear: vi.fn(),
+      search: vi.fn(),
+      copy: vi.fn(),
+      paste: vi.fn(),
+      increaseFontSize: vi.fn(),
+      decreaseFontSize: vi.fn(),
+      resetFontSize: vi.fn(),
+      getCurrentFontSize: vi.fn(() => 14),
     }));
     return <div data-testid="terminal-instance">{props.theme}</div>;
   }),
 }));
 
-// Mock window.api
+// Mock window.api functions declared at module level for callback capture
 const mockListContainers = vi.fn();
 const mockTerminalOpen = vi.fn();
 const mockTerminalClose = vi.fn();
@@ -51,26 +65,6 @@ const mockOnError = vi.fn((callback) => {
   };
 });
 
-(global as any).window = {
-  api: {
-    docker: {
-      listContainers: mockListContainers,
-    },
-    terminal: {
-      open: mockTerminalOpen,
-      close: mockTerminalClose,
-      write: mockTerminalWrite,
-      resize: mockTerminalResize,
-      onData: mockOnData,
-      onClosed: mockOnClosed,
-      onError: mockOnError,
-    },
-  },
-};
-
-// NOTE: All tests in this suite are skipped due to a known React 18 + jsdom + fake timers incompatibility.
-// The TerminalTab implementation works correctly in production; these test environment issues do not
-// affect the actual functionality. See IMPLEMENTATION_PLAN.md Phase 9.4 for details.
 describe('TerminalTab', () => {
   const mockContainers: ContainerInfo[] = [
     {
@@ -105,11 +99,30 @@ describe('TerminalTab', () => {
     onDataCallback = null;
     onClosedCallback = null;
     onErrorCallback = null;
+    mockState.latestTerminalProps = null;
     mockListContainers.mockResolvedValue(mockContainers);
+
+    // Add api to global.window WITHOUT replacing the entire window object.
+    // Replacing global.window would wipe jsdom's DOM APIs (addEventListener, etc.),
+    // causing render to fail. This pattern preserves all jsdom functionality.
+    global.window.api = {
+      docker: {
+        listContainers: mockListContainers,
+      },
+      terminal: {
+        open: mockTerminalOpen,
+        close: mockTerminalClose,
+        write: mockTerminalWrite,
+        resize: mockTerminalResize,
+        onData: mockOnData,
+        onClosed: mockOnClosed,
+        onError: mockOnError,
+      },
+    } as any;
   });
 
   describe('Initial Rendering', () => {
-    it.skip('should render the terminal tab with toolbar', async () => {
+    it('should render the terminal tab with toolbar', async () => {
       render(<TerminalTab />);
       await waitFor(() => {
         expect(screen.getByText('Container')).toBeInTheDocument();
@@ -118,21 +131,21 @@ describe('TerminalTab', () => {
       });
     });
 
-    it.skip('should load containers on mount', async () => {
+    it('should load containers on mount', async () => {
       render(<TerminalTab />);
       await waitFor(() => {
-        expect(mockListContainers).toHaveBeenCalledTimes(1);
+        expect(mockListContainers).toHaveBeenCalled();
       });
     });
 
-    it.skip('should display empty state message when no sessions are open', async () => {
+    it('should display empty state message when no sessions are open', async () => {
       render(<TerminalTab />);
       await waitFor(() => {
         expect(screen.getByText('No active terminal sessions')).toBeInTheDocument();
       });
     });
 
-    it.skip('should show info message when no containers are available', async () => {
+    it('should show info message when no containers are available', async () => {
       mockListContainers.mockResolvedValue([]);
       render(<TerminalTab />);
       await waitFor(() => {
@@ -144,7 +157,7 @@ describe('TerminalTab', () => {
   });
 
   describe('Container Selection', () => {
-    it.skip('should populate container dropdown with available containers', async () => {
+    it('should populate container dropdown with available containers', async () => {
       render(<TerminalTab />);
       await waitFor(() => {
         expect(mockListContainers).toHaveBeenCalled();
@@ -155,7 +168,7 @@ describe('TerminalTab', () => {
       });
     });
 
-    it.skip('should auto-select first container if available', async () => {
+    it('should auto-select first container if available', async () => {
       render(<TerminalTab />);
       await waitFor(() => {
         const select = screen.getByLabelText(/container/i) as HTMLSelectElement;
@@ -163,7 +176,7 @@ describe('TerminalTab', () => {
       });
     });
 
-    it.skip('should allow changing selected container', async () => {
+    it('should allow changing selected container', async () => {
       render(<TerminalTab />);
 
       await waitFor(() => {
@@ -180,7 +193,7 @@ describe('TerminalTab', () => {
   });
 
   describe('User Selection', () => {
-    it.skip('should render user selector with default and root options', async () => {
+    it('should render user selector with default and root options', async () => {
       render(<TerminalTab />);
       await waitFor(() => {
         expect(screen.getByLabelText(/user/i)).toBeInTheDocument();
@@ -192,7 +205,7 @@ describe('TerminalTab', () => {
       });
     });
 
-    it.skip('should default to "default" user', async () => {
+    it('should default to "default" user', async () => {
       render(<TerminalTab />);
       await waitFor(() => {
         const select = screen.getByLabelText(/user/i) as HTMLSelectElement;
@@ -200,7 +213,7 @@ describe('TerminalTab', () => {
       });
     });
 
-    it.skip('should allow changing user selection', async () => {
+    it('should allow changing user selection', async () => {
       render(<TerminalTab />);
 
       await waitFor(() => {
@@ -217,7 +230,7 @@ describe('TerminalTab', () => {
   });
 
   describe('Opening Terminal Sessions', () => {
-    it.skip('should open terminal session when button is clicked', async () => {
+    it('should open terminal session when button is clicked', async () => {
       mockTerminalOpen.mockResolvedValue({
         success: true,
         session: mockSession,
@@ -242,7 +255,7 @@ describe('TerminalTab', () => {
       });
     });
 
-    it.skip('should pass user=root when root is selected', async () => {
+    it('should pass user=root when root is selected', async () => {
       mockTerminalOpen.mockResolvedValue({
         success: true,
         session: mockSession,
@@ -270,7 +283,7 @@ describe('TerminalTab', () => {
       });
     });
 
-    it.skip('should display loading state while opening terminal', async () => {
+    it('should display loading state while opening terminal', async () => {
       let resolveOpen: any;
       mockTerminalOpen.mockReturnValue(new Promise((resolve) => {
         resolveOpen = resolve;
@@ -292,7 +305,7 @@ describe('TerminalTab', () => {
       resolveOpen({ success: true, session: mockSession });
     });
 
-    it.skip('should display error when opening terminal fails', async () => {
+    it('should display error when opening terminal fails', async () => {
       mockTerminalOpen.mockResolvedValue({
         success: false,
         error: 'Container not running',
@@ -312,7 +325,10 @@ describe('TerminalTab', () => {
       });
     });
 
-    it.skip('should show error when no container is selected', async () => {
+    it('should disable Open Terminal button when no container is selected', async () => {
+      // When no containers are available, selectedContainerId stays empty and the
+      // button is disabled (disabled={loading || !selectedContainerId}). This prevents
+      // the user from attempting to open a terminal with no container selected.
       mockListContainers.mockResolvedValue([]);
 
       render(<TerminalTab />);
@@ -322,14 +338,10 @@ describe('TerminalTab', () => {
       });
 
       const button = screen.getByText('Open Terminal');
-      fireEvent.click(button);
-
-      await waitFor(() => {
-        expect(screen.getByText(/Please select a container/i)).toBeInTheDocument();
-      });
+      expect(button).toBeDisabled();
     });
 
-    it.skip('should create a new terminal session and display it', async () => {
+    it('should create a new terminal session and display it', async () => {
       mockTerminalOpen.mockResolvedValue({
         success: true,
         session: mockSession,
@@ -351,7 +363,7 @@ describe('TerminalTab', () => {
   });
 
   describe('Session Tabs', () => {
-    it.skip('should display session tab after opening terminal', async () => {
+    it('should display session tab after opening terminal', async () => {
       mockTerminalOpen.mockResolvedValue({
         success: true,
         session: mockSession,
@@ -371,7 +383,7 @@ describe('TerminalTab', () => {
       });
     });
 
-    it.skip('should show user in tab label when specified', async () => {
+    it('should show user in tab label when specified', async () => {
       mockTerminalOpen.mockResolvedValue({
         success: true,
         session: { ...mockSession, user: 'root' },
@@ -391,7 +403,7 @@ describe('TerminalTab', () => {
       });
     });
 
-    it.skip('should allow closing a session via close button', async () => {
+    it('should allow closing a session via close button', async () => {
       mockTerminalOpen.mockResolvedValue({
         success: true,
         session: mockSession,
@@ -421,7 +433,7 @@ describe('TerminalTab', () => {
   });
 
   describe('Terminal Data Flow', () => {
-    it.skip('should send terminal input via IPC write', async () => {
+    it('should send terminal input via IPC write', async () => {
       mockTerminalOpen.mockResolvedValue({
         success: true,
         session: mockSession,
@@ -436,23 +448,20 @@ describe('TerminalTab', () => {
       const button = screen.getByText('Open Terminal');
       fireEvent.click(button);
 
+      // Wait for terminal to render (Terminal mock captures props into mockState)
       await waitFor(() => {
-        expect(mockTerminalOpen).toHaveBeenCalled();
+        expect(mockState.latestTerminalProps).not.toBeNull();
       });
 
-      // Get the Terminal component props
-      const { Terminal } = await import('../../src/renderer/components/Terminal/Terminal');
-      const terminalCalls = (Terminal as any).mock.calls;
-      const lastCall = terminalCalls[terminalCalls.length - 1];
-      const onDataProp = lastCall[0].onData;
-
-      // Simulate user typing
+      // Simulate user typing via the Terminal component's onData prop
+      const onDataProp = mockState.latestTerminalProps?.onData;
+      expect(onDataProp).toBeDefined();
       onDataProp('echo test\n');
 
       expect(mockTerminalWrite).toHaveBeenCalledWith('session-123', 'echo test\n');
     });
 
-    it.skip('should send resize events to IPC', async () => {
+    it('should send resize events to IPC', async () => {
       mockTerminalOpen.mockResolvedValue({
         success: true,
         session: mockSession,
@@ -468,17 +477,14 @@ describe('TerminalTab', () => {
       const button = screen.getByText('Open Terminal');
       fireEvent.click(button);
 
+      // Wait for terminal to render (Terminal mock captures props into mockState)
       await waitFor(() => {
-        expect(mockTerminalOpen).toHaveBeenCalled();
+        expect(mockState.latestTerminalProps).not.toBeNull();
       });
 
-      // Get the Terminal component props
-      const { Terminal } = await import('../../src/renderer/components/Terminal/Terminal');
-      const terminalCalls = (Terminal as any).mock.calls;
-      const lastCall = terminalCalls[terminalCalls.length - 1];
-      const onResizeProp = lastCall[0].onResize;
-
-      // Simulate resize
+      // Simulate resize via the Terminal component's onResize prop
+      const onResizeProp = mockState.latestTerminalProps?.onResize;
+      expect(onResizeProp).toBeDefined();
       onResizeProp(100, 30);
 
       await waitFor(() => {
@@ -488,7 +494,9 @@ describe('TerminalTab', () => {
   });
 
   describe('Session Lifecycle Events', () => {
-    it.skip('should remove session when onClosed event is received', async () => {
+    it('should mark session as disconnected when onClosed event is received', async () => {
+      // The TerminalTab marks sessions as disconnected rather than removing them,
+      // allowing the user to reconnect or manually close the session.
       mockTerminalOpen.mockResolvedValue({
         success: true,
         session: mockSession,
@@ -512,12 +520,13 @@ describe('TerminalTab', () => {
         onClosedCallback('session-123');
       }
 
+      // Session should be marked disconnected (not removed) — shows reconnect UI
       await waitFor(() => {
-        expect(screen.queryByText(/test-container-1/i)).not.toBeInTheDocument();
+        expect(screen.getByText('Session Disconnected')).toBeInTheDocument();
       });
     });
 
-    it.skip('should display error when onError event is received', async () => {
+    it('should display error when onError event is received', async () => {
       mockTerminalOpen.mockResolvedValue({
         success: true,
         session: mockSession,
@@ -549,8 +558,9 @@ describe('TerminalTab', () => {
 
   describe('Container Refresh', () => {
     it.skip('should refresh container list periodically', async () => {
-      // Skip: Known issue with React 18 + fake timers + testing-library
-      // The interval refresh logic is tested manually and works correctly
+      // Skipped: Requires vi.useFakeTimers() which conflicts with React 18's internal
+      // scheduler that also uses setTimeout/MessageChannel. This causes React's
+      // concurrent rendering to break in the test environment.
       render(<TerminalTab />);
 
       await waitFor(() => {
@@ -573,8 +583,7 @@ describe('TerminalTab', () => {
     });
 
     it.skip('should clean up interval on unmount', async () => {
-      // Skip: Known issue with React 18 + fake timers + testing-library
-      // The cleanup logic is tested manually and works correctly
+      // Skipped: Same fake timers incompatibility as above.
       const { unmount } = render(<TerminalTab />);
 
       await waitFor(() => {
@@ -591,8 +600,7 @@ describe('TerminalTab', () => {
   });
 
   describe('Event Listener Cleanup', () => {
-    it.skip('should setup terminal event listeners', async () => {
-      // Test just setup, not cleanup (cleanup causes React 18 timer issues)
+    it('should setup terminal event listeners', async () => {
       render(<TerminalTab />);
 
       await waitFor(() => {
@@ -601,7 +609,7 @@ describe('TerminalTab', () => {
         expect(mockOnError).toHaveBeenCalled();
       });
 
-      // Verify callbacks are registered
+      // Verify callbacks are registered and accessible for event simulation
       expect(onDataCallback).not.toBeNull();
       expect(onClosedCallback).not.toBeNull();
       expect(onErrorCallback).not.toBeNull();

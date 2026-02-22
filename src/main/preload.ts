@@ -139,4 +139,26 @@ contextBridge.exposeInMainWorld('api', {
     apply: (dockerImage: string, envVars?: Record<string, string>) =>
       ipcRenderer.invoke(IPC.UPDATES_APPLY, dockerImage, envVars),
   },
+
+  images: {
+    list: () => ipcRenderer.invoke(IPC.IMAGE_LIST),
+    get: (id: string) => ipcRenderer.invoke(IPC.IMAGE_GET, id),
+    build: (config: unknown) => ipcRenderer.invoke(IPC.IMAGE_BUILD, config),
+    rebuild: (id: string) => ipcRenderer.invoke(IPC.IMAGE_REBUILD, id),
+    delete: (id: string) => ipcRenderer.invoke(IPC.IMAGE_DELETE, id),
+    onBuildProgress: (callback: (line: string) => void) => {
+      const listener = (_event: unknown, line: string) => callback(line);
+      ipcRenderer.on(IPC.IMAGE_BUILD_PROGRESS, listener);
+      // Return cleanup function
+      return () => ipcRenderer.removeListener(IPC.IMAGE_BUILD_PROGRESS, listener);
+    },
+  },
+
+  preValidation: {
+    list: () => ipcRenderer.invoke(IPC.PRE_VALIDATION_LIST),
+    get: (filename: string) => ipcRenderer.invoke(IPC.PRE_VALIDATION_GET, filename),
+    add: (filename: string, content: string) =>
+      ipcRenderer.invoke(IPC.PRE_VALIDATION_ADD, filename, content),
+    remove: (filename: string) => ipcRenderer.invoke(IPC.PRE_VALIDATION_REMOVE, filename),
+  },
 });

@@ -34,6 +34,23 @@ export interface UpdateInfo {
 export const SELF_UPDATE_PROJECT_ID = 'zephyr-self-update';
 
 /**
+ * Compare two semver version strings (X.Y.Z format).
+ * Returns positive if a > b, negative if a < b, zero if equal.
+ *
+ * @param a - First version string
+ * @param b - Second version string
+ * @returns Positive, negative, or zero
+ */
+function compareVersions(a: string, b: string): number {
+  const parse = (v: string) => v.split('.').map((n) => parseInt(n, 10) || 0);
+  const [aMaj, aMin, aPat] = parse(a);
+  const [bMaj, bMin, bPat] = parse(b);
+  if (aMaj !== bMaj) return aMaj - bMaj;
+  if (aMin !== bMin) return aMin - bMin;
+  return aPat - bPat;
+}
+
+/**
  * Manages application self-updates.
  *
  * Uses GitManager to check for new versions by fetching and comparing
@@ -112,23 +129,32 @@ export class SelfUpdater {
     const currentVersion = this.getCurrentVersion();
 
     try {
-      // Fetch the latest remote changes
-      // Note: simple-git's fetch() doesn't provide direct version comparison,
-      // so we'll use a simplified approach: fetch and check if remote is ahead
-      // Verify repo info is accessible (triggers validation)
+      // Fetch the latest remote changes so origin/HEAD is up to date
+      await this.gitManager.fetchRemote(this.appDir);
+
+      // Verify repo info is accessible
       await this.gitManager.getRepoInfo(this.appDir);
 
-      // For now, we'll consider an update available if:
-      // 1. The repository is clean (no local changes)
-      // 2. We can fetch remote commits
-      // In a real implementation, you'd parse package.json from the remote HEAD
-      // and compare versions. For this initial implementation, we'll use a
-      // simplified heuristic.
+      // Read remote package.json to get the latest published version
+      let latestVersion = currentVersion;
+      try {
+        const remoteContent = await this.gitManager.getRemoteFileContent(
+          this.appDir,
+          'origin/HEAD',
+          'package.json'
+        );
+        const remotePkg = JSON.parse(remoteContent);
+        if (remotePkg.version) {
+          latestVersion = remotePkg.version;
+        }
+      } catch {
+        // If the remote package.json cannot be read (e.g., no network, missing
+        // file), treat as no update available — don't surface a hard error.
+        latestVersion = currentVersion;
+      }
 
-      // Get recent commits to see if there are any
+      // Get recent commits for changelog
       const commits = await this.gitManager.getRecentCommits(this.appDir, 5);
-
-      // Generate changelog from recent commits
       let changelog = '';
       if (commits.length > 0) {
         changelog = commits
@@ -136,15 +162,13 @@ export class SelfUpdater {
           .join('\n');
       }
 
-      // For this implementation, we'll assume no update is available unless
-      // the repository is dirty or has unpulled commits. A complete implementation
-      // would compare package.json versions from local vs. remote HEAD.
-      // This is a placeholder that satisfies the interface requirements.
+      // An update is available only when the remote version is strictly newer
+      const available = compareVersions(latestVersion, currentVersion) > 0;
 
       return {
-        available: false, // Conservative default
+        available,
         currentVersion,
-        latestVersion: currentVersion,
+        latestVersion,
         changelog,
       };
     } catch (error) {

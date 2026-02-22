@@ -3,6 +3,12 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import { UpdatesSection } from '../../src/renderer/pages/SettingsTab/UpdatesSection';
 
+// Mock useSettings hook — controls what settings the component sees
+const mockUseSettings = vi.fn();
+vi.mock('../../src/renderer/hooks/useSettings', () => ({
+  useSettings: () => mockUseSettings(),
+}));
+
 // Mock window.api.updates
 const mockUpdates = {
   check: vi.fn(),
@@ -15,9 +21,25 @@ globalThis.window.api = {
   updates: mockUpdates,
 };
 
+const DEFAULT_IMAGE = 'zephyr-desktop:latest';
+
 describe('UpdatesSection', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // Default: settings loaded with no custom docker image
+    mockUseSettings.mockReturnValue({
+      settings: {
+        max_concurrent_containers: 5,
+        notification_enabled: true,
+        theme: 'system',
+        log_level: 'INFO',
+        self_update_docker_image: DEFAULT_IMAGE,
+      },
+      loading: false,
+      error: null,
+      refresh: vi.fn(),
+      update: vi.fn().mockResolvedValue(undefined),
+    });
     mockUpdates.check.mockResolvedValue({
       available: false,
       currentVersion: '0.1.0',
@@ -25,6 +47,7 @@ describe('UpdatesSection', () => {
     });
     mockUpdates.apply.mockResolvedValue(undefined);
   });
+
   describe('Initial State', () => {
     it('should render check button and initial message', () => {
       render(<UpdatesSection />);
@@ -43,9 +66,144 @@ describe('UpdatesSection', () => {
     });
   });
 
+  describe('Docker Image Configuration', () => {
+    it('should render docker image input with default value', () => {
+      render(<UpdatesSection />);
+
+      const input = screen.getByTestId('docker-image-input');
+      expect(input).toBeInTheDocument();
+      expect(input).toHaveValue(DEFAULT_IMAGE);
+    });
+
+    it('should load docker image from settings', () => {
+      mockUseSettings.mockReturnValue({
+        settings: {
+          max_concurrent_containers: 5,
+          notification_enabled: true,
+          theme: 'system',
+          log_level: 'INFO',
+          self_update_docker_image: 'my-custom-image:v2',
+        },
+        loading: false,
+        error: null,
+        refresh: vi.fn(),
+        update: vi.fn().mockResolvedValue(undefined),
+      });
+
+      render(<UpdatesSection />);
+
+      expect(screen.getByTestId('docker-image-input')).toHaveValue('my-custom-image:v2');
+    });
+
+    it('should default to zephyr-desktop:latest when settings has no docker image', () => {
+      mockUseSettings.mockReturnValue({
+        settings: {
+          max_concurrent_containers: 5,
+          notification_enabled: true,
+          theme: 'system',
+          log_level: 'INFO',
+        },
+        loading: false,
+        error: null,
+        refresh: vi.fn(),
+        update: vi.fn().mockResolvedValue(undefined),
+      });
+
+      render(<UpdatesSection />);
+
+      expect(screen.getByTestId('docker-image-input')).toHaveValue(DEFAULT_IMAGE);
+    });
+
+    it('should update docker image input value when user types', () => {
+      render(<UpdatesSection />);
+
+      const input = screen.getByTestId('docker-image-input');
+      fireEvent.change(input, { target: { value: 'my-image:latest' } });
+
+      expect(input).toHaveValue('my-image:latest');
+    });
+
+    it('should save updated docker image on blur', async () => {
+      const mockUpdate = vi.fn().mockResolvedValue(undefined);
+      mockUseSettings.mockReturnValue({
+        settings: {
+          max_concurrent_containers: 5,
+          notification_enabled: true,
+          theme: 'system',
+          log_level: 'INFO',
+          self_update_docker_image: DEFAULT_IMAGE,
+        },
+        loading: false,
+        error: null,
+        refresh: vi.fn(),
+        update: mockUpdate,
+      });
+
+      render(<UpdatesSection />);
+
+      const input = screen.getByTestId('docker-image-input');
+      fireEvent.change(input, { target: { value: 'my-image:v3' } });
+      fireEvent.blur(input);
+
+      await waitFor(() => {
+        expect(mockUpdate).toHaveBeenCalledWith({ self_update_docker_image: 'my-image:v3' });
+      });
+    });
+
+    it('should not save if docker image value is unchanged on blur', async () => {
+      const mockUpdate = vi.fn().mockResolvedValue(undefined);
+      mockUseSettings.mockReturnValue({
+        settings: {
+          max_concurrent_containers: 5,
+          notification_enabled: true,
+          theme: 'system',
+          log_level: 'INFO',
+          self_update_docker_image: DEFAULT_IMAGE,
+        },
+        loading: false,
+        error: null,
+        refresh: vi.fn(),
+        update: mockUpdate,
+      });
+
+      render(<UpdatesSection />);
+
+      const input = screen.getByTestId('docker-image-input');
+      fireEvent.blur(input);
+
+      expect(mockUpdate).not.toHaveBeenCalled();
+    });
+
+    it('should use default image when input is blank on blur', async () => {
+      const mockUpdate = vi.fn().mockResolvedValue(undefined);
+      mockUseSettings.mockReturnValue({
+        settings: {
+          max_concurrent_containers: 5,
+          notification_enabled: true,
+          theme: 'system',
+          log_level: 'INFO',
+          self_update_docker_image: DEFAULT_IMAGE,
+        },
+        loading: false,
+        error: null,
+        refresh: vi.fn(),
+        update: mockUpdate,
+      });
+
+      render(<UpdatesSection />);
+
+      const input = screen.getByTestId('docker-image-input');
+      fireEvent.change(input, { target: { value: '   ' } });
+      fireEvent.blur(input);
+
+      await waitFor(() => {
+        expect(input).toHaveValue(DEFAULT_IMAGE);
+      });
+    });
+  });
+
   describe('Check for Updates', () => {
     it('should call window.api.updates.check when button clicked', async () => {
-      
       mockUpdates.check.mockResolvedValue({
         available: false,
         currentVersion: '0.1.0',
@@ -61,7 +219,6 @@ describe('UpdatesSection', () => {
     });
 
     it('should disable button while checking', async () => {
-      
       mockUpdates.check.mockImplementation(
         () => new Promise((resolve) => setTimeout(resolve, 100))
       );
@@ -76,7 +233,6 @@ describe('UpdatesSection', () => {
     });
 
     it('should display version info after successful check', async () => {
-      
       mockUpdates.check.mockResolvedValue({
         available: false,
         currentVersion: '0.1.0',
@@ -94,7 +250,6 @@ describe('UpdatesSection', () => {
     });
 
     it('should display error message on check failure', async () => {
-      
       const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
       mockUpdates.check.mockRejectedValue(new Error('Network error'));
 
@@ -116,7 +271,6 @@ describe('UpdatesSection', () => {
     });
 
     it('should clear previous error when checking again', async () => {
-      
       const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
       mockUpdates.check.mockRejectedValueOnce(new Error('Network error'));
 
@@ -147,7 +301,6 @@ describe('UpdatesSection', () => {
 
   describe('No Update Available', () => {
     it('should display "no update" message when up-to-date', async () => {
-      
       mockUpdates.check.mockResolvedValue({
         available: false,
         currentVersion: '0.1.0',
@@ -167,7 +320,6 @@ describe('UpdatesSection', () => {
     });
 
     it('should not show update button when no update available', async () => {
-      
       mockUpdates.check.mockResolvedValue({
         available: false,
         currentVersion: '0.1.0',
@@ -186,7 +338,6 @@ describe('UpdatesSection', () => {
 
   describe('Update Available', () => {
     it('should display update available message', async () => {
-      
       mockUpdates.check.mockResolvedValue({
         available: true,
         currentVersion: '0.1.0',
@@ -206,7 +357,6 @@ describe('UpdatesSection', () => {
     });
 
     it('should highlight latest version when update available', async () => {
-      
       mockUpdates.check.mockResolvedValue({
         available: true,
         currentVersion: '0.1.0',
@@ -225,7 +375,6 @@ describe('UpdatesSection', () => {
     });
 
     it('should display changelog when provided', async () => {
-      
       mockUpdates.check.mockResolvedValue({
         available: true,
         currentVersion: '0.1.0',
@@ -246,7 +395,6 @@ describe('UpdatesSection', () => {
     });
 
     it('should not display changelog section when not provided', async () => {
-      
       mockUpdates.check.mockResolvedValue({
         available: true,
         currentVersion: '0.1.0',
@@ -263,7 +411,6 @@ describe('UpdatesSection', () => {
     });
 
     it('should display update button when update available', async () => {
-      
       mockUpdates.check.mockResolvedValue({
         available: true,
         currentVersion: '0.1.0',
@@ -282,8 +429,7 @@ describe('UpdatesSection', () => {
   });
 
   describe('Apply Update', () => {
-    it('should call window.api.updates.apply when update button clicked', async () => {
-      
+    it('should call window.api.updates.apply with configured docker image', async () => {
       mockUpdates.check.mockResolvedValue({
         available: true,
         currentVersion: '0.1.0',
@@ -305,12 +451,46 @@ describe('UpdatesSection', () => {
 
       await waitFor(() => {
         expect(mockUpdates.apply).toHaveBeenCalledTimes(1);
-        expect(mockUpdates.apply).toHaveBeenCalledWith('zephyr-desktop:latest');
+        expect(mockUpdates.apply).toHaveBeenCalledWith(DEFAULT_IMAGE);
+      });
+    });
+
+    it('should call apply with custom docker image when configured', async () => {
+      mockUseSettings.mockReturnValue({
+        settings: {
+          max_concurrent_containers: 5,
+          notification_enabled: true,
+          theme: 'system',
+          log_level: 'INFO',
+          self_update_docker_image: 'custom-image:v2',
+        },
+        loading: false,
+        error: null,
+        refresh: vi.fn(),
+        update: vi.fn().mockResolvedValue(undefined),
+      });
+      mockUpdates.check.mockResolvedValue({
+        available: true,
+        currentVersion: '0.1.0',
+        latestVersion: '0.2.0',
+      });
+      mockUpdates.apply.mockResolvedValue(undefined);
+
+      render(<UpdatesSection />);
+
+      fireEvent.click(screen.getByTestId('check-updates-button'));
+      await waitFor(() => {
+        expect(screen.getByTestId('apply-update-button')).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByTestId('apply-update-button'));
+
+      await waitFor(() => {
+        expect(mockUpdates.apply).toHaveBeenCalledWith('custom-image:v2');
       });
     });
 
     it('should disable update button while updating', async () => {
-      
       mockUpdates.check.mockResolvedValue({
         available: true,
         currentVersion: '0.1.0',
@@ -337,7 +517,6 @@ describe('UpdatesSection', () => {
     });
 
     it('should display error message on update failure', async () => {
-      
       const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
       mockUpdates.check.mockResolvedValue({
         available: true,
@@ -373,7 +552,6 @@ describe('UpdatesSection', () => {
     });
 
     it('should clear error when applying update again', async () => {
-      
       const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
       mockUpdates.check.mockResolvedValue({
         available: true,
@@ -408,7 +586,6 @@ describe('UpdatesSection', () => {
     });
 
     it('should not allow update when no update available', async () => {
-      
       mockUpdates.check.mockResolvedValue({
         available: false,
         currentVersion: '0.1.0',
@@ -429,7 +606,6 @@ describe('UpdatesSection', () => {
 
   describe('UI Elements', () => {
     it('should display informative note about update process', async () => {
-      
       mockUpdates.check.mockResolvedValue({
         available: true,
         currentVersion: '0.1.0',
@@ -448,7 +624,6 @@ describe('UpdatesSection', () => {
     });
 
     it('should hide initial message after checking', async () => {
-      
       mockUpdates.check.mockResolvedValue({
         available: false,
         currentVersion: '0.1.0',

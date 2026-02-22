@@ -14,6 +14,8 @@ vi.mock('simple-git', () => {
     status: vi.fn(),
     getRemotes: vi.fn(),
     log: vi.fn(),
+    fetch: vi.fn(),
+    raw: vi.fn(),
   };
 
   return {
@@ -456,6 +458,112 @@ describe('GitManager', () => {
       await expect(
         manager.getRecentCommits('/path/to/repo')
       ).rejects.toThrow('Network error');
+    });
+  });
+
+  describe('fetchRemote', () => {
+    it('should fetch from origin successfully', async () => {
+      mockExistsSync.mockReturnValue(true);
+      mockGit.revparse.mockResolvedValue('.git');
+      mockGit.fetch.mockResolvedValue(undefined);
+
+      await manager.fetchRemote('/path/to/repo');
+
+      expect(mockGit.fetch).toHaveBeenCalledWith('origin');
+    });
+
+    it('should fetch from custom remote', async () => {
+      mockExistsSync.mockReturnValue(true);
+      mockGit.revparse.mockResolvedValue('.git');
+      mockGit.fetch.mockResolvedValue(undefined);
+
+      await manager.fetchRemote('/path/to/repo', 'upstream');
+
+      expect(mockGit.fetch).toHaveBeenCalledWith('upstream');
+    });
+
+    it('should throw error if path does not exist', async () => {
+      mockExistsSync.mockReturnValue(false);
+
+      await expect(manager.fetchRemote('/nonexistent')).rejects.toThrow(
+        'Repository path does not exist'
+      );
+    });
+
+    it('should throw error if not a git repository', async () => {
+      mockExistsSync.mockReturnValue(true);
+      mockGit.revparse.mockRejectedValue(new Error('not a git repo'));
+
+      await expect(manager.fetchRemote('/path/to/repo')).rejects.toThrow(
+        'Not a valid Git repository'
+      );
+    });
+
+    it('should throw error if fetch fails', async () => {
+      mockExistsSync.mockReturnValue(true);
+      mockGit.revparse.mockResolvedValue('.git');
+      mockGit.fetch.mockRejectedValue(new Error('Connection refused'));
+
+      await expect(manager.fetchRemote('/path/to/repo')).rejects.toThrow(
+        "Failed to fetch from remote 'origin'"
+      );
+    });
+  });
+
+  describe('getRemoteFileContent', () => {
+    it('should return file content at given ref', async () => {
+      mockExistsSync.mockReturnValue(true);
+      mockGit.revparse.mockResolvedValue('.git');
+      mockGit.raw.mockResolvedValue('{"name":"zephyr","version":"0.2.0"}\n');
+
+      const content = await manager.getRemoteFileContent(
+        '/path/to/repo',
+        'origin/HEAD',
+        'package.json'
+      );
+
+      expect(content).toBe('{"name":"zephyr","version":"0.2.0"}\n');
+      expect(mockGit.raw).toHaveBeenCalledWith([
+        'show',
+        'origin/HEAD:package.json',
+      ]);
+    });
+
+    it('should support arbitrary refs (tag, branch, commit)', async () => {
+      mockExistsSync.mockReturnValue(true);
+      mockGit.revparse.mockResolvedValue('.git');
+      mockGit.raw.mockResolvedValue('content');
+
+      await manager.getRemoteFileContent('/path/to/repo', 'v1.2.3', 'README.md');
+
+      expect(mockGit.raw).toHaveBeenCalledWith(['show', 'v1.2.3:README.md']);
+    });
+
+    it('should throw error if path does not exist', async () => {
+      mockExistsSync.mockReturnValue(false);
+
+      await expect(
+        manager.getRemoteFileContent('/nonexistent', 'origin/HEAD', 'package.json')
+      ).rejects.toThrow('Repository path does not exist');
+    });
+
+    it('should throw error if not a git repository', async () => {
+      mockExistsSync.mockReturnValue(true);
+      mockGit.revparse.mockRejectedValue(new Error('not a git repo'));
+
+      await expect(
+        manager.getRemoteFileContent('/path/to/repo', 'origin/HEAD', 'package.json')
+      ).rejects.toThrow('Not a valid Git repository');
+    });
+
+    it('should throw error if file does not exist at ref', async () => {
+      mockExistsSync.mockReturnValue(true);
+      mockGit.revparse.mockResolvedValue('.git');
+      mockGit.raw.mockRejectedValue(new Error('path not in tree'));
+
+      await expect(
+        manager.getRemoteFileContent('/path/to/repo', 'origin/HEAD', 'missing.json')
+      ).rejects.toThrow("Failed to read 'missing.json' at ref 'origin/HEAD'");
     });
   });
 

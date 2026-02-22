@@ -1,7 +1,8 @@
 // Global type augmentations for the renderer process.
 // window.api is exposed by the preload script via contextBridge.
 
-import type { AppSettings, ProjectConfig } from '../../shared/models';
+import type { AppSettings, ProjectConfig, ZephyrImage, ImageBuildConfig } from '../../shared/models';
+import type { PreValidationScript } from '../../services/pre-validation-store';
 import type {
   DockerInfo,
   ContainerCreateOpts,
@@ -173,6 +174,32 @@ declare global {
         check: () => Promise<UpdateInfo>;
         /** Apply an update by starting a self-update loop */
         apply: (dockerImage: string, envVars?: Record<string, string>) => Promise<void>;
+      };
+
+      images: {
+        /** List all built images in the library */
+        list: () => Promise<ZephyrImage[]>;
+        /** Get a single image by ID */
+        get: (id: string) => Promise<ZephyrImage | null>;
+        /** Start building an image from config. Progress is streamed via onBuildProgress. */
+        build: (config: ImageBuildConfig) => Promise<ZephyrImage>;
+        /** Rebuild an image using its original config */
+        rebuild: (id: string) => Promise<ZephyrImage>;
+        /** Delete an image from the library */
+        delete: (id: string) => Promise<boolean>;
+        /** Listen for build progress lines. Returns cleanup function. */
+        onBuildProgress: (callback: (line: string) => void) => () => void;
+      };
+
+      preValidation: {
+        /** List all pre-validation scripts in ~/.zephyr/pre_validation_scripts/ */
+        list: () => Promise<PreValidationScript[]>;
+        /** Get the content of a specific script */
+        get: (filename: string) => Promise<string | null>;
+        /** Add or overwrite a custom script */
+        add: (filename: string, content: string) => Promise<void>;
+        /** Remove a script. Returns true if deleted, false if not found. */
+        remove: (filename: string) => Promise<boolean>;
       };
     };
   }
