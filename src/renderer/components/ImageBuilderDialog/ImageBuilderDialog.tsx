@@ -17,7 +17,7 @@ export interface ImageBuilderDialogProps {
   onBuilt?: (image: ZephyrImage) => void;
 }
 
-const BASE_TOOLS = ['git', 'curl', 'vim', 'jq', 'ssh', 'build-essential'];
+const BASE_TOOLS = ['git', 'curl', 'vim', 'jq', 'ssh', 'build-essential', 'playwright-deps'];
 
 /**
  * Derives a deterministic image name from the selected languages/versions.
@@ -163,7 +163,12 @@ export function ImageBuilderDialog({ isOpen, onClose, onBuilt }: ImageBuilderDia
       <div className="bg-gray-800 rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-700">
-          <h2 className="text-lg font-semibold text-white">Build New Image</h2>
+          <div className="flex items-center gap-3">
+            <h2 className="text-lg font-semibold text-white">Build New Image</h2>
+            {buildActive && (
+              <div className="animate-spin rounded-full h-4 w-4 border-2 border-blue-400 border-t-transparent" />
+            )}
+          </div>
           <button
             onClick={handleClose}
             aria-label="Close dialog"
@@ -247,7 +252,12 @@ export function ImageBuilderDialog({ isOpen, onClose, onBuilt }: ImageBuilderDia
           {/* Streaming build output */}
           {progressLines.length > 0 && (
             <div>
-              <div className="text-sm font-medium text-gray-300 mb-1">Build Output</div>
+              <div className="flex items-center gap-2 mb-1">
+                <span className="text-sm font-medium text-gray-300">Build Output</span>
+                {buildActive && (
+                  <div className="animate-spin rounded-full h-3 w-3 border-2 border-gray-400 border-t-transparent" />
+                )}
+              </div>
               <pre
                 ref={progressContainerRef}
                 data-testid="build-output"

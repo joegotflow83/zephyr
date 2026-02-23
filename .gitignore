@@ -31,10 +31,10 @@ install_claude.sh
 
 # Local dev
 docker-compose.yml
-setup_mcp
-.mcp.json
-.mcp.json.backup
 
 # Plans
 specs/*
 IMPLEMENTATION_PLAN.md
+
+# Playwright
+.playwright

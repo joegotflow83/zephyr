@@ -12,6 +12,15 @@ const COMMON_TOOLS = [
   'ca-certificates',
   'build-essential',
   'openssh-client',
+  // Playwright runtime dependencies
+  'libglib2.0-0',
+  'libnspr4',
+  'libnspr4-dev',
+  'libnss3',
+  'libatk1.0-0',
+  'libatk-bridge2.0-0',
+  'libxcomposite1',
+  'libxdamage1',
 ];
 
 export function generateDockerfile(config: ImageBuildConfig): string {
@@ -32,9 +41,11 @@ export function generateDockerfile(config: ImageBuildConfig): string {
   );
   sections.push('');
 
-  // Create ralph group and user using build arg UID/GID
+  // Create ralph group and user using build arg UID/GID.
+  // ubuntu:24.04 ships with an `ubuntu` user at UID/GID 1000, which collides
+  // when the host UID/GID is also 1000. Remove it first if present.
   sections.push(
-    'RUN groupadd -g ${HOST_GID} ralph && \\\n    useradd -m -u ${HOST_UID} -g ${HOST_GID} -s /bin/bash ralph'
+    'RUN userdel -r ubuntu 2>/dev/null || true && \\\n    groupdel ubuntu 2>/dev/null || true && \\\n    groupadd -g ${HOST_GID} ralph && \\\n    useradd -m -u ${HOST_UID} -g ${HOST_GID} -s /bin/bash ralph'
   );
 
   // Language install blocks

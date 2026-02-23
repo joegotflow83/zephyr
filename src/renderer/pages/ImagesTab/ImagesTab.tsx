@@ -130,6 +130,7 @@ export const ImagesTab: React.FC = () => {
                 <ImageRow
                   key={image.id}
                   image={image}
+                  buildActive={buildActive}
                   onRebuild={handleRebuild}
                   onDelete={handleDeleteRequest}
                 />
@@ -142,7 +143,10 @@ export const ImagesTab: React.FC = () => {
       {/* Build progress banner */}
       {buildActive && buildProgress && (
         <div className="p-4 border-t border-gray-700 bg-gray-800">
-          <div className="text-xs font-medium text-gray-400 mb-1">Build Progress</div>
+          <div className="flex items-center gap-2 mb-1">
+            <div className="animate-spin rounded-full h-3 w-3 border-2 border-green-400 border-t-transparent" />
+            <div className="text-xs font-medium text-gray-400">Build in Progress</div>
+          </div>
           <div className="text-sm text-green-300 font-mono">{buildProgress}</div>
         </div>
       )}
