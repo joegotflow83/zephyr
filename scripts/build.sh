@@ -13,6 +13,16 @@ NC='\033[0m' # No Color
 echo -e "${GREEN}=== Zephyr Desktop Build Script ===${NC}"
 echo ""
 
+# Parse arguments
+CLEAN=false
+for arg in "$@"; do
+    case $arg in
+        --clean)
+            CLEAN=true
+            ;;
+    esac
+done
+
 # Detect platform
 PLATFORM="$(uname -s)"
 case "${PLATFORM}" in
@@ -41,9 +51,20 @@ echo "Node.js version: $(node --version)"
 echo "npm version: $(npm --version)"
 echo ""
 
+# Clean build artifacts if requested
+if [ "$CLEAN" = true ]; then
+    echo -e "${YELLOW}Cleaning build artifacts (node_modules, .vite, out)...${NC}"
+    rm -rf node_modules .vite out
+    echo ""
+fi
+
 # Step 1: Install dependencies
+# Use 'npm install' instead of 'npm ci' so npm resolves the correct
+# platform-specific optional dependencies (e.g. @rollup/rollup-darwin-arm64
+# on Apple Silicon). 'npm ci' uses the lockfile verbatim, which may have
+# been generated on a different OS and won't include your platform's binary.
 echo -e "${GREEN}Step 1: Installing dependencies${NC}"
-npm ci
+npm install
 echo ""
 
 # Step 2: Lint

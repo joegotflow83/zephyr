@@ -22,10 +22,10 @@ import * as path from 'path';
 
 import { ImageBuildConfig, ZephyrImage } from '../shared/models';
 import { generateDockerfile, writeDockerfile } from './dockerfile-generator';
-import { BuildProgressEvent, DockerManager } from './docker-manager';
+import { type BuildProgressEvent, DockerManager } from './docker-manager';
 import { ImageStore } from './image-store';
 
-export { BuildProgressEvent };
+export type { BuildProgressEvent };
 
 /**
  * Derives a Docker tag from a human-readable image name.

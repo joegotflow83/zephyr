@@ -14,7 +14,7 @@ interface ImageRowProps {
 export const ImageRow: React.FC<ImageRowProps> = ({ image, onRebuild, onDelete }) => {
   const formatDate = (isoString: string) => {
     const date = new Date(isoString);
-    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
   };
 
   return (
