@@ -2,20 +2,36 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import { CredentialsSection } from '../../src/renderer/pages/SettingsTab/CredentialsSection';
+import type { AppSettings } from '../../src/shared/models';
 
-// Mock window.api.credentials
+const defaultSettings: AppSettings = {
+  max_concurrent_containers: 5,
+  notification_enabled: true,
+  theme: 'system',
+  log_level: 'INFO',
+  anthropic_auth_method: 'api_key',
+};
+
+// Mock window.api
 const mockCredentials = {
   list: vi.fn(),
   get: vi.fn(),
   store: vi.fn(),
   delete: vi.fn(),
   login: vi.fn(),
+  checkAuth: vi.fn(),
+};
+
+const mockSettings = {
+  load: vi.fn(),
+  save: vi.fn(),
 };
 
 // @ts-expect-error - mocking window.api
 globalThis.window.api = {
   ...globalThis.window.api,
   credentials: mockCredentials,
+  settings: mockSettings,
 };
 
 describe('CredentialsSection', () => {
@@ -25,342 +41,252 @@ describe('CredentialsSection', () => {
     mockCredentials.get.mockResolvedValue(null);
     mockCredentials.store.mockResolvedValue(undefined);
     mockCredentials.delete.mockResolvedValue(undefined);
-    mockCredentials.login.mockResolvedValue({ success: true, service: 'anthropic' });
+    mockCredentials.login.mockResolvedValue({ success: true, service: 'claude-code' });
+    mockCredentials.checkAuth.mockResolvedValue({
+      api_key: false,
+      browser_session: false,
+      aws_bedrock: false,
+    });
+    mockSettings.load.mockResolvedValue(defaultSettings);
+    mockSettings.save.mockResolvedValue(undefined);
   });
 
-  it('renders all three services', async () => {
+  it('renders Anthropic API Access section heading', async () => {
     render(<CredentialsSection />);
-
     await waitFor(() => {
-      expect(screen.getByText('Anthropic')).toBeInTheDocument();
-      expect(screen.getByText('OpenAI')).toBeInTheDocument();
+      expect(screen.getByText('Anthropic API Access')).toBeInTheDocument();
+    });
+  });
+
+  it('renders all three auth method cards', async () => {
+    render(<CredentialsSection />);
+    await waitFor(() => {
+      expect(screen.getByText('API Key')).toBeInTheDocument();
+      expect(screen.getByText('Browser Session')).toBeInTheDocument();
+      expect(screen.getByText('AWS Bedrock')).toBeInTheDocument();
+    });
+  });
+
+  it('renders GitHub section', async () => {
+    render(<CredentialsSection />);
+    await waitFor(() => {
       expect(screen.getByText('GitHub')).toBeInTheDocument();
     });
   });
 
-  it('displays service descriptions', async () => {
+  it('shows loading state initially', async () => {
+    mockSettings.load.mockImplementation(
+      () => new Promise((resolve) => setTimeout(() => resolve(defaultSettings), 100))
+    );
+
+    render(<CredentialsSection />);
+    expect(screen.getByText('Loading credentials...')).toBeInTheDocument();
+
+    await waitFor(
+      () => expect(screen.queryByText('Loading credentials...')).not.toBeInTheDocument(),
+      { timeout: 200 }
+    );
+  });
+
+  it('shows "Not configured" status when no credentials stored', async () => {
     render(<CredentialsSection />);
 
     await waitFor(() => {
-      expect(screen.getByText('Claude API access')).toBeInTheDocument();
-      expect(screen.getByText('GPT API access')).toBeInTheDocument();
-      expect(screen.getByText('Repository access')).toBeInTheDocument();
+      // All three Anthropic auth methods should show not configured
+      const notConfigured = screen.getAllByText('Not configured');
+      expect(notConfigured.length).toBeGreaterThanOrEqual(3);
     });
   });
 
-  it('shows "Not Set" status when no credentials stored', async () => {
-    mockCredentials.list.mockResolvedValue([]);
-
-    render(<CredentialsSection />);
-
-    await waitFor(() => {
-      const notSetBadges = screen.getAllByText('Not Set');
-      expect(notSetBadges).toHaveLength(3);
-    });
-  });
-
-  it('shows "Configured" status when credentials stored', async () => {
-    mockCredentials.list.mockResolvedValue(['anthropic', 'openai']);
-
-    render(<CredentialsSection />);
-
-    await waitFor(() => {
-      const configuredBadges = screen.getAllByText('Configured');
-      expect(configuredBadges).toHaveLength(2);
-      expect(screen.getByText('Not Set')).toBeInTheDocument();
-    });
-  });
-
-  it('displays masked keys for configured services', async () => {
-    mockCredentials.list.mockResolvedValue(['anthropic']);
-    mockCredentials.get.mockImplementation((service) => {
-      if (service === 'anthropic') return Promise.resolve('sk_t**********cdef');
-      return Promise.resolve(null);
+  it('shows "Key stored" when API key is configured', async () => {
+    mockCredentials.checkAuth.mockResolvedValue({
+      api_key: true,
+      browser_session: false,
+      aws_bedrock: false,
     });
 
     render(<CredentialsSection />);
 
     await waitFor(() => {
-      expect(screen.getByText('sk_t**********cdef')).toBeInTheDocument();
+      expect(screen.getByText('Key stored')).toBeInTheDocument();
     });
   });
 
-  it('shows Configure button for services without credentials', async () => {
-    mockCredentials.list.mockResolvedValue([]);
+  it('shows "Session stored" when browser session is configured', async () => {
+    mockCredentials.checkAuth.mockResolvedValue({
+      api_key: false,
+      browser_session: true,
+      aws_bedrock: false,
+    });
 
     render(<CredentialsSection />);
 
     await waitFor(() => {
-      const configureButtons = screen.getAllByText('Configure');
-      expect(configureButtons).toHaveLength(3);
+      expect(screen.getByText('Session stored')).toBeInTheDocument();
     });
   });
 
-  it('shows Update button for services with credentials', async () => {
-    mockCredentials.list.mockResolvedValue(['anthropic']);
+  it('shows "Configured" for Bedrock when aws_bedrock is stored', async () => {
+    mockCredentials.checkAuth.mockResolvedValue({
+      api_key: false,
+      browser_session: false,
+      aws_bedrock: true,
+    });
 
     render(<CredentialsSection />);
 
     await waitFor(() => {
-      expect(screen.getByText('Update')).toBeInTheDocument();
-      expect(screen.getAllByText('Configure')).toHaveLength(2);
+      expect(screen.getByText(/Configured/)).toBeInTheDocument();
     });
   });
 
-  it('shows Delete button only for configured services', async () => {
-    mockCredentials.list.mockResolvedValue(['anthropic']);
-
+  it('opens CredentialDialog when API Key Configure is clicked', async () => {
     render(<CredentialsSection />);
+
+    await waitFor(() => screen.getByText('API Key'));
+
+    // Click the Configure button next to API Key
+    const configureButton = screen.getAllByText('Configure')[0];
+    fireEvent.click(configureButton);
 
     await waitFor(() => {
-      const deleteButtons = screen.getAllByText('Delete');
-      expect(deleteButtons).toHaveLength(1);
+      expect(screen.getByText('Configure Anthropic Credentials')).toBeInTheDocument();
     });
   });
 
-  it('opens CredentialDialog when Configure clicked', async () => {
+  it('opens BedrockDialog when Bedrock Configure is clicked', async () => {
     render(<CredentialsSection />);
 
-    await waitFor(() => screen.getByText('Anthropic'));
+    await waitFor(() => screen.getByText('AWS Bedrock'));
 
+    // Configure buttons order: [API Key, Bedrock, GitHub] — index 1 is Bedrock
     const configureButtons = screen.getAllByText('Configure');
-    fireEvent.click(configureButtons[0]);
-
-    expect(screen.getByText('Configure Anthropic Credentials')).toBeInTheDocument();
-  });
-
-  it('opens CredentialDialog when Update clicked', async () => {
-    mockCredentials.list.mockResolvedValue(['openai']);
-
-    render(<CredentialsSection />);
-
-    await waitFor(() => screen.getByText('Update'));
-
-    const updateButton = screen.getByText('Update');
-    fireEvent.click(updateButton);
-
-    expect(screen.getByText('Configure OpenAI Credentials')).toBeInTheDocument();
-  });
-
-  it('closes dialog when Cancel clicked', async () => {
-    render(<CredentialsSection />);
-
-    await waitFor(() => screen.getByText('Anthropic'));
-
-    const configureButtons = screen.getAllByText('Configure');
-    fireEvent.click(configureButtons[0]);
-
-    const cancelButton = screen.getByText('Cancel');
-    fireEvent.click(cancelButton);
+    fireEvent.click(configureButtons[1]);
 
     await waitFor(() => {
-      expect(screen.queryByText('Configure Anthropic Credentials')).not.toBeInTheDocument();
+      expect(screen.getByText('Configure AWS Bedrock')).toBeInTheDocument();
     });
   });
 
-  it('saves API key and refreshes when Save clicked', async () => {
-    mockCredentials.store.mockResolvedValue(undefined);
-
+  it('triggers browser login when "Login via Browser" is clicked', async () => {
     render(<CredentialsSection />);
 
-    await waitFor(() => screen.getByText('Anthropic'));
+    await waitFor(() => screen.getByText('Login via Browser'));
 
-    // Open dialog
-    const configureButtons = screen.getAllByText('Configure');
-    fireEvent.click(configureButtons[0]);
-
-    // Enter key
-    const input = screen.getByPlaceholderText(/Enter your Anthropic API key/);
-    fireEvent.change(input, { target: { value: 'sk_test_key_12345' } });
-
-    // Save
-    const saveButton = screen.getByText('Save API Key');
-    fireEvent.click(saveButton);
-
-    await waitFor(() => {
-      expect(mockCredentials.store).toHaveBeenCalledWith('anthropic', 'sk_test_key_12345');
-      expect(mockCredentials.list).toHaveBeenCalledTimes(2); // Initial + after save
-    });
-  });
-
-  it('handles login mode and refreshes', async () => {
-    mockCredentials.login.mockResolvedValue({ success: true, service: 'github' });
-
-    render(<CredentialsSection />);
-
-    await waitFor(() => screen.getByText('GitHub'));
-
-    // Open dialog
-    const configureButtons = screen.getAllByText('Configure');
-    fireEvent.click(configureButtons[2]); // GitHub is third
-
-    // Click login mode
-    const loginButton = screen.getByText('Use Browser Login');
+    const loginButton = screen.getByText('Login via Browser');
     fireEvent.click(loginButton);
 
     await waitFor(() => {
-      expect(mockCredentials.login).toHaveBeenCalledWith('github');
-      expect(mockCredentials.list).toHaveBeenCalledTimes(2); // Initial + after login
+      expect(mockCredentials.login).toHaveBeenCalledWith('claude-code');
     });
   });
 
-  it('displays error when login fails', async () => {
+  it('shows error when browser login fails', async () => {
     mockCredentials.login.mockResolvedValue({
       success: false,
-      service: 'anthropic',
+      service: 'claude-code',
       error: 'Login window closed',
     });
 
     render(<CredentialsSection />);
 
-    await waitFor(() => screen.getByText('Anthropic'));
+    await waitFor(() => screen.getByText('Login via Browser'));
 
-    const configureButtons = screen.getAllByText('Configure');
-    fireEvent.click(configureButtons[0]);
-
-    const loginButton = screen.getByText('Use Browser Login');
-    fireEvent.click(loginButton);
+    fireEvent.click(screen.getByText('Login via Browser'));
 
     await waitFor(() => {
       expect(screen.getByText('Login window closed')).toBeInTheDocument();
     });
   });
 
-  it('deletes credential when Delete clicked', async () => {
-    mockCredentials.list.mockResolvedValue(['anthropic']);
-    mockCredentials.delete.mockResolvedValue(undefined);
-
+  it('saves auth method to settings when a card is clicked', async () => {
     render(<CredentialsSection />);
 
-    await waitFor(() => screen.getByText('Delete'));
+    await waitFor(() => screen.getByText('Browser Session'));
 
-    const deleteButton = screen.getByText('Delete');
-    fireEvent.click(deleteButton);
+    const browserCard = screen.getByText('Browser Session').closest('div[class*="bg-gray-900"]');
+    fireEvent.click(browserCard!);
 
     await waitFor(() => {
-      expect(mockCredentials.delete).toHaveBeenCalledWith('anthropic');
-      expect(mockCredentials.list).toHaveBeenCalledTimes(2); // Initial + after delete
+      expect(mockSettings.save).toHaveBeenCalledWith(
+        expect.objectContaining({ anthropic_auth_method: 'browser_session' })
+      );
     });
   });
 
-  it('displays error when store fails', async () => {
-    mockCredentials.store.mockRejectedValue(new Error('Encryption failed'));
-
-    render(<CredentialsSection />);
-
-    await waitFor(() => screen.getByText('Anthropic'));
-
-    const configureButtons = screen.getAllByText('Configure');
-    fireEvent.click(configureButtons[0]);
-
-    const input = screen.getByPlaceholderText(/Enter your Anthropic API key/);
-    fireEvent.change(input, { target: { value: 'sk_test' } });
-
-    const saveButton = screen.getByText('Save API Key');
-    fireEvent.click(saveButton);
-
-    await waitFor(() => {
-      expect(screen.getByText('Encryption failed')).toBeInTheDocument();
-    });
-  });
-
-  it('displays error when delete fails', async () => {
-    mockCredentials.list.mockResolvedValue(['openai']);
-    mockCredentials.delete.mockRejectedValue(new Error('Delete failed'));
-
-    render(<CredentialsSection />);
-
-    await waitFor(() => screen.getByText('Delete'));
-
-    const deleteButton = screen.getByText('Delete');
-    fireEvent.click(deleteButton);
-
-    await waitFor(() => {
-      expect(screen.getByText('Delete failed')).toBeInTheDocument();
-    });
-  });
-
-  it('displays error when load fails', async () => {
-    mockCredentials.list.mockRejectedValue(new Error('Network error'));
-
+  it('shows GitHub section with Not Set status initially', async () => {
     render(<CredentialsSection />);
 
     await waitFor(() => {
-      expect(screen.getByText('Network error')).toBeInTheDocument();
+      expect(screen.getByText('GitHub')).toBeInTheDocument();
+      expect(screen.getByText('Not Set')).toBeInTheDocument();
     });
   });
 
-  it('shows loading state initially', async () => {
-    mockCredentials.list.mockImplementation(
-      () => new Promise((resolve) => setTimeout(() => resolve([]), 100))
-    );
-
-    render(<CredentialsSection />);
-
-    expect(screen.getByText('Loading credentials...')).toBeInTheDocument();
-
-    await waitFor(
-      () => {
-        expect(screen.queryByText('Loading credentials...')).not.toBeInTheDocument();
-      },
-      { timeout: 200 }
-    );
-  });
-
-  it('displays description text', async () => {
-    render(<CredentialsSection />);
-
-    await waitFor(() => {
-      expect(
-        screen.getByText(/Store API keys or use browser login to authenticate/)
-      ).toBeInTheDocument();
-    });
-  });
-
-  it('passes masked key to dialog', async () => {
-    mockCredentials.list.mockResolvedValue(['anthropic']);
-    mockCredentials.get.mockImplementation((service) => {
-      if (service === 'anthropic') return Promise.resolve('sk_t**********cdef');
+  it('shows GitHub delete button when GitHub credential stored', async () => {
+    mockCredentials.list.mockResolvedValue(['github']);
+    mockCredentials.get.mockImplementation((service: string) => {
+      if (service === 'github') return Promise.resolve('ghp_****5678');
       return Promise.resolve(null);
     });
 
     render(<CredentialsSection />);
 
-    await waitFor(() => screen.getByText('Update'));
-
-    const updateButton = screen.getByText('Update');
-    fireEvent.click(updateButton);
-
     await waitFor(() => {
-      expect(screen.getByText('Current key:')).toBeInTheDocument();
-      expect(screen.getAllByText('sk_t**********cdef')).toHaveLength(2); // In list and dialog
+      expect(screen.getByText('Delete')).toBeInTheDocument();
     });
   });
 
-  it('clears error on successful operation', async () => {
-    mockCredentials.list.mockRejectedValueOnce(new Error('Network error'));
+  it('deletes GitHub credential when Delete clicked', async () => {
+    mockCredentials.list.mockResolvedValue(['github']);
+    mockCredentials.get.mockResolvedValue('ghp_****5678');
+
+    render(<CredentialsSection />);
+
+    await waitFor(() => screen.getByText('Delete'));
+
+    fireEvent.click(screen.getByText('Delete'));
+
+    await waitFor(() => {
+      expect(mockCredentials.delete).toHaveBeenCalledWith('github');
+    });
+  });
+
+  it('displays error when settings load fails', async () => {
+    mockSettings.load.mockRejectedValue(new Error('Settings error'));
 
     render(<CredentialsSection />);
 
     await waitFor(() => {
-      expect(screen.getByText('Network error')).toBeInTheDocument();
+      expect(screen.getByText('Settings error')).toBeInTheDocument();
     });
+  });
 
-    // Retry should clear error
-    mockCredentials.list.mockResolvedValue([]);
-    mockCredentials.store.mockResolvedValue(undefined);
+  it('saves Bedrock bearer token via credentials.store', async () => {
+    render(<CredentialsSection />);
 
-    const configureButtons = await screen.findAllByText('Configure');
-    fireEvent.click(configureButtons[0]);
+    await waitFor(() => screen.getByText('AWS Bedrock'));
 
-    const input = screen.getByPlaceholderText(/Enter your Anthropic API key/);
-    fireEvent.change(input, { target: { value: 'sk_test' } });
+    // Configure buttons order: [API Key, Bedrock, GitHub] — index 1 is Bedrock
+    const configureButtons = screen.getAllByText('Configure');
+    fireEvent.click(configureButtons[1]);
 
-    const saveButton = screen.getByText('Save API Key');
-    fireEvent.click(saveButton);
+    await waitFor(() => screen.getByText('Configure AWS Bedrock'));
+
+    // Fill in required fields
+    const regionInput = screen.getByPlaceholderText('us-east-1');
+    fireEvent.change(regionInput, { target: { value: 'us-west-2' } });
+
+    const tokenInputs = screen.getAllByPlaceholderText('Stored encrypted');
+    fireEvent.change(tokenInputs[0], { target: { value: 'my-bearer-token' } });
+
+    fireEvent.click(screen.getByText('Save'));
 
     await waitFor(() => {
-      expect(screen.queryByText('Network error')).not.toBeInTheDocument();
+      expect(mockCredentials.store).toHaveBeenCalledWith('anthropic_bedrock', 'my-bearer-token');
+      expect(mockSettings.save).toHaveBeenCalledWith(
+        expect.objectContaining({ bedrock_region: 'us-west-2' })
+      );
     });
   });
 });

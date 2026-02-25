@@ -73,7 +73,24 @@ export function registerCredentialHandlers(services: CredentialServices): void {
   ipcMain.handle(
     IPC.CREDENTIALS_LOGIN,
     async (_event, service: string): Promise<LoginResult> => {
+      if (service === 'claude-code') {
+        return loginManager.openClaudeCodeLoginSession();
+      }
       return loginManager.openLoginSession(service);
+    },
+  );
+
+  // ── Check Auth Status ─────────────────────────────────────────────────────
+
+  ipcMain.handle(
+    IPC.CREDENTIALS_CHECK_AUTH,
+    async (): Promise<{ api_key: boolean; browser_session: boolean; aws_bedrock: boolean }> => {
+      const stored = await credentialManager.listStoredServices();
+      return {
+        api_key: stored.includes('anthropic'),
+        browser_session: stored.includes('anthropic_session'),
+        aws_bedrock: stored.includes('anthropic_bedrock'),
+      };
     },
   );
 }

@@ -341,7 +341,11 @@ export const TerminalTab: React.FC = () => {
                   ? 'bg-blue-600 text-white'
                   : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
               } ${session.disconnected ? 'opacity-60' : ''}`}
-              onClick={() => setActiveSessionId(session.id)}
+              onClick={() => {
+                setActiveSessionId(session.id);
+                // Re-focus the terminal when switching tabs
+                setTimeout(() => session.terminalRef.current?.focus(), 0);
+              }}
             >
               <span className="text-sm">
                 {session.containerName}

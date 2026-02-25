@@ -17,7 +17,7 @@ export interface ImageBuilderDialogProps {
   onBuilt?: (image: ZephyrImage) => void;
 }
 
-const BASE_TOOLS = ['git', 'curl', 'vim', 'jq', 'ssh', 'build-essential', 'playwright-deps'];
+const BASE_TOOLS = ['git', 'curl', 'vim', 'jq', 'ssh', 'build-essential', 'playwright-deps', 'claude-code'];
 
 /**
  * Derives a deterministic image name from the selected languages/versions.

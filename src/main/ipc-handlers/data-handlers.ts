@@ -8,6 +8,9 @@ import type { ConfigManager } from '../../services/config-manager';
 import type { ProjectStore } from '../../services/project-store';
 import type { ImportExportService } from '../../services/import-export';
 import type { PreValidationStore } from '../../services/pre-validation-store';
+import type { HooksStore } from '../../services/hooks-store';
+import type { LoopRunner } from '../../services/loop-runner';
+import type { DockerManager } from '../../services/docker-manager';
 import type { AppSettings, ProjectConfig } from '../../shared/models';
 import { createDefaultSettings } from '../../shared/models';
 import { setLogLevel, getLogger, type LogLevel } from '../../services/logging';
@@ -28,10 +31,14 @@ export interface DataServices {
   projectStore: ProjectStore;
   importExport: ImportExportService;
   preValidationStore: PreValidationStore;
+  hooksStore: HooksStore;
+  loopRunner: LoopRunner;
+  dockerManager: DockerManager;
 }
 
 export function registerDataHandlers(services: DataServices): void {
-  const { configManager, projectStore, importExport, preValidationStore } = services;
+  const { configManager, projectStore, importExport, preValidationStore, hooksStore, loopRunner, dockerManager } =
+    services;
   const logger = getLogger('ipc');
 
   // ── Projects ──────────────────────────────────────────────────────────────
@@ -68,6 +75,31 @@ export function registerDataHandlers(services: DataServices): void {
   ipcMain.handle(
     IPC.PROJECTS_REMOVE,
     async (_event, id: string): Promise<boolean> => {
+      // Stop any running loop for this project before removing it
+      try {
+        const running = loopRunner.listRunning();
+        if (running.some((l) => l.projectId === id)) {
+          await loopRunner.stopLoop(id);
+        }
+      } catch (err) {
+        logger.warn('Failed to stop loop for deleted project', { projectId: id, err });
+      }
+
+      // Remove all Docker containers associated with this project
+      try {
+        const containers = await dockerManager.listRunningContainers();
+        const projectContainers = containers.filter((c) => c.projectId === id);
+        for (const container of projectContainers) {
+          try {
+            await dockerManager.removeContainer(container.id, true);
+          } catch (err) {
+            logger.warn('Failed to remove container for deleted project', { containerId: container.id, err });
+          }
+        }
+      } catch (err) {
+        logger.warn('Failed to list containers for deleted project', { projectId: id, err });
+      }
+
       return projectStore.removeProject(id);
     },
   );
@@ -136,5 +168,26 @@ export function registerDataHandlers(services: DataServices): void {
 
   ipcMain.handle(IPC.PRE_VALIDATION_REMOVE, async (_event, filename: string): Promise<boolean> => {
     return preValidationStore.removeScript(filename);
+  });
+
+  // ── Claude hooks ───────────────────────────────────────────────────────────
+
+  ipcMain.handle(IPC.HOOKS_LIST, async () => {
+    return hooksStore.listHooks();
+  });
+
+  ipcMain.handle(IPC.HOOKS_GET, async (_event, filename: string) => {
+    return hooksStore.getHook(filename);
+  });
+
+  ipcMain.handle(
+    IPC.HOOKS_ADD,
+    async (_event, filename: string, content: string): Promise<void> => {
+      await hooksStore.addHook(filename, content);
+    },
+  );
+
+  ipcMain.handle(IPC.HOOKS_REMOVE, async (_event, filename: string): Promise<boolean> => {
+    return hooksStore.removeHook(filename);
   });
 }

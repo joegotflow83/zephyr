@@ -3,6 +3,8 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 
 import {
   generateDockerfile,
+  generateClaudeCodeInstallBlock,
+  generateClaudeCodeConfigBlock,
   getLanguageInstallBlock,
   writeDockerfile,
 } from '../../src/services/dockerfile-generator';
@@ -90,18 +92,65 @@ describe('generateDockerfile', () => {
     };
     const result = generateDockerfile(config);
     const workdirIdx = result.indexOf('WORKDIR /home/ralph/workspace');
-    const pythonIdx = result.indexOf('deadsnakes');
+    const pythonIdx = result.indexOf('python3.12');
     expect(pythonIdx).toBeGreaterThan(0);
     expect(workdirIdx).toBeGreaterThan(pythonIdx);
   });
 
-  it('empty languages produces base-only Dockerfile without language blocks', () => {
+  it('empty languages produces base-only Dockerfile without language-specific blocks', () => {
     const config: ImageBuildConfig = { name: 'test', languages: [] };
     const result = generateDockerfile(config);
     expect(result).not.toContain('deadsnakes');
-    expect(result).not.toContain('nodesource');
     expect(result).not.toContain('rustup.rs');
     expect(result).not.toContain('golang');
+    // Node may be installed for Claude Code even when no language is selected
+  });
+
+  it('includes claude code installation by default', () => {
+    const config: ImageBuildConfig = { name: 'test', languages: [] };
+    const result = generateDockerfile(config);
+    expect(result).toContain('@anthropic-ai/claude-code');
+  });
+
+  it('installs Node 22 for claude code when nodejs not selected as language', () => {
+    const config: ImageBuildConfig = { name: 'test', languages: [] };
+    const result = generateDockerfile(config);
+    expect(result).toContain('nodesource');
+    expect(result).toContain('setup_22.x');
+  });
+
+  it('skips standalone node install for claude code when nodejs already selected', () => {
+    const config: ImageBuildConfig = {
+      name: 'test',
+      languages: [{ languageId: 'nodejs', version: '20' }],
+    };
+    const result = generateDockerfile(config);
+    // nodesource appears once (for the nodejs language block), not twice
+    expect(result.split('nodesource').length - 1).toBe(1);
+    expect(result).toContain('@anthropic-ai/claude-code');
+  });
+
+  it('omits claude code when installClaudeCode is false', () => {
+    const config: ImageBuildConfig = { name: 'test', languages: [], installClaudeCode: false };
+    const result = generateDockerfile(config);
+    expect(result).not.toContain('@anthropic-ai/claude-code');
+    expect(result).not.toContain('setup_22.x');
+  });
+
+  it('pre-configures claude settings file as ralph user', () => {
+    const config: ImageBuildConfig = { name: 'test', languages: [] };
+    const result = generateDockerfile(config);
+    expect(result).toContain('/home/ralph/.claude/settings.json');
+    expect(result).toContain('autoUpdaterStatus');
+  });
+
+  it('claude code config block appears after USER ralph', () => {
+    const config: ImageBuildConfig = { name: 'test', languages: [] };
+    const result = generateDockerfile(config);
+    const userRalphIdx = result.indexOf('USER ralph');
+    const settingsIdx = result.indexOf('/home/ralph/.claude/settings.json');
+    expect(userRalphIdx).toBeGreaterThan(0);
+    expect(settingsIdx).toBeGreaterThan(userRalphIdx);
   });
 
   it('includes python language block when python is in config', () => {
@@ -146,7 +195,7 @@ describe('generateDockerfile', () => {
     const config: ImageBuildConfig = {
       name: 'test',
       languages: [
-        { languageId: 'python', version: '3.12' },
+        { languageId: 'python', version: '3.11' },
         { languageId: 'nodejs', version: '20' },
         { languageId: 'rust', version: 'stable' },
         { languageId: 'go', version: '1.23' },
@@ -169,14 +218,14 @@ describe('generateDockerfile', () => {
     };
     const result = generateDockerfile(config);
     const nodeIdx = result.indexOf('nodesource');
-    const pythonIdx = result.indexOf('deadsnakes');
+    const pythonIdx = result.indexOf('python3.12');
     expect(nodeIdx).toBeLessThan(pythonIdx);
   });
 });
 
 describe('getLanguageInstallBlock', () => {
   it('python block includes deadsnakes PPA', () => {
-    const result = getLanguageInstallBlock({ languageId: 'python', version: '3.12' });
+    const result = getLanguageInstallBlock({ languageId: 'python', version: '3.11' });
     expect(result).toContain('deadsnakes');
   });
 
@@ -187,9 +236,13 @@ describe('getLanguageInstallBlock', () => {
   });
 
   it('python block installs pip', () => {
-    const result = getLanguageInstallBlock({ languageId: 'python', version: '3.12' });
-    expect(result).toContain('get-pip.py');
-    expect(result).toContain('python3.12');
+    // 3.12 uses Ubuntu 24.04 default repos with python3-pip
+    const result312 = getLanguageInstallBlock({ languageId: 'python', version: '3.12' });
+    expect(result312).toContain('python3-pip');
+    expect(result312).toContain('python3.12');
+    // older versions use get-pip.py via deadsnakes PPA
+    const result311 = getLanguageInstallBlock({ languageId: 'python', version: '3.11' });
+    expect(result311).toContain('get-pip.py');
   });
 
   it('nodejs block includes nodesource setup script for specified version', () => {
@@ -234,6 +287,40 @@ describe('getLanguageInstallBlock', () => {
     const result = getLanguageInstallBlock({ languageId: 'ruby', version: '3.0' });
     expect(result).toContain('# Unknown language');
     expect(result).toContain('ruby');
+  });
+});
+
+describe('generateClaudeCodeInstallBlock', () => {
+  it('includes npm install for @anthropic-ai/claude-code', () => {
+    const result = generateClaudeCodeInstallBlock(true);
+    expect(result).toContain('@anthropic-ai/claude-code');
+    expect(result).toContain('npm install -g');
+  });
+
+  it('does not add nodesource when nodejs is already available', () => {
+    const result = generateClaudeCodeInstallBlock(true);
+    expect(result).not.toContain('nodesource');
+  });
+
+  it('adds Node 22 via nodesource when nodejs is not available', () => {
+    const result = generateClaudeCodeInstallBlock(false);
+    expect(result).toContain('nodesource');
+    expect(result).toContain('setup_22.x');
+    expect(result).toContain('@anthropic-ai/claude-code');
+  });
+});
+
+describe('generateClaudeCodeConfigBlock', () => {
+  it('creates the .claude directory', () => {
+    const result = generateClaudeCodeConfigBlock();
+    expect(result).toContain('mkdir -p /home/ralph/.claude');
+  });
+
+  it('writes settings.json with autoUpdaterStatus disabled', () => {
+    const result = generateClaudeCodeConfigBlock();
+    expect(result).toContain('settings.json');
+    expect(result).toContain('autoUpdaterStatus');
+    expect(result).toContain('disabled');
   });
 });
 

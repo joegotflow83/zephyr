@@ -9,14 +9,14 @@
  * - credentials.json: { service: encryptedBase64String, ... }
  * - All values are encrypted with safeStorage.encryptString()
  *
- * Supported services: 'anthropic', 'openai', 'github'
+ * Supported services: 'anthropic', 'github'
  */
 
 import { safeStorage } from 'electron';
 import fs from 'fs';
 import path from 'path';
 
-export type CredentialService = 'anthropic' | 'openai' | 'github';
+export type CredentialService = 'anthropic' | 'github' | 'anthropic_bedrock' | 'anthropic_session';
 
 interface CredentialStorage {
   [service: string]: string; // encrypted base64

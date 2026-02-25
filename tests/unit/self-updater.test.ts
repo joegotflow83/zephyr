@@ -331,6 +331,7 @@ describe('SelfUpdater', () => {
       );
       expect(mockLoopRunner.startLoop).toHaveBeenCalledWith({
         projectId: SELF_UPDATE_PROJECT_ID,
+        projectName: 'Zephyr Self-Update',
         dockerImage,
         mode: LoopMode.SINGLE,
         envVars: undefined,
@@ -344,6 +345,7 @@ describe('SelfUpdater', () => {
 
       expect(mockLoopRunner.startLoop).toHaveBeenCalledWith({
         projectId: SELF_UPDATE_PROJECT_ID,
+        projectName: 'Zephyr Self-Update',
         dockerImage,
         mode: LoopMode.SINGLE,
         envVars,

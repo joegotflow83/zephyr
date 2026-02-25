@@ -16,6 +16,7 @@ function createMockDockerManager(): DockerManager {
     startContainer: vi.fn().mockResolvedValue(undefined),
     stopContainer: vi.fn().mockResolvedValue(undefined),
     removeContainer: vi.fn().mockResolvedValue(undefined),
+    listRunningContainers: vi.fn().mockResolvedValue([]),
     getContainerStatus: vi.fn().mockResolvedValue({
       id: 'container-123',
       state: 'running',
@@ -82,7 +83,7 @@ describe('LoopRunner', () => {
     it('creates container, starts it, and transitions to RUNNING', async () => {
       const state = await runner.startLoop({
         projectId: 'proj-123',
-        dockerImage: 'ubuntu:22.04',
+        projectName: 'Test Project',        dockerImage: 'ubuntu:22.04',
         mode: LoopMode.SINGLE,
       });
 
@@ -105,7 +106,7 @@ describe('LoopRunner', () => {
     it('passes env vars and volumes to Docker', async () => {
       await runner.startLoop({
         projectId: 'proj-123',
-        dockerImage: 'ubuntu:22.04',
+        projectName: 'Test Project',        dockerImage: 'ubuntu:22.04',
         mode: LoopMode.CONTINUOUS,
         envVars: { FOO: 'bar', BAZ: 'qux' },
         volumeMounts: ['/host/path:/container/path', '/tmp:/data'],
@@ -122,7 +123,7 @@ describe('LoopRunner', () => {
     it('passes workDir and user options', async () => {
       await runner.startLoop({
         projectId: 'proj-123',
-        dockerImage: 'ubuntu:22.04',
+        projectName: 'Test Project',        dockerImage: 'ubuntu:22.04',
         mode: LoopMode.SINGLE,
         workDir: '/workspace',
         user: 'root',
@@ -149,7 +150,7 @@ describe('LoopRunner', () => {
       await expect(
         runner.startLoop({
           projectId: 'proj-123',
-          dockerImage: '',
+          projectName: 'Test Project',          dockerImage: '',
           mode: LoopMode.SINGLE,
         }),
       ).rejects.toThrow('dockerImage must be a non-empty string');
@@ -158,14 +159,14 @@ describe('LoopRunner', () => {
     it('throws if loop is already running for project', async () => {
       await runner.startLoop({
         projectId: 'proj-123',
-        dockerImage: 'ubuntu:22.04',
+        projectName: 'Test Project',        dockerImage: 'ubuntu:22.04',
         mode: LoopMode.SINGLE,
       });
 
       await expect(
         runner.startLoop({
           projectId: 'proj-123',
-          dockerImage: 'ubuntu:22.04',
+          projectName: 'Test Project',          dockerImage: 'ubuntu:22.04',
           mode: LoopMode.SINGLE,
         }),
       ).rejects.toThrow('Loop for project proj-123 is already running');
@@ -176,20 +177,20 @@ describe('LoopRunner', () => {
 
       await runner.startLoop({
         projectId: 'proj-1',
-        dockerImage: 'ubuntu:22.04',
+        projectName: 'Test Project',        dockerImage: 'ubuntu:22.04',
         mode: LoopMode.CONTINUOUS,
       });
 
       await runner.startLoop({
         projectId: 'proj-2',
-        dockerImage: 'ubuntu:22.04',
+        projectName: 'Test Project',        dockerImage: 'ubuntu:22.04',
         mode: LoopMode.CONTINUOUS,
       });
 
       await expect(
         runner.startLoop({
           projectId: 'proj-3',
-          dockerImage: 'ubuntu:22.04',
+          projectName: 'Test Project',          dockerImage: 'ubuntu:22.04',
           mode: LoopMode.CONTINUOUS,
         }),
       ).rejects.toThrow('Concurrency limit reached: 2/2 loops running');
@@ -201,7 +202,7 @@ describe('LoopRunner', () => {
       await expect(
         runner.startLoop({
           projectId: 'proj-123',
-          dockerImage: 'ubuntu:22.04',
+          projectName: 'Test Project',          dockerImage: 'ubuntu:22.04',
           mode: LoopMode.SINGLE,
         }),
       ).rejects.toThrow('Docker unavailable');
@@ -218,7 +219,7 @@ describe('LoopRunner', () => {
       await expect(
         runner.startLoop({
           projectId: 'proj-123',
-          dockerImage: 'ubuntu:22.04',
+          projectName: 'Test Project',          dockerImage: 'ubuntu:22.04',
           mode: LoopMode.SINGLE,
         }),
       ).rejects.toThrow('Start failed');
@@ -235,7 +236,7 @@ describe('LoopRunner', () => {
     it('stops container and transitions to STOPPED', async () => {
       await runner.startLoop({
         projectId: 'proj-123',
-        dockerImage: 'ubuntu:22.04',
+        projectName: 'Test Project',        dockerImage: 'ubuntu:22.04',
         mode: LoopMode.CONTINUOUS,
       });
 
@@ -253,7 +254,7 @@ describe('LoopRunner', () => {
 
       await runner.startLoop({
         projectId: 'proj-123',
-        dockerImage: 'ubuntu:22.04',
+        projectName: 'Test Project',        dockerImage: 'ubuntu:22.04',
         mode: LoopMode.CONTINUOUS,
       });
 
@@ -269,7 +270,7 @@ describe('LoopRunner', () => {
     it('throws if loop is already in terminal state', async () => {
       await runner.startLoop({
         projectId: 'proj-123',
-        dockerImage: 'ubuntu:22.04',
+        projectName: 'Test Project',        dockerImage: 'ubuntu:22.04',
         mode: LoopMode.SINGLE,
       });
 
@@ -283,7 +284,7 @@ describe('LoopRunner', () => {
     it('transitions to FAILED if stop fails', async () => {
       await runner.startLoop({
         projectId: 'proj-123',
-        dockerImage: 'ubuntu:22.04',
+        projectName: 'Test Project',        dockerImage: 'ubuntu:22.04',
         mode: LoopMode.CONTINUOUS,
       });
 
@@ -307,7 +308,7 @@ describe('LoopRunner', () => {
 
       const startPromise = runner.startLoop({
         projectId: 'proj-123',
-        dockerImage: 'ubuntu:22.04',
+        projectName: 'Test Project',        dockerImage: 'ubuntu:22.04',
         mode: LoopMode.SINGLE,
       });
 
@@ -336,7 +337,7 @@ describe('LoopRunner', () => {
     it('returns state for existing loop', async () => {
       await runner.startLoop({
         projectId: 'proj-123',
-        dockerImage: 'ubuntu:22.04',
+        projectName: 'Test Project',        dockerImage: 'ubuntu:22.04',
         mode: LoopMode.SINGLE,
       });
 
@@ -354,13 +355,13 @@ describe('LoopRunner', () => {
     it('lists only active loops', async () => {
       await runner.startLoop({
         projectId: 'proj-1',
-        dockerImage: 'ubuntu:22.04',
+        projectName: 'Test Project',        dockerImage: 'ubuntu:22.04',
         mode: LoopMode.CONTINUOUS,
       });
 
       await runner.startLoop({
         projectId: 'proj-2',
-        dockerImage: 'ubuntu:22.04',
+        projectName: 'Test Project',        dockerImage: 'ubuntu:22.04',
         mode: LoopMode.CONTINUOUS,
       });
 
@@ -376,13 +377,13 @@ describe('LoopRunner', () => {
     it('returns all loops including terminal states', async () => {
       await runner.startLoop({
         projectId: 'proj-1',
-        dockerImage: 'ubuntu:22.04',
+        projectName: 'Test Project',        dockerImage: 'ubuntu:22.04',
         mode: LoopMode.CONTINUOUS,
       });
 
       await runner.startLoop({
         projectId: 'proj-2',
-        dockerImage: 'ubuntu:22.04',
+        projectName: 'Test Project',        dockerImage: 'ubuntu:22.04',
         mode: LoopMode.CONTINUOUS,
       });
 
@@ -399,7 +400,7 @@ describe('LoopRunner', () => {
     it('removes loop in terminal state', async () => {
       await runner.startLoop({
         projectId: 'proj-123',
-        dockerImage: 'ubuntu:22.04',
+        projectName: 'Test Project',        dockerImage: 'ubuntu:22.04',
         mode: LoopMode.SINGLE,
       });
 
@@ -412,7 +413,7 @@ describe('LoopRunner', () => {
     it('throws if loop is still active', async () => {
       await runner.startLoop({
         projectId: 'proj-123',
-        dockerImage: 'ubuntu:22.04',
+        projectName: 'Test Project',        dockerImage: 'ubuntu:22.04',
         mode: LoopMode.CONTINUOUS,
       });
 
@@ -433,7 +434,7 @@ describe('LoopRunner', () => {
 
       await runner.startLoop({
         projectId: 'proj-123',
-        dockerImage: 'ubuntu:22.04',
+        projectName: 'Test Project',        dockerImage: 'ubuntu:22.04',
         mode: LoopMode.SINGLE,
       });
 
@@ -452,7 +453,7 @@ describe('LoopRunner', () => {
 
       await runner.startLoop({
         projectId: 'proj-123',
-        dockerImage: 'ubuntu:22.04',
+        projectName: 'Test Project',        dockerImage: 'ubuntu:22.04',
         mode: LoopMode.SINGLE,
       });
 
@@ -470,7 +471,7 @@ describe('LoopRunner', () => {
 
       await runner.startLoop({
         projectId: 'proj-123',
-        dockerImage: 'ubuntu:22.04',
+        projectName: 'Test Project',        dockerImage: 'ubuntu:22.04',
         mode: LoopMode.SINGLE,
       });
 
@@ -509,7 +510,7 @@ describe('LoopRunner', () => {
 
       await runner.startLoop({
         projectId: 'proj-123',
-        dockerImage: 'ubuntu:22.04',
+        projectName: 'Test Project',        dockerImage: 'ubuntu:22.04',
         mode: LoopMode.SINGLE,
       });
 
@@ -534,7 +535,7 @@ describe('LoopRunner', () => {
 
       await runner.startLoop({
         projectId: 'proj-123',
-        dockerImage: 'ubuntu:22.04',
+        projectName: 'Test Project',        dockerImage: 'ubuntu:22.04',
         mode: LoopMode.SINGLE,
       });
 
@@ -569,7 +570,7 @@ describe('LoopRunner', () => {
 
       await runner.startLoop({
         projectId: 'proj-123',
-        dockerImage: 'ubuntu:22.04',
+        projectName: 'Test Project',        dockerImage: 'ubuntu:22.04',
         mode: LoopMode.SINGLE,
       });
 
@@ -596,7 +597,7 @@ describe('LoopRunner', () => {
 
       await runner.startLoop({
         projectId: 'proj-123',
-        dockerImage: 'ubuntu:22.04',
+        projectName: 'Test Project',        dockerImage: 'ubuntu:22.04',
         mode: LoopMode.SINGLE,
       });
 
@@ -621,7 +622,7 @@ describe('LoopRunner', () => {
 
       await runner.startLoop({
         projectId: 'proj-123',
-        dockerImage: 'ubuntu:22.04',
+        projectName: 'Test Project',        dockerImage: 'ubuntu:22.04',
         mode: LoopMode.CONTINUOUS,
       });
 
@@ -644,7 +645,7 @@ describe('LoopRunner', () => {
 
       await runner.startLoop({
         projectId: 'proj-123',
-        dockerImage: 'ubuntu:22.04',
+        projectName: 'Test Project',        dockerImage: 'ubuntu:22.04',
         mode: LoopMode.SINGLE,
       });
 

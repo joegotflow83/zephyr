@@ -208,6 +208,7 @@ export class SelfUpdater {
     // Start the loop
     await this.loopRunner.startLoop({
       projectId: SELF_UPDATE_PROJECT_ID,
+      projectName: 'Zephyr Self-Update',
       dockerImage,
       mode: LoopMode.SINGLE,
       envVars,

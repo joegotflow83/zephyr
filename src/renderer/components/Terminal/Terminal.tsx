@@ -22,6 +22,7 @@ export interface TerminalProps {
 export interface TerminalHandle {
   write: (data: string) => void;
   clear: () => void;
+  focus: () => void;
   search: () => void;
   copy: () => void;
   paste: (text: string) => void;
@@ -46,6 +47,9 @@ export const Terminal = forwardRef<TerminalHandle, TerminalProps>(
       },
       clear: () => {
         xtermRef.current?.clear();
+      },
+      focus: () => {
+        xtermRef.current?.focus();
       },
       search: () => {
         if (searchAddonRef.current && xtermRef.current) {
@@ -166,6 +170,9 @@ export const Terminal = forwardRef<TerminalHandle, TerminalProps>(
 
       // Fit to container size
       fitAddon.fit();
+
+      // Focus the terminal so keyboard input works immediately
+      terminal.focus();
 
       // Handle data events
       if (onData) {

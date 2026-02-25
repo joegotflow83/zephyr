@@ -111,7 +111,7 @@ describe('Loop Workflow Integration', () => {
     // Start the loop
     const initialState = await loopRunner.startLoop({
       projectId: project.id,
-      dockerImage: 'ubuntu:22.04',
+      projectName: project.name,      dockerImage: 'ubuntu:22.04',
       mode: LoopMode.SINGLE,
     });
 
@@ -180,7 +180,7 @@ describe('Loop Workflow Integration', () => {
     // Start loop
     await loopRunner.startLoop({
       projectId: project.id,
-      dockerImage: 'ubuntu:22.04',
+      projectName: project.name,      dockerImage: 'ubuntu:22.04',
       mode: LoopMode.CONTINUOUS,
     });
 
@@ -248,7 +248,7 @@ describe('Loop Workflow Integration', () => {
     // Start loop with custom runner
     await customRunner.startLoop({
       projectId: project.id,
-      dockerImage: 'ubuntu:22.04',
+      projectName: project.name,      dockerImage: 'ubuntu:22.04',
       mode: LoopMode.CONTINUOUS,
     });
 
@@ -289,13 +289,13 @@ describe('Loop Workflow Integration', () => {
     // Start first two (should succeed, limit is 2)
     await loopRunner.startLoop({
       projectId: p1.id,
-      dockerImage: 'ubuntu:22.04',
+      projectName: p1.name,      dockerImage: 'ubuntu:22.04',
       mode: LoopMode.CONTINUOUS,
     });
 
     await loopRunner.startLoop({
       projectId: p2.id,
-      dockerImage: 'ubuntu:22.04',
+      projectName: p2.name,      dockerImage: 'ubuntu:22.04',
       mode: LoopMode.CONTINUOUS,
     });
 
@@ -305,7 +305,7 @@ describe('Loop Workflow Integration', () => {
     await expect(
       loopRunner.startLoop({
         projectId: p3.id,
-        dockerImage: 'ubuntu:22.04',
+        projectName: p3.name,        dockerImage: 'ubuntu:22.04',
         mode: LoopMode.CONTINUOUS,
       }),
     ).rejects.toThrow(/Concurrency limit reached/);
@@ -315,7 +315,7 @@ describe('Loop Workflow Integration', () => {
 
     await loopRunner.startLoop({
       projectId: p3.id,
-      dockerImage: 'ubuntu:22.04',
+      projectName: p3.name,      dockerImage: 'ubuntu:22.04',
       mode: LoopMode.CONTINUOUS,
     });
 
@@ -335,12 +335,12 @@ describe('Loop Workflow Integration', () => {
     // Start two (max is 2)
     await loopRunner.startLoop({
       projectId: p1.id,
-      dockerImage: 'ubuntu:22.04',
+      projectName: p1.name,      dockerImage: 'ubuntu:22.04',
       mode: LoopMode.CONTINUOUS,
     });
     await loopRunner.startLoop({
       projectId: p2.id,
-      dockerImage: 'ubuntu:22.04',
+      projectName: p2.name,      dockerImage: 'ubuntu:22.04',
       mode: LoopMode.CONTINUOUS,
     });
 
@@ -350,7 +350,7 @@ describe('Loop Workflow Integration', () => {
     // Now third should succeed
     await loopRunner.startLoop({
       projectId: p3.id,
-      dockerImage: 'ubuntu:22.04',
+      projectName: p3.name,      dockerImage: 'ubuntu:22.04',
       mode: LoopMode.CONTINUOUS,
     });
 
@@ -377,7 +377,7 @@ describe('Loop Workflow Integration', () => {
         id: 'existing-container-123',
         name: 'zephyr-existing',
         projectId: project.id,
-        created: new Date(Date.now() - 60000).toISOString(), // Started 1 minute ago
+        projectName: project.name,        created: new Date(Date.now() - 60000).toISOString(), // Started 1 minute ago
       },
     ];
 
@@ -478,7 +478,7 @@ describe('Loop Workflow Integration', () => {
       schedule,
       {
         projectId: project.id,
-        dockerImage: 'ubuntu:22.04',
+        projectName: project.name,        dockerImage: 'ubuntu:22.04',
       },
     );
 
@@ -514,7 +514,7 @@ describe('Loop Workflow Integration', () => {
       schedule,
       {
         projectId: project.id,
-        dockerImage: 'ubuntu:22.04',
+        projectName: project.name,        dockerImage: 'ubuntu:22.04',
       },
     );
 
@@ -540,12 +540,12 @@ describe('Loop Workflow Integration', () => {
 
     await scheduler.scheduleLoop(p1.id, schedule1, {
       projectId: p1.id,
-      dockerImage: 'ubuntu:22.04',
+      projectName: p1.name,      dockerImage: 'ubuntu:22.04',
     });
 
     await scheduler.scheduleLoop(p2.id, schedule2, {
       projectId: p2.id,
-      dockerImage: 'ubuntu:22.04',
+      projectName: p2.name,      dockerImage: 'ubuntu:22.04',
     });
 
     const scheduled = scheduler.listScheduled();
@@ -567,13 +567,13 @@ describe('Loop Workflow Integration', () => {
     // Start and stop one
     await loopRunner.startLoop({
       projectId: p1.id,
-      dockerImage: 'ubuntu:22.04',
+      projectName: p1.name,      dockerImage: 'ubuntu:22.04',
       mode: LoopMode.CONTINUOUS,
     });
 
     await loopRunner.startLoop({
       projectId: p2.id,
-      dockerImage: 'ubuntu:22.04',
+      projectName: p2.name,      dockerImage: 'ubuntu:22.04',
       mode: LoopMode.SINGLE,
     });
     await loopRunner.stopLoop(p2.id);
@@ -599,7 +599,7 @@ describe('Loop Workflow Integration', () => {
 
     await loopRunner.startLoop({
       projectId: project.id,
-      dockerImage: 'ubuntu:22.04',
+      projectName: project.name,      dockerImage: 'ubuntu:22.04',
       mode: LoopMode.SINGLE,
     });
 
@@ -623,7 +623,7 @@ describe('Loop Workflow Integration', () => {
 
     await loopRunner.startLoop({
       projectId: project.id,
-      dockerImage: 'ubuntu:22.04',
+      projectName: project.name,      dockerImage: 'ubuntu:22.04',
       mode: LoopMode.CONTINUOUS,
     });
 
@@ -649,7 +649,7 @@ describe('Loop Workflow Integration', () => {
     await expect(
       loopRunner.startLoop({
         projectId: project.id,
-        dockerImage: 'ubuntu:22.04',
+        projectName: project.name,        dockerImage: 'ubuntu:22.04',
         mode: LoopMode.SINGLE,
       }),
     ).rejects.toThrow('Image not found');
@@ -669,7 +669,7 @@ describe('Loop Workflow Integration', () => {
 
     await loopRunner.startLoop({
       projectId: project.id,
-      dockerImage: 'ubuntu:22.04',
+      projectName: project.name,      dockerImage: 'ubuntu:22.04',
       mode: LoopMode.SINGLE,
     });
 
@@ -677,7 +677,7 @@ describe('Loop Workflow Integration', () => {
     await expect(
       loopRunner.startLoop({
         projectId: project.id,
-        dockerImage: 'ubuntu:22.04',
+        projectName: project.name,        dockerImage: 'ubuntu:22.04',
         mode: LoopMode.SINGLE,
       }),
     ).rejects.toThrow(/already running/);

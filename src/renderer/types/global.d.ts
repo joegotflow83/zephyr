@@ -3,6 +3,7 @@
 
 import type { AppSettings, ProjectConfig, ZephyrImage, ImageBuildConfig } from '../../shared/models';
 import type { PreValidationScript } from '../../services/pre-validation-store';
+import type { HookFile } from '../../services/hooks-store';
 import type {
   DockerInfo,
   ContainerCreateOpts,
@@ -98,6 +99,8 @@ declare global {
         list: () => Promise<string[]>;
         /** Open browser-based login window for a service */
         login: (service: string) => Promise<LoginResult>;
+        /** Check which auth methods are currently configured */
+        checkAuth: () => Promise<{ api_key: boolean; browser_session: boolean; aws_bedrock: boolean }>;
       };
 
       loops: {
@@ -199,6 +202,17 @@ declare global {
         /** Add or overwrite a custom script */
         add: (filename: string, content: string) => Promise<void>;
         /** Remove a script. Returns true if deleted, false if not found. */
+        remove: (filename: string) => Promise<boolean>;
+      };
+
+      hooks: {
+        /** List all hook files in ~/.zephyr/hooks/ */
+        list: () => Promise<HookFile[]>;
+        /** Get the content of a specific hook file */
+        get: (filename: string) => Promise<string | null>;
+        /** Add or overwrite a hook file */
+        add: (filename: string, content: string) => Promise<void>;
+        /** Remove a hook file. Returns true if deleted, false if not found. */
         remove: (filename: string) => Promise<boolean>;
       };
     };

@@ -13,6 +13,7 @@ import { ProjectConfig, createProjectConfig } from '../../../shared/models';
 import type { ZephyrImage } from '../../../shared/models';
 import { PromptEditor } from './PromptEditor';
 import { PreValidationSection } from './PreValidationSection';
+import { HooksSection } from './HooksSection';
 import { useImages } from '../../hooks/useImages';
 import { ImageBuilderDialog } from '../ImageBuilderDialog/ImageBuilderDialog';
 
@@ -30,14 +31,16 @@ type ImageMode = 'library' | 'custom';
  * Includes form validation and custom prompt management.
  */
 export const ProjectDialog: React.FC<ProjectDialogProps> = ({ mode, project, onSave, onClose }) => {
-  const { images } = useImages();
+  const { images, refresh: refreshImages } = useImages();
 
   // Form fields
   const [name, setName] = useState('');
   const [repoUrl, setRepoUrl] = useState('');
+  const [localPath, setLocalPath] = useState('');
   const [dockerImage, setDockerImage] = useState('ubuntu:24.04');
   const [customPrompts, setCustomPrompts] = useState<Record<string, string>>({});
   const [preValidationScripts, setPreValidationScripts] = useState<string[]>([]);
+  const [hooks, setHooks] = useState<string[]>([]);
 
   // Image picker state: library = pick from ZephyrImage library, custom = free-text
   const [imageMode, setImageMode] = useState<ImageMode>('custom');
@@ -48,15 +51,22 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({ mode, project, onS
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [showPromptEditor, setShowPromptEditor] = useState(false);
 
+  // Fetch images when the dialog opens so the library is always up to date.
+  useEffect(() => {
+    refreshImages();
+  }, [refreshImages]);
+
   // Initialize form from project data in edit mode, or set defaults for add mode.
   // Default image mode: library if images exist, custom if library is empty.
   useEffect(() => {
     if (mode === 'edit' && project) {
       setName(project.name);
       setRepoUrl(project.repo_url);
+      setLocalPath(project.local_path ?? '');
       setDockerImage(project.docker_image);
       setCustomPrompts(project.custom_prompts);
       setPreValidationScripts(project.pre_validation_scripts ?? []);
+      setHooks(project.hooks ?? []);
       setImageId(project.image_id);
       setImageMode(project.image_id ? 'library' : images.length > 0 ? 'library' : 'custom');
     } else {
@@ -64,16 +74,21 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({ mode, project, onS
       setImageMode(images.length > 0 ? 'library' : 'custom');
       setImageId(undefined);
       setPreValidationScripts([]);
+      setHooks([]);
     }
-  }, [mode, project]);
+  }, [mode, project, images.length]);
 
-  // Validate repo URL format
+  // Validate repo URL (git/remote URLs only)
   const validateRepoUrl = (url: string): boolean => {
     if (!url) return true; // Optional field
-
-    // Basic URL validation (http/https/git/file paths)
-    const urlPattern = /^(https?:\/\/|git@|file:\/\/|\/|\.\/|\.\.\/)/i;
+    const urlPattern = /^(https?:\/\/|git@|git:\/\/)/i;
     return urlPattern.test(url);
+  };
+
+  // Validate local path (must be an absolute path)
+  const validateLocalPath = (path: string): boolean => {
+    if (!path) return true; // Optional field
+    return path.startsWith('/');
   };
 
   // Handle form submission
@@ -89,7 +104,12 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({ mode, project, onS
 
     const trimmedRepoUrl = repoUrl.trim();
     if (trimmedRepoUrl && !validateRepoUrl(trimmedRepoUrl)) {
-      newErrors.repoUrl = 'Invalid repository URL format';
+      newErrors.repoUrl = 'Must be a valid git URL (https://, git@, or git://)';
+    }
+
+    const trimmedLocalPath = localPath.trim();
+    if (trimmedLocalPath && !validateLocalPath(trimmedLocalPath)) {
+      newErrors.localPath = 'Must be an absolute path (starting with /)';
     }
 
     if (Object.keys(newErrors).length > 0) {
@@ -110,18 +130,22 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({ mode, project, onS
             ...project,
             name: name.trim(),
             repo_url: trimmedRepoUrl,
+            local_path: trimmedLocalPath || undefined,
             docker_image: effectiveDockerImage,
             image_id: effectiveImageId,
             pre_validation_scripts: preValidationScripts,
+            hooks,
             custom_prompts: customPrompts,
             updated_at: new Date().toISOString(),
           }
         : createProjectConfig({
             name: name.trim(),
             repo_url: trimmedRepoUrl,
+            local_path: trimmedLocalPath || undefined,
             docker_image: effectiveDockerImage,
             image_id: effectiveImageId,
             pre_validation_scripts: preValidationScripts,
+            hooks,
             custom_prompts: customPrompts,
           });
 
@@ -226,7 +250,33 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({ mode, project, onS
                 <p className="mt-1 text-sm text-red-400">{errors.repoUrl}</p>
               )}
               <p className="mt-1 text-xs text-gray-400">
-                Git repository URL, local path, or leave empty
+                Git repository URL (optional) — e.g. https://github.com/user/repo or git@github.com:user/repo
+              </p>
+            </div>
+
+            {/* Local Path field */}
+            <div className="mb-4">
+              <label htmlFor="localPath" className="block text-sm font-medium text-gray-300 mb-2">
+                Local Path
+              </label>
+              <input
+                id="localPath"
+                type="text"
+                value={localPath}
+                onChange={(e) => {
+                  setLocalPath(e.target.value);
+                  setErrors((prev) => ({ ...prev, localPath: '' }));
+                }}
+                className={`w-full px-3 py-2 bg-gray-700 border ${
+                  errors.localPath ? 'border-red-500' : 'border-gray-600'
+                } rounded text-white focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                placeholder="/home/user/my-project"
+              />
+              {errors.localPath && (
+                <p className="mt-1 text-sm text-red-400">{errors.localPath}</p>
+              )}
+              <p className="mt-1 text-xs text-gray-400">
+                Absolute path on your machine to mount into the container at <code className="bg-gray-700 px-1 rounded">/workspace</code> (optional)
               </p>
             </div>
 
@@ -321,6 +371,9 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({ mode, project, onS
               selected={preValidationScripts}
               onChange={setPreValidationScripts}
             />
+
+            {/* Claude Hooks section */}
+            <HooksSection selected={hooks} onChange={setHooks} />
 
             {/* Custom Prompts section */}
             <div className="mb-6">

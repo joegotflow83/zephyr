@@ -151,6 +151,7 @@ const {
   mockSelfUpdater,
   mockCleanupManager,
   mockPreValidationStore,
+  mockHooksStore,
   MockConfigManager,
   MockProjectStore,
   MockImportExportService,
@@ -167,6 +168,7 @@ const {
   MockSelfUpdater,
   MockCleanupManager,
   MockPreValidationStore,
+  MockHooksStore,
 } = vi.hoisted(() => {
   const mockConfigManager = {
     loadJson: vi.fn(),
@@ -290,6 +292,9 @@ const {
   const mockPreValidationStore = {};
   const MockPreValidationStore = vi.fn(function() { return mockPreValidationStore; });
 
+  const mockHooksStore = {};
+  const MockHooksStore = vi.fn(function() { return mockHooksStore; });
+
   return {
     mockConfigManager,
     mockProjectStore,
@@ -307,6 +312,7 @@ const {
     mockSelfUpdater,
     mockCleanupManager,
     mockPreValidationStore,
+    mockHooksStore,
     MockConfigManager,
     MockProjectStore,
     MockImportExportService,
@@ -323,6 +329,7 @@ const {
     MockSelfUpdater,
     MockCleanupManager,
     MockPreValidationStore,
+    MockHooksStore,
   };
 });
 
@@ -388,6 +395,10 @@ vi.mock('../../src/services/cleanup-manager', () => ({
 
 vi.mock('../../src/services/pre-validation-store', () => ({
   PreValidationStore: MockPreValidationStore,
+}));
+
+vi.mock('../../src/services/hooks-store', () => ({
+  HooksStore: MockHooksStore,
 }));
 
 // ── Mock logging ─────────────────────────────────────────────────────────────
@@ -594,12 +605,15 @@ describe('Main Entry Point', () => {
   });
 
   describe('IPC Handler Registration', () => {
-    it('should register data handlers with ConfigManager, ProjectStore, ImportExport, and PreValidationStore', () => {
+    it('should register data handlers with ConfigManager, ProjectStore, ImportExport, PreValidationStore, HooksStore, LoopRunner, and DockerManager', () => {
       expect(mockRegisterDataHandlers).toHaveBeenCalledWith({
         configManager: mockConfigManager,
         projectStore: mockProjectStore,
         importExport: mockImportExport,
         preValidationStore: mockPreValidationStore,
+        hooksStore: mockHooksStore,
+        loopRunner: mockLoopRunner,
+        dockerManager: mockDockerManager,
       });
     });
 
@@ -617,12 +631,18 @@ describe('Main Entry Point', () => {
       });
     });
 
-    it('should register loop handlers with LoopRunner, Scheduler, and CleanupManager', () => {
-      expect(mockRegisterLoopHandlers).toHaveBeenCalledWith({
-        loopRunner: mockLoopRunner,
-        scheduler: mockScheduler,
-        cleanupManager: mockCleanupManager,
-      });
+    it('should register loop handlers with LoopRunner, Scheduler, CleanupManager, and injection services', () => {
+      expect(mockRegisterLoopHandlers).toHaveBeenCalledWith(
+        expect.objectContaining({
+          loopRunner: mockLoopRunner,
+          scheduler: mockScheduler,
+          cleanupManager: mockCleanupManager,
+          projectStore: mockProjectStore,
+          preValidationStore: mockPreValidationStore,
+          hooksStore: mockHooksStore,
+          dockerManager: mockDockerManager,
+        })
+      );
     });
 
     it('should register log handlers with LogExporter and LoopRunner', () => {

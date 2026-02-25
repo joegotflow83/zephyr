@@ -83,6 +83,16 @@ const mockPreValidationStore = {
   removeScript: vi.fn(),
 };
 
+const mockLoopRunner = {
+  listRunning: vi.fn(),
+  stopLoop: vi.fn(),
+};
+
+const mockDockerManager = {
+  listRunningContainers: vi.fn(),
+  removeContainer: vi.fn(),
+};
+
 // ── Setup ─────────────────────────────────────────────────────────────────────
 
 describe('registerDataHandlers', () => {
@@ -92,11 +102,15 @@ describe('registerDataHandlers', () => {
     for (const key of Object.keys(handlerRegistry)) {
       delete handlerRegistry[key];
     }
+    mockLoopRunner.listRunning.mockReturnValue([]);
+    mockDockerManager.listRunningContainers.mockResolvedValue([]);
     registerDataHandlers({
       configManager: mockConfigManager as never,
       projectStore: mockProjectStore as never,
       importExport: mockImportExport as never,
       preValidationStore: mockPreValidationStore as never,
+      loopRunner: mockLoopRunner as never,
+      dockerManager: mockDockerManager as never,
     });
   });
 
@@ -168,6 +182,38 @@ describe('registerDataHandlers', () => {
       mockProjectStore.removeProject.mockResolvedValue(false);
       const result = await invoke(IPC.PROJECTS_REMOVE, 'ghost-id');
       expect(result).toBe(false);
+    });
+
+    it('stops a running loop before removing the project', async () => {
+      const id = 'running-project';
+      mockLoopRunner.listRunning.mockReturnValue([{ projectId: id }]);
+      mockLoopRunner.stopLoop.mockResolvedValue(undefined);
+      mockProjectStore.removeProject.mockResolvedValue(true);
+      await invoke(IPC.PROJECTS_REMOVE, id);
+      expect(mockLoopRunner.stopLoop).toHaveBeenCalledWith(id);
+    });
+
+    it('removes all containers associated with the project', async () => {
+      const id = 'proj-with-containers';
+      mockDockerManager.listRunningContainers.mockResolvedValue([
+        { id: 'c1', projectId: id, state: 'running' },
+        { id: 'c2', projectId: id, state: 'exited' },
+        { id: 'c3', projectId: 'other-project', state: 'running' },
+      ]);
+      mockProjectStore.removeProject.mockResolvedValue(true);
+      await invoke(IPC.PROJECTS_REMOVE, id);
+      expect(mockDockerManager.removeContainer).toHaveBeenCalledWith('c1', true);
+      expect(mockDockerManager.removeContainer).toHaveBeenCalledWith('c2', true);
+      expect(mockDockerManager.removeContainer).not.toHaveBeenCalledWith('c3', true);
+    });
+
+    it('still removes the project even if container cleanup fails', async () => {
+      const id = 'proj-cleanup-fail';
+      mockDockerManager.listRunningContainers.mockRejectedValue(new Error('Docker unavailable'));
+      mockProjectStore.removeProject.mockResolvedValue(true);
+      const result = await invoke(IPC.PROJECTS_REMOVE, id);
+      expect(mockProjectStore.removeProject).toHaveBeenCalledWith(id);
+      expect(result).toBe(true);
     });
   });
 

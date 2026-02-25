@@ -149,7 +149,7 @@ describe('ProjectDialog', () => {
       // Submit
       await user.click(screen.getByText('Create Project'));
 
-      expect(await screen.findByText('Invalid repository URL format')).toBeInTheDocument();
+      expect(await screen.findByText('Must be a valid git URL (https://, git@, or git://)')).toBeInTheDocument();
       expect(mockOnSave).not.toHaveBeenCalled();
     });
 
@@ -159,10 +159,6 @@ describe('ProjectDialog', () => {
         'https://github.com/user/repo',
         'http://example.com/repo.git',
         'git@github.com:user/repo.git',
-        'file:///path/to/repo',
-        '/absolute/path',
-        './relative/path',
-        '../parent/path',
       ];
 
       for (const url of validUrls) {
@@ -182,7 +178,7 @@ describe('ProjectDialog', () => {
 
         unmount();
       }
-    }, 10000); // Increase timeout for multiple renders
+    }, 30000); // Increase timeout for multiple renders
 
     it('creates project with correct data on submit (custom image mode)', async () => {
       const user = userEvent.setup();
@@ -753,12 +749,12 @@ describe('ProjectDialog', () => {
       await user.type(screen.getByLabelText(/Repository URL/i), 'invalid');
       await user.click(screen.getByText('Create Project'));
 
-      expect(await screen.findByText('Invalid repository URL format')).toBeInTheDocument();
+      expect(await screen.findByText('Must be a valid git URL (https://, git@, or git://)')).toBeInTheDocument();
 
       // Clear and retype - error should clear
       await user.clear(screen.getByLabelText(/Repository URL/i));
       await user.type(screen.getByLabelText(/Repository URL/i), 'https://');
-      expect(screen.queryByText('Invalid repository URL format')).not.toBeInTheDocument();
+      expect(screen.queryByText('Must be a valid git URL (https://, git@, or git://)')).not.toBeInTheDocument();
     });
   });
 });

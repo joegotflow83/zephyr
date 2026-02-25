@@ -60,6 +60,8 @@ export interface ImageBuildConfig {
   name: string;
   languages: LanguageSelection[];
   baseTools?: string[];
+  /** Install Claude Code globally during the image build. Defaults to true. */
+  installClaudeCode?: boolean;
 }
 
 /**
@@ -84,14 +86,18 @@ export interface ProjectConfig {
   id: string;
   /** Human-readable project name */
   name: string;
-  /** Git repository URL or local path */
+  /** Git repository URL (e.g. https://github.com/user/repo or git@github.com:user/repo) */
   repo_url: string;
+  /** Absolute host path to mount into the container at /workspace */
+  local_path?: string;
   /** Docker image to use for the container */
   docker_image: string;
   /** ID of a ZephyrImage from the image library, if using a built image */
   image_id?: string;
   /** Filenames of pre-validation scripts to run before each loop */
   pre_validation_scripts: string[];
+  /** Filenames of hook files to inject into ~/.claude/hooks in the container */
+  hooks: string[];
   /** Map of prompt filename → content for custom agent instructions */
   custom_prompts: Record<string, string>;
   /** ISO 8601 creation timestamp */
@@ -99,6 +105,14 @@ export interface ProjectConfig {
   /** ISO 8601 last-updated timestamp */
   updated_at: string;
 }
+
+/**
+ * Authentication method for Anthropic API access.
+ * - api_key: ANTHROPIC_API_KEY injected as env var
+ * - browser_session: claude.ai cookies written to ~/.claude.json in container
+ * - aws_bedrock: AWS Bedrock env vars injected at container start
+ */
+export type AnthropicAuthMethod = 'api_key' | 'browser_session' | 'aws_bedrock';
 
 /**
  * Global application settings persisted to ~/.zephyr/settings.json
@@ -114,6 +128,16 @@ export interface AppSettings {
   log_level: 'DEBUG' | 'INFO' | 'WARNING' | 'ERROR';
   /** Docker image used when running the self-update loop */
   self_update_docker_image?: string;
+  /** Which Anthropic auth method to inject into containers */
+  anthropic_auth_method: AnthropicAuthMethod;
+  /** AWS region for Bedrock access */
+  bedrock_region?: string;
+  /** Anthropic model override for Bedrock */
+  bedrock_model?: string;
+  /** Small/fast model override for Bedrock */
+  bedrock_small_fast_model?: string;
+  /** Anthropic log level for Bedrock */
+  bedrock_log?: string;
 }
 
 /**
@@ -126,6 +150,7 @@ export function createDefaultSettings(): AppSettings {
     theme: 'system',
     log_level: 'INFO',
     self_update_docker_image: 'zephyr-desktop:latest',
+    anthropic_auth_method: 'api_key',
   };
 }
 
@@ -162,9 +187,11 @@ export function createProjectConfig(partial: Partial<ProjectConfig> = {}): Proje
     id: partial.id ?? generateUUID(),
     name: partial.name ?? '',
     repo_url: partial.repo_url ?? '',
+    local_path: partial.local_path,
     docker_image: partial.docker_image ?? 'ubuntu:24.04',
     image_id: partial.image_id,
     pre_validation_scripts: partial.pre_validation_scripts ?? [],
+    hooks: partial.hooks ?? [],
     custom_prompts: partial.custom_prompts ?? {},
     created_at: partial.created_at ?? now,
     updated_at: partial.updated_at ?? now,

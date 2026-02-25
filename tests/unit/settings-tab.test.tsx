@@ -18,7 +18,8 @@ const mockCredentials = {
   get: vi.fn().mockResolvedValue(null),
   store: vi.fn().mockResolvedValue(undefined),
   delete: vi.fn().mockResolvedValue(undefined),
-  login: vi.fn().mockResolvedValue({ success: true, service: 'anthropic' }),
+  login: vi.fn().mockResolvedValue({ success: true, service: 'claude-code' }),
+  checkAuth: vi.fn().mockResolvedValue({ api_key: false, browser_session: false, aws_bedrock: false }),
 };
 
 // Mock window.api.docker for DockerSection
@@ -27,11 +28,23 @@ const mockDocker = {
   onStatusChanged: vi.fn().mockReturnValue(() => {}),
 };
 
+const mockSettingsApi = {
+  load: vi.fn().mockResolvedValue({
+    max_concurrent_containers: 3,
+    notification_enabled: true,
+    theme: 'dark',
+    log_level: 'INFO',
+    anthropic_auth_method: 'api_key',
+  }),
+  save: vi.fn().mockResolvedValue(undefined),
+};
+
 // @ts-expect-error - mocking window.api
 globalThis.window.api = {
   ...globalThis.window.api,
   credentials: mockCredentials,
   docker: mockDocker,
+  settings: mockSettingsApi,
 };
 
 describe('SettingsTab', () => {
@@ -43,6 +56,7 @@ describe('SettingsTab', () => {
     notification_enabled: true,
     theme: 'dark',
     log_level: 'INFO',
+    anthropic_auth_method: 'api_key',
   };
 
   const defaultUseSettingsReturn = {
@@ -58,6 +72,9 @@ describe('SettingsTab', () => {
     vi.clearAllMocks();
     mockCredentials.list.mockResolvedValue([]);
     mockCredentials.get.mockResolvedValue(null);
+    mockCredentials.checkAuth.mockResolvedValue({ api_key: false, browser_session: false, aws_bedrock: false });
+    mockSettingsApi.load.mockResolvedValue({ ...mockSettings });
+    mockSettingsApi.save.mockResolvedValue(undefined);
     mockDocker.status.mockResolvedValue({ available: false, info: undefined });
     mockDocker.onStatusChanged.mockReturnValue(() => {});
     vi.clearAllMocks();
@@ -117,7 +134,7 @@ describe('SettingsTab', () => {
       // Wait for async data to load
       await waitFor(() => {
         expect(
-          screen.getByText(/Store API keys or use browser login/)
+          screen.getByText('Anthropic API Access')
         ).toBeInTheDocument();
       });
     });
@@ -155,7 +172,7 @@ describe('SettingsTab', () => {
       // Credentials section should be expanded initially (wait for async load)
       await waitFor(() => {
         expect(
-          screen.getByText(/Store API keys or use browser login/)
+          screen.getByText('Anthropic API Access')
         ).toBeInTheDocument();
       });
 
@@ -166,7 +183,7 @@ describe('SettingsTab', () => {
 
       // Credentials section should now be collapsed
       expect(
-        screen.queryByText(/Store API keys or use browser login/)
+        screen.queryByText('Anthropic API Access')
       ).not.toBeInTheDocument();
     });
 
@@ -184,7 +201,7 @@ describe('SettingsTab', () => {
 
       // Both should be visible along with initially expanded Credentials
       expect(
-        screen.getByText(/Store API keys or use browser login/)
+        screen.getByText('Anthropic API Access')
       ).toBeInTheDocument();
       expect(screen.getByText('Connection Status')).toBeInTheDocument();
       expect(screen.getByText('Desktop Notifications')).toBeInTheDocument();

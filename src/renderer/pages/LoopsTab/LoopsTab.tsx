@@ -117,8 +117,12 @@ export const LoopsTab: React.FC = () => {
       const project = projects.find((p) => p.id === projectId);
       const opts: LoopStartOpts = {
         projectId,
+        projectName: project?.name || projectId,
         mode: LoopMode.CONTINUOUS,
         dockerImage: project?.docker_image || '',
+        ...(project?.local_path
+          ? { volumeMounts: [`${project.local_path}:/workspace`], workDir: '/workspace' }
+          : {}),
       };
       await start(opts);
     } catch (err) {

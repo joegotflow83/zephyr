@@ -14,6 +14,7 @@ vi.mock('@xterm/xterm', () => {
       this.dispose = vi.fn();
       this.write = vi.fn();
       this.clear = vi.fn();
+      this.focus = vi.fn();
       this.loadAddon = vi.fn();
       this.onData = vi.fn(() => ({ dispose: vi.fn() }));
       this.onResize = vi.fn(() => ({ dispose: vi.fn() }));

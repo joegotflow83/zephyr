@@ -589,7 +589,11 @@ export class DockerManager {
     });
 
     // Start exec and get duplex stream
+    // hijack: true is required to upgrade the connection to a raw bidirectional
+    // TCP socket so that stdin writes actually reach the container process.
+    // Without it, exec.start() returns a read-only HTTP response stream.
     const stream = (await exec.start({
+      hijack: true,
       Detach: false,
       Tty: true,
       stdin: true,

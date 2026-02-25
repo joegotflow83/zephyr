@@ -30,6 +30,8 @@ import { registerImageHandlers } from './ipc-handlers/image-handlers';
 import { ImageStore } from '../services/image-store';
 import { ImageBuilder } from '../services/image-builder';
 import { PreValidationStore } from '../services/pre-validation-store';
+import { HooksStore } from '../services/hooks-store';
+import { AuthInjector } from '../services/auth-injector';
 import { buildApplicationMenu } from './menu';
 import { IPC } from '../shared/ipc-channels';
 import os from 'node:os';
@@ -78,12 +80,24 @@ const autoUpdater = getAutoUpdater();
 const imageStore = new ImageStore(configManager);
 const imageBuilder = new ImageBuilder(dockerManager, imageStore);
 const preValidationStore = new PreValidationStore(configManager);
+const hooksStore = new HooksStore(configManager);
+const authInjector = new AuthInjector(configManager, credentialManager);
 
 // Register all IPC handlers before the window is created.
-registerDataHandlers({ configManager, projectStore, importExport, preValidationStore });
+registerDataHandlers({ configManager, projectStore, importExport, preValidationStore, hooksStore, loopRunner, dockerManager });
 registerDockerHandlers({ dockerManager, dockerHealth });
 registerCredentialHandlers({ credentialManager, loginManager });
-registerLoopHandlers({ loopRunner, scheduler, cleanupManager });
+registerLoopHandlers({
+  loopRunner,
+  scheduler,
+  cleanupManager,
+  projectStore,
+  preValidationStore,
+  hooksStore,
+  dockerManager,
+  authInjector,
+  credentialManager,
+});
 registerLogHandlers({ logExporter, loopRunner });
 registerTerminalHandlers({ terminalManager });
 registerUpdateHandlers({ selfUpdater });

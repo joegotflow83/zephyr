@@ -92,8 +92,8 @@ describe('LoginManager', () => {
         expect(result.service).toBe('anthropic');
       });
 
-      it('should use correct URL for OpenAI', async () => {
-        const promise = loginManager.openLoginSession('openai');
+      it('should use correct URL for GitHub', async () => {
+        const promise = loginManager.openLoginSession('github');
 
         // Wait a tick for event handlers to be registered
         await new Promise(resolve => setImmediate(resolve));
@@ -106,10 +106,10 @@ describe('LoginManager', () => {
         const result = await promise;
 
         expect(mockLoadURL).toHaveBeenCalledWith(
-          'https://platform.openai.com/login'
+          'https://github.com/login'
         );
         expect(result.success).toBe(false);
-        expect(result.service).toBe('openai');
+        expect(result.service).toBe('github');
       });
     });
 

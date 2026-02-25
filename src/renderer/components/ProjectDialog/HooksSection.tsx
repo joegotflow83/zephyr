@@ -1,37 +1,35 @@
 /**
- * PreValidationSection — checkbox list of pre-validation scripts for the
- * ProjectDialog.
+ * HooksSection — checkbox list of Claude hook files for the ProjectDialog.
  *
- * Displays all scripts from ~/.zephyr/pre_validation_scripts/ with checkboxes.
- * Selected script filenames are stored in ProjectConfig.pre_validation_scripts.
- * Also provides an "Add Custom Script" inline editor for user-authored scripts.
+ * Displays all hook files from ~/.zephyr/hooks/ with checkboxes.
+ * Selected hook filenames are stored in ProjectConfig.hooks.
+ * Also provides an "Add Hook File" inline editor for user-authored hooks.
+ *
+ * Hook files are injected into containers at ~/.claude/hooks/ so the
+ * Claude agent can invoke them during execution.
  */
 
 import React, { useState, useEffect } from 'react';
 
-interface PreValidationScript {
+interface HookFile {
   filename: string;
   name: string;
   description: string;
-  isBuiltIn: boolean;
 }
 
-interface PreValidationSectionProps {
-  /** Currently selected script filenames */
+interface HooksSectionProps {
+  /** Currently selected hook filenames */
   selected: string[];
   /** Callback when selection changes */
   onChange: (selected: string[]) => void;
 }
 
 /**
- * Renders a checkbox list of pre-validation scripts.
- * Loads available scripts from the main process via IPC on mount.
+ * Renders a checkbox list of Claude hook files.
+ * Loads available hooks from the main process via IPC on mount.
  */
-export const PreValidationSection: React.FC<PreValidationSectionProps> = ({
-  selected,
-  onChange,
-}) => {
-  const [scripts, setScripts] = useState<PreValidationScript[]>([]);
+export const HooksSection: React.FC<HooksSectionProps> = ({ selected, onChange }) => {
+  const [hooks, setHooks] = useState<HookFile[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddEditor, setShowAddEditor] = useState(false);
   const [newFilename, setNewFilename] = useState('');
@@ -39,20 +37,19 @@ export const PreValidationSection: React.FC<PreValidationSectionProps> = ({
   const [addError, setAddError] = useState('');
   const [saving, setSaving] = useState(false);
 
-  const loadScripts = async () => {
+  const loadHooks = async () => {
     try {
-      const list = await window.api.preValidation.list();
-      setScripts(list);
+      const list = await window.api.hooks.list();
+      setHooks(list);
     } catch {
-      // Non-fatal: show empty list
-      setScripts([]);
+      setHooks([]);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    loadScripts();
+    loadHooks();
   }, []);
 
   const handleToggle = (filename: string) => {
@@ -63,28 +60,31 @@ export const PreValidationSection: React.FC<PreValidationSectionProps> = ({
     }
   };
 
-  const handleAddCustomScript = async () => {
+  const handleAddHook = async () => {
     setAddError('');
     const trimmedFilename = newFilename.trim();
     if (!trimmedFilename) {
       setAddError('Filename is required');
       return;
     }
-    const filename = trimmedFilename.endsWith('.sh') ? trimmedFilename : `${trimmedFilename}.sh`;
+    if (!trimmedFilename.includes('.')) {
+      setAddError('Filename must include an extension (e.g. pre-tool-use.sh)');
+      return;
+    }
     if (!newContent.trim()) {
-      setAddError('Script content is required');
+      setAddError('File content is required');
       return;
     }
 
     setSaving(true);
     try {
-      await window.api.preValidation.add(filename, newContent);
+      await window.api.hooks.add(trimmedFilename, newContent);
       setNewFilename('');
       setNewContent('');
       setShowAddEditor(false);
-      await loadScripts();
+      await loadHooks();
     } catch (err) {
-      setAddError(err instanceof Error ? err.message : 'Failed to save script');
+      setAddError(err instanceof Error ? err.message : 'Failed to save hook file');
     } finally {
       setSaving(false);
     }
@@ -92,39 +92,32 @@ export const PreValidationSection: React.FC<PreValidationSectionProps> = ({
 
   return (
     <div className="mb-4">
-      <div className="text-sm font-medium text-gray-300 mb-1">Pre-Validation Scripts</div>
+      <div className="text-sm font-medium text-gray-300 mb-1">Claude Hooks</div>
       <p className="text-xs text-gray-400 mb-3">
-        Select scripts to place at the root of the project local path (
-        <code className="bg-gray-700 px-1 rounded">/workspace</code> in the container).
-        These run before git commits for validation.
+        Select hook files to inject into the container at{' '}
+        <code className="bg-gray-700 px-1 rounded">~/.claude/hooks</code>.
       </p>
 
       {loading ? (
-        <p className="text-xs text-gray-500">Loading scripts…</p>
-      ) : scripts.length === 0 && !showAddEditor ? (
+        <p className="text-xs text-gray-500">Loading hooks…</p>
+      ) : hooks.length === 0 && !showAddEditor ? (
         <p className="text-xs text-gray-500">
-          No scripts available. Use &quot;+ Add Custom Script&quot; to create one.
+          No hook files available. Use &quot;+ Add Hook File&quot; to create one.
         </p>
       ) : (
         <div className="space-y-2 mb-3">
-          {scripts.map((script) => (
-            <label
-              key={script.filename}
-              className="flex items-start gap-2 cursor-pointer group"
-            >
+          {hooks.map((hook) => (
+            <label key={hook.filename} className="flex items-start gap-2 cursor-pointer group">
               <input
                 type="checkbox"
-                checked={selected.includes(script.filename)}
-                onChange={() => handleToggle(script.filename)}
+                checked={selected.includes(hook.filename)}
+                onChange={() => handleToggle(hook.filename)}
                 className="mt-0.5 flex-shrink-0"
               />
               <div>
-                <span className="text-sm text-gray-200">{script.filename}</span>
-                {script.description && (
-                  <span className="ml-2 text-xs text-gray-400">— {script.description}</span>
-                )}
-                {script.isBuiltIn && (
-                  <span className="ml-1 text-xs text-blue-400">(built-in)</span>
+                <span className="text-sm text-gray-200">{hook.filename}</span>
+                {hook.description && (
+                  <span className="ml-2 text-xs text-gray-400">— {hook.description}</span>
                 )}
               </div>
             </label>
@@ -132,28 +125,28 @@ export const PreValidationSection: React.FC<PreValidationSectionProps> = ({
         </div>
       )}
 
-      {/* Add Custom Script */}
+      {/* Add Hook File */}
       {showAddEditor ? (
         <div className="mt-2 p-3 bg-gray-750 border border-gray-600 rounded space-y-2">
           <div>
-            <label className="block text-xs text-gray-400 mb-1">Filename (.sh)</label>
+            <label className="block text-xs text-gray-400 mb-1">Filename (with extension)</label>
             <input
               type="text"
               value={newFilename}
               onChange={(e) => setNewFilename(e.target.value)}
-              placeholder="my-check.sh"
+              placeholder="pre-tool-use.sh"
               className="w-full px-2 py-1 text-sm bg-gray-700 border border-gray-600 rounded text-white focus:outline-none focus:ring-1 focus:ring-blue-500"
             />
           </div>
           <div>
-            <label htmlFor="pv-script-content" className="block text-xs text-gray-400 mb-1">
-              Script Content
+            <label htmlFor="hook-file-content" className="block text-xs text-gray-400 mb-1">
+              File Content
             </label>
             <textarea
-              id="pv-script-content"
+              id="hook-file-content"
               value={newContent}
               onChange={(e) => setNewContent(e.target.value)}
-              placeholder={'#!/bin/bash\n# Description: My custom check\necho "Running check..."'}
+              placeholder={'#!/bin/bash\n# Description: My custom hook\necho "Hook triggered"'}
               rows={6}
               className="w-full px-2 py-1 text-sm bg-gray-700 border border-gray-600 rounded text-white font-mono focus:outline-none focus:ring-1 focus:ring-blue-500"
             />
@@ -162,11 +155,11 @@ export const PreValidationSection: React.FC<PreValidationSectionProps> = ({
           <div className="flex gap-2">
             <button
               type="button"
-              onClick={handleAddCustomScript}
+              onClick={handleAddHook}
               disabled={saving}
               className="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 transition-colors"
             >
-              {saving ? 'Saving…' : 'Save Script'}
+              {saving ? 'Saving…' : 'Save Hook'}
             </button>
             <button
               type="button"
@@ -188,7 +181,7 @@ export const PreValidationSection: React.FC<PreValidationSectionProps> = ({
           onClick={() => setShowAddEditor(true)}
           className="text-sm text-blue-400 hover:text-blue-300 transition-colors"
         >
-          + Add Custom Script
+          + Add Hook File
         </button>
       )}
     </div>

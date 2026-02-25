@@ -1,3 +1,4 @@
+import * as crypto from 'crypto';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 
@@ -21,9 +22,12 @@ const COMMON_TOOLS = [
   'libatk-bridge2.0-0',
   'libxcomposite1',
   'libxdamage1',
+  'libxfixes3',
 ];
 
 export function generateDockerfile(config: ImageBuildConfig): string {
+  const installClaudeCode = config.installClaudeCode !== false;
+  const hasNodejs = config.languages.some((l) => l.languageId === 'nodejs');
   const sections: string[] = [];
 
   // Base image
@@ -42,10 +46,14 @@ export function generateDockerfile(config: ImageBuildConfig): string {
   sections.push('');
 
   // Create ralph group and user using build arg UID/GID.
-  // ubuntu:24.04 ships with an `ubuntu` user at UID/GID 1000, which collides
-  // when the host UID/GID is also 1000. Remove it first if present.
+  // Generically remove any existing user/group occupying HOST_UID/HOST_GID
+  // (e.g. ubuntu:24.04 ships with an `ubuntu` user at UID/GID 1000) to
+  // prevent groupadd/useradd exit code 4 ("GID/UID already in use").
   sections.push(
-    'RUN userdel -r ubuntu 2>/dev/null || true && \\\n    groupdel ubuntu 2>/dev/null || true && \\\n    groupadd -g ${HOST_GID} ralph && \\\n    useradd -m -u ${HOST_UID} -g ${HOST_GID} -s /bin/bash ralph'
+    'RUN (getent passwd "${HOST_UID}" | cut -d: -f1 | xargs -r userdel -r) 2>/dev/null || true && \\\n' +
+    '    (getent group "${HOST_GID}" | cut -d: -f1 | xargs -r groupdel) 2>/dev/null || true && \\\n' +
+    '    groupadd -g ${HOST_GID} ralph && \\\n' +
+    '    useradd -m -u ${HOST_UID} -g ${HOST_GID} -s /bin/bash ralph'
   );
 
   // Language install blocks
@@ -54,21 +62,87 @@ export function generateDockerfile(config: ImageBuildConfig): string {
     sections.push(getLanguageInstallBlock(lang));
   }
 
+  // Claude Code installation (as root, before USER switch so npm -g works).
+  // If Node.js was not selected as a language, install Node 22 LTS first.
+  if (installClaudeCode) {
+    sections.push('');
+    sections.push(generateClaudeCodeInstallBlock(hasNodejs));
+  }
+
   // Final directives
   sections.push('');
   sections.push('WORKDIR /home/ralph/workspace');
   sections.push('USER ralph');
   sections.push('');
 
+  // Pre-configure Claude Code settings as the ralph user (cached layer).
+  if (installClaudeCode) {
+    sections.push(generateClaudeCodeConfigBlock());
+    sections.push('');
+  }
+
+  // Unique label per build to bust Docker's BuildKit cache at this point.
+  // Without it, BuildKit can return a fully-cached image whose CMD is still
+  // the ubuntu base default (/bin/bash) rather than our sleep infinity.
+  // All expensive RUN layers above remain cached; only the final metadata
+  // steps are re-evaluated.
+  sections.push(`LABEL zephyr.build_id="${crypto.randomUUID()}"`);
+  sections.push('');
+  // Keep the container alive so exec commands (e.g. Claude Code runs) can be
+  // dispatched into it without the container exiting immediately.
+  sections.push('CMD ["sleep", "infinity"]');
+  sections.push('');
+
   return sections.join('\n');
+}
+
+/**
+ * Generates the Dockerfile RUN block(s) that install Claude Code globally.
+ *
+ * @param hasNodejs - Whether Node.js was already selected as a language (and
+ *   will therefore be available on PATH before this block executes).
+ */
+export function generateClaudeCodeInstallBlock(hasNodejs: boolean): string {
+  const parts: string[] = [];
+  if (!hasNodejs) {
+    // Node.js not selected as a language; install Node 22 LTS via NodeSource
+    // so that npm is available for the Claude Code global install below.
+    parts.push(
+      'RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - && \\\n' +
+      '    apt-get install -y nodejs && \\\n' +
+      '    rm -rf /var/lib/apt/lists/*'
+    );
+    parts.push('');
+  }
+  parts.push('RUN npm install -g @anthropic-ai/claude-code');
+  return parts.join('\n');
+}
+
+/**
+ * Generates the Dockerfile RUN block that writes a minimal Claude Code
+ * settings file as the ralph user.  Must be emitted after `USER ralph`.
+ */
+export function generateClaudeCodeConfigBlock(): string {
+  return [
+    'RUN mkdir -p /home/ralph/.claude && \\',
+    `    printf '{"autoUpdaterStatus":"disabled"}\\n' > /home/ralph/.claude/settings.json`,
+  ].join('\n');
 }
 
 export function getLanguageInstallBlock(lang: LanguageSelection): string {
   switch (lang.languageId) {
     case 'python': {
       const ver = lang.version;
+      // Python 3.12 ships in Ubuntu 24.04's default repos; no PPA needed.
+      // Older versions require the deadsnakes PPA.
+      if (ver === '3.12') {
+        return [
+          `RUN apt-get update && apt-get install -y python3.12 python3.12-venv python3.12-dev python3-pip && \\`,
+          `    rm -rf /var/lib/apt/lists/*`,
+        ].join('\n');
+      }
       return [
-        `RUN apt-get update && apt-get install -y software-properties-common && \\`,
+        `RUN apt-get update && apt-get install -y software-properties-common gnupg && \\`,
         `    add-apt-repository ppa:deadsnakes/ppa && \\`,
         `    apt-get update && apt-get install -y python${ver} python${ver}-venv python${ver}-dev && \\`,
         `    curl -sS https://bootstrap.pypa.io/get-pip.py | python${ver} && \\`,

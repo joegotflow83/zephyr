@@ -96,9 +96,14 @@ export class LoopRunner {
     // Validate options
     validateLoopStartOpts(opts);
 
-    // Check if already running
-    if (this.states.has(opts.projectId)) {
+    // Check if already actively running — terminal states (COMPLETED, FAILED, STOPPED) can be restarted
+    const existingState = this.states.get(opts.projectId);
+    if (existingState && !isLoopTerminal(existingState.status)) {
       throw new Error(`Loop for project ${opts.projectId} is already running`);
+    }
+    // Clear stale terminal state so we start fresh
+    if (existingState) {
+      this.states.delete(opts.projectId);
     }
 
     // Check concurrency limit
@@ -120,11 +125,24 @@ export class LoopRunner {
         startedAt: new Date().toISOString(),
       });
 
+      // Derive a stable, Docker-safe container name from the project name.
+      // Docker names must match [a-zA-Z0-9][a-zA-Z0-9_.-]*, so we lowercase,
+      // replace any invalid characters with hyphens, and trim leading hyphens.
+      const safeName = opts.projectName
+        .toLowerCase()
+        .replace(/[^a-z0-9_.-]+/g, '-')
+        .replace(/^-+/, '') || opts.projectId.substring(0, 8);
+      const containerName = `zephyr-${safeName}`;
+
+      // Remove any stale (stopped/exited) container with this name so we can
+      // reuse it on subsequent runs.
+      await this.removeStaleContainer(containerName);
+
       // Create container
       const containerId = await this.docker.createContainer({
         image: opts.dockerImage,
         projectId: opts.projectId,
-        name: `zephyr-${opts.projectId.substring(0, 8)}`,
+        name: containerName,
         env: opts.envVars,
         workingDir: opts.workDir,
         volumes: this.parseVolumeMounts(opts.volumeMounts),
@@ -562,6 +580,24 @@ export class LoopRunner {
       });
     } catch (error) {
       console.error(`Error monitoring container ${containerId}:`, error);
+    }
+  }
+
+  /**
+   * Remove a stopped/exited container by name, if one exists.
+   * Silently ignores errors so a failed removal never blocks a new run.
+   */
+  private async removeStaleContainer(name: string): Promise<void> {
+    try {
+      const containers = await this.docker.listRunningContainers();
+      const stale = containers.find(
+        (c) => c.name === name && (c.state === 'exited' || c.state === 'created' || c.state === 'dead'),
+      );
+      if (stale) {
+        await this.docker.removeContainer(stale.id);
+      }
+    } catch {
+      // Best-effort — don't block the new container creation
     }
   }
 

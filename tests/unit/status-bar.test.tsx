@@ -190,18 +190,18 @@ describe('StatusBar Component', () => {
   });
 
   describe('Layout and Styling', () => {
-    it('renders with fixed positioning at bottom', () => {
+    it('renders without fixed positioning (in-flow layout)', () => {
       const { container } = render(<StatusBar />);
 
       const statusBar = container.firstChild as HTMLElement;
-      expect(statusBar).toHaveClass('fixed', 'bottom-0', 'left-0', 'right-0');
+      expect(statusBar).not.toHaveClass('fixed', 'bottom-0', 'left-0', 'right-0');
     });
 
     it('has correct height and background color', () => {
       const { container } = render(<StatusBar />);
 
       const statusBar = container.firstChild as HTMLElement;
-      expect(statusBar).toHaveClass('h-7', 'bg-gray-800', 'border-t', 'border-gray-700');
+      expect(statusBar).toHaveClass('h-7', 'bg-gray-800');
     });
 
     it('uses flex layout for content positioning', () => {
@@ -211,11 +211,11 @@ describe('StatusBar Component', () => {
       expect(statusBar).toHaveClass('flex', 'items-center', 'justify-between');
     });
 
-    it('has high z-index to stay above other content', () => {
+    it('does not use z-index (relies on document flow)', () => {
       const { container } = render(<StatusBar />);
 
       const statusBar = container.firstChild as HTMLElement;
-      expect(statusBar).toHaveClass('z-50');
+      expect(statusBar).not.toHaveClass('z-50');
     });
   });
 

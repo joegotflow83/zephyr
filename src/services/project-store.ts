@@ -112,7 +112,8 @@ export class ProjectStore {
   // ---------------------------------------------------------------------------
 
   private load(): ProjectConfig[] {
-    return this.config.loadJson<ProjectConfig[]>(PROJECTS_FILE) ?? [];
+    const data = this.config.loadJson<unknown>(PROJECTS_FILE);
+    return Array.isArray(data) ? (data as ProjectConfig[]) : [];
   }
 
   private save(projects: ProjectConfig[]): void {

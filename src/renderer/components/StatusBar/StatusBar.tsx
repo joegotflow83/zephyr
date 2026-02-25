@@ -21,7 +21,7 @@ export function StatusBar({ activeLoopCount = 0, appVersion }: StatusBarProps) {
   const { isConnected, dockerInfo } = useDockerStatus();
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 h-7 bg-gray-800 border-t border-gray-700 flex items-center justify-between px-4 text-sm text-gray-300 z-50">
+    <div className="h-7 bg-gray-800 flex items-center justify-between px-4 text-sm text-gray-300">
       {/* Left section: Docker status */}
       <div className="flex items-center space-x-4">
         <div className="flex items-center space-x-2">

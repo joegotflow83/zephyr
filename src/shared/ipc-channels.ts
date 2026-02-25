@@ -38,6 +38,7 @@ export const IPC = {
   CREDENTIALS_DELETE: 'credentials:delete',
   CREDENTIALS_LIST: 'credentials:list',
   CREDENTIALS_LOGIN: 'credentials:login',
+  CREDENTIALS_CHECK_AUTH: 'credentials:check-auth',
 
   // Loop execution
   LOOP_START: 'loop:start',
@@ -93,6 +94,12 @@ export const IPC = {
   PRE_VALIDATION_GET: 'pre-validation:get',
   PRE_VALIDATION_ADD: 'pre-validation:add',
   PRE_VALIDATION_REMOVE: 'pre-validation:remove',
+
+  // Claude hooks
+  HOOKS_LIST: 'hooks:list',
+  HOOKS_GET: 'hooks:get',
+  HOOKS_ADD: 'hooks:add',
+  HOOKS_REMOVE: 'hooks:remove',
 
   // Misc
   PING: 'ping',

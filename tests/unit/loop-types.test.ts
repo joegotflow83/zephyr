@@ -77,7 +77,7 @@ describe('LoopState interface', () => {
   it('should compile with all required fields', () => {
     const state: LoopState = {
       projectId: 'test-id',
-      containerId: null,
+      projectName: 'Test Project',      containerId: null,
       mode: LoopMode.SINGLE,
       status: LoopStatus.IDLE,
       iteration: 0,
@@ -143,7 +143,7 @@ describe('LoopStartOpts interface', () => {
   it('should compile with required fields only', () => {
     const opts: LoopStartOpts = {
       projectId: 'test-id',
-      dockerImage: 'anthropics/anthropic-quickstarts:latest',
+      projectName: 'Test Project',      dockerImage: 'anthropics/anthropic-quickstarts:latest',
       mode: LoopMode.CONTINUOUS,
     };
     expect(opts.projectId).toBe('test-id');
@@ -152,7 +152,7 @@ describe('LoopStartOpts interface', () => {
   it('should allow optional envVars', () => {
     const opts: LoopStartOpts = {
       projectId: 'test-id',
-      dockerImage: 'test:latest',
+      projectName: 'Test Project',      dockerImage: 'test:latest',
       mode: LoopMode.SINGLE,
       envVars: { API_KEY: 'secret', DEBUG: 'true' },
     };
@@ -162,7 +162,7 @@ describe('LoopStartOpts interface', () => {
   it('should allow optional volumeMounts', () => {
     const opts: LoopStartOpts = {
       projectId: 'test-id',
-      dockerImage: 'test:latest',
+      projectName: 'Test Project',      dockerImage: 'test:latest',
       mode: LoopMode.SINGLE,
       volumeMounts: ['/host/path:/container/path', '/another:/mount'],
     };
@@ -172,7 +172,7 @@ describe('LoopStartOpts interface', () => {
   it('should allow optional workDir', () => {
     const opts: LoopStartOpts = {
       projectId: 'test-id',
-      dockerImage: 'test:latest',
+      projectName: 'Test Project',      dockerImage: 'test:latest',
       mode: LoopMode.SINGLE,
       workDir: '/app',
     };
@@ -182,7 +182,7 @@ describe('LoopStartOpts interface', () => {
   it('should allow optional user', () => {
     const opts: LoopStartOpts = {
       projectId: 'test-id',
-      dockerImage: 'test:latest',
+      projectName: 'Test Project',      dockerImage: 'test:latest',
       mode: LoopMode.SINGLE,
       user: 'root',
     };
@@ -312,7 +312,7 @@ describe('validateLoopStartOpts', () => {
   it('should not throw for valid options', () => {
     const opts: LoopStartOpts = {
       projectId: 'test-id',
-      dockerImage: 'test:latest',
+      projectName: 'Test Project',      dockerImage: 'test:latest',
       mode: LoopMode.SINGLE,
     };
     expect(() => validateLoopStartOpts(opts)).not.toThrow();
@@ -343,7 +343,7 @@ describe('validateLoopStartOpts', () => {
   it('should throw if dockerImage is empty string', () => {
     const opts: LoopStartOpts = {
       projectId: 'test-id',
-      dockerImage: '',
+      projectName: 'Test Project',      dockerImage: '',
       mode: LoopMode.SINGLE,
     };
     expect(() => validateLoopStartOpts(opts)).toThrow(
@@ -354,7 +354,7 @@ describe('validateLoopStartOpts', () => {
   it('should throw if dockerImage is not a string', () => {
     const opts = {
       projectId: 'test-id',
-      dockerImage: null,
+      projectName: 'Test Project',      dockerImage: null,
       mode: LoopMode.SINGLE,
     } as unknown as LoopStartOpts;
     expect(() => validateLoopStartOpts(opts)).toThrow(
@@ -365,7 +365,7 @@ describe('validateLoopStartOpts', () => {
   it('should throw if mode is invalid', () => {
     const opts = {
       projectId: 'test-id',
-      dockerImage: 'test:latest',
+      projectName: 'Test Project',      dockerImage: 'test:latest',
       mode: 'invalid-mode',
     } as unknown as LoopStartOpts;
     expect(() => validateLoopStartOpts(opts)).toThrow('mode must be one of');
@@ -376,7 +376,7 @@ describe('validateLoopStartOpts', () => {
     modes.forEach((mode) => {
       const opts: LoopStartOpts = {
         projectId: 'test-id',
-        dockerImage: 'test:latest',
+        projectName: 'Test Project',        dockerImage: 'test:latest',
         mode,
       };
       expect(() => validateLoopStartOpts(opts)).not.toThrow();
@@ -386,7 +386,7 @@ describe('validateLoopStartOpts', () => {
   it('should accept optional fields', () => {
     const opts: LoopStartOpts = {
       projectId: 'test-id',
-      dockerImage: 'test:latest',
+      projectName: 'Test Project',      dockerImage: 'test:latest',
       mode: LoopMode.CONTINUOUS,
       envVars: { FOO: 'bar' },
       volumeMounts: ['/host:/container'],

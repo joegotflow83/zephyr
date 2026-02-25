@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 /**
  * Service type for credential management
  */
-export type CredentialService = 'anthropic' | 'openai' | 'github';
+export type CredentialService = 'anthropic' | 'github';
 
 export interface CredentialDialogProps {
   /** The service to configure */
@@ -12,8 +12,8 @@ export interface CredentialDialogProps {
   currentKey?: string | null;
   /** Called when user saves the API key */
   onSave: (key: string) => void;
-  /** Called when user requests login mode */
-  onLoginMode: () => void;
+  /** Called when user requests login mode (optional) */
+  onLoginMode?: () => void;
   /** Called when dialog should close */
   onClose: () => void;
 }
@@ -23,7 +23,6 @@ export interface CredentialDialogProps {
  */
 const SERVICE_NAMES: Record<CredentialService, string> = {
   anthropic: 'Anthropic',
-  openai: 'OpenAI',
   github: 'GitHub',
 };
 

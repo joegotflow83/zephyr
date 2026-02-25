@@ -17,8 +17,8 @@ describe('CredentialDialog', () => {
   });
 
   it('renders for each service type', () => {
-    const services: Array<'anthropic' | 'openai' | 'github'> = ['anthropic', 'openai', 'github'];
-    const names = ['Anthropic', 'OpenAI', 'GitHub'];
+    const services: Array<'anthropic' | 'github'> = ['anthropic', 'github'];
+    const names = ['Anthropic', 'GitHub'];
 
     services.forEach((service, index) => {
       const { unmount } = render(<CredentialDialog {...defaultProps} service={service} />);
@@ -191,9 +191,8 @@ describe('CredentialDialog', () => {
   });
 
   it('has correct placeholder for each service', () => {
-    const services: Array<{ id: 'anthropic' | 'openai' | 'github'; name: string }> = [
+    const services: Array<{ id: 'anthropic' | 'github'; name: string }> = [
       { id: 'anthropic', name: 'Anthropic' },
-      { id: 'openai', name: 'OpenAI' },
       { id: 'github', name: 'GitHub' },
     ];
 
@@ -213,8 +212,8 @@ describe('CredentialDialog', () => {
     expect(input.value).toBe('sk_test_123');
 
     // Rerender with different service
-    rerender(<CredentialDialog {...defaultProps} service="openai" />);
-    const newInput = screen.getByPlaceholderText(/Enter your OpenAI API key/) as HTMLInputElement;
+    rerender(<CredentialDialog {...defaultProps} service="github" />);
+    const newInput = screen.getByPlaceholderText(/Enter your GitHub API key/) as HTMLInputElement;
     // Note: input value persists in React component state between rerenders
     // This is expected behavior - when the component unmounts and remounts, state resets
     expect(newInput).toBeDefined();

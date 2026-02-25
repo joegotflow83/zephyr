@@ -64,6 +64,7 @@ contextBridge.exposeInMainWorld('api', {
     delete: (service: string) => ipcRenderer.invoke(IPC.CREDENTIALS_DELETE, service),
     list: () => ipcRenderer.invoke(IPC.CREDENTIALS_LIST),
     login: (service: string) => ipcRenderer.invoke(IPC.CREDENTIALS_LOGIN, service),
+    checkAuth: () => ipcRenderer.invoke(IPC.CREDENTIALS_CHECK_AUTH),
   },
 
   loops: {
@@ -160,5 +161,13 @@ contextBridge.exposeInMainWorld('api', {
     add: (filename: string, content: string) =>
       ipcRenderer.invoke(IPC.PRE_VALIDATION_ADD, filename, content),
     remove: (filename: string) => ipcRenderer.invoke(IPC.PRE_VALIDATION_REMOVE, filename),
+  },
+
+  hooks: {
+    list: () => ipcRenderer.invoke(IPC.HOOKS_LIST),
+    get: (filename: string) => ipcRenderer.invoke(IPC.HOOKS_GET, filename),
+    add: (filename: string, content: string) =>
+      ipcRenderer.invoke(IPC.HOOKS_ADD, filename, content),
+    remove: (filename: string) => ipcRenderer.invoke(IPC.HOOKS_REMOVE, filename),
   },
 });

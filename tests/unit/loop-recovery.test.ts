@@ -15,6 +15,8 @@ function createMockDockerManager(): DockerManager {
     createContainer: vi.fn().mockResolvedValue('container-123'),
     startContainer: vi.fn().mockResolvedValue(undefined),
     stopContainer: vi.fn().mockResolvedValue(undefined),
+    removeContainer: vi.fn().mockResolvedValue(undefined),
+    listRunningContainers: vi.fn().mockResolvedValue([]),
     streamLogs: vi.fn().mockResolvedValue({
       abort: vi.fn(),
     }),
@@ -157,7 +159,7 @@ describe('LoopRunner - recoverLoops', () => {
       // Start a loop normally
       await runner.startLoop({
         projectId: 'proj-1',
-        dockerImage: 'ubuntu:22.04',
+        projectName: 'Test Project',        dockerImage: 'ubuntu:22.04',
         mode: LoopMode.SINGLE,
       });
 
@@ -215,12 +217,12 @@ describe('LoopRunner - recoverLoops', () => {
       // Start 2 loops manually
       await runner.startLoop({
         projectId: 'proj-manual-1',
-        dockerImage: 'ubuntu:22.04',
+        projectName: 'Test Project',        dockerImage: 'ubuntu:22.04',
         mode: LoopMode.SINGLE,
       });
       await runner.startLoop({
         projectId: 'proj-manual-2',
-        dockerImage: 'ubuntu:22.04',
+        projectName: 'Test Project',        dockerImage: 'ubuntu:22.04',
         mode: LoopMode.SINGLE,
       });
 

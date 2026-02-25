@@ -5,11 +5,11 @@
  * Opens a BrowserWindow for the user to authenticate with LLM provider
  * services, then captures session cookies/tokens for reuse via CredentialManager.
  *
- * Services supported: Anthropic, OpenAI
+ * Services supported: Anthropic, GitHub
  */
 
 import { BrowserWindow } from 'electron';
-import type { CredentialManager } from './credential-manager';
+import type { CredentialManager, CredentialService } from './credential-manager';
 
 export interface LoginResult {
   success: boolean;
@@ -28,13 +28,15 @@ interface LoginSessionOptions {
 // Known service login URLs
 const SERVICE_URLS: Record<string, string> = {
   anthropic: 'https://console.anthropic.com/login',
-  openai: 'https://platform.openai.com/login',
+  github: 'https://github.com/login',
+  'claude-code': 'https://claude.ai/login',
 };
 
 // Default cookie domains per service
 const SERVICE_COOKIE_DOMAINS: Record<string, string> = {
   anthropic: '.anthropic.com',
-  openai: '.openai.com',
+  github: '.github.com',
+  'claude-code': '.claude.ai',
 };
 
 // Session key prefix in credential manager (stored as JSON string)
@@ -60,7 +62,7 @@ export class LoginManager {
    * to complete authentication, then extracts session cookies matching the
    * service's domain and stores them via CredentialManager.
    *
-   * @param service - Service identifier (e.g. 'anthropic', 'openai')
+   * @param service - Service identifier (e.g. 'anthropic', 'github')
    * @param options - Optional configuration for login session
    * @returns Promise resolving to LoginResult
    */
@@ -170,7 +172,7 @@ export class LoginManager {
 
             // Store using the session key prefix
             await this.credentialManager.storeApiKey(
-              `${SESSION_KEY_PREFIX}${service}` as any,
+              `${SESSION_KEY_PREFIX}${service}` as unknown as CredentialService,
               sessionData
             );
 
@@ -202,6 +204,100 @@ export class LoginManager {
         resolveOnce({
           success: false,
           service,
+          error: `Failed to load login URL: ${err instanceof Error ? err.message : String(err)}`,
+        });
+      });
+    });
+  }
+
+  /**
+   * Open a browser login window for claude.ai and capture the session cookies.
+   *
+   * On successful login the captured cookies are stored as a JSON blob under
+   * the 'anthropic_session' credential key so they can be injected into
+   * containers at loop start time.
+   *
+   * @returns Promise resolving to LoginResult
+   */
+  async openClaudeCodeLoginSession(): Promise<LoginResult> {
+    const timeoutMs = DEFAULT_LOGIN_TIMEOUT_MS;
+    const width = 900;
+    const height = 700;
+    const loginUrl = 'https://claude.ai/login';
+
+    return new Promise<LoginResult>((resolve) => {
+      let resolved = false;
+
+      const loginWindow = new BrowserWindow({
+        width,
+        height,
+        show: true,
+        webPreferences: {
+          nodeIntegration: false,
+          contextIsolation: true,
+          partition: 'persist:login-claude-code',
+        },
+        title: 'Login to Claude',
+      });
+
+      const resolveOnce = (result: LoginResult) => {
+        if (resolved) return;
+        resolved = true;
+        clearTimeout(timeoutId);
+        if (!loginWindow.isDestroyed()) loginWindow.close();
+        resolve(result);
+      };
+
+      const timeoutId = setTimeout(() => {
+        resolveOnce({ success: false, service: 'claude-code', error: `Login timed out after ${timeoutMs}ms` });
+      }, timeoutMs);
+
+      loginWindow.webContents.on('did-navigate', async (_, url) => {
+        if (url !== loginUrl && !url.includes('/login')) {
+          try {
+            const allCookies = await loginWindow.webContents.session.cookies.get({});
+            const filteredCookies = allCookies.filter(
+              (c) => c.domain && (c.domain.includes('claude.ai') || c.domain.includes('anthropic.com'))
+            );
+
+            if (filteredCookies.length === 0) {
+              resolveOnce({ success: false, service: 'claude-code', error: 'No cookies captured after login' });
+              return;
+            }
+
+            const sessionData = JSON.stringify({
+              service: 'claude-code',
+              cookies: filteredCookies.map((c) => ({
+                name: c.name,
+                value: c.value,
+                domain: c.domain,
+                path: c.path,
+                secure: c.secure,
+                httpOnly: c.httpOnly,
+                expirationDate: c.expirationDate,
+              })),
+            });
+
+            await this.credentialManager.storeApiKey('anthropic_session', sessionData);
+            resolveOnce({ success: true, service: 'claude-code' });
+          } catch (err) {
+            resolveOnce({
+              success: false,
+              service: 'claude-code',
+              error: `Failed to capture session: ${err instanceof Error ? err.message : String(err)}`,
+            });
+          }
+        }
+      });
+
+      loginWindow.on('closed', () => {
+        resolveOnce({ success: false, service: 'claude-code', error: 'Login window closed by user' });
+      });
+
+      loginWindow.loadURL(loginUrl).catch((err) => {
+        resolveOnce({
+          success: false,
+          service: 'claude-code',
           error: `Failed to load login URL: ${err instanceof Error ? err.message : String(err)}`,
         });
       });

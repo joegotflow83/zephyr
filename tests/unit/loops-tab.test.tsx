@@ -274,6 +274,7 @@ describe('LoopsTab', () => {
       await user.click(screen.getByText('Start'));
       expect(mockLoops.start).toHaveBeenCalledWith({
         projectId: project1.id,
+        projectName: project1.name,
         mode: LoopMode.CONTINUOUS,
         dockerImage: project1.docker_image,
       });

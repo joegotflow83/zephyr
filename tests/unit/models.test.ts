@@ -179,6 +179,7 @@ describe('createProjectConfig', () => {
         repo_url: 'git@github.com:org/full.git',
         docker_image: 'python:3.12',
         pre_validation_scripts: ['lint.sh'],
+        hooks: ['pre-tool-use.sh'],
         custom_prompts: { 'task.md': 'Refactor everything' },
         created_at: '2024-01-01T00:00:00.000Z',
         updated_at: '2024-06-01T00:00:00.000Z',

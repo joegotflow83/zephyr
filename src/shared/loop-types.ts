@@ -85,6 +85,9 @@ export interface LoopStartOpts {
   /** UUID of the project to execute */
   projectId: string;
 
+  /** Human-readable project name, used to name the Docker container */
+  projectName: string;
+
   /** Docker image to use (e.g., "anthropics/anthropic-quickstarts:latest") */
   dockerImage: string;
 
@@ -150,6 +153,9 @@ export function isLoopActive(status: LoopStatus): boolean {
 export function validateLoopStartOpts(opts: LoopStartOpts): void {
   if (!opts.projectId || typeof opts.projectId !== 'string') {
     throw new Error('LoopStartOpts.projectId must be a non-empty string');
+  }
+  if (!opts.projectName || typeof opts.projectName !== 'string') {
+    throw new Error('LoopStartOpts.projectName must be a non-empty string');
   }
   if (!opts.dockerImage || typeof opts.dockerImage !== 'string') {
     throw new Error('LoopStartOpts.dockerImage must be a non-empty string');

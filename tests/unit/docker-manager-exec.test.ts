@@ -236,8 +236,9 @@ describe('DockerManager — exec sessions', () => {
         Env: undefined,
       });
 
-      // Verify exec was started in TTY mode
+      // Verify exec was started in TTY mode with hijack for bidirectional stdin
       expect(mockExec.start).toHaveBeenCalledWith({
+        hijack: true,
         Detach: false,
         Tty: true,
         stdin: true,
