@@ -39,12 +39,25 @@ const mockSettingsApi = {
   save: vi.fn().mockResolvedValue(undefined),
 };
 
+// Mock window.api.deployKeys for OrphanedKeysSection
+const mockDeployKeys = {
+  listOrphaned: vi.fn().mockResolvedValue([]),
+  getUrl: vi.fn().mockResolvedValue('https://github.com/owner/repo/settings/keys'),
+};
+
+// Mock window.api.shell
+const mockShell = {
+  openExternal: vi.fn().mockResolvedValue(undefined),
+};
+
 // @ts-expect-error - mocking window.api
 globalThis.window.api = {
   ...globalThis.window.api,
   credentials: mockCredentials,
   docker: mockDocker,
   settings: mockSettingsApi,
+  deployKeys: mockDeployKeys,
+  shell: mockShell,
 };
 
 describe('SettingsTab', () => {
@@ -77,6 +90,9 @@ describe('SettingsTab', () => {
     mockSettingsApi.save.mockResolvedValue(undefined);
     mockDocker.status.mockResolvedValue({ available: false, info: undefined });
     mockDocker.onStatusChanged.mockReturnValue(() => {});
+    mockDeployKeys.listOrphaned.mockResolvedValue([]);
+    mockDeployKeys.getUrl.mockResolvedValue('https://github.com/owner/repo/settings/keys');
+    mockShell.openExternal.mockResolvedValue(undefined);
     vi.clearAllMocks();
     vi.spyOn(useSettingsModule, 'useSettings').mockReturnValue(
       defaultUseSettingsReturn
@@ -103,12 +119,13 @@ describe('SettingsTab', () => {
       expect(mockRefresh).toHaveBeenCalledTimes(1);
     });
 
-    it('should render all four section headers', () => {
+    it('should render all five section headers', () => {
       render(<SettingsTab />);
       expect(screen.getByText('Credentials')).toBeInTheDocument();
       expect(screen.getByText('Docker')).toBeInTheDocument();
       expect(screen.getByText('General')).toBeInTheDocument();
       expect(screen.getByText('Updates')).toBeInTheDocument();
+      expect(screen.getByText('Orphaned Deploy Keys')).toBeInTheDocument();
     });
 
     it('should render section descriptions', () => {
@@ -124,6 +141,9 @@ describe('SettingsTab', () => {
       ).toBeInTheDocument();
       expect(
         screen.getByText('Check for and install application updates')
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText('GitHub deploy keys that were not cleaned up and may need manual removal')
       ).toBeInTheDocument();
     });
   });
@@ -306,8 +326,8 @@ describe('SettingsTab', () => {
       const sectionButtons = screen.getAllByRole('button').filter(
         (btn) => btn.getAttribute('aria-expanded') !== null
       );
-      // We have 4 section headers
-      expect(sectionButtons).toHaveLength(4);
+      // We have 5 section headers
+      expect(sectionButtons).toHaveLength(5);
       sectionButtons.forEach((button) => {
         const svg = button.querySelector('svg');
         expect(svg).toBeInTheDocument();

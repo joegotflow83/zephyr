@@ -86,11 +86,16 @@ const mockPreValidationStore = {
 const mockLoopRunner = {
   listRunning: vi.fn(),
   stopLoop: vi.fn(),
+  setMaxConcurrent: vi.fn(),
 };
 
 const mockDockerManager = {
   listRunningContainers: vi.fn(),
   removeContainer: vi.fn(),
+};
+
+const mockCredentialManager = {
+  deleteGithubPat: vi.fn(),
 };
 
 // ── Setup ─────────────────────────────────────────────────────────────────────
@@ -104,6 +109,7 @@ describe('registerDataHandlers', () => {
     }
     mockLoopRunner.listRunning.mockReturnValue([]);
     mockDockerManager.listRunningContainers.mockResolvedValue([]);
+    mockCredentialManager.deleteGithubPat.mockResolvedValue(undefined);
     registerDataHandlers({
       configManager: mockConfigManager as never,
       projectStore: mockProjectStore as never,
@@ -111,6 +117,7 @@ describe('registerDataHandlers', () => {
       preValidationStore: mockPreValidationStore as never,
       loopRunner: mockLoopRunner as never,
       dockerManager: mockDockerManager as never,
+      credentialManager: mockCredentialManager as never,
     });
   });
 
@@ -210,6 +217,22 @@ describe('registerDataHandlers', () => {
     it('still removes the project even if container cleanup fails', async () => {
       const id = 'proj-cleanup-fail';
       mockDockerManager.listRunningContainers.mockRejectedValue(new Error('Docker unavailable'));
+      mockProjectStore.removeProject.mockResolvedValue(true);
+      const result = await invoke(IPC.PROJECTS_REMOVE, id);
+      expect(mockProjectStore.removeProject).toHaveBeenCalledWith(id);
+      expect(result).toBe(true);
+    });
+
+    it('deletes the GitHub PAT when removing a project', async () => {
+      const id = 'proj-with-pat';
+      mockProjectStore.removeProject.mockResolvedValue(true);
+      await invoke(IPC.PROJECTS_REMOVE, id);
+      expect(mockCredentialManager.deleteGithubPat).toHaveBeenCalledWith(id);
+    });
+
+    it('still removes the project even if GitHub PAT deletion fails', async () => {
+      const id = 'proj-pat-fail';
+      mockCredentialManager.deleteGithubPat.mockRejectedValue(new Error('Keychain unavailable'));
       mockProjectStore.removeProject.mockResolvedValue(true);
       const result = await invoke(IPC.PROJECTS_REMOVE, id);
       expect(mockProjectStore.removeProject).toHaveBeenCalledWith(id);

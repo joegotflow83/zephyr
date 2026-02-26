@@ -101,6 +101,15 @@ export const IPC = {
   HOOKS_ADD: 'hooks:add',
   HOOKS_REMOVE: 'hooks:remove',
 
+  // Deploy keys (ephemeral GitHub SSH deploy keys for container access)
+  DEPLOY_KEYS_LIST_ORPHANED: 'deploy-keys:list-orphaned',
+  DEPLOY_KEYS_GET_URL: 'deploy-keys:get-url',
+
+  // GitHub PAT storage per project (for deploy key management)
+  GITHUB_PAT_SET: 'github-pat:set',
+  GITHUB_PAT_GET: 'github-pat:get',
+  GITHUB_PAT_DELETE: 'github-pat:delete',
+
   // Misc
   PING: 'ping',
 } as const;

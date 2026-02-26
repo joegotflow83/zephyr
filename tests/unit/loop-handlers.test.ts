@@ -360,9 +360,10 @@ describe('registerLoopHandlers', () => {
 
   describe('event broadcasting', () => {
     it('should register onStateChange callback that broadcasts to all windows', () => {
-      expect(mockLoopRunner.onStateChange).toHaveBeenCalledTimes(1);
+      // Two onStateChange callbacks are registered: [0] for deploy-key cleanup, [1] for broadcasting
+      expect(mockLoopRunner.onStateChange).toHaveBeenCalledTimes(2);
 
-      const callback = mockLoopRunner.onStateChange.mock.calls[0][0];
+      const callback = mockLoopRunner.onStateChange.mock.calls[1][0];
       const testState = {
         projectId: 'test-project',
         containerId: 'abc123',

@@ -47,6 +47,11 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({ mode, project, onS
   const [imageId, setImageId] = useState<string | undefined>(undefined);
   const [showImageBuilder, setShowImageBuilder] = useState(false);
 
+  // GitHub SSH Access state
+  const [githubPat, setGithubPat] = useState('');
+  const [hasStoredPat, setHasStoredPat] = useState(false);
+  const [showGithubSection, setShowGithubSection] = useState(false);
+
   // Validation state
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [showPromptEditor, setShowPromptEditor] = useState(false);
@@ -69,13 +74,17 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({ mode, project, onS
       setHooks(project.hooks ?? []);
       setImageId(project.image_id);
       setImageMode(project.image_id ? 'library' : images.length > 0 ? 'library' : 'custom');
+      // Check if a GitHub PAT is already stored for this project
+      void window.api.githubPat.has(project.id).then(setHasStoredPat);
     } else {
       // Add mode: default to library if images exist, custom if empty
       setImageMode(images.length > 0 ? 'library' : 'custom');
       setImageId(undefined);
       setPreValidationScripts([]);
       setHooks([]);
+      setHasStoredPat(false);
     }
+    setGithubPat('');
   }, [mode, project, images.length]);
 
   // Validate repo URL (git/remote URLs only)
@@ -91,8 +100,11 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({ mode, project, onS
     return path.startsWith('/');
   };
 
+  // Check whether the current repo URL points to GitHub (drives GitHub SSH Access section visibility)
+  const isGithubRepo = repoUrl.trim().toLowerCase().includes('github.com');
+
   // Handle form submission
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     // Validate fields
@@ -148,6 +160,11 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({ mode, project, onS
             hooks,
             custom_prompts: customPrompts,
           });
+
+    // Store GitHub PAT if the user entered one (uses config.id so it works in both add and edit mode)
+    if (githubPat.trim()) {
+      await window.api.githubPat.set(config.id, githubPat.trim());
+    }
 
     onSave(config);
   };
@@ -374,6 +391,72 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({ mode, project, onS
 
             {/* Claude Hooks section */}
             <HooksSection selected={hooks} onChange={setHooks} />
+
+            {/* GitHub SSH Access section — only shown when repo URL is a GitHub URL */}
+            {isGithubRepo && (
+              <div className="mb-4">
+                <div className="flex items-center justify-between mb-2">
+                  <label className="block text-sm font-medium text-gray-300">
+                    GitHub SSH Access
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setShowGithubSection(!showGithubSection)}
+                    className="text-sm text-blue-400 hover:text-blue-300 transition-colors"
+                  >
+                    {showGithubSection ? 'Hide' : hasStoredPat ? 'Update Token' : 'Set Up'}
+                  </button>
+                </div>
+
+                {!showGithubSection && hasStoredPat && (
+                  <p className="text-xs text-green-400">Token stored — deploy keys will be created automatically on loop start.</p>
+                )}
+
+                {showGithubSection && (
+                  <div className="bg-gray-750 border border-gray-600 rounded p-4 space-y-3">
+                    <div>
+                      <input
+                        id="githubPat"
+                        type="password"
+                        value={githubPat}
+                        onChange={(e) => setGithubPat(e.target.value)}
+                        placeholder={hasStoredPat ? '••••••••••••  (leave blank to keep existing)' : 'github_pat_…'}
+                        className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded text-white focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                        autoComplete="off"
+                      />
+                      <p className="mt-1 text-xs text-gray-400">
+                        Fine-grained PAT with read/write access to repository deploy keys. Scoped to this repo only.{' '}
+                        <a
+                          href="https://github.com/settings/personal-access-tokens/new"
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-blue-400 hover:text-blue-300 underline"
+                          onClick={(e) => { e.preventDefault(); window.open('https://github.com/settings/personal-access-tokens/new', '_blank'); }}
+                        >
+                          Create token on GitHub
+                        </a>
+                      </p>
+                    </div>
+
+                    {hasStoredPat && (
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          if (mode === 'edit' && project) {
+                            await window.api.githubPat.delete(project.id);
+                            setHasStoredPat(false);
+                            setGithubPat('');
+                          }
+                        }}
+                        className="text-xs text-red-400 hover:text-red-300 transition-colors"
+                      >
+                        Remove stored token
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Custom Prompts section */}
             <div className="mb-6">

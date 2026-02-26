@@ -104,6 +104,14 @@ export interface ProjectConfig {
   created_at: string;
   /** ISO 8601 last-updated timestamp */
   updated_at: string;
+  /**
+   * GitHub Personal Access Token for ephemeral deploy key management.
+   * Required only when repo_url points to a GitHub repository and the agent
+   * needs to push commits. The actual PAT is stored encrypted in credentials.json
+   * via CredentialManager.setGithubPat(); this flag indicates a PAT is configured.
+   * Fine-grained PAT with read/write access to repository deploy keys, scoped to the repo.
+   */
+  github_pat?: string;
 }
 
 /**
@@ -195,5 +203,6 @@ export function createProjectConfig(partial: Partial<ProjectConfig> = {}): Proje
     custom_prompts: partial.custom_prompts ?? {},
     created_at: partial.created_at ?? now,
     updated_at: partial.updated_at ?? now,
+    github_pat: partial.github_pat,
   };
 }

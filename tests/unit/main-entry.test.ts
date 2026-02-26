@@ -605,7 +605,7 @@ describe('Main Entry Point', () => {
   });
 
   describe('IPC Handler Registration', () => {
-    it('should register data handlers with ConfigManager, ProjectStore, ImportExport, PreValidationStore, HooksStore, LoopRunner, and DockerManager', () => {
+    it('should register data handlers with ConfigManager, ProjectStore, ImportExport, PreValidationStore, HooksStore, LoopRunner, DockerManager, and CredentialManager', () => {
       expect(mockRegisterDataHandlers).toHaveBeenCalledWith({
         configManager: mockConfigManager,
         projectStore: mockProjectStore,
@@ -614,6 +614,7 @@ describe('Main Entry Point', () => {
         hooksStore: mockHooksStore,
         loopRunner: mockLoopRunner,
         dockerManager: mockDockerManager,
+        credentialManager: mockCredentialManager,
       });
     });
 

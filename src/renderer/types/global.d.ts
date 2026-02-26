@@ -2,6 +2,7 @@
 // window.api is exposed by the preload script via contextBridge.
 
 import type { AppSettings, ProjectConfig, ZephyrImage, ImageBuildConfig } from '../../shared/models';
+import type { DeployKeyRecord } from '../../services/deploy-key-store';
 import type { PreValidationScript } from '../../services/pre-validation-store';
 import type { HookFile } from '../../services/hooks-store';
 import type {
@@ -214,6 +215,27 @@ declare global {
         add: (filename: string, content: string) => Promise<void>;
         /** Remove a hook file. Returns true if deleted, false if not found. */
         remove: (filename: string) => Promise<boolean>;
+      };
+
+      githubPat: {
+        /** Store a GitHub PAT for a project (encrypted) */
+        set: (projectId: string, pat: string) => Promise<void>;
+        /** Check whether a GitHub PAT is stored for a project. Returns true if stored. */
+        has: (projectId: string) => Promise<boolean>;
+        /** Delete the GitHub PAT for a project */
+        delete: (projectId: string) => Promise<void>;
+      };
+
+      deployKeys: {
+        /** List all orphaned deploy keys (keys that were never cleaned up) */
+        listOrphaned: () => Promise<DeployKeyRecord[]>;
+        /** Get the GitHub deploy keys management URL for a repo (owner/repo format) */
+        getUrl: (repo: string) => Promise<string>;
+      };
+
+      shell: {
+        /** Open a URL in the system's default browser */
+        openExternal: (url: string) => Promise<void>;
       };
     };
   }

@@ -9,6 +9,7 @@ import { IPC } from '../../shared/ipc-channels';
 import type { LoopRunner } from '../../services/loop-runner';
 import type { LoopScheduler } from '../../services/scheduler';
 import type { LoopState, LoopStartOpts } from '../../shared/loop-types';
+import { isLoopTerminal } from '../../shared/loop-types';
 import type { ScheduledLoop } from '../../services/scheduler';
 import type { ProjectConfig } from '../../shared/models';
 import type { PreValidationStore } from '../../services/pre-validation-store';
@@ -16,6 +17,8 @@ import type { HooksStore } from '../../services/hooks-store';
 import type { DockerManager } from '../../services/docker-manager';
 import type { AuthInjector } from '../../services/auth-injector';
 import type { CredentialManager } from '../../services/credential-manager';
+import type { SSHKeyManager } from '../../services/ssh-key-manager';
+import type { DeployKeyStore } from '../../services/deploy-key-store';
 import { getLogger } from '../../services/logging';
 
 export interface LoopServices {
@@ -28,6 +31,8 @@ export interface LoopServices {
   dockerManager?: Pick<DockerManager, 'execCommand'>;
   authInjector?: AuthInjector;
   credentialManager?: CredentialManager;
+  sshKeyManager?: SSHKeyManager;
+  deployKeyStore?: DeployKeyStore;
 }
 
 export function registerLoopHandlers(services: LoopServices): void {
@@ -41,9 +46,16 @@ export function registerLoopHandlers(services: LoopServices): void {
     dockerManager,
     authInjector,
     credentialManager,
+    sshKeyManager,
+    deployKeyStore,
   } = services;
 
   const logger = getLogger('loop');
+
+  // In-memory map tracking active deploy keys for cleanup on loop termination.
+  // Maps projectId -> { keyId, repoUrl, pat } so we can delete keys from GitHub
+  // when the loop stops, fails, or completes.
+  const activeDeployKeys = new Map<string, { keyId: number; repoUrl: string; pat: string }>();
 
   // ── Loop lifecycle ────────────────────────────────────────────────────────
 
@@ -140,6 +152,46 @@ export function registerLoopHandlers(services: LoopServices): void {
         }
       }
 
+      // Inject ephemeral SSH deploy key for GitHub repos.
+      // Only runs when: project has a GitHub repo_url, a PAT is stored, and
+      // the container has started (containerId is set). Failures are non-fatal
+      // — the loop continues without SSH access rather than aborting.
+      if (
+        project &&
+        project.repo_url &&
+        sshKeyManager?.isGithubUrl(project.repo_url) &&
+        credentialManager &&
+        state.containerId
+      ) {
+        try {
+          const pat = await credentialManager.getGithubPat(opts.projectId);
+          if (pat) {
+            const { privateKey, publicKey } = sshKeyManager.generateKeyPair();
+            const keyTitle = `zephyr-${opts.projectId.slice(0, 8)}-${Date.now()}`;
+            const keyId = await sshKeyManager.addDeployKey(pat, project.repo_url, publicKey, keyTitle);
+
+            // Record in store before injection so a mid-injection crash leaves a traceable entry
+            if (deployKeyStore) {
+              const { owner, repo } = sshKeyManager.parseGithubRepo(project.repo_url);
+              deployKeyStore.record({
+                key_id: keyId,
+                repo: `${owner}/${repo}`,
+                project_id: opts.projectId,
+                project_name: opts.projectName,
+                loop_id: state.containerId,
+                created_at: new Date().toISOString(),
+              });
+            }
+
+            await sshKeyManager.injectIntoContainer(state.containerId, privateKey);
+            activeDeployKeys.set(opts.projectId, { keyId, repoUrl: project.repo_url, pat });
+            logger.info('SSH deploy key injected into container', { projectId: opts.projectId, keyId });
+          }
+        } catch (err) {
+          logger.warn('Failed to set up SSH deploy key; loop continues without GitHub SSH access', { err });
+        }
+      }
+
       return state;
     },
   );
@@ -195,6 +247,34 @@ export function registerLoopHandlers(services: LoopServices): void {
   });
 
   // ── Event broadcasting ────────────────────────────────────────────────────
+
+  // Clean up GitHub deploy keys when a loop reaches a terminal state.
+  // Uses a separate onStateChange callback so cleanup is decoupled from broadcasting.
+  loopRunner.onStateChange(async (state: LoopState) => {
+    if (!isLoopTerminal(state.status)) {
+      return;
+    }
+
+    const keyInfo = activeDeployKeys.get(state.projectId);
+    if (!keyInfo || !sshKeyManager) {
+      return;
+    }
+
+    // Remove from local map first so a re-entrant terminal state change is a no-op
+    activeDeployKeys.delete(state.projectId);
+
+    try {
+      await sshKeyManager.removeDeployKey(keyInfo.pat, keyInfo.repoUrl, keyInfo.keyId);
+      deployKeyStore?.markCleaned(keyInfo.keyId);
+      logger.info('SSH deploy key removed from GitHub', { projectId: state.projectId, keyId: keyInfo.keyId });
+    } catch (err) {
+      logger.warn('Failed to remove deploy key from GitHub (key may need manual cleanup)', {
+        err,
+        projectId: state.projectId,
+        keyId: keyInfo.keyId,
+      });
+    }
+  });
 
   // Register callbacks to broadcast state changes and log lines to all renderer windows
 

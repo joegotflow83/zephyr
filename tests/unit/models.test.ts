@@ -188,6 +188,16 @@ describe('createProjectConfig', () => {
       expect(project).toEqual(full);
     });
 
+    it('preserves github_pat when provided', () => {
+      const project = createProjectConfig({ github_pat: 'configured' });
+      expect(project.github_pat).toBe('configured');
+    });
+
+    it('defaults github_pat to undefined when not provided', () => {
+      const project = createProjectConfig();
+      expect(project.github_pat).toBeUndefined();
+    });
+
     it('works with no arguments (empty call)', () => {
       const project = createProjectConfig();
       expect(project).toBeDefined();

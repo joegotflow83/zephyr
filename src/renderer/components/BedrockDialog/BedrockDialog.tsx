@@ -17,7 +17,7 @@ interface BedrockDialogProps {
  * Modal form for configuring AWS Bedrock credentials and settings.
  *
  * Saves non-sensitive fields (region, model overrides, log level) via
- * settings.save() and the AWS_BEARER_TOKEN encrypted via credentials.store().
+ * settings.save() and the AWS_BEARER_TOKEN_BEDROCK encrypted via credentials.store().
  */
 export const BedrockDialog: React.FC<BedrockDialogProps> = ({
   currentSettings,

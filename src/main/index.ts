@@ -32,8 +32,11 @@ import { ImageBuilder } from '../services/image-builder';
 import { PreValidationStore } from '../services/pre-validation-store';
 import { HooksStore } from '../services/hooks-store';
 import { AuthInjector } from '../services/auth-injector';
+import { DeployKeyStore } from '../services/deploy-key-store';
+import { SSHKeyManager } from '../services/ssh-key-manager';
 import { buildApplicationMenu } from './menu';
 import { IPC } from '../shared/ipc-channels';
+import { registerDeployKeyHandlers } from './ipc-handlers/deploy-key-handlers';
 import os from 'node:os';
 import type { AppSettings } from '../shared/models';
 import { isLoopActive } from '../shared/loop-types';
@@ -82,9 +85,11 @@ const imageBuilder = new ImageBuilder(dockerManager, imageStore);
 const preValidationStore = new PreValidationStore(configManager);
 const hooksStore = new HooksStore(configManager);
 const authInjector = new AuthInjector(configManager, credentialManager);
+const deployKeyStore = new DeployKeyStore(path.join(os.homedir(), '.zephyr'));
+const sshKeyManager = new SSHKeyManager(dockerManager);
 
 // Register all IPC handlers before the window is created.
-registerDataHandlers({ configManager, projectStore, importExport, preValidationStore, hooksStore, loopRunner, dockerManager });
+registerDataHandlers({ configManager, projectStore, importExport, preValidationStore, hooksStore, loopRunner, dockerManager, credentialManager });
 registerDockerHandlers({ dockerManager, dockerHealth });
 registerCredentialHandlers({ credentialManager, loginManager });
 registerLoopHandlers({
@@ -97,12 +102,15 @@ registerLoopHandlers({
   dockerManager,
   authInjector,
   credentialManager,
+  sshKeyManager,
+  deployKeyStore,
 });
 registerLogHandlers({ logExporter, loopRunner });
 registerTerminalHandlers({ terminalManager });
 registerUpdateHandlers({ selfUpdater });
 registerAutoUpdateHandlers({ autoUpdater });
 registerImageHandlers({ imageStore, imageBuilder });
+registerDeployKeyHandlers({ deployKeyStore });
 
 // Legacy ping handler kept for backwards compatibility with existing tests.
 ipcMain.handle(IPC.PING, () => 'pong');
@@ -184,13 +192,17 @@ async function recoverLoops(): Promise<void> {
 app.on('ready', async () => {
   logger.info('Application starting');
 
-  // Load settings to configure log level
+  // Load settings to configure log level and concurrency limit
   try {
     const settings: AppSettings = await configManager.loadJson('settings.json');
     if (settings.log_level) {
       const mappedLevel = mapLogLevel(settings.log_level);
       setLogLevel(mappedLevel);
       logger.info('Log level set from settings', { level: mappedLevel });
+    }
+    if (settings.max_concurrent_containers) {
+      loopRunner.setMaxConcurrent(settings.max_concurrent_containers);
+      logger.info('Max concurrent containers set from settings', { max: settings.max_concurrent_containers });
     }
   } catch (error) {
     logger.warn('Could not load settings, using default log level', { error });
@@ -199,6 +211,8 @@ app.on('ready', async () => {
   createWindow();
   // Build the application menu bar
   buildApplicationMenu();
+  // Mark any deploy keys still 'active' from a previous session as orphaned
+  deployKeyStore.detectOrphans();
   // Recover any loops that survived a crash or force-quit
   await recoverLoops();
   // Start Docker health monitoring

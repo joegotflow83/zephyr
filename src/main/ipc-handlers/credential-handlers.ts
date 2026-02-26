@@ -93,4 +93,28 @@ export function registerCredentialHandlers(services: CredentialServices): void {
       };
     },
   );
+
+  // ── GitHub PAT (per-project) ──────────────────────────────────────────────
+
+  ipcMain.handle(
+    IPC.GITHUB_PAT_SET,
+    async (_event, projectId: string, pat: string): Promise<void> => {
+      await credentialManager.setGithubPat(projectId, pat);
+    },
+  );
+
+  ipcMain.handle(
+    IPC.GITHUB_PAT_GET,
+    async (_event, projectId: string): Promise<boolean> => {
+      const pat = await credentialManager.getGithubPat(projectId);
+      return pat !== null;
+    },
+  );
+
+  ipcMain.handle(
+    IPC.GITHUB_PAT_DELETE,
+    async (_event, projectId: string): Promise<void> => {
+      await credentialManager.deleteGithubPat(projectId);
+    },
+  );
 }

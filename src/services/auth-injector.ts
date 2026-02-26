@@ -7,7 +7,7 @@
  * Auth modes:
  * - api_key: ANTHROPIC_API_KEY env var
  * - browser_session: no env vars (session JSON is exec-written to container after start)
- * - aws_bedrock: CLAUDE_CODE_USE_BEDROCK=1 + AWS_REGION + AWS_BEARER_TOKEN + optional overrides
+ * - aws_bedrock: CLAUDE_CODE_USE_BEDROCK=1 + AWS_REGION + AWS_BEARER_TOKEN_BEDROCK + optional overrides
  */
 
 import type { ConfigManager } from './config-manager';
@@ -80,7 +80,7 @@ export class AuthInjector {
   private async buildBedrockConfig(settings: AppSettings | null): Promise<ContainerAuthConfig> {
     const bearerToken = await this.credentialManager.getApiKey('anthropic_bedrock');
     if (!bearerToken) {
-      this.logger.warn('aws_bedrock auth method selected but no AWS_BEARER_TOKEN stored');
+      this.logger.warn('aws_bedrock auth method selected but no AWS_BEARER_TOKEN_BEDROCK stored');
     }
 
     const envVars: Record<string, string> = {
@@ -91,7 +91,7 @@ export class AuthInjector {
       envVars['AWS_REGION'] = settings.bedrock_region;
     }
     if (bearerToken) {
-      envVars['AWS_BEARER_TOKEN'] = bearerToken;
+      envVars['AWS_BEARER_TOKEN_BEDROCK'] = bearerToken;
     }
     if (settings?.bedrock_model) {
       envVars['ANTHROPIC_MODEL'] = settings.bedrock_model;

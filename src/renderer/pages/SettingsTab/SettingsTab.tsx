@@ -4,6 +4,7 @@ import { CredentialsSection } from './CredentialsSection';
 import { DockerSection } from './DockerSection';
 import { GeneralSection } from './GeneralSection';
 import { UpdatesSection } from './UpdatesSection';
+import { OrphanedKeysSection } from './OrphanedKeysSection';
 
 interface SettingsSectionProps {
   title: string;
@@ -137,6 +138,14 @@ export const SettingsTab: React.FC = () => {
           description="Check for and install application updates"
         >
           <UpdatesSection />
+        </SettingsSection>
+
+        {/* Orphaned Deploy Keys Section */}
+        <SettingsSection
+          title="Orphaned Deploy Keys"
+          description="GitHub deploy keys that were not cleaned up and may need manual removal"
+        >
+          <OrphanedKeysSection />
         </SettingsSection>
       </div>
     </div>

@@ -319,6 +319,105 @@ describe('CredentialManager', () => {
     });
   });
 
+  describe('setGithubPat / getGithubPat / deleteGithubPat', () => {
+    it('should store and retrieve a GitHub PAT for a project', async () => {
+      await credentialManager.setGithubPat('proj-123', 'ghp_test_token');
+
+      const retrieved = await credentialManager.getGithubPat('proj-123');
+      expect(retrieved).toBe('ghp_test_token');
+    });
+
+    it('should store PATs independently per project', async () => {
+      await credentialManager.setGithubPat('proj-aaa', 'ghp_token_aaa');
+      await credentialManager.setGithubPat('proj-bbb', 'ghp_token_bbb');
+
+      expect(await credentialManager.getGithubPat('proj-aaa')).toBe('ghp_token_aaa');
+      expect(await credentialManager.getGithubPat('proj-bbb')).toBe('ghp_token_bbb');
+    });
+
+    it('should return null for a project with no PAT', async () => {
+      const result = await credentialManager.getGithubPat('nonexistent-project');
+      expect(result).toBeNull();
+    });
+
+    it('should overwrite existing PAT for the same project', async () => {
+      await credentialManager.setGithubPat('proj-123', 'old-token');
+      await credentialManager.setGithubPat('proj-123', 'new-token');
+
+      expect(await credentialManager.getGithubPat('proj-123')).toBe('new-token');
+    });
+
+    it('should throw if PAT is empty', async () => {
+      await expect(credentialManager.setGithubPat('proj-123', '')).rejects.toThrow(
+        'GitHub PAT cannot be empty'
+      );
+      await expect(credentialManager.setGithubPat('proj-123', '   ')).rejects.toThrow(
+        'GitHub PAT cannot be empty'
+      );
+    });
+
+    it('should throw if encryption is unavailable when setting', async () => {
+      mockIsEncryptionAvailable.mockReturnValue(false);
+      await expect(credentialManager.setGithubPat('proj-123', 'token')).rejects.toThrow(
+        'Encryption not available on this system'
+      );
+    });
+
+    it('should throw if encryption is unavailable when getting', async () => {
+      await credentialManager.setGithubPat('proj-123', 'token');
+      mockIsEncryptionAvailable.mockReturnValue(false);
+      await expect(credentialManager.getGithubPat('proj-123')).rejects.toThrow(
+        'Encryption not available on this system'
+      );
+    });
+
+    it('should return null if decryption fails when getting', async () => {
+      await credentialManager.setGithubPat('proj-123', 'token');
+      mockDecryptString.mockImplementation(() => {
+        throw new Error('Decryption failed');
+      });
+      expect(await credentialManager.getGithubPat('proj-123')).toBeNull();
+    });
+
+    it('should delete a GitHub PAT', async () => {
+      await credentialManager.setGithubPat('proj-123', 'ghp_test_token');
+      await credentialManager.deleteGithubPat('proj-123');
+
+      expect(await credentialManager.getGithubPat('proj-123')).toBeNull();
+    });
+
+    it('should not throw when deleting a non-existent PAT', async () => {
+      await expect(credentialManager.deleteGithubPat('no-such-project')).resolves.toBeUndefined();
+    });
+
+    it('should only delete the specified project PAT', async () => {
+      await credentialManager.setGithubPat('proj-aaa', 'token-aaa');
+      await credentialManager.setGithubPat('proj-bbb', 'token-bbb');
+
+      await credentialManager.deleteGithubPat('proj-aaa');
+
+      expect(await credentialManager.getGithubPat('proj-aaa')).toBeNull();
+      expect(await credentialManager.getGithubPat('proj-bbb')).toBe('token-bbb');
+    });
+
+    it('should store PAT keyed independently from regular service credentials', async () => {
+      await credentialManager.storeApiKey('anthropic', 'sk-ant-test');
+      await credentialManager.setGithubPat('proj-123', 'ghp_token');
+
+      // Regular key unaffected
+      expect(await credentialManager.getApiKey('anthropic')).toBe('sk-ant-test');
+      // PAT unaffected
+      expect(await credentialManager.getGithubPat('proj-123')).toBe('ghp_token');
+    });
+
+    it('should persist PAT across manager instances', async () => {
+      await credentialManager.setGithubPat('proj-123', 'persistent-pat');
+
+      const manager2 = new CredentialManager(tmpDir);
+      expect(await manager2.getGithubPat('proj-123')).toBe('persistent-pat');
+    });
+  });
+
   describe('encryption verification', () => {
     it('should store encrypted data on disk', async () => {
       await credentialManager.storeApiKey('anthropic', 'plaintext-secret');

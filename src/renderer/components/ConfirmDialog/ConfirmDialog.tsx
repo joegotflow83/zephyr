@@ -6,6 +6,7 @@ interface ConfirmDialogProps {
   confirmLabel?: string;
   cancelLabel?: string;
   variant?: 'danger' | 'default';
+  loading?: boolean;
   onConfirm: () => void;
   onCancel: () => void;
 }
@@ -21,20 +22,25 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
   confirmLabel = 'Confirm',
   cancelLabel = 'Cancel',
   variant = 'default',
+  loading = false,
   onConfirm,
   onCancel,
 }) => {
-  // Handle backdrop click to close (cancel)
+  // Handle backdrop click to close (cancel) — disabled while loading
   const handleBackdropClick = (e: React.MouseEvent) => {
+    if (loading) return;
     if (e.target === e.currentTarget) {
       onCancel();
     }
   };
 
-  // Determine confirm button styles based on variant
-  const confirmButtonClass = variant === 'danger'
-    ? 'px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition-colors font-medium'
-    : 'px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors font-medium';
+  // Determine confirm button styles based on variant and loading state
+  const confirmButtonClass = loading
+    ? 'px-4 py-2 rounded font-medium flex items-center gap-2 opacity-60 cursor-not-allowed ' +
+      (variant === 'danger' ? 'bg-red-600 text-white' : 'bg-blue-600 text-white')
+    : variant === 'danger'
+      ? 'px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition-colors font-medium'
+      : 'px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors font-medium';
 
   return (
     <div
@@ -52,7 +58,8 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
           </h2>
           <button
             onClick={onCancel}
-            className="text-gray-400 hover:text-white transition-colors"
+            disabled={loading}
+            className="text-gray-400 hover:text-white transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
             aria-label="Close dialog"
           >
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -71,15 +78,32 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
           <button
             type="button"
             onClick={onCancel}
-            className="px-4 py-2 text-gray-300 hover:text-white transition-colors"
+            disabled={loading}
+            className="px-4 py-2 text-gray-300 hover:text-white transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
           >
             {cancelLabel}
           </button>
           <button
             type="button"
             onClick={onConfirm}
+            disabled={loading}
             className={confirmButtonClass}
           >
+            {loading && (
+              <svg
+                className="w-4 h-4 animate-spin"
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
+              >
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path
+                  className="opacity-75"
+                  fill="currentColor"
+                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+                />
+              </svg>
+            )}
             {confirmLabel}
           </button>
         </div>

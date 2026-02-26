@@ -2,7 +2,7 @@
 // All window.api.* calls are defined here.
 // See src/shared/ipc-channels.ts for channel constants.
 
-import { contextBridge, ipcRenderer } from 'electron';
+import { contextBridge, ipcRenderer, shell } from 'electron';
 import { IPC } from '../shared/ipc-channels';
 
 contextBridge.exposeInMainWorld('api', {
@@ -169,5 +169,21 @@ contextBridge.exposeInMainWorld('api', {
     add: (filename: string, content: string) =>
       ipcRenderer.invoke(IPC.HOOKS_ADD, filename, content),
     remove: (filename: string) => ipcRenderer.invoke(IPC.HOOKS_REMOVE, filename),
+  },
+
+  githubPat: {
+    set: (projectId: string, pat: string) =>
+      ipcRenderer.invoke(IPC.GITHUB_PAT_SET, projectId, pat),
+    has: (projectId: string) => ipcRenderer.invoke(IPC.GITHUB_PAT_GET, projectId),
+    delete: (projectId: string) => ipcRenderer.invoke(IPC.GITHUB_PAT_DELETE, projectId),
+  },
+
+  deployKeys: {
+    listOrphaned: () => ipcRenderer.invoke(IPC.DEPLOY_KEYS_LIST_ORPHANED),
+    getUrl: (repo: string) => ipcRenderer.invoke(IPC.DEPLOY_KEYS_GET_URL, repo),
+  },
+
+  shell: {
+    openExternal: (url: string) => shell.openExternal(url),
   },
 });

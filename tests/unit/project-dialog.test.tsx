@@ -94,10 +94,27 @@ describe('ProjectDialog', () => {
   const mockOnSave = vi.fn();
   const mockOnClose = vi.fn();
 
+  // Mock window.api.githubPat for all tests — the component calls it in useEffect
+  // when editing a project with a GitHub repo URL.
+  const mockGithubPat = {
+    has: vi.fn().mockResolvedValue(false),
+    set: vi.fn().mockResolvedValue(undefined),
+    delete: vi.fn().mockResolvedValue(undefined),
+  };
+
   beforeEach(() => {
     vi.clearAllMocks();
     // Default: no images in library → custom mode
     vi.mocked(useImages).mockReturnValue(makeImagesMock([]));
+    // Reset githubPat mocks to defaults
+    mockGithubPat.has.mockResolvedValue(false);
+    mockGithubPat.set.mockResolvedValue(undefined);
+    mockGithubPat.delete.mockResolvedValue(undefined);
+    Object.defineProperty(window, 'api', {
+      value: { githubPat: mockGithubPat },
+      writable: true,
+      configurable: true,
+    });
   });
 
   describe('Add Mode', () => {

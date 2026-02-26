@@ -95,7 +95,7 @@ export const ProjectsTab: React.FC<ProjectsTabProps> = ({ onRunProject, toast })
         projectId: project.id,
         projectName: project.name,
         dockerImage: project.docker_image,
-        mode: LoopMode.SINGLE,
+        mode: LoopMode.CONTINUOUS,
         ...(project.local_path
           ? { volumeMounts: [`${project.local_path}:/workspace`], workDir: '/workspace' }
           : {}),
@@ -258,6 +258,7 @@ export const ProjectsTab: React.FC<ProjectsTabProps> = ({ onRunProject, toast })
           confirmLabel="Delete"
           cancelLabel="Cancel"
           variant="danger"
+          loading={!!actionLoading[`delete-${confirmDialog.project.id}`]}
           onConfirm={handleConfirmDelete}
           onCancel={handleCancelDelete}
         />

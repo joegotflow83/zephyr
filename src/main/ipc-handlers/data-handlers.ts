@@ -11,6 +11,7 @@ import type { PreValidationStore } from '../../services/pre-validation-store';
 import type { HooksStore } from '../../services/hooks-store';
 import type { LoopRunner } from '../../services/loop-runner';
 import type { DockerManager } from '../../services/docker-manager';
+import type { CredentialManager } from '../../services/credential-manager';
 import type { AppSettings, ProjectConfig } from '../../shared/models';
 import { createDefaultSettings } from '../../shared/models';
 import { setLogLevel, getLogger, type LogLevel } from '../../services/logging';
@@ -34,10 +35,11 @@ export interface DataServices {
   hooksStore: HooksStore;
   loopRunner: LoopRunner;
   dockerManager: DockerManager;
+  credentialManager: CredentialManager;
 }
 
 export function registerDataHandlers(services: DataServices): void {
-  const { configManager, projectStore, importExport, preValidationStore, hooksStore, loopRunner, dockerManager } =
+  const { configManager, projectStore, importExport, preValidationStore, hooksStore, loopRunner, dockerManager, credentialManager } =
     services;
   const logger = getLogger('ipc');
 
@@ -100,6 +102,13 @@ export function registerDataHandlers(services: DataServices): void {
         logger.warn('Failed to list containers for deleted project', { projectId: id, err });
       }
 
+      // Clean up any stored GitHub PAT for this project
+      try {
+        await credentialManager.deleteGithubPat(id);
+      } catch (err) {
+        logger.warn('Failed to delete GitHub PAT for deleted project', { projectId: id, err });
+      }
+
       return projectStore.removeProject(id);
     },
   );
@@ -121,6 +130,12 @@ export function registerDataHandlers(services: DataServices): void {
         const mappedLevel = mapLogLevel(settings.log_level);
         setLogLevel(mappedLevel);
         logger.info('Log level updated from settings', { level: mappedLevel });
+      }
+
+      // Update max concurrent containers if it changed
+      if (settings.max_concurrent_containers) {
+        loopRunner.setMaxConcurrent(settings.max_concurrent_containers);
+        logger.info('Max concurrent containers updated from settings', { max: settings.max_concurrent_containers });
       }
     },
   );
