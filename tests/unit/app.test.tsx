@@ -12,6 +12,7 @@ beforeEach(() => {
         info: { version: '24.0.7', containers: 0, images: 0 },
       }),
       onStatusChanged: vi.fn(() => vi.fn()),
+      listContainers: vi.fn().mockResolvedValue([]),
     },
     loops: {
       list: vi.fn().mockResolvedValue([]),
@@ -27,6 +28,11 @@ beforeEach(() => {
         theme: 'system',
         log_level: 'INFO',
       }),
+    },
+    terminal: {
+      onData: vi.fn(() => vi.fn()),
+      onClosed: vi.fn(() => vi.fn()),
+      onError: vi.fn(() => vi.fn()),
     },
   } as any;
 });

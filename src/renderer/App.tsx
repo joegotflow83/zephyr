@@ -41,31 +41,28 @@ const App: React.FC = () => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  const renderActiveTab = () => {
-    const toastMethods = { success, error, warning, info };
-
-    switch (activeTab) {
-      case 'projects':
-        return <ProjectsTab onRunProject={() => setActiveTab('loops')} toast={toastMethods} />;
-      case 'loops':
-        return <LoopsTab />;
-      case 'terminal':
-        return <TerminalTab />;
-      case 'images':
-        return <ImagesTab />;
-      case 'settings':
-        return <SettingsTab />;
-      default:
-        return <ProjectsTab onRunProject={() => setActiveTab('loops')} toast={toastMethods} />;
-    }
-  };
+  const toastMethods = { success, error, warning, info };
 
   return (
     <Layout
       header={<TabBar tabs={tabs} activeTab={activeTab} onTabChange={setActiveTab} />}
       statusBar={<StatusBar activeLoopCount={activeLoopCount} />}
     >
-      {renderActiveTab()}
+      <div style={{ display: activeTab === 'projects' ? undefined : 'none', height: '100%' }}>
+        <ProjectsTab onRunProject={() => setActiveTab('loops')} toast={toastMethods} />
+      </div>
+      <div style={{ display: activeTab === 'loops' ? undefined : 'none', height: '100%' }}>
+        <LoopsTab />
+      </div>
+      <div style={{ display: activeTab === 'terminal' ? undefined : 'none', height: '100%' }}>
+        <TerminalTab />
+      </div>
+      <div style={{ display: activeTab === 'images' ? undefined : 'none', height: '100%' }}>
+        <ImagesTab />
+      </div>
+      <div style={{ display: activeTab === 'settings' ? undefined : 'none', height: '100%' }}>
+        <SettingsTab />
+      </div>
       <Toast toasts={toasts} onDismiss={dismissToast} />
     </Layout>
   );
