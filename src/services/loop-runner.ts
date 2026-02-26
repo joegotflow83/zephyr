@@ -311,6 +311,11 @@ export class LoopRunner {
           continue;
         }
 
+        // Skip non-running containers (e.g., stopped containers from a previous session)
+        if (container.state !== 'running') {
+          continue;
+        }
+
         // Skip if project was deleted
         const project = projectStore.getProject(projectId);
         if (!project) {

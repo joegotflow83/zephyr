@@ -124,6 +124,23 @@ describe('LoopRunner - recoverLoops', () => {
   // -- Skip conditions --------------------------------------------------------
 
   describe('skipping containers', () => {
+    it('skips non-running containers (e.g., stopped/exited from a previous session)', async () => {
+      const containers = [
+        { ...createMockContainer('proj-stopped', 'container-1'), state: 'exited' },
+        { ...createMockContainer('proj-dead', 'container-2'), state: 'dead' },
+        { ...createMockContainer('proj-created', 'container-3'), state: 'created' },
+        createMockContainer('proj-running', 'container-4'), // state: 'running'
+      ];
+
+      const recovered = await runner.recoverLoops(containers, projectStore);
+
+      expect(recovered).toEqual(['proj-running']);
+      expect(runner.listRunning()).toHaveLength(1);
+      expect(runner.getLoopState('proj-stopped')).toBeNull();
+      expect(runner.getLoopState('proj-dead')).toBeNull();
+      expect(runner.getLoopState('proj-created')).toBeNull();
+    });
+
     it('skips containers without project ID', async () => {
       const containers = [
         {
