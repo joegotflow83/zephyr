@@ -1,6 +1,6 @@
 # Zephyr Desktop
 
-A native PyQt6 desktop application for managing and orchestrating Ralph loops via Docker containers.
+A native Electron + React + TypeScript desktop application for managing and orchestrating AI loops via Docker containers.
 
 ## What It Does
 
@@ -8,40 +8,37 @@ Zephyr Desktop provides a graphical interface for:
 
 - **Project management** -- create, edit, import/export project configurations with Docker container settings, environment variables, and shared assets
 - **Loop execution** -- start, stop, and monitor long-running Docker-based loops with real-time log streaming and parsing
+- **Terminal** -- interactive xterm.js terminal with full PTY sessions via Docker exec
+- **Image builder** -- build and manage custom Docker images from within the app
 - **Scheduling** -- schedule loops with cron expressions for automated execution
-- **Credential management** -- securely store API keys and session cookies via the system keyring; optionally use browser-based login via Playwright
+- **Credential management** -- securely store API keys and session cookies via Electron's `safeStorage`; optionally use browser-based login via Playwright
+- **AWS Bedrock auth** -- built-in support for AWS Bedrock authentication
+- **GitHub deploy keys** -- ephemeral SSH deploy key management for private repositories
 - **Docker health monitoring** -- background polling detects Docker daemon availability changes and warns when disk space is low
-- **Self-update** -- check for and apply updates from the upstream Git repository
+- **Self-update** -- check for and apply updates via `electron-updater`
 - **Desktop notifications** -- get notified when loops complete or fail
 - **Log export** -- export individual or all loop logs to disk
 
 ## Requirements
 
-- Python 3.12+
+- Node.js 18+
 - Docker Desktop (for loop execution; project management works without it)
-- System keyring backend (for credential storage)
 
 ## Installation
 
 ```bash
 # Clone the repository
-git clone <repo-url> && cd zephyr-desktop
+git clone https://github.com/joegotflow83/zephyr.git && cd zephyr
 
-# Install in development mode
-pip install -e ".[dev]"
-
-# Install Playwright browsers (needed for login mode)
-playwright install chromium
+# Install dependencies
+npm install
 ```
 
 ## Running
 
 ```bash
-# Via the installed entry point
-zephyr
-
-# Or directly
-python -m src.main
+# Start in development mode
+npm start
 ```
 
 ## Development
@@ -50,92 +47,100 @@ python -m src.main
 
 ```
 src/
-  main.py                 # Application entry point and service wiring
-  lib/
-    app_controller.py     # Central UI-to-backend coordinator
-    config_manager.py     # JSON configuration persistence
-    models.py             # Data models (ProjectConfig, LoopConfig, AppSettings)
-    project_store.py      # Project CRUD operations
-    docker_manager.py     # Docker container lifecycle and log streaming
-    loop_runner.py        # Loop execution engine
-    log_parser.py         # Structured log output parsing
-    scheduler.py          # Cron-based loop scheduling
-    credential_manager.py # Keyring-backed credential storage
-    login_manager.py      # Playwright browser-based authentication
-    asset_injector.py     # Shared file injection into containers
-    notifier.py           # Desktop notification service
-    log_exporter.py       # Log export to files
-    log_bridge.py         # Thread-safe Qt signal bridging for logs
-    docker_health.py      # Background Docker daemon health polling
-    disk_checker.py       # Pre-launch disk space validation
-    git_manager.py        # Git repository operations
-    self_updater.py       # In-app update mechanism
-    cleanup.py            # Graceful shutdown and signal handling
-    logging_config.py     # Application-wide logging setup
-    import_export.py      # Project configuration import/export
-    _version.py           # Version string (generated, not committed)
-  ui/
-    main_window.py        # Tab-based main window
-    projects_tab.py       # Project list and management
-    loops_tab.py          # Running loops display and log viewer
-    settings_tab.py       # Application settings and updates
-    project_dialog.py     # Add/edit project dialog
-    credential_dialog.py  # Credential input dialog
-tests/                    # 1376+ tests covering all modules
+  main/
+    index.ts              # Electron main process entry point
+    preload.ts            # Context bridge / preload script
+    menu.ts               # Application menu
+    ipc-handlers/         # IPC handler modules
+  renderer/
+    App.tsx               # Root React component
+    index.tsx             # Renderer entry point
+    pages/
+      ProjectsTab/        # Project list and management
+      LoopsTab/           # Running loops display and log viewer
+      TerminalTab/        # Interactive terminal
+      ImagesTab/          # Docker image builder
+      SettingsTab/        # Application settings and updates
+    components/           # Shared UI components (dialogs, log viewer, status bar, etc.)
+    stores/               # Zustand state stores
+    hooks/                # Custom React hooks
+  services/
+    config-manager.ts     # JSON configuration persistence
+    project-store.ts      # Project CRUD operations
+    docker-manager.ts     # Docker container lifecycle and log streaming
+    loop-runner.ts        # Loop execution engine
+    log-parser.ts         # Structured log output parsing
+    scheduler.ts          # Cron-based loop scheduling
+    credential-manager.ts # safeStorage-backed credential storage
+    login-manager.ts      # Playwright browser-based authentication
+    asset-injector.ts     # Shared file injection into containers
+    image-builder.ts      # Docker image build orchestration
+    terminal-manager.ts   # xterm.js PTY session management
+    docker-health.ts      # Background Docker daemon health polling
+    disk-checker.ts       # Pre-launch disk space validation
+    git-manager.ts        # Git repository operations
+    self-updater.ts       # In-app update mechanism
+    ssh-key-manager.ts    # Ephemeral GitHub SSH deploy key management
+    import-export.ts      # Project configuration import/export
+    logging.ts            # Application-wide logging (electron-log)
+  shared/
+    ipc-channels.ts       # IPC channel name constants
+    models.ts             # Shared data models
+    loop-types.ts         # Loop-related type definitions
 scripts/
-  build.sh                # PyInstaller build wrapper
-  generate_icon.py        # Application icon generation
-  generate_icns.sh        # macOS .icns icon conversion
+  build.sh                # Build wrapper
+  generate-icons.js       # Application icon generation
 ```
 
 ### Running Tests
 
 ```bash
-# Full test suite
-./validate.sh
+# Unit tests
+npm run test:unit
 
-# Specific tests
-./validate.sh targeted tests/test_config_manager.py
+# Integration tests
+npm run test:integration
 
-# Re-run only last-failed tests
-./validate.sh lf
+# E2E tests (requires display)
+npm run test:e2e
 
-# Failed-first ordering
-./validate.sh ff
+# All tests
+npm test
 
-# Linting (black + pylint)
-./validate.sh lint
+# Linting
+npm run lint
+npm run lint:fix
 ```
-
-The test suite requires `QT_QPA_PLATFORM=offscreen` for headless environments (set automatically by `validate.sh`).
 
 ### Building
 
 ```bash
-# Build standalone application via PyInstaller
-./scripts/build.sh
+# Package the application
+npm run package
 
-# Output: dist/Zephyr/
+# Create distributable (dmg, deb, exe, etc.)
+npm run make
 ```
 
-Builds produce platform-native packages: `.app` bundle on macOS, standalone binary on Linux, `.exe` on Windows.
+Builds produce platform-native packages: `.dmg` on macOS, `.deb`/`.rpm` on Linux, `.exe` (Squirrel) on Windows.
 
 ### CI/CD
 
 GitHub Actions workflows in `.github/workflows/`:
 
-- **ci.yml** -- runs tests and linting on every push
+- **ci.yml** -- runs type-check, unit tests, integration tests, linting, and E2E tests on every push
 - **release.yml** -- triggered by `v*` tags; builds for macOS, Linux, and Windows, then publishes a GitHub release with artifacts
 
 ## Architecture
 
-The application follows a service-oriented architecture with a central `AppController` that wires 12+ backend services to the PyQt6 UI. All Docker operations, credential access, and long-running tasks happen in background threads with results bridged to the Qt event loop via signals and queued connections.
+The application follows Electron's process model with a strict security posture (`contextIsolation: true`, `nodeIntegration: false`). All IPC channel names are defined as constants in `src/shared/ipc-channels.ts`. The React renderer communicates with backend services exclusively via the context bridge.
 
 Key design decisions:
 
 - **Best-effort resilience** -- Docker unavailability, disk check failures, and git validation errors are caught and logged but never prevent the app from starting or project management from working
-- **Thread-safe log bridging** -- a dedicated `LogBridge` with an internal `QObject` emitter uses `QueuedConnection` to safely forward logs from worker threads to the UI
-- **Secure credentials** -- all secrets stored via the system keyring; never written to plaintext config files
+- **Secure credentials** -- all secrets stored via `electron.safeStorage`; never written to plaintext config files
+- **Zustand state** -- renderer state is managed with Zustand stores, keeping UI logic out of components
+- **Virtual log rendering** -- `@tanstack/react-virtual` enables smooth scrolling through large log outputs
 
 ## License
 
