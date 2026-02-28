@@ -220,7 +220,7 @@ describe('UpdatesSection', () => {
 
     it('should disable button while checking', async () => {
       mockUpdates.check.mockImplementation(
-        () => new Promise((resolve) => setTimeout(resolve, 100))
+        () => new Promise(() => {}) // Never resolves — avoids dangling timers causing act() errors
       );
 
       render(<UpdatesSection />);
@@ -497,7 +497,7 @@ describe('UpdatesSection', () => {
         latestVersion: '0.2.0',
       });
       mockUpdates.apply.mockImplementation(
-        () => new Promise((resolve) => setTimeout(resolve, 100))
+        () => new Promise(() => {}) // Never resolves — avoids dangling timers causing act() errors
       );
 
       render(<UpdatesSection />);

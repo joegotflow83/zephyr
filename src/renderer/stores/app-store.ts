@@ -15,6 +15,7 @@ import { create } from 'zustand';
 import type { ProjectConfig, AppSettings, ZephyrImage, ImageBuildConfig } from '../../shared/models';
 import type { LoopState } from '../../shared/loop-types';
 import type { DockerInfo } from '../../services/docker-manager';
+import type { VMInfo } from '../../services/vm-manager';
 
 /**
  * Complete application state shape
@@ -45,6 +46,10 @@ export interface AppState {
   // Docker status
   dockerConnected: boolean;
   dockerInfo: DockerInfo | undefined;
+
+  // VM status
+  vmInfos: VMInfo[];
+  multipassAvailable: boolean;
 
   // Actions
   setProjects: (projects: ProjectConfig[]) => void;
@@ -79,6 +84,12 @@ export interface AppState {
   rebuildImage: (id: string) => Promise<void>;
 
   setDockerStatus: (connected: boolean, info?: DockerInfo) => void;
+
+  setVMInfos: (vmInfos: VMInfo[]) => void;
+  setMultipassAvailable: (available: boolean) => void;
+  updateVMInfo: (info: VMInfo) => void;
+  refreshVMStatus: () => Promise<void>;
+  refreshVMInfos: () => Promise<void>;
 }
 
 /**
@@ -107,6 +118,9 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   dockerConnected: false,
   dockerInfo: undefined,
+
+  vmInfos: [],
+  multipassAvailable: false,
 
   // Project actions
   setProjects: (projects) => set({ projects, projectsError: null }),
@@ -269,6 +283,38 @@ export const useAppStore = create<AppState>((set, get) => ({
   // Docker actions
   setDockerStatus: (connected, info) =>
     set({ dockerConnected: connected, dockerInfo: info }),
+
+  // VM actions
+  setVMInfos: (vmInfos) => set({ vmInfos }),
+  setMultipassAvailable: (available) => set({ multipassAvailable: available }),
+
+  updateVMInfo: (info) =>
+    set((state) => {
+      const existing = state.vmInfos.find((v) => v.name === info.name);
+      if (existing) {
+        return { vmInfos: state.vmInfos.map((v) => (v.name === info.name ? info : v)) };
+      } else {
+        return { vmInfos: [...state.vmInfos, info] };
+      }
+    }),
+
+  refreshVMStatus: async () => {
+    try {
+      const result = await window.api.vm.status();
+      set({ multipassAvailable: result.available });
+    } catch {
+      set({ multipassAvailable: false });
+    }
+  },
+
+  refreshVMInfos: async () => {
+    try {
+      const vmInfos = await window.api.vm.list();
+      set({ vmInfos });
+    } catch {
+      set({ vmInfos: [] });
+    }
+  },
 }));
 
 /**
@@ -304,11 +350,18 @@ export function initializeStoreListeners() {
     useAppStore.getState().setImageBuildProgress(line);
   });
 
+  // VM status changes
+  window.api.vm.onStatusChanged((info) => {
+    useAppStore.getState().updateVMInfo(info as VMInfo);
+  });
+
   // Initial data load
   useAppStore.getState().refreshProjects();
   useAppStore.getState().refreshLoops();
   useAppStore.getState().refreshSettings();
   useAppStore.getState().refreshImages();
+  useAppStore.getState().refreshVMStatus();
+  useAppStore.getState().refreshVMInfos();
 
   // Initial Docker status
   window.api.docker

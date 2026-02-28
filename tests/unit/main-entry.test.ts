@@ -152,6 +152,7 @@ const {
   mockCleanupManager,
   mockPreValidationStore,
   mockHooksStore,
+  mockVmManager,
   MockConfigManager,
   MockProjectStore,
   MockImportExportService,
@@ -169,6 +170,7 @@ const {
   MockCleanupManager,
   MockPreValidationStore,
   MockHooksStore,
+  MockVMManager,
 } = vi.hoisted(() => {
   const mockConfigManager = {
     loadJson: vi.fn(),
@@ -295,6 +297,13 @@ const {
   const mockHooksStore = {};
   const MockHooksStore = vi.fn(function() { return mockHooksStore; });
 
+  const mockVmManager = {
+    isMultipassAvailable: vi.fn().mockResolvedValue(false),
+    listVMs: vi.fn().mockResolvedValue([]),
+    isZephyrVM: vi.fn().mockReturnValue(false),
+  };
+  const MockVMManager = vi.fn(function() { return mockVmManager; });
+
   return {
     mockConfigManager,
     mockProjectStore,
@@ -313,6 +322,7 @@ const {
     mockCleanupManager,
     mockPreValidationStore,
     mockHooksStore,
+    mockVmManager,
     MockConfigManager,
     MockProjectStore,
     MockImportExportService,
@@ -330,6 +340,7 @@ const {
     MockCleanupManager,
     MockPreValidationStore,
     MockHooksStore,
+    MockVMManager,
   };
 });
 
@@ -401,6 +412,10 @@ vi.mock('../../src/services/hooks-store', () => ({
   HooksStore: MockHooksStore,
 }));
 
+vi.mock('../../src/services/vm-manager', () => ({
+  VMManager: MockVMManager,
+}));
+
 // ── Mock logging ─────────────────────────────────────────────────────────────
 
 const {
@@ -446,6 +461,7 @@ const {
   mockRegisterLogHandlers,
   mockRegisterTerminalHandlers,
   mockRegisterUpdateHandlers,
+  mockRegisterVMHandlers,
 } = vi.hoisted(() => {
   const mockRegisterDataHandlers = vi.fn();
   const mockRegisterDockerHandlers = vi.fn();
@@ -454,6 +470,7 @@ const {
   const mockRegisterLogHandlers = vi.fn();
   const mockRegisterTerminalHandlers = vi.fn();
   const mockRegisterUpdateHandlers = vi.fn();
+  const mockRegisterVMHandlers = vi.fn();
 
   return {
     mockRegisterDataHandlers,
@@ -463,6 +480,7 @@ const {
     mockRegisterLogHandlers,
     mockRegisterTerminalHandlers,
     mockRegisterUpdateHandlers,
+    mockRegisterVMHandlers,
   };
 });
 
@@ -492,6 +510,10 @@ vi.mock('../../src/main/ipc-handlers/terminal-handlers', () => ({
 
 vi.mock('../../src/main/ipc-handlers/update-handlers', () => ({
   registerUpdateHandlers: mockRegisterUpdateHandlers,
+}));
+
+vi.mock('../../src/main/ipc-handlers/vm-handlers', () => ({
+  registerVMHandlers: mockRegisterVMHandlers,
 }));
 
 // ── Mock menu ────────────────────────────────────────────────────────────────
@@ -575,8 +597,8 @@ describe('Main Entry Point', () => {
       expect(MockLogParser).toHaveBeenCalled();
     });
 
-    it('should instantiate LoopRunner with DockerManager, LogParser, and max concurrent 3', () => {
-      expect(MockLoopRunner).toHaveBeenCalledWith(mockDockerManager, mockLogParser, 3);
+    it('should instantiate LoopRunner with DockerManager, LogParser, max concurrent 3, and VMManager', () => {
+      expect(MockLoopRunner).toHaveBeenCalledWith(mockDockerManager, mockLogParser, 3, mockVmManager);
     });
 
     it('should instantiate LoopScheduler with LoopRunner', () => {
@@ -656,12 +678,20 @@ describe('Main Entry Point', () => {
     it('should register terminal handlers with TerminalManager', () => {
       expect(mockRegisterTerminalHandlers).toHaveBeenCalledWith({
         terminalManager: mockTerminalManager,
+        vmManager: mockVmManager,
       });
     });
 
     it('should register update handlers with SelfUpdater', () => {
       expect(mockRegisterUpdateHandlers).toHaveBeenCalledWith({
         selfUpdater: mockSelfUpdater,
+      });
+    });
+
+    it('should register VM handlers with VMManager and LoopRunner', () => {
+      expect(mockRegisterVMHandlers).toHaveBeenCalledWith({
+        vmManager: mockVmManager,
+        loopRunner: mockLoopRunner,
       });
     });
 

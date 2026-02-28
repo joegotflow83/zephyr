@@ -47,6 +47,15 @@ const mockApi = {
     delete: vi.fn(),
     onBuildProgress: vi.fn(() => vi.fn()),
   },
+  vm: {
+    status: vi.fn(),
+    list: vi.fn(),
+    get: vi.fn(),
+    start: vi.fn(),
+    stop: vi.fn(),
+    delete: vi.fn(),
+    onStatusChanged: vi.fn(() => vi.fn()),
+  },
 };
 
 (global as any).window = { api: mockApi };
@@ -71,6 +80,8 @@ describe('useAppStore', () => {
       imagesError: null,
       imageBuildProgress: null,
       imageBuildActive: false,
+      vmInfos: [],
+      multipassAvailable: false,
     });
     vi.clearAllMocks();
   });
@@ -445,6 +456,7 @@ describe('useAppStore', () => {
         return vi.fn();
       });
       mockApi.images.onBuildProgress.mockImplementation(() => vi.fn());
+      mockApi.vm.onStatusChanged.mockImplementation(() => vi.fn());
       mockApi.docker.status.mockResolvedValue({ available: false });
       mockApi.projects.list.mockResolvedValue([]);
       mockApi.loops.list.mockResolvedValue([]);
@@ -455,6 +467,8 @@ describe('useAppStore', () => {
         log_level: 'INFO',
       });
       mockApi.images.list.mockResolvedValue([]);
+      mockApi.vm.status.mockResolvedValue({ available: false });
+      mockApi.vm.list.mockResolvedValue([]);
     });
 
     it('should register Docker status listener', async () => {
@@ -619,6 +633,7 @@ describe('useAppStore', () => {
         buildProgressCallback = callback;
         return vi.fn();
       });
+      mockApi.vm.onStatusChanged.mockImplementation(() => vi.fn());
       mockApi.docker.status.mockResolvedValue({ available: false });
       mockApi.projects.list.mockResolvedValue([]);
       mockApi.loops.list.mockResolvedValue([]);
@@ -629,6 +644,8 @@ describe('useAppStore', () => {
         log_level: 'INFO',
       });
       mockApi.images.list.mockResolvedValue([]);
+      mockApi.vm.status.mockResolvedValue({ available: false });
+      mockApi.vm.list.mockResolvedValue([]);
     });
 
     it('should register build progress listener and update imageBuildProgress', () => {

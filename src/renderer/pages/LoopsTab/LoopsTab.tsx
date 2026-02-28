@@ -115,13 +115,23 @@ export const LoopsTab: React.FC = () => {
   const handleStart = async (projectId: string) => {
     try {
       const project = projects.find((p) => p.id === projectId);
+      const extraMounts = (project?.additional_mounts ?? []).map((hostPath) => {
+        const basename = hostPath.split('/').filter(Boolean).pop() ?? hostPath;
+        return `${hostPath}:/mnt/${basename}`;
+      });
       const opts: LoopStartOpts = {
         projectId,
         projectName: project?.name || projectId,
         mode: LoopMode.CONTINUOUS,
         dockerImage: project?.docker_image || '',
-        ...(project?.local_path
-          ? { volumeMounts: [`${project.local_path}:/workspace`], workDir: '/workspace' }
+        ...(project?.local_path || extraMounts.length > 0
+          ? {
+              volumeMounts: [
+                ...(project?.local_path ? [`${project.local_path}:/workspace`] : []),
+                ...extraMounts,
+              ],
+              ...(project?.local_path ? { workDir: '/workspace' } : {}),
+            }
           : {}),
       };
       await start(opts);

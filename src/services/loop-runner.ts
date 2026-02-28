@@ -9,8 +9,14 @@
  * - Notifies listeners of state changes and log events
  */
 
+import fs from 'fs';
+import os from 'os';
+import path from 'path';
+
 import type { DockerManager, ContainerInfo } from './docker-manager';
 import type { LogParser, ParsedLogLine } from './log-parser';
+import type { VMManager, VMInfo } from './vm-manager';
+import type { VMConfig } from '../shared/models';
 import {
   LoopState,
   LoopStatus,
@@ -44,11 +50,14 @@ export type LogLineCallback = (projectId: string, line: ParsedLogLine) => void;
 export class LoopRunner {
   private docker: DockerManager;
   private parser: LogParser;
+  private vm?: VMManager;
   private states: Map<string, LoopState> = new Map();
   private maxConcurrent: number;
   private stateCallbacks: Set<StateChangeCallback> = new Set();
   private logCallbacks: Set<LogLineCallback> = new Set();
   private logAbortControllers: Map<string, AbortController> = new Map();
+  /** Stores the VM name for each persistent-VM project across loop runs */
+  private persistentVMNames: Map<string, string> = new Map();
 
   /**
    * Create a new LoopRunner.
@@ -56,11 +65,13 @@ export class LoopRunner {
    * @param docker - DockerManager instance for container operations
    * @param parser - LogParser instance for log classification
    * @param maxConcurrent - Maximum number of concurrent loops (default: 3)
+   * @param vm - Optional VMManager for VM-backed loop execution
    */
-  constructor(docker: DockerManager, parser: LogParser, maxConcurrent = 3) {
+  constructor(docker: DockerManager, parser: LogParser, maxConcurrent = 3, vm?: VMManager) {
     this.docker = docker;
     this.parser = parser;
     this.maxConcurrent = maxConcurrent;
+    this.vm = vm;
   }
 
   /**
@@ -115,8 +126,13 @@ export class LoopRunner {
     }
 
     // Initialize state as IDLE
-    const state = createLoopState(opts.projectId, opts.mode);
+    const state = createLoopState(opts.projectId, opts.mode, opts.projectName);
     this.states.set(opts.projectId, state);
+
+    // Branch to VM execution if requested
+    if (opts.sandboxType === 'vm') {
+      return this.vmStartLoop(opts);
+    }
 
     try {
       // Transition to STARTING
@@ -190,6 +206,11 @@ export class LoopRunner {
 
     if (isLoopTerminal(state.status)) {
       throw new Error(`Loop for project ${projectId} is already in terminal state ${state.status}`);
+    }
+
+    // VM-backed loop path
+    if (state.sandboxType === 'vm' && state.vmName) {
+      return this.vmStopLoop(projectId, state.vmName);
     }
 
     if (!state.containerId) {
@@ -388,6 +409,123 @@ export class LoopRunner {
    */
   removeLogCallback(callback: LogLineCallback): void {
     this.logCallbacks.delete(callback);
+  }
+
+  // -- VM management public API ------------------------------------------------
+
+  /**
+   * Start a persistent VM for a project (independent of loop execution).
+   * Called by IPC handlers to pre-warm or restart a persistent VM.
+   *
+   * @param projectId - Project ID whose VM to start
+   * @returns Current VMInfo after starting
+   * @throws if VMManager is not configured or VM is not found
+   */
+  async startProjectVM(projectId: string, vmConfig?: VMConfig): Promise<VMInfo> {
+    if (!this.vm) {
+      throw new Error('VMManager is not configured');
+    }
+
+    let vmName = this.persistentVMNames.get(projectId);
+    if (!vmName) {
+      // In-memory map is empty (e.g. after app restart). Try to rediscover the
+      // VM by matching the project ID prefix embedded in the VM name.
+      const prefix = `zephyr-${projectId.slice(0, 8)}-`;
+      const vms = await this.vm.listVMs();
+      const match = vms.find((v) => v.name.startsWith(prefix));
+      if (match) {
+        vmName = match.name;
+        this.persistentVMNames.set(projectId, vmName);
+      } else if (vmConfig) {
+        // VM has never been created — provision it now using the project's VM config.
+        vmName = this.vm.generatePersistentVMName(projectId);
+        this.persistentVMNames.set(projectId, vmName);
+        await this.vm.createVM({
+          name: vmName,
+          cpus: vmConfig.cpus ?? 2,
+          memoryGb: vmConfig.memory_gb ?? 4,
+          diskGb: vmConfig.disk_gb ?? 20,
+          cloudInit: vmConfig.cloud_init,
+        });
+        await this.vm.waitForCloudInit(vmName);
+        const created = await this.vm.getVMInfo(vmName);
+        return created ?? { name: vmName, state: 'Running', cpus: vmConfig.cpus ?? 2, memory: '', disk: '', release: '' };
+      } else {
+        throw new Error(`No persistent VM found for project ${projectId}`);
+      }
+    }
+
+    const info = await this.vm.getVMInfo(vmName);
+    if (!info) {
+      throw new Error(`VM "${vmName}" not found`);
+    }
+
+    if (info.state !== 'Running') {
+      await this.vm.startVM(vmName);
+      const updated = await this.vm.getVMInfo(vmName);
+      return updated ?? info;
+    }
+
+    return info;
+  }
+
+  /**
+   * Stop a persistent VM for a project.
+   * Refuses if a loop is actively running in the VM.
+   *
+   * @param projectId - Project ID whose VM to stop
+   * @throws if VMManager is not configured, VM not found, or loop is running
+   */
+  async stopProjectVM(projectId: string): Promise<void> {
+    if (!this.vm) {
+      throw new Error('VMManager is not configured');
+    }
+
+    // Don't stop VM if a loop is actively running in it
+    const state = this.states.get(projectId);
+    if (state && !isLoopTerminal(state.status)) {
+      throw new Error(`Cannot stop VM while a loop is running for project ${projectId}`);
+    }
+
+    let vmName = this.persistentVMNames.get(projectId);
+    if (!vmName) {
+      const prefix = `zephyr-${projectId.slice(0, 8)}-`;
+      const vms = await this.vm.listVMs();
+      const match = vms.find((v) => v.name.startsWith(prefix));
+      if (!match) {
+        throw new Error(`No persistent VM registered for project ${projectId}`);
+      }
+      vmName = match.name;
+      this.persistentVMNames.set(projectId, vmName);
+    }
+
+    await this.vm.stopVM(vmName);
+  }
+
+  /**
+   * Get VMInfo for a project's persistent VM.
+   *
+   * @param projectId - Project ID to query
+   * @returns VMInfo or null if no VM is registered for this project
+   */
+  async getProjectVMInfo(projectId: string): Promise<VMInfo | null> {
+    if (!this.vm) {
+      return null;
+    }
+
+    let vmName = this.persistentVMNames.get(projectId);
+    if (!vmName) {
+      const prefix = `zephyr-${projectId.slice(0, 8)}-`;
+      const vms = await this.vm.listVMs();
+      const match = vms.find((v) => v.name.startsWith(prefix));
+      if (!match) {
+        return null;
+      }
+      vmName = match.name;
+      this.persistentVMNames.set(projectId, vmName);
+    }
+
+    return this.vm.getVMInfo(vmName);
   }
 
   // -- Private methods ----------------------------------------------------------
@@ -626,5 +764,320 @@ export class LoopRunner {
       }
     }
     return result;
+  }
+
+  /**
+   * Derive a Docker-safe container name from project name/id.
+   * Used for both the host container path and the container-inside-VM name.
+   */
+  private deriveContainerName(projectName: string, projectId: string): string {
+    return (
+      projectName
+        .toLowerCase()
+        .replace(/[^a-z0-9_.-]+/g, '-')
+        .replace(/^-+/, '') || projectId.substring(0, 8)
+    );
+  }
+
+  /**
+   * Build docker run CLI args from LoopStartOpts.
+   * Produces: [-e KEY=VAL ...] [-v host:container ...] [-w dir] [-u user]
+   */
+  private buildDockerRunArgs(opts: LoopStartOpts): string[] {
+    const args: string[] = [];
+
+    if (opts.envVars) {
+      for (const [key, value] of Object.entries(opts.envVars)) {
+        args.push('-e', `${key}=${value}`);
+      }
+    }
+
+    if (opts.volumeMounts) {
+      for (const mount of opts.volumeMounts) {
+        args.push('-v', mount);
+      }
+    }
+
+    if (opts.workDir) {
+      args.push('-w', opts.workDir);
+    }
+
+    if (opts.user) {
+      args.push('-u', opts.user);
+    }
+
+    return args;
+  }
+
+  /**
+   * Execute a VM-backed loop. Called from startLoop() when sandboxType === 'vm'.
+   *
+   * Handles both persistent and ephemeral VM modes:
+   * - Persistent: reuses (or creates) a named VM; VM survives loop end
+   * - Ephemeral: creates a fresh VM per run, deleted on any terminal state
+   *
+   * State transitions: IDLE -> STARTING -> RUNNING (then COMPLETED/FAILED/STOPPED on exit)
+   */
+  private async vmStartLoop(opts: LoopStartOpts): Promise<LoopState> {
+    if (!this.vm) {
+      const errorMessage = 'VMManager is not configured';
+      this.updateState(opts.projectId, {
+        status: LoopStatus.FAILED,
+        error: errorMessage,
+        stoppedAt: new Date().toISOString(),
+      });
+      throw new Error(errorMessage);
+    }
+
+    const { projectId, mode } = opts;
+    const vmMode = opts.vmConfig?.vm_mode ?? 'ephemeral';
+
+    try {
+      this.updateState(projectId, {
+        status: LoopStatus.STARTING,
+        startedAt: new Date().toISOString(),
+        sandboxType: 'vm',
+      });
+
+      let vmName: string;
+
+      if (vmMode === 'persistent') {
+        // Reuse the stable VM name across runs.
+        // After an app restart the in-memory map is empty, so fall back to
+        // prefix-based discovery (same logic as startProjectVM / stopProjectVM)
+        // before generating a brand-new name to avoid creating a duplicate VM.
+        vmName = this.persistentVMNames.get(projectId);
+        if (!vmName) {
+          const prefix = `zephyr-${projectId.slice(0, 8)}-`;
+          const vms = await this.vm.listVMs();
+          const match = vms.find((v) => v.name.startsWith(prefix));
+          vmName = match?.name ?? this.vm.generatePersistentVMName(projectId);
+        }
+        this.persistentVMNames.set(projectId, vmName);
+
+        const vmInfo = await this.vm.getVMInfo(vmName);
+        if (!vmInfo) {
+          // VM doesn't exist yet — create and provision it
+          await this.vm.createVM({
+            name: vmName,
+            cpus: opts.vmConfig?.cpus ?? 2,
+            memoryGb: opts.vmConfig?.memory_gb ?? 4,
+            diskGb: opts.vmConfig?.disk_gb ?? 20,
+            cloudInit: opts.vmConfig?.cloud_init,
+          });
+          await this.vm.waitForCloudInit(vmName);
+        } else if (vmInfo.state === 'Stopped') {
+          await this.vm.startVM(vmName);
+        }
+        // state === 'Running' → proceed immediately
+      } else {
+        // Ephemeral: create a fresh VM for this run
+        vmName = this.vm.generateEphemeralVMName(projectId);
+        await this.vm.createVM({
+          name: vmName,
+          cpus: opts.vmConfig?.cpus ?? 2,
+          memoryGb: opts.vmConfig?.memory_gb ?? 4,
+          diskGb: opts.vmConfig?.disk_gb ?? 20,
+          cloudInit: opts.vmConfig?.cloud_init,
+        });
+        await this.vm.waitForCloudInit(vmName);
+      }
+
+      // Record VM name in state
+      this.updateState(projectId, { vmName });
+
+      // If the image exists locally on the host (e.g. a locally-built Zephyr image),
+      // export it and load it into the VM. Otherwise pull from the registry inside the VM.
+      const isLocalImage = await this.docker.isImageAvailable(opts.dockerImage);
+      if (isLocalImage) {
+        await this.transferImageToVM(vmName, opts.dockerImage);
+      } else {
+        const pullResult = await this.vm.execInVM(vmName, ['docker', 'pull', opts.dockerImage]);
+        if (pullResult.exitCode !== 0) {
+          throw new Error(`docker pull failed inside VM: ${pullResult.stderr || pullResult.stdout}`);
+        }
+      }
+
+      // Mount host volume paths into the VM so docker can bind-mount them.
+      // Volume mount strings are "hostPath:containerPath"; the host path must
+      // exist inside the VM's filesystem for docker run -v to work. We mount
+      // each host path at the same path inside the VM so the existing -v flags
+      // need no translation. Best-effort: log warnings but don't abort the loop.
+      if (opts.volumeMounts && opts.volumeMounts.length > 0) {
+        for (const mount of opts.volumeMounts) {
+          const hostPath = mount.split(':')[0];
+          if (hostPath) {
+            await this.vm!.mountIntoVM(vmName, hostPath, hostPath).catch((err) => {
+              console.warn(`Failed to mount "${hostPath}" into VM ${vmName}:`, err);
+            });
+          }
+        }
+      }
+
+      // Derive container name (reused for docker stop on manual stop)
+      const containerName = this.deriveContainerName(opts.projectName, opts.projectId);
+
+      // Remove any stale container left over from a previous run. This can
+      // happen when the docker run client process is killed (e.g. on manual
+      // stop) before Docker's --rm cleanup fires, leaving the named container
+      // behind. Best-effort: ignore errors (container may not exist).
+      await this.vm!.execInVM(vmName, ['docker', 'rm', '-f', containerName]).catch(() => undefined);
+
+      // Build docker run args
+      const dockerRunArgs = this.buildDockerRunArgs(opts);
+
+      // Transition to RUNNING before starting the stream
+      this.updateState(projectId, { status: LoopStatus.RUNNING });
+
+      // Stream docker run output from inside the VM
+      const abortController = await this.vm.streamExecInVM(
+        vmName,
+        ['docker', 'run', '--rm', '--name', containerName, ...dockerRunArgs, opts.dockerImage],
+        (line) => this.handleLogLine(projectId, line),
+        {
+          onExit: (exitCode) => {
+            this.handleVMContainerExit(projectId, vmName, containerName, mode, vmMode, exitCode);
+          },
+        },
+      );
+
+      this.logAbortControllers.set(projectId, abortController);
+
+      return this.states.get(projectId)!;
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      this.updateState(projectId, {
+        status: LoopStatus.FAILED,
+        error: `Failed to start VM loop: ${errorMessage}`,
+        stoppedAt: new Date().toISOString(),
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Export a host-local Docker image and load it into a VM.
+   *
+   * Used when the project image was built locally on the host (e.g. via the
+   * Zephyr image builder) and therefore doesn't exist in any remote registry.
+   * Flow: docker save → write to host temp file → multipass transfer → docker load.
+   */
+  private async transferImageToVM(vmName: string, imageTag: string): Promise<void> {
+    const tmpFile = path.join(os.tmpdir(), `zephyr-image-${Date.now()}.tar`);
+    try {
+      await this.docker.saveImage(imageTag, tmpFile);
+      await this.vm!.transfer(vmName, tmpFile, '/tmp/zephyr-image.tar');
+      const loadResult = await this.vm!.execInVM(vmName, ['docker', 'load', '-i', '/tmp/zephyr-image.tar']);
+      if (loadResult.exitCode !== 0) {
+        throw new Error(`docker load failed inside VM: ${loadResult.stderr || loadResult.stdout}`);
+      }
+    } finally {
+      try { fs.unlinkSync(tmpFile); } catch { /* ignore cleanup errors */ }
+      // Best-effort removal of the tar inside the VM
+      this.vm!.execInVM(vmName, ['rm', '-f', '/tmp/zephyr-image.tar']).catch(() => undefined);
+    }
+  }
+
+  /**
+   * Stop a VM-backed loop. Called from stopLoop() when sandboxType === 'vm'.
+   *
+   * Aborts the stream, stops the Docker container inside the VM, and for
+   * ephemeral VMs also deletes the VM. Persistent VMs keep running.
+   */
+  private async vmStopLoop(projectId: string, vmName: string): Promise<void> {
+    const state = this.states.get(projectId)!;
+
+    try {
+      this.updateState(projectId, { status: LoopStatus.STOPPING });
+
+      // Abort log streaming
+      const abortController = this.logAbortControllers.get(projectId);
+      if (abortController) {
+        abortController.abort();
+        this.logAbortControllers.delete(projectId);
+      }
+
+      // Stop the docker container running inside the VM
+      const containerName = this.deriveContainerName(state.projectName, state.projectId);
+      await this.vm!.execInVM(vmName, ['docker', 'stop', containerName]);
+
+      // For ephemeral VMs, delete the VM on stop; for persistent VMs, unmount
+      // host directories that were mounted for this loop run.
+      const isPersistent = this.persistentVMNames.has(projectId);
+      if (!isPersistent) {
+        await this.vm!.deleteVM(vmName, true).catch((err) => {
+          console.error(`Failed to delete ephemeral VM ${vmName} on stop:`, err);
+        });
+      } else {
+        await this.vm!.unmountFromVM(vmName).catch((err) => {
+          console.error(`Failed to unmount directories from VM ${vmName} on stop:`, err);
+        });
+      }
+
+      this.updateState(projectId, {
+        status: LoopStatus.STOPPED,
+        stoppedAt: new Date().toISOString(),
+      });
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      this.updateState(projectId, {
+        status: LoopStatus.FAILED,
+        error: `Failed to stop VM loop: ${errorMessage}`,
+        stoppedAt: new Date().toISOString(),
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Handle a natural (non-manual) exit of the Docker container running inside a VM.
+   * Mirrors monitorContainerExit() logic for the VM execution path.
+   *
+   * Called via the onExit callback from streamExecInVM when the docker run
+   * process terminates. Skips update if state is already terminal (manual stop).
+   */
+  private handleVMContainerExit(
+    projectId: string,
+    vmName: string,
+    _containerName: string,
+    mode: LoopMode,
+    vmMode: 'persistent' | 'ephemeral',
+    _exitCode: number,
+  ): void {
+    const state = this.states.get(projectId);
+    if (!state || isLoopTerminal(state.status)) {
+      // Already handled (e.g., stopLoop was called manually)
+      return;
+    }
+
+    const stoppedAt = new Date().toISOString();
+
+    if (mode === LoopMode.SINGLE) {
+      this.updateState(projectId, {
+        status: LoopStatus.COMPLETED,
+        stoppedAt,
+      });
+    } else {
+      // CONTINUOUS or SCHEDULED should not exit on their own
+      this.updateState(projectId, {
+        status: LoopStatus.FAILED,
+        error: 'Container exited unexpectedly',
+        stoppedAt,
+      });
+    }
+
+    this.logAbortControllers.delete(projectId);
+
+    // Clean up after the loop ends: delete ephemeral VMs; unmount host
+    // directories from persistent VMs.
+    if (vmMode === 'ephemeral') {
+      this.vm!.deleteVM(vmName, true).catch((err) => {
+        console.error(`Failed to delete ephemeral VM ${vmName} after exit:`, err);
+      });
+    } else {
+      this.vm!.unmountFromVM(vmName).catch((err) => {
+        console.error(`Failed to unmount directories from VM ${vmName} after exit:`, err);
+      });
+    }
   }
 }

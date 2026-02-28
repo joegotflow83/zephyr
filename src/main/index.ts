@@ -37,6 +37,8 @@ import { SSHKeyManager } from '../services/ssh-key-manager';
 import { buildApplicationMenu } from './menu';
 import { IPC } from '../shared/ipc-channels';
 import { registerDeployKeyHandlers } from './ipc-handlers/deploy-key-handlers';
+import { registerVMHandlers } from './ipc-handlers/vm-handlers';
+import { VMManager } from '../services/vm-manager';
 import os from 'node:os';
 import type { AppSettings } from '../shared/models';
 import { isLoopActive } from '../shared/loop-types';
@@ -72,7 +74,8 @@ const credentialManager = new CredentialManager(
 );
 const loginManager = new LoginManager(credentialManager);
 const logParser = new LogParser();
-const loopRunner = new LoopRunner(dockerManager, logParser, 3); // Default max 3 concurrent
+const vmManager = new VMManager();
+const loopRunner = new LoopRunner(dockerManager, logParser, 3, vmManager); // Default max 3 concurrent
 const scheduler = new LoopScheduler(loopRunner);
 const logExporter = new LogExporter();
 const terminalManager = new TerminalManager(dockerManager);
@@ -106,11 +109,12 @@ registerLoopHandlers({
   deployKeyStore,
 });
 registerLogHandlers({ logExporter, loopRunner });
-registerTerminalHandlers({ terminalManager });
+registerTerminalHandlers({ terminalManager, vmManager });
 registerUpdateHandlers({ selfUpdater });
 registerAutoUpdateHandlers({ autoUpdater });
 registerImageHandlers({ imageStore, imageBuilder });
 registerDeployKeyHandlers({ deployKeyStore });
+registerVMHandlers({ vmManager, loopRunner });
 
 // Legacy ping handler kept for backwards compatibility with existing tests.
 ipcMain.handle(IPC.PING, () => 'pong');
@@ -189,6 +193,66 @@ async function recoverLoops(): Promise<void> {
   }
 }
 
+/**
+ * Identify whether a Zephyr VM is ephemeral based on its name.
+ *
+ * Ephemeral VM names end with a millisecond Unix timestamp (≥10 digits).
+ * Persistent VM names end with a 4-character base-36 random suffix.
+ */
+function isEphemeralVMName(name: string): boolean {
+  const parts = name.split('-');
+  const suffix = parts[parts.length - 1];
+  return /^\d{10,}$/.test(suffix);
+}
+
+/**
+ * Clean up orphaned Zephyr VMs left over from a previous session.
+ *
+ * Ephemeral VMs are deleted immediately (they should never survive across
+ * sessions). Persistent VMs that have no active loop are logged but kept —
+ * the user may want to keep them.
+ */
+async function cleanupOrphanedVMs(): Promise<void> {
+  try {
+    const available = await vmManager.isMultipassAvailable();
+    if (!available) {
+      logger.debug('Multipass not available, skipping orphaned VM cleanup');
+      return;
+    }
+
+    const vms = await vmManager.listVMs();
+    const zephyrVMs = vms.filter((vm) => vmManager.isZephyrVM(vm.name));
+
+    if (zephyrVMs.length === 0) {
+      return;
+    }
+
+    logger.info(`Found ${zephyrVMs.length} Zephyr-managed VM(s) on startup`);
+
+    const activeProjectIds = new Set(loopRunner.listRunning().map((s) => s.projectId));
+
+    for (const vm of zephyrVMs) {
+      if (isEphemeralVMName(vm.name)) {
+        // Ephemeral VMs should always be deleted — they were never cleaned up
+        logger.info(`Deleting orphaned ephemeral VM "${vm.name}"`);
+        vmManager.deleteVM(vm.name, true).catch((err) => {
+          logger.warn(`Failed to delete orphaned ephemeral VM "${vm.name}"`, { err });
+        });
+      } else {
+        // Persistent VMs: log if no active loop is using them
+        const hasActiveLoop = Array.from(activeProjectIds).some(
+          (id) => loopRunner.getLoopState(id)?.vmName === vm.name,
+        );
+        if (!hasActiveLoop) {
+          logger.info(`Persistent VM "${vm.name}" has no active loop (state: ${vm.state})`);
+        }
+      }
+    }
+  } catch (error) {
+    logger.warn('Error during orphaned VM cleanup (non-fatal)', { error });
+  }
+}
+
 app.on('ready', async () => {
   logger.info('Application starting');
 
@@ -215,6 +279,8 @@ app.on('ready', async () => {
   deployKeyStore.detectOrphans();
   // Recover any loops that survived a crash or force-quit
   await recoverLoops();
+  // Clean up orphaned VMs from a previous session
+  await cleanupOrphanedVMs();
   // Start Docker health monitoring
   dockerHealth.start();
   // Check for updates on startup (with delay)
@@ -284,6 +350,29 @@ async function gracefulShutdown(): Promise<void> {
     // 5. Run cleanup manager to stop tracked containers
     logger.debug('Running cleanup manager');
     await cleanupManager.cleanupAll();
+
+    // 6. Delete any running ephemeral VMs to avoid resource leaks
+    try {
+      const available = await vmManager.isMultipassAvailable();
+      if (available) {
+        const vms = await vmManager.listVMs();
+        const ephemeralRunning = vms.filter(
+          (vm) => vmManager.isZephyrVM(vm.name) && isEphemeralVMName(vm.name),
+        );
+        if (ephemeralRunning.length > 0) {
+          logger.info(`Deleting ${ephemeralRunning.length} ephemeral VM(s) on quit`);
+          await Promise.all(
+            ephemeralRunning.map((vm) =>
+              vmManager.deleteVM(vm.name, true).catch((err) => {
+                logger.warn(`Failed to delete ephemeral VM "${vm.name}" on quit`, { err });
+              }),
+            ),
+          );
+        }
+      }
+    } catch (err) {
+      logger.warn('Error during ephemeral VM cleanup on quit (non-fatal)', { err });
+    }
 
     logger.info('Graceful shutdown complete');
   } catch (error) {

@@ -273,6 +273,13 @@ describe('ImageBuilder', () => {
       expect(tag).toBe('zephyr-python-node-dev:latest');
     });
 
+    it('does not double-prefix when image name starts with "Zephyr"', async () => {
+      const config: ImageBuildConfig = { name: 'Zephyr Python 3.12 NodeJS 22', languages: [] };
+      await builder.buildImage(config);
+      const tag = dockerManager.buildImage.mock.calls[0][1] as string;
+      expect(tag).toBe('zephyr-python-312-nodejs-22:latest');
+    });
+
     it('handles empty language list (base-only image)', async () => {
       const config: ImageBuildConfig = { name: 'base-only', languages: [] };
       await builder.buildImage(config);

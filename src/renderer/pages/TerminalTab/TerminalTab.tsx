@@ -5,6 +5,8 @@ import {
 } from '../../components/Terminal/Terminal';
 import type { ContainerInfo } from '../../../services/docker-manager';
 import type { TerminalSession } from '../../../services/terminal-manager';
+import type { LoopState } from '../../../shared/loop-types';
+import { LoopStatus } from '../../../shared/loop-types';
 import { useAppStore } from '../../stores/app-store';
 
 interface OpenTerminalSession extends TerminalSession {
@@ -12,12 +14,26 @@ interface OpenTerminalSession extends TerminalSession {
   containerName: string;
   terminalRef: React.RefObject<TerminalHandle>;
   disconnected?: boolean;
+  /** Present for VM-backed sessions; used to reconnect through the right path. */
+  vmName?: string;
+}
+
+/** Derive the Docker container name from a loop state (mirrors LoopRunner.deriveContainerName). */
+function deriveContainerName(loop: LoopState): string {
+  return (
+    loop.projectName
+      .toLowerCase()
+      .replace(/[^a-z0-9_.-]+/g, '-')
+      .replace(/^-+/, '') || loop.projectId.substring(0, 8)
+  );
 }
 
 export const TerminalTab: React.FC = () => {
   const { settings } = useAppStore();
   const [containers, setContainers] = useState<ContainerInfo[]>([]);
-  const [selectedContainerId, setSelectedContainerId] = useState<string>('');
+  const [vmLoops, setVmLoops] = useState<LoopState[]>([]);
+  // Encoded as "docker:{containerId}" or "vm:{vmName}:{containerName}"
+  const [selectedTarget, setSelectedTarget] = useState<string>('');
   const [selectedUser, setSelectedUser] = useState<string>('default');
   const [sessions, setSessions] = useState<OpenTerminalSession[]>([]);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
@@ -28,15 +44,29 @@ export const TerminalTab: React.FC = () => {
   // Determine theme from settings
   const theme = settings?.theme === 'light' ? 'light' : 'dark';
 
-  // Load running containers on mount
+  // Load running containers and VM loops on mount, refresh every 5 seconds
   useEffect(() => {
-    const loadContainers = async () => {
+    const load = async () => {
       try {
-        const containerList = await window.api.docker.listContainers();
+        const [containerList, loopList] = await Promise.all([
+          window.api.docker.listContainers(),
+          window.api.loops.list(),
+        ]);
         setContainers(containerList);
-        // Auto-select first container if available
-        if (containerList.length > 0 && !selectedContainerId) {
-          setSelectedContainerId(containerList[0].id);
+        // Running VM-backed loops whose container is accessible via multipass exec
+        const running = loopList.filter(
+          (l) => l.sandboxType === 'vm' && l.vmName && l.status === LoopStatus.RUNNING,
+        );
+        setVmLoops(running);
+
+        // Auto-select first available target
+        if (!selectedTarget) {
+          if (containerList.length > 0) {
+            setSelectedTarget(`docker:${containerList[0].id}`);
+          } else if (running.length > 0) {
+            const loop = running[0];
+            setSelectedTarget(`vm:${loop.vmName}:${deriveContainerName(loop)}`);
+          }
         }
       } catch (err) {
         console.error('Failed to load containers:', err);
@@ -44,11 +74,10 @@ export const TerminalTab: React.FC = () => {
       }
     };
 
-    loadContainers();
-    // Refresh container list every 5 seconds
-    const interval = setInterval(loadContainers, 5000);
+    load();
+    const interval = setInterval(load, 5000);
     return () => clearInterval(interval);
-  }, [selectedContainerId]);
+  }, [selectedTarget]);
 
   // Set up global terminal event listeners
   useEffect(() => {
@@ -79,7 +108,7 @@ export const TerminalTab: React.FC = () => {
   }, [sessions]);
 
   const openTerminal = async () => {
-    if (!selectedContainerId) {
+    if (!selectedTarget) {
       setError('Please select a container');
       return;
     }
@@ -95,20 +124,41 @@ export const TerminalTab: React.FC = () => {
         cols: 80,
       };
 
-      const result = await window.api.terminal.open(selectedContainerId, opts);
+      let result: { success: boolean; session?: TerminalSession; error?: string };
+      let displayName: string;
+      let vmName: string | undefined;
+      let containerId: string;
+
+      if (selectedTarget.startsWith('vm:')) {
+        // VM-backed container: "vm:{vmName}:{containerName}"
+        const parts = selectedTarget.split(':');
+        const vName = parts[1];
+        const cName = parts.slice(2).join(':');
+        result = await window.api.terminal.openVM(vName, cName, opts);
+        displayName = `${cName} [VM]`;
+        vmName = vName;
+        containerId = cName;
+      } else {
+        // Regular Docker container: "docker:{containerId}"
+        const cId = selectedTarget.replace(/^docker:/, '');
+        result = await window.api.terminal.open(cId, opts);
+        const container = containers.find((c) => c.id === cId);
+        displayName = container?.name || 'Unknown';
+        containerId = cId;
+      }
 
       if (!result.success || !result.session) {
         throw new Error(result.error || 'Failed to open terminal session');
       }
 
-      const container = containers.find((c) => c.id === selectedContainerId);
       const terminalRef = React.createRef<TerminalHandle>();
 
       const newSession: OpenTerminalSession = {
         ...result.session,
-        containerId: selectedContainerId,
-        containerName: container?.name || 'Unknown',
+        containerId,
+        containerName: displayName,
         terminalRef,
+        vmName,
       };
 
       setSessions((prev) => [...prev, newSession]);
@@ -166,7 +216,9 @@ export const TerminalTab: React.FC = () => {
           cols: 80,
         };
 
-        const result = await window.api.terminal.open(session.containerId, opts);
+        const result = session.vmName
+          ? await window.api.terminal.openVM(session.vmName, session.containerId, opts)
+          : await window.api.terminal.open(session.containerId, opts);
 
         if (!result.success || !result.session) {
           throw new Error(result.error || 'Failed to reconnect terminal session');
@@ -272,17 +324,33 @@ export const TerminalTab: React.FC = () => {
             </label>
             <select
               id="container-select"
-              value={selectedContainerId}
-              onChange={(e) => setSelectedContainerId(e.target.value)}
+              value={selectedTarget}
+              onChange={(e) => setSelectedTarget(e.target.value)}
               className="w-full bg-gray-700 text-white px-3 py-2 rounded border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
               disabled={loading}
             >
               <option value="">Select a container...</option>
-              {containers.map((container) => (
-                <option key={container.id} value={container.id}>
-                  {container.name} ({container.image})
-                </option>
-              ))}
+              {containers.length > 0 && (
+                <optgroup label="Docker (host)">
+                  {containers.map((container) => (
+                    <option key={container.id} value={`docker:${container.id}`}>
+                      {container.name} ({container.image})
+                    </option>
+                  ))}
+                </optgroup>
+              )}
+              {vmLoops.length > 0 && (
+                <optgroup label="VM containers">
+                  {vmLoops.map((loop) => {
+                    const cName = deriveContainerName(loop);
+                    return (
+                      <option key={loop.projectId} value={`vm:${loop.vmName}:${cName}`}>
+                        {cName} — {loop.projectName} [VM]
+                      </option>
+                    );
+                  })}
+                </optgroup>
+              )}
             </select>
           </div>
 
@@ -305,7 +373,7 @@ export const TerminalTab: React.FC = () => {
           <div className="pt-6">
             <button
               onClick={openTerminal}
-              disabled={loading || !selectedContainerId}
+              disabled={loading || !selectedTarget}
               className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed transition-colors"
             >
               {loading ? 'Opening...' : 'Open Terminal'}
@@ -321,7 +389,7 @@ export const TerminalTab: React.FC = () => {
         )}
 
         {/* Info message when no containers */}
-        {containers.length === 0 && (
+        {containers.length === 0 && vmLoops.length === 0 && (
           <div className="mt-2 p-2 bg-blue-900/50 border border-blue-700 rounded text-blue-200 text-sm">
             No running containers found. Start a loop or container to use the
             terminal.

@@ -105,6 +105,8 @@ contextBridge.exposeInMainWorld('api', {
   terminal: {
     open: (containerId: string, opts?: unknown) =>
       ipcRenderer.invoke(IPC.TERMINAL_OPEN, containerId, opts),
+    openVM: (vmName: string, containerName: string, opts?: unknown) =>
+      ipcRenderer.invoke(IPC.TERMINAL_OPEN_VM, vmName, containerName, opts),
     close: (sessionId: string) =>
       ipcRenderer.invoke(IPC.TERMINAL_CLOSE, sessionId),
     write: (sessionId: string, data: string) =>
@@ -185,5 +187,29 @@ contextBridge.exposeInMainWorld('api', {
 
   shell: {
     openExternal: (url: string) => shell.openExternal(url),
+  },
+
+  vm: {
+    /** Check Multipass availability and version */
+    status: () => ipcRenderer.invoke(IPC.VM_STATUS),
+    /** List all Multipass VMs */
+    list: () => ipcRenderer.invoke(IPC.VM_LIST),
+    /** Get detailed info for a specific VM by name */
+    get: (name: string) => ipcRenderer.invoke(IPC.VM_GET, name),
+    /** Start (or provision-then-start) the persistent VM for a project */
+    start: (projectId: string, vmConfig?: unknown) => ipcRenderer.invoke(IPC.VM_START, projectId, vmConfig),
+    /** Stop the persistent VM for a project */
+    stop: (projectId: string) => ipcRenderer.invoke(IPC.VM_STOP, projectId),
+    /** Delete a VM by name and purge it from disk */
+    delete: (name: string) => ipcRenderer.invoke(IPC.VM_DELETE, name),
+
+    // Event listeners
+    /** Listen for VM status changes. Returns cleanup function. */
+    onStatusChanged: (callback: (info: unknown) => void) => {
+      const listener = (_event: unknown, info: unknown) => callback(info);
+      ipcRenderer.on(IPC.VM_STATUS_CHANGED, listener);
+      // Return cleanup function
+      return () => ipcRenderer.removeListener(IPC.VM_STATUS_CHANGED, listener);
+    },
   },
 });

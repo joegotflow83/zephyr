@@ -60,6 +60,7 @@ export const IPC = {
 
   // Terminal operations
   TERMINAL_OPEN: 'terminal:open',
+  TERMINAL_OPEN_VM: 'terminal:open-vm',
   TERMINAL_CLOSE: 'terminal:close',
   TERMINAL_WRITE: 'terminal:write',
   TERMINAL_RESIZE: 'terminal:resize',
@@ -109,6 +110,17 @@ export const IPC = {
   GITHUB_PAT_SET: 'github-pat:set',
   GITHUB_PAT_GET: 'github-pat:get',
   GITHUB_PAT_DELETE: 'github-pat:delete',
+
+  // VM management
+  VM_STATUS: 'vm:status',
+  VM_LIST: 'vm:list',
+  VM_GET: 'vm:get',
+  VM_START: 'vm:start',
+  VM_STOP: 'vm:stop',
+  VM_DELETE: 'vm:delete',
+
+  // VM events (main → renderer)
+  VM_STATUS_CHANGED: 'vm:status-changed',
 
   // Misc
   PING: 'ping',

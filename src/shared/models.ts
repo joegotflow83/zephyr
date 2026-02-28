@@ -78,6 +78,22 @@ export interface ZephyrImage {
 }
 
 /**
+ * VM configuration for a project using VM-backed sandbox execution.
+ */
+export interface VMConfig {
+  /** Whether the VM persists between runs or is created fresh each time */
+  vm_mode: 'persistent' | 'ephemeral';
+  /** Number of vCPUs to allocate (default: 2) */
+  cpus: number;
+  /** RAM in gigabytes (default: 4) */
+  memory_gb: number;
+  /** Disk size in gigabytes (default: 20) */
+  disk_gb: number;
+  /** Optional cloud-init YAML override; omit to use the built-in Docker-install template */
+  cloud_init?: string;
+}
+
+/**
  * Represents a user-configured AI loop project.
  * Each project maps to a Docker container running an AI agent.
  */
@@ -112,6 +128,19 @@ export interface ProjectConfig {
    * Fine-grained PAT with read/write access to repository deploy keys, scoped to the repo.
    */
   github_pat?: string;
+  /**
+   * Additional host paths to mount into the container.
+   * Each path is mounted at /mnt/<basename> inside the container.
+   * e.g. ["/home/user/data"] mounts at /mnt/data
+   */
+  additional_mounts?: string[];
+  /**
+   * Whether to run loops inside a VM (via Multipass) or directly in a Docker container.
+   * Defaults to 'container' when absent.
+   */
+  sandbox_type?: 'container' | 'vm';
+  /** VM configuration; only relevant when sandbox_type === 'vm' */
+  vm_config?: VMConfig;
 }
 
 /**
@@ -204,5 +233,8 @@ export function createProjectConfig(partial: Partial<ProjectConfig> = {}): Proje
     created_at: partial.created_at ?? now,
     updated_at: partial.updated_at ?? now,
     github_pat: partial.github_pat,
+    additional_mounts: partial.additional_mounts,
+    sandbox_type: partial.sandbox_type,
+    vm_config: partial.vm_config,
   };
 }

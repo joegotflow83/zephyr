@@ -16,6 +16,7 @@ import userEvent from '@testing-library/user-event';
 import { ProjectsTab } from '../../src/renderer/pages/ProjectsTab/ProjectsTab';
 import { createProjectConfig } from '../../src/shared/models';
 import { createLoopState, LoopStatus, LoopMode } from '../../src/shared/loop-types';
+import { useAppStore } from '../../src/renderer/stores/app-store';
 
 // Mock the hooks
 vi.mock('../../src/renderer/hooks/useProjects', () => ({
@@ -45,6 +46,9 @@ describe('ProjectsTab', () => {
 
   beforeEach(() => {
     vi.resetAllMocks();
+
+    // Reset store state (multipassAvailable defaults to false, vmInfos to [])
+    useAppStore.setState({ multipassAvailable: false, vmInfos: [] });
 
     // Set up window.api mock (must use global.window.api, never replace global.window)
     global.window.api = {
@@ -417,6 +421,76 @@ describe('ProjectsTab', () => {
       await waitFor(() => {
         expect(mockRefresh).toHaveBeenCalledTimes(1);
       });
+    });
+  });
+
+  describe('Multipass Unavailable', () => {
+    it('shows toast error when running a VM project and Multipass is not available', async () => {
+      const user = userEvent.setup();
+      // Use ephemeral mode so the Run button is not gated on VM running state
+      const vmProject = createProjectConfig({
+        name: 'VM Project',
+        sandbox_type: 'vm',
+        vm_config: { vm_mode: 'ephemeral', cpus: 2, memory_gb: 4, disk_gb: 20 },
+      });
+
+      useAppStore.setState({ multipassAvailable: false });
+
+      vi.mocked(useProjects).mockReturnValue({
+        projects: [vmProject],
+        loading: false,
+        error: null,
+        refresh: mockRefresh,
+        add: mockAdd,
+        update: mockUpdate,
+        remove: mockRemove,
+        get: mockGet,
+      });
+
+      render(<ProjectsTab toast={mockToast} />);
+
+      const runButton = screen.getByRole('button', { name: /Run/i });
+      await user.click(runButton);
+
+      expect(mockToast.error).toHaveBeenCalledWith(
+        expect.stringContaining('Multipass is not installed')
+      );
+      expect(global.window.api.loops.start).not.toHaveBeenCalled();
+    });
+
+    it('starts loop normally for ephemeral VM project when Multipass is available', async () => {
+      const user = userEvent.setup();
+      // Use ephemeral mode so the Run button is not gated on VM running state
+      const vmProject = createProjectConfig({
+        name: 'VM Project',
+        sandbox_type: 'vm',
+        vm_config: { vm_mode: 'ephemeral', cpus: 2, memory_gb: 4, disk_gb: 20 },
+      });
+
+      useAppStore.setState({ multipassAvailable: true });
+
+      vi.mocked(useProjects).mockReturnValue({
+        projects: [vmProject],
+        loading: false,
+        error: null,
+        refresh: mockRefresh,
+        add: mockAdd,
+        update: mockUpdate,
+        remove: mockRemove,
+        get: mockGet,
+      });
+
+      render(<ProjectsTab toast={mockToast} />);
+
+      const runButton = screen.getByRole('button', { name: /Run/i });
+      await user.click(runButton);
+
+      await waitFor(() => {
+        expect(global.window.api.loops.start).toHaveBeenCalled();
+      });
+      expect(mockToast.error).not.toHaveBeenCalledWith(
+        expect.stringContaining('Multipass is not installed')
+      );
     });
   });
 });

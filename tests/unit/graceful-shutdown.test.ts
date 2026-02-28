@@ -197,6 +197,18 @@ vi.mock('../../src/main/ipc-handlers/update-handlers', () => ({
   registerUpdateHandlers: vi.fn(),
 }));
 
+vi.mock('../../src/main/ipc-handlers/vm-handlers', () => ({
+  registerVMHandlers: vi.fn(),
+}));
+
+vi.mock('../../src/services/vm-manager', () => ({
+  VMManager: class VMManager {
+    isMultipassAvailable = vi.fn().mockResolvedValue(false);
+    listVMs = vi.fn().mockResolvedValue([]);
+    isZephyrVM = vi.fn().mockReturnValue(false);
+  },
+}));
+
 vi.mock('../../src/main/menu', () => ({
   buildApplicationMenu: vi.fn(),
 }));

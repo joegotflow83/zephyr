@@ -35,7 +35,9 @@ vi.mock('../../src/renderer/components/Terminal/Terminal', () => ({
 
 // Mock window.api functions declared at module level for callback capture
 const mockListContainers = vi.fn();
+const mockListLoops = vi.fn();
 const mockTerminalOpen = vi.fn();
+const mockTerminalOpenVM = vi.fn();
 const mockTerminalClose = vi.fn();
 const mockTerminalWrite = vi.fn();
 const mockTerminalResize = vi.fn();
@@ -101,6 +103,7 @@ describe('TerminalTab', () => {
     onErrorCallback = null;
     mockState.latestTerminalProps = null;
     mockListContainers.mockResolvedValue(mockContainers);
+    mockListLoops.mockResolvedValue([]);
 
     // Add api to global.window WITHOUT replacing the entire window object.
     // Replacing global.window would wipe jsdom's DOM APIs (addEventListener, etc.),
@@ -109,8 +112,12 @@ describe('TerminalTab', () => {
       docker: {
         listContainers: mockListContainers,
       },
+      loops: {
+        list: mockListLoops,
+      },
       terminal: {
         open: mockTerminalOpen,
+        openVM: mockTerminalOpenVM,
         close: mockTerminalClose,
         write: mockTerminalWrite,
         resize: mockTerminalResize,
@@ -172,7 +179,7 @@ describe('TerminalTab', () => {
       render(<TerminalTab />);
       await waitFor(() => {
         const select = screen.getByLabelText(/container/i) as HTMLSelectElement;
-        expect(select.value).toBe('container1');
+        expect(select.value).toBe('docker:container1');
       });
     });
 
@@ -184,10 +191,10 @@ describe('TerminalTab', () => {
       });
 
       const select = screen.getByLabelText(/container/i) as HTMLSelectElement;
-      fireEvent.change(select, { target: { value: 'container2' } });
+      fireEvent.change(select, { target: { value: 'docker:container2' } });
 
       await waitFor(() => {
-        expect(select.value).toBe('container2');
+        expect(select.value).toBe('docker:container2');
       });
     });
   });

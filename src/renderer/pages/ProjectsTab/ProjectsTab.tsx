@@ -28,6 +28,8 @@ export const ProjectsTab: React.FC<ProjectsTabProps> = ({ onRunProject, toast })
   const { projects, loading, error, refresh } = useProjects();
   const { get: getLoop } = useLoops();
   const removeLoop = useAppStore((state) => state.removeLoop);
+  const vmInfos = useAppStore((state) => state.vmInfos);
+  const multipassAvailable = useAppStore((state) => state.multipassAvailable);
 
   // Dialog state
   const [dialogMode, setDialogMode] = useState<'add' | 'edit' | null>(null);
@@ -88,16 +90,34 @@ export const ProjectsTab: React.FC<ProjectsTabProps> = ({ onRunProject, toast })
   };
 
   const handleRun = async (project: ProjectConfig) => {
+    if (project.sandbox_type === 'vm' && !multipassAvailable) {
+      toast.error('Multipass is not installed. Visit multipass.run to install.');
+      return;
+    }
+
     setActionLoading({ ...actionLoading, [`run-${project.id}`]: true });
 
     try {
+      const extraMounts = (project.additional_mounts ?? []).map((hostPath) => {
+        const basename = hostPath.split('/').filter(Boolean).pop() ?? hostPath;
+        return `${hostPath}:/mnt/${basename}`;
+      });
       await window.api.loops.start({
         projectId: project.id,
         projectName: project.name,
         dockerImage: project.docker_image,
         mode: LoopMode.CONTINUOUS,
-        ...(project.local_path
-          ? { volumeMounts: [`${project.local_path}:/workspace`], workDir: '/workspace' }
+        ...(project.local_path || extraMounts.length > 0
+          ? {
+              volumeMounts: [
+                ...(project.local_path ? [`${project.local_path}:/workspace`] : []),
+                ...extraMounts,
+              ],
+              ...(project.local_path ? { workDir: '/workspace' } : {}),
+            }
+          : {}),
+        ...(project.sandbox_type === 'vm'
+          ? { sandboxType: 'vm', vmConfig: project.vm_config }
           : {}),
       });
       toast.success(`Loop started for "${project.name}"`);
@@ -109,6 +129,34 @@ export const ProjectsTab: React.FC<ProjectsTabProps> = ({ onRunProject, toast })
       toast.error(`Failed to start loop: ${message}`);
     } finally {
       setActionLoading({ ...actionLoading, [`run-${project.id}`]: false });
+    }
+  };
+
+  const handleStartVM = async (project: ProjectConfig) => {
+    setActionLoading({ ...actionLoading, [`startvm-${project.id}`]: true });
+
+    try {
+      await window.api.vm.start(project.id, project.vm_config);
+      toast.success(`VM started for "${project.name}"`);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      toast.error(`Failed to start VM: ${message}`);
+    } finally {
+      setActionLoading({ ...actionLoading, [`startvm-${project.id}`]: false });
+    }
+  };
+
+  const handleStopVM = async (project: ProjectConfig) => {
+    setActionLoading({ ...actionLoading, [`stopvm-${project.id}`]: true });
+
+    try {
+      await window.api.vm.stop(project.id);
+      toast.success(`VM stopped for "${project.name}"`);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      toast.error(`Failed to stop VM: ${message}`);
+    } finally {
+      setActionLoading({ ...actionLoading, [`stopvm-${project.id}`]: false });
     }
   };
 
@@ -222,17 +270,31 @@ export const ProjectsTab: React.FC<ProjectsTabProps> = ({ onRunProject, toast })
                   </tr>
                 </thead>
                 <tbody>
-                  {projects.map((project) => (
-                    <ProjectRow
-                      key={project.id}
-                      project={project}
-                      loop={getLoop(project.id)}
-                      isDeleting={!!actionLoading[`delete-${project.id}`]}
-                      onEdit={handleEdit}
-                      onDelete={handleDelete}
-                      onRun={handleRun}
-                    />
-                  ))}
+                  {projects.map((project) => {
+                    // Find VM info for persistent VM projects by matching the project's VM name
+                    // stored in the vmInfos array. The VM name is keyed by name in the store.
+                    const projectVMInfo =
+                      project.sandbox_type === 'vm' && project.vm_config?.vm_mode === 'persistent'
+                        ? vmInfos.find((v) => v.name.startsWith(`zephyr-${project.id.slice(0, 8)}`)) ?? null
+                        : null;
+
+                    return (
+                      <ProjectRow
+                        key={project.id}
+                        project={project}
+                        loop={getLoop(project.id)}
+                        vmInfo={projectVMInfo}
+                        isDeleting={!!actionLoading[`delete-${project.id}`]}
+                        isStartingVM={!!actionLoading[`startvm-${project.id}`]}
+                        isStoppingVM={!!actionLoading[`stopvm-${project.id}`]}
+                        onEdit={handleEdit}
+                        onDelete={handleDelete}
+                        onRun={handleRun}
+                        onStartVM={handleStartVM}
+                        onStopVM={handleStopVM}
+                      />
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

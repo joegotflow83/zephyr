@@ -37,7 +37,9 @@ function deriveDockerTag(name: string): string {
     .toLowerCase()
     .replace(/\s+/g, '-')
     .replace(/[^a-z0-9-]/g, '');
-  return `zephyr-${slug}:latest`;
+  // Avoid double prefix if the user named their image "Zephyr ..."
+  const prefixed = slug.startsWith('zephyr-') ? slug : `zephyr-${slug}`;
+  return `${prefixed}:latest`;
 }
 
 export class ImageBuilder {

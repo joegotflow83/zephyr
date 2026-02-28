@@ -5,6 +5,8 @@
  * in Docker containers: execution modes, lifecycle states, and options.
  */
 
+import type { VMConfig } from './models';
+
 /**
  * How a loop should execute.
  *
@@ -47,6 +49,9 @@ export interface LoopState {
   /** UUID of the project this loop belongs to */
   projectId: string;
 
+  /** Human-readable project name */
+  projectName: string;
+
   /** Docker container ID, or null if not yet created */
   containerId: string | null;
 
@@ -76,6 +81,12 @@ export interface LoopState {
 
   /** Fatal error message if status is FAILED, else null */
   error: string | null;
+
+  /** Multipass VM name for VM-backed loops */
+  vmName?: string;
+
+  /** Sandbox type for this loop ('container' default, 'vm' for VM-backed) */
+  sandboxType?: 'container' | 'vm';
 }
 
 /**
@@ -105,6 +116,12 @@ export interface LoopStartOpts {
 
   /** User to run as inside container (e.g., "root" or "1000:1000") */
   user?: string;
+
+  /** Whether to run in a VM sandbox instead of a plain container */
+  sandboxType?: 'container' | 'vm';
+
+  /** VM configuration; only used when sandboxType === 'vm' */
+  vmConfig?: VMConfig;
 }
 
 /**
@@ -113,9 +130,11 @@ export interface LoopStartOpts {
 export function createLoopState(
   projectId: string,
   mode: LoopMode = LoopMode.SINGLE,
+  projectName = '',
 ): LoopState {
   return {
     projectId,
+    projectName,
     containerId: null,
     mode,
     status: LoopStatus.IDLE,

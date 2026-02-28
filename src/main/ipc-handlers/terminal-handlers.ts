@@ -5,9 +5,11 @@
 import { ipcMain } from 'electron';
 import { IPC } from '../../shared/ipc-channels';
 import type { TerminalManager, TerminalSessionOpts } from '../../services/terminal-manager';
+import type { VMManager } from '../../services/vm-manager';
 
 export interface TerminalServices {
   terminalManager: TerminalManager;
+  vmManager: VMManager;
 }
 
 /**
@@ -15,7 +17,7 @@ export interface TerminalServices {
  * @param services - Terminal services to delegate to
  */
 export function registerTerminalHandlers(services: TerminalServices): void {
-  const { terminalManager } = services;
+  const { terminalManager, vmManager } = services;
 
   // ── Open Terminal Session ────────────────────────────────────────────────
 
@@ -24,6 +26,21 @@ export function registerTerminalHandlers(services: TerminalServices): void {
     async (_event, containerId: string, opts?: TerminalSessionOpts) => {
       try {
         const session = await terminalManager.openSession(containerId, opts);
+        return { success: true, session };
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        return { success: false, error: message };
+      }
+    }
+  );
+
+  // ── Open VM Terminal Session ─────────────────────────────────────────────
+
+  ipcMain.handle(
+    IPC.TERMINAL_OPEN_VM,
+    async (_event, vmName: string, containerName: string, opts?: TerminalSessionOpts) => {
+      try {
+        const session = await terminalManager.openVMSession(vmName, containerName, vmManager, opts);
         return { success: true, session };
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);

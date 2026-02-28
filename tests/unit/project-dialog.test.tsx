@@ -18,6 +18,7 @@ import userEvent from '@testing-library/user-event';
 import { ProjectDialog } from '../../src/renderer/components/ProjectDialog/ProjectDialog';
 import { createProjectConfig } from '../../src/shared/models';
 import type { ZephyrImage } from '../../src/shared/models';
+import { useAppStore } from '../../src/renderer/stores/app-store';
 
 // --- Mock useImages hook ---
 vi.mock('../../src/renderer/hooks/useImages', () => ({
@@ -115,6 +116,8 @@ describe('ProjectDialog', () => {
       writable: true,
       configurable: true,
     });
+    // Reset store: multipassAvailable defaults to false
+    useAppStore.setState({ multipassAvailable: false });
   });
 
   describe('Add Mode', () => {
@@ -737,6 +740,241 @@ describe('ProjectDialog', () => {
           })
         );
       });
+    });
+  });
+
+  describe('Sandbox Type', () => {
+    it('renders Sandbox Type radio buttons', () => {
+      render(
+        <ProjectDialog mode="add" onSave={mockOnSave} onClose={mockOnClose} />
+      );
+
+      expect(screen.getByDisplayValue('container')).toBeInTheDocument();
+      expect(screen.getByDisplayValue('vm')).toBeInTheDocument();
+    });
+
+    it('defaults to Container sandbox type', () => {
+      render(
+        <ProjectDialog mode="add" onSave={mockOnSave} onClose={mockOnClose} />
+      );
+
+      const containerRadio = screen.getByDisplayValue('container') as HTMLInputElement;
+      expect(containerRadio.checked).toBe(true);
+    });
+
+    it('does not show VM Configuration section when container is selected', () => {
+      render(
+        <ProjectDialog mode="add" onSave={mockOnSave} onClose={mockOnClose} />
+      );
+
+      expect(screen.queryByText('VM Configuration')).not.toBeInTheDocument();
+    });
+
+    it('shows VM Configuration section when VM is selected', async () => {
+      const user = userEvent.setup();
+      render(
+        <ProjectDialog mode="add" onSave={mockOnSave} onClose={mockOnClose} />
+      );
+
+      await user.click(screen.getByDisplayValue('vm'));
+      expect(screen.getByText('VM Configuration')).toBeInTheDocument();
+    });
+
+    it('saves sandbox_type as container when not using VM', async () => {
+      const user = userEvent.setup();
+      render(
+        <ProjectDialog mode="add" onSave={mockOnSave} onClose={mockOnClose} />
+      );
+
+      await user.type(screen.getByLabelText(/Project Name/i), 'Container Project');
+      await user.click(screen.getByText('Create Project'));
+
+      await waitFor(() => {
+        expect(mockOnSave).toHaveBeenCalledWith(
+          expect.objectContaining({
+            sandbox_type: 'container',
+            vm_config: undefined,
+          })
+        );
+      });
+    });
+
+    it('saves sandbox_type as vm with vm_config when VM is selected', async () => {
+      const user = userEvent.setup();
+      render(
+        <ProjectDialog mode="add" onSave={mockOnSave} onClose={mockOnClose} />
+      );
+
+      await user.click(screen.getByDisplayValue('vm'));
+      await user.type(screen.getByLabelText(/Project Name/i), 'VM Project');
+      await user.click(screen.getByText('Create Project'));
+
+      await waitFor(() => {
+        expect(mockOnSave).toHaveBeenCalledWith(
+          expect.objectContaining({
+            sandbox_type: 'vm',
+            vm_config: expect.objectContaining({
+              vm_mode: 'persistent',
+              cpus: 2,
+              memory_gb: 4,
+              disk_gb: 20,
+            }),
+          })
+        );
+      });
+    });
+
+    it('populates VM config from existing project in edit mode', () => {
+      const vmProject = createProjectConfig({
+        name: 'VM Project',
+        sandbox_type: 'vm',
+        vm_config: {
+          vm_mode: 'ephemeral',
+          cpus: 4,
+          memory_gb: 8,
+          disk_gb: 50,
+        },
+      });
+
+      render(
+        <ProjectDialog
+          mode="edit"
+          project={vmProject}
+          onSave={mockOnSave}
+          onClose={mockOnClose}
+        />
+      );
+
+      const vmRadio = screen.getByDisplayValue('vm') as HTMLInputElement;
+      expect(vmRadio.checked).toBe(true);
+
+      const ephemeralRadio = screen.getByDisplayValue('ephemeral') as HTMLInputElement;
+      expect(ephemeralRadio.checked).toBe(true);
+
+      expect(screen.getByLabelText('CPUs')).toHaveValue(4);
+      expect(screen.getByLabelText('Memory (GB)')).toHaveValue(8);
+      expect(screen.getByLabelText('Disk (GB)')).toHaveValue(50);
+    });
+
+    it('can switch VM mode between persistent and ephemeral', async () => {
+      const user = userEvent.setup();
+      render(
+        <ProjectDialog mode="add" onSave={mockOnSave} onClose={mockOnClose} />
+      );
+
+      await user.click(screen.getByDisplayValue('vm'));
+
+      const ephemeralRadio = screen.getByDisplayValue('ephemeral') as HTMLInputElement;
+      await user.click(ephemeralRadio);
+      expect(ephemeralRadio.checked).toBe(true);
+
+      await user.type(screen.getByLabelText(/Project Name/i), 'Ephemeral VM');
+      await user.click(screen.getByText('Create Project'));
+
+      await waitFor(() => {
+        expect(mockOnSave).toHaveBeenCalledWith(
+          expect.objectContaining({
+            vm_config: expect.objectContaining({ vm_mode: 'ephemeral' }),
+          })
+        );
+      });
+    });
+
+    it('shows Advanced toggle and cloud-init textarea when expanded', async () => {
+      const user = userEvent.setup();
+      render(
+        <ProjectDialog mode="add" onSave={mockOnSave} onClose={mockOnClose} />
+      );
+
+      await user.click(screen.getByDisplayValue('vm'));
+      expect(screen.queryByLabelText('Cloud-init YAML (optional override)')).not.toBeInTheDocument();
+
+      await user.click(screen.getByText(/Advanced/i));
+      expect(screen.getByLabelText('Cloud-init YAML (optional override)')).toBeInTheDocument();
+    });
+
+    it('saves cloud_init when provided', async () => {
+      const user = userEvent.setup();
+      render(
+        <ProjectDialog mode="add" onSave={mockOnSave} onClose={mockOnClose} />
+      );
+
+      await user.click(screen.getByDisplayValue('vm'));
+      await user.click(screen.getByText(/Advanced/i));
+
+      const textarea = screen.getByLabelText('Cloud-init YAML (optional override)');
+      await user.type(textarea, '#cloud-config\npackages:\n  - git');
+
+      await user.type(screen.getByLabelText(/Project Name/i), 'Cloud-init VM');
+      await user.click(screen.getByText('Create Project'));
+
+      await waitFor(() => {
+        expect(mockOnSave).toHaveBeenCalledWith(
+          expect.objectContaining({
+            vm_config: expect.objectContaining({
+              cloud_init: '#cloud-config\npackages:\n  - git',
+            }),
+          })
+        );
+      });
+    });
+
+    it('saves vm_config as undefined when switching back to container', async () => {
+      const user = userEvent.setup();
+      render(
+        <ProjectDialog mode="add" onSave={mockOnSave} onClose={mockOnClose} />
+      );
+
+      // Switch to VM then back to container
+      await user.click(screen.getByDisplayValue('vm'));
+      await user.click(screen.getByDisplayValue('container'));
+
+      await user.type(screen.getByLabelText(/Project Name/i), 'Container Project');
+      await user.click(screen.getByText('Create Project'));
+
+      await waitFor(() => {
+        expect(mockOnSave).toHaveBeenCalledWith(
+          expect.objectContaining({
+            sandbox_type: 'container',
+            vm_config: undefined,
+          })
+        );
+      });
+    });
+
+    it('shows Multipass unavailable warning in VM section when multipassAvailable is false', async () => {
+      const user = userEvent.setup();
+      // multipassAvailable is false by default (set in beforeEach)
+      render(
+        <ProjectDialog mode="add" onSave={mockOnSave} onClose={mockOnClose} />
+      );
+
+      await user.click(screen.getByDisplayValue('vm'));
+
+      expect(screen.getByRole('alert')).toBeInTheDocument();
+      expect(screen.getByText(/Multipass is not installed/i)).toBeInTheDocument();
+    });
+
+    it('does not show Multipass warning when multipassAvailable is true', async () => {
+      const user = userEvent.setup();
+      useAppStore.setState({ multipassAvailable: true });
+      render(
+        <ProjectDialog mode="add" onSave={mockOnSave} onClose={mockOnClose} />
+      );
+
+      await user.click(screen.getByDisplayValue('vm'));
+
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+      expect(screen.queryByText(/Multipass is not installed/i)).not.toBeInTheDocument();
+    });
+
+    it('does not show Multipass warning when container sandbox type is selected', () => {
+      // multipassAvailable is false by default — no warning for container mode
+      render(
+        <ProjectDialog mode="add" onSave={mockOnSave} onClose={mockOnClose} />
+      );
+
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
     });
   });
 

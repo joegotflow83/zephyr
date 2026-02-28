@@ -15,6 +15,7 @@ import userEvent from '@testing-library/user-event';
 import { ProjectRow } from '../../src/renderer/pages/ProjectsTab/ProjectRow';
 import { createProjectConfig } from '../../src/shared/models';
 import { createLoopState, LoopStatus, LoopMode } from '../../src/shared/loop-types';
+import type { VMInfo } from '../../src/services/vm-manager';
 
 describe('ProjectRow', () => {
   const mockOnEdit = vi.fn();
@@ -533,6 +534,301 @@ describe('ProjectRow', () => {
       );
 
       expect(screen.getByRole('button', { name: /Run/i })).toHaveAttribute('title', 'Already running');
+    });
+  });
+
+  describe('VM Controls (persistent VM projects)', () => {
+    const persistentVMProject = createProjectConfig({
+      name: 'VM Project',
+      repo_url: 'https://github.com/user/repo',
+      docker_image: 'ubuntu:22.04',
+      sandbox_type: 'vm',
+      vm_config: {
+        vm_mode: 'persistent',
+        cpus: 2,
+        memory_gb: 4,
+        disk_gb: 20,
+      },
+    });
+
+    const runningVMInfo: VMInfo = {
+      name: 'zephyr-test1234-abc1',
+      state: 'Running',
+      cpus: 2,
+      memory: '4G',
+      disk: '20G',
+      release: '22.04',
+    };
+
+    const stoppedVMInfo: VMInfo = {
+      ...runningVMInfo,
+      state: 'Stopped',
+    };
+
+    const mockOnStartVM = vi.fn();
+    const mockOnStopVM = vi.fn();
+
+    it('shows Start VM and Stop VM buttons for persistent VM projects', () => {
+      render(
+        <table>
+          <tbody>
+            <ProjectRow
+              project={persistentVMProject}
+              onEdit={mockOnEdit}
+              onDelete={mockOnDelete}
+              onRun={mockOnRun}
+              onStartVM={mockOnStartVM}
+              onStopVM={mockOnStopVM}
+            />
+          </tbody>
+        </table>
+      );
+
+      expect(screen.getByRole('button', { name: /Start VM/i })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /Stop VM/i })).toBeInTheDocument();
+    });
+
+    it('does not show VM buttons for container projects', () => {
+      render(
+        <table>
+          <tbody>
+            <ProjectRow
+              project={defaultProject}
+              onEdit={mockOnEdit}
+              onDelete={mockOnDelete}
+              onRun={mockOnRun}
+            />
+          </tbody>
+        </table>
+      );
+
+      expect(screen.queryByRole('button', { name: /Start VM/i })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /Stop VM/i })).not.toBeInTheDocument();
+    });
+
+    it('shows VM Running badge when VM is running', () => {
+      render(
+        <table>
+          <tbody>
+            <ProjectRow
+              project={persistentVMProject}
+              vmInfo={runningVMInfo}
+              onEdit={mockOnEdit}
+              onDelete={mockOnDelete}
+              onRun={mockOnRun}
+              onStartVM={mockOnStartVM}
+              onStopVM={mockOnStopVM}
+            />
+          </tbody>
+        </table>
+      );
+
+      // VM status badge showing "Running"
+      const badges = screen.getAllByText('Running');
+      expect(badges.length).toBeGreaterThan(0);
+    });
+
+    it('shows VM Stopped badge when VM is stopped', () => {
+      render(
+        <table>
+          <tbody>
+            <ProjectRow
+              project={persistentVMProject}
+              vmInfo={stoppedVMInfo}
+              onEdit={mockOnEdit}
+              onDelete={mockOnDelete}
+              onRun={mockOnRun}
+              onStartVM={mockOnStartVM}
+              onStopVM={mockOnStopVM}
+            />
+          </tbody>
+        </table>
+      );
+
+      expect(screen.getByText('Stopped')).toBeInTheDocument();
+    });
+
+    it('disables Run button when VM is stopped', () => {
+      render(
+        <table>
+          <tbody>
+            <ProjectRow
+              project={persistentVMProject}
+              vmInfo={stoppedVMInfo}
+              onEdit={mockOnEdit}
+              onDelete={mockOnDelete}
+              onRun={mockOnRun}
+              onStartVM={mockOnStartVM}
+              onStopVM={mockOnStopVM}
+            />
+          </tbody>
+        </table>
+      );
+
+      expect(screen.getByRole('button', { name: /Run/i })).toBeDisabled();
+      expect(screen.getByRole('button', { name: /Run/i })).toHaveAttribute('title', 'Start the VM first');
+    });
+
+    it('enables Run button when VM is running', () => {
+      render(
+        <table>
+          <tbody>
+            <ProjectRow
+              project={persistentVMProject}
+              vmInfo={runningVMInfo}
+              onEdit={mockOnEdit}
+              onDelete={mockOnDelete}
+              onRun={mockOnRun}
+              onStartVM={mockOnStartVM}
+              onStopVM={mockOnStopVM}
+            />
+          </tbody>
+        </table>
+      );
+
+      expect(screen.getByRole('button', { name: /Run/i })).not.toBeDisabled();
+    });
+
+    it('disables Start VM button when VM is already running', () => {
+      render(
+        <table>
+          <tbody>
+            <ProjectRow
+              project={persistentVMProject}
+              vmInfo={runningVMInfo}
+              onEdit={mockOnEdit}
+              onDelete={mockOnDelete}
+              onRun={mockOnRun}
+              onStartVM={mockOnStartVM}
+              onStopVM={mockOnStopVM}
+            />
+          </tbody>
+        </table>
+      );
+
+      expect(screen.getByRole('button', { name: /Start VM/i })).toBeDisabled();
+    });
+
+    it('disables Stop VM button when loop is actively running', () => {
+      const loop: LoopState = {
+        ...createLoopState(persistentVMProject.id, LoopMode.CONTINUOUS),
+        status: LoopStatus.RUNNING,
+      };
+
+      render(
+        <table>
+          <tbody>
+            <ProjectRow
+              project={persistentVMProject}
+              loop={loop}
+              vmInfo={runningVMInfo}
+              onEdit={mockOnEdit}
+              onDelete={mockOnDelete}
+              onRun={mockOnRun}
+              onStartVM={mockOnStartVM}
+              onStopVM={mockOnStopVM}
+            />
+          </tbody>
+        </table>
+      );
+
+      expect(screen.getByRole('button', { name: /Stop VM/i })).toBeDisabled();
+    });
+
+    it('calls onStartVM when Start VM button is clicked', async () => {
+      const user = userEvent.setup();
+
+      render(
+        <table>
+          <tbody>
+            <ProjectRow
+              project={persistentVMProject}
+              vmInfo={stoppedVMInfo}
+              onEdit={mockOnEdit}
+              onDelete={mockOnDelete}
+              onRun={mockOnRun}
+              onStartVM={mockOnStartVM}
+              onStopVM={mockOnStopVM}
+            />
+          </tbody>
+        </table>
+      );
+
+      const startVMButton = screen.getByRole('button', { name: /Start VM/i });
+      await user.click(startVMButton);
+
+      expect(mockOnStartVM).toHaveBeenCalledWith(persistentVMProject);
+      expect(mockOnStartVM).toHaveBeenCalledTimes(1);
+    });
+
+    it('calls onStopVM when Stop VM button is clicked', async () => {
+      const user = userEvent.setup();
+
+      render(
+        <table>
+          <tbody>
+            <ProjectRow
+              project={persistentVMProject}
+              vmInfo={runningVMInfo}
+              onEdit={mockOnEdit}
+              onDelete={mockOnDelete}
+              onRun={mockOnRun}
+              onStartVM={mockOnStartVM}
+              onStopVM={mockOnStopVM}
+            />
+          </tbody>
+        </table>
+      );
+
+      const stopVMButton = screen.getByRole('button', { name: /Stop VM/i });
+      await user.click(stopVMButton);
+
+      expect(mockOnStopVM).toHaveBeenCalledWith(persistentVMProject);
+      expect(mockOnStopVM).toHaveBeenCalledTimes(1);
+    });
+
+    it('shows Starting... text when VM is starting', () => {
+      render(
+        <table>
+          <tbody>
+            <ProjectRow
+              project={persistentVMProject}
+              vmInfo={stoppedVMInfo}
+              isStartingVM={true}
+              onEdit={mockOnEdit}
+              onDelete={mockOnDelete}
+              onRun={mockOnRun}
+              onStartVM={mockOnStartVM}
+              onStopVM={mockOnStopVM}
+            />
+          </tbody>
+        </table>
+      );
+
+      expect(screen.getByText('Starting...')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /Starting/i })).toBeDisabled();
+    });
+
+    it('shows Stopping... text when VM is stopping', () => {
+      render(
+        <table>
+          <tbody>
+            <ProjectRow
+              project={persistentVMProject}
+              vmInfo={runningVMInfo}
+              isStoppingVM={true}
+              onEdit={mockOnEdit}
+              onDelete={mockOnDelete}
+              onRun={mockOnRun}
+              onStartVM={mockOnStartVM}
+              onStopVM={mockOnStopVM}
+            />
+          </tbody>
+        </table>
+      );
+
+      expect(screen.getByText('Stopping...')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /Stopping/i })).toBeDisabled();
     });
   });
 });

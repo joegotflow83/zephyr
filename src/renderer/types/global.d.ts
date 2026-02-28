@@ -1,7 +1,7 @@
 // Global type augmentations for the renderer process.
 // window.api is exposed by the preload script via contextBridge.
 
-import type { AppSettings, ProjectConfig, ZephyrImage, ImageBuildConfig } from '../../shared/models';
+import type { AppSettings, ProjectConfig, VMConfig, ZephyrImage, ImageBuildConfig } from '../../shared/models';
 import type { DeployKeyRecord } from '../../services/deploy-key-store';
 import type { PreValidationScript } from '../../services/pre-validation-store';
 import type { HookFile } from '../../services/hooks-store';
@@ -20,6 +20,7 @@ import type { ScheduledLoop } from '../../services/scheduler';
 import type { ParsedLogLine } from '../../services/log-parser';
 import type { TerminalSession, TerminalSessionOpts } from '../../services/terminal-manager';
 import type { UpdateInfo } from '../../services/self-updater';
+import type { VMInfo } from '../../services/vm-manager';
 
 export {};
 
@@ -148,9 +149,15 @@ declare global {
       };
 
       terminal: {
-        /** Open a new terminal session to a container */
+        /** Open a new terminal session to a Docker container on the host */
         open: (
           containerId: string,
+          opts?: TerminalSessionOpts,
+        ) => Promise<{ success: boolean; session?: TerminalSession; error?: string }>;
+        /** Open a terminal session to a Docker container running inside a Multipass VM */
+        openVM: (
+          vmName: string,
+          containerName: string,
           opts?: TerminalSessionOpts,
         ) => Promise<{ success: boolean; session?: TerminalSession; error?: string }>;
         /** Close a terminal session */
@@ -236,6 +243,25 @@ declare global {
       shell: {
         /** Open a URL in the system's default browser */
         openExternal: (url: string) => Promise<void>;
+      };
+
+      vm: {
+        /** Check Multipass availability and version */
+        status: () => Promise<{ available: false } | { available: true; version?: string }>;
+        /** List all Multipass VMs */
+        list: () => Promise<VMInfo[]>;
+        /** Get detailed info for a specific VM by name */
+        get: (name: string) => Promise<VMInfo | null>;
+        /** Start (or provision-then-start) the persistent VM for a project */
+        start: (projectId: string, vmConfig?: VMConfig) => Promise<VMInfo>;
+        /** Stop the persistent VM for a project */
+        stop: (projectId: string) => Promise<void>;
+        /** Delete a VM by name and purge it from disk */
+        delete: (name: string) => Promise<void>;
+
+        // Event listeners
+        /** Listen for VM status changes. Returns cleanup function. */
+        onStatusChanged: (callback: (info: VMInfo) => void) => () => void;
       };
     };
   }

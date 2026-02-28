@@ -1,3 +1,6 @@
+import { createWriteStream } from 'fs';
+import { pipeline } from 'stream/promises';
+
 import Dockerode from 'dockerode';
 import { Readable } from 'stream';
 
@@ -163,6 +166,19 @@ export class DockerManager {
     } catch (error) {
       return false;
     }
+  }
+
+  /**
+   * Save a Docker image to a tar file on disk.
+   * @param tag - Image tag to save (e.g. "zephyr-python-dev:latest")
+   * @param outputPath - Absolute path for the output tar file
+   * @throws Error if the image is not found or write fails
+   */
+  async saveImage(tag: string, outputPath: string): Promise<void> {
+    const image = this.docker.getImage(tag);
+    const stream = (await image.get()) as Readable;
+    const writeStream = createWriteStream(outputPath);
+    await pipeline(stream, writeStream);
   }
 
   /**

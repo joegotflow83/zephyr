@@ -2,34 +2,56 @@ import React from 'react';
 import type { ProjectConfig } from '../../../shared/models';
 import type { LoopState } from '../../../shared/loop-types';
 import { LoopStatus } from '../../../shared/loop-types';
+import type { VMInfo } from '../../../services/vm-manager';
 
 interface ProjectRowProps {
   project: ProjectConfig;
   loop?: LoopState;
+  vmInfo?: VMInfo | null;
   isDeleting?: boolean;
+  isStartingVM?: boolean;
+  isStoppingVM?: boolean;
   onEdit: (project: ProjectConfig) => void;
   onDelete: (project: ProjectConfig) => void;
   onRun: (project: ProjectConfig) => void;
+  onStartVM?: (project: ProjectConfig) => void;
+  onStopVM?: (project: ProjectConfig) => void;
 }
 
 /**
  * Single row component for displaying a project in the projects table.
  * Shows project details, current status, and action buttons.
+ * For persistent VM projects, also shows VM status badge and Start/Stop VM buttons.
  */
 export const ProjectRow: React.FC<ProjectRowProps> = ({
   project,
   loop,
+  vmInfo,
   isDeleting = false,
+  isStartingVM = false,
+  isStoppingVM = false,
   onEdit,
   onDelete,
   onRun,
+  onStartVM,
+  onStopVM,
 }) => {
-  // Determine if the project is currently in an active state
+  const isPersistentVM =
+    project.sandbox_type === 'vm' && project.vm_config?.vm_mode === 'persistent';
+
+  // Determine if the project is currently in an active loop state
   const isRunning = loop &&
     (loop.status === LoopStatus.STARTING ||
      loop.status === LoopStatus.RUNNING ||
      loop.status === LoopStatus.PAUSED ||
      loop.status === LoopStatus.STOPPING);
+
+  // For persistent VMs: Run Loop requires VM to be running
+  const vmStopped = isPersistentVM && vmInfo?.state !== 'Running';
+  const runDisabled = !!isRunning || vmStopped;
+
+  // Stop VM is disabled when a loop is actively running in the VM
+  const stopVMDisabled = !!isRunning || isStoppingVM;
 
   // Status badge styling
   const getStatusBadge = () => {
@@ -81,6 +103,29 @@ export const ProjectRow: React.FC<ProjectRowProps> = ({
     );
   };
 
+  const getVMStatusBadge = () => {
+    if (!isPersistentVM) return null;
+
+    const isVMRunning = vmInfo?.state === 'Running';
+    return (
+      <span
+        className={`inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded ${
+          isVMRunning ? 'bg-green-900 text-green-300' : 'bg-gray-700 text-gray-400'
+        }`}
+        title={`VM: ${vmInfo?.state ?? 'Unknown'}`}
+      >
+        <span>{isVMRunning ? '●' : '○'}</span>
+        <span>{isVMRunning ? 'Running' : 'Stopped'}</span>
+      </span>
+    );
+  };
+
+  const getRunButtonTitle = () => {
+    if (isRunning) return 'Already running';
+    if (vmStopped) return 'Start the VM first';
+    return 'Run this project';
+  };
+
   return (
     <tr className="border-b border-gray-700 hover:bg-gray-800">
       <td className="px-4 py-3 text-sm font-medium text-white">
@@ -93,18 +138,55 @@ export const ProjectRow: React.FC<ProjectRowProps> = ({
         {project.docker_image}
       </td>
       <td className="px-4 py-3 text-sm">
-        {getStatusBadge()}
+        <div className="flex items-center gap-2 flex-wrap">
+          {getStatusBadge()}
+          {getVMStatusBadge()}
+        </div>
       </td>
       <td className="px-4 py-3 text-sm text-right space-x-2">
+        {isPersistentVM && (
+          <>
+            <button
+              onClick={() => onStartVM?.(project)}
+              disabled={isStartingVM || vmInfo?.state === 'Running'}
+              className={`px-3 py-1 rounded font-medium transition-colors ${
+                isStartingVM || vmInfo?.state === 'Running'
+                  ? 'bg-gray-700 text-gray-500 cursor-not-allowed'
+                  : 'bg-green-700 text-white hover:bg-green-600'
+              }`}
+              title={isStartingVM ? 'Starting VM...' : vmInfo?.state === 'Running' ? 'VM is already running' : 'Start the VM'}
+            >
+              {isStartingVM ? 'Starting...' : 'Start VM'}
+            </button>
+            <button
+              onClick={() => onStopVM?.(project)}
+              disabled={stopVMDisabled}
+              className={`px-3 py-1 rounded font-medium transition-colors ${
+                stopVMDisabled
+                  ? 'bg-gray-700 text-gray-500 cursor-not-allowed'
+                  : 'bg-yellow-700 text-white hover:bg-yellow-600'
+              }`}
+              title={
+                isRunning
+                  ? 'Stop the loop before stopping the VM'
+                  : isStoppingVM
+                  ? 'Stopping VM...'
+                  : 'Stop the VM'
+              }
+            >
+              {isStoppingVM ? 'Stopping...' : 'Stop VM'}
+            </button>
+          </>
+        )}
         <button
           onClick={() => onRun(project)}
-          disabled={!!isRunning}
+          disabled={runDisabled}
           className={`px-3 py-1 rounded font-medium transition-colors ${
-            isRunning
+            runDisabled
               ? 'bg-gray-700 text-gray-500 cursor-not-allowed'
               : 'bg-blue-600 text-white hover:bg-blue-700'
           }`}
-          title={isRunning ? 'Already running' : 'Run this project'}
+          title={getRunButtonTitle()}
         >
           Run
         </button>

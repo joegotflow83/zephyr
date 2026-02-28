@@ -5,17 +5,20 @@
  * - Name, Repo URL fields with validation
  * - Docker image picker: toggle between image library and custom text input
  * - "Build New Image" shortcut that opens ImageBuilderDialog inline
+ * - Sandbox Type: Container (default) or VM
+ * - VM Configuration: mode, resources (CPUs, Memory, Disk), cloud-init YAML
  * - Custom prompt management via PromptEditor
  */
 
 import React, { useState, useEffect } from 'react';
-import { ProjectConfig, createProjectConfig } from '../../../shared/models';
+import { ProjectConfig, VMConfig, createProjectConfig } from '../../../shared/models';
 import type { ZephyrImage } from '../../../shared/models';
 import { PromptEditor } from './PromptEditor';
 import { PreValidationSection } from './PreValidationSection';
 import { HooksSection } from './HooksSection';
 import { useImages } from '../../hooks/useImages';
 import { ImageBuilderDialog } from '../ImageBuilderDialog/ImageBuilderDialog';
+import { useAppStore } from '../../stores/app-store';
 
 interface ProjectDialogProps {
   mode: 'add' | 'edit';
@@ -32,6 +35,7 @@ type ImageMode = 'library' | 'custom';
  */
 export const ProjectDialog: React.FC<ProjectDialogProps> = ({ mode, project, onSave, onClose }) => {
   const { images, refresh: refreshImages } = useImages();
+  const multipassAvailable = useAppStore((state) => state.multipassAvailable);
 
   // Form fields
   const [name, setName] = useState('');
@@ -51,6 +55,20 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({ mode, project, onS
   const [githubPat, setGithubPat] = useState('');
   const [hasStoredPat, setHasStoredPat] = useState(false);
   const [showGithubSection, setShowGithubSection] = useState(false);
+
+  // Additional mount points
+  const [additionalMounts, setAdditionalMounts] = useState<string[]>([]);
+  const [newMountPath, setNewMountPath] = useState('');
+  const [mountErrors, setMountErrors] = useState<Record<string, string>>({});
+
+  // VM / sandbox state
+  const [sandboxType, setSandboxType] = useState<'container' | 'vm'>('container');
+  const [vmMode, setVmMode] = useState<'persistent' | 'ephemeral'>('persistent');
+  const [vmCpus, setVmCpus] = useState(2);
+  const [vmMemoryGb, setVmMemoryGb] = useState(4);
+  const [vmDiskGb, setVmDiskGb] = useState(20);
+  const [vmCloudInit, setVmCloudInit] = useState('');
+  const [showVmAdvanced, setShowVmAdvanced] = useState(false);
 
   // Validation state
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -72,17 +90,33 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({ mode, project, onS
       setCustomPrompts(project.custom_prompts);
       setPreValidationScripts(project.pre_validation_scripts ?? []);
       setHooks(project.hooks ?? []);
+      setAdditionalMounts(project.additional_mounts ?? []);
       setImageId(project.image_id);
       setImageMode(project.image_id ? 'library' : images.length > 0 ? 'library' : 'custom');
       // Check if a GitHub PAT is already stored for this project
       void window.api.githubPat.has(project.id).then(setHasStoredPat);
+      // VM config
+      setSandboxType(project.sandbox_type ?? 'container');
+      setVmMode(project.vm_config?.vm_mode ?? 'persistent');
+      setVmCpus(project.vm_config?.cpus ?? 2);
+      setVmMemoryGb(project.vm_config?.memory_gb ?? 4);
+      setVmDiskGb(project.vm_config?.disk_gb ?? 20);
+      setVmCloudInit(project.vm_config?.cloud_init ?? '');
     } else {
       // Add mode: default to library if images exist, custom if empty
       setImageMode(images.length > 0 ? 'library' : 'custom');
       setImageId(undefined);
       setPreValidationScripts([]);
       setHooks([]);
+      setAdditionalMounts([]);
       setHasStoredPat(false);
+      // VM defaults
+      setSandboxType('container');
+      setVmMode('persistent');
+      setVmCpus(2);
+      setVmMemoryGb(4);
+      setVmDiskGb(20);
+      setVmCloudInit('');
     }
     setGithubPat('');
   }, [mode, project, images.length]);
@@ -98,6 +132,27 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({ mode, project, onS
   const validateLocalPath = (path: string): boolean => {
     if (!path) return true; // Optional field
     return path.startsWith('/');
+  };
+
+  // Add an additional mount path (validates absolute path and no duplicates)
+  const handleAddMount = () => {
+    const trimmed = newMountPath.trim();
+    if (!trimmed) return;
+    if (!trimmed.startsWith('/')) {
+      setMountErrors((prev) => ({ ...prev, new: 'Must be an absolute path (starting with /)' }));
+      return;
+    }
+    if (additionalMounts.includes(trimmed)) {
+      setMountErrors((prev) => ({ ...prev, new: 'This path is already added' }));
+      return;
+    }
+    setAdditionalMounts((prev) => [...prev, trimmed]);
+    setNewMountPath('');
+    setMountErrors((prev) => { const next = { ...prev }; delete next.new; return next; });
+  };
+
+  const handleRemoveMount = (index: number) => {
+    setAdditionalMounts((prev) => prev.filter((_, i) => i !== index));
   };
 
   // Check whether the current repo URL points to GitHub (drives GitHub SSH Access section visibility)
@@ -135,6 +190,18 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({ mode, project, onS
     const effectiveDockerImage = selectedImage ? selectedImage.dockerTag : dockerImage.trim();
     const effectiveImageId = selectedImage ? selectedImage.id : undefined;
 
+    // Build VM config if sandbox type is VM
+    const effectiveVmConfig: VMConfig | undefined =
+      sandboxType === 'vm'
+        ? {
+            vm_mode: vmMode,
+            cpus: vmCpus,
+            memory_gb: vmMemoryGb,
+            disk_gb: vmDiskGb,
+            cloud_init: vmCloudInit.trim() || undefined,
+          }
+        : undefined;
+
     // Build config object
     const config: ProjectConfig =
       mode === 'edit' && project
@@ -148,7 +215,10 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({ mode, project, onS
             pre_validation_scripts: preValidationScripts,
             hooks,
             custom_prompts: customPrompts,
+            additional_mounts: additionalMounts.length > 0 ? additionalMounts : undefined,
             updated_at: new Date().toISOString(),
+            sandbox_type: sandboxType,
+            vm_config: effectiveVmConfig,
           }
         : createProjectConfig({
             name: name.trim(),
@@ -159,6 +229,9 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({ mode, project, onS
             pre_validation_scripts: preValidationScripts,
             hooks,
             custom_prompts: customPrompts,
+            additional_mounts: additionalMounts.length > 0 ? additionalMounts : undefined,
+            sandbox_type: sandboxType,
+            vm_config: effectiveVmConfig,
           });
 
     // Store GitHub PAT if the user entered one (uses config.id so it works in both add and edit mode)
@@ -297,6 +370,74 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({ mode, project, onS
               </p>
             </div>
 
+            {/* Additional Mount Points section */}
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-300 mb-2">
+                Additional Mount Points
+              </label>
+
+              {/* Existing mounts list */}
+              {additionalMounts.length > 0 && (
+                <ul className="mb-2 space-y-1">
+                  {additionalMounts.map((hostPath, idx) => {
+                    const basename = hostPath.split('/').filter(Boolean).pop() ?? hostPath;
+                    return (
+                      <li
+                        key={idx}
+                        className="flex items-center justify-between bg-gray-700 rounded px-3 py-1.5 text-sm"
+                      >
+                        <span className="text-gray-200 font-mono truncate flex-1 mr-2">{hostPath}</span>
+                        <span className="text-gray-400 text-xs mr-3 shrink-0">
+                          → <code className="bg-gray-600 px-1 rounded">/mnt/{basename}</code>
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveMount(idx)}
+                          className="text-gray-500 hover:text-red-400 transition-colors shrink-0"
+                          aria-label={`Remove mount ${hostPath}`}
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+
+              {/* Add new mount input */}
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={newMountPath}
+                  onChange={(e) => {
+                    setNewMountPath(e.target.value);
+                    setMountErrors((prev) => { const next = { ...prev }; delete next.new; return next; });
+                  }}
+                  onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddMount(); } }}
+                  className={`flex-1 px-3 py-2 bg-gray-700 border ${
+                    mountErrors.new ? 'border-red-500' : 'border-gray-600'
+                  } rounded text-white focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm`}
+                  placeholder="/home/user/data"
+                />
+                <button
+                  type="button"
+                  onClick={handleAddMount}
+                  className="px-3 py-2 bg-gray-600 hover:bg-gray-500 text-white rounded text-sm transition-colors shrink-0"
+                >
+                  Add
+                </button>
+              </div>
+              {mountErrors.new && (
+                <p className="mt-1 text-sm text-red-400">{mountErrors.new}</p>
+              )}
+              <p className="mt-1 text-xs text-gray-400">
+                Extra host paths to mount into the container. Each path mounts at{' '}
+                <code className="bg-gray-700 px-1 rounded">/mnt/&lt;foldername&gt;</code>.
+              </p>
+            </div>
+
             {/* Docker Image section — library picker or custom text input */}
             <div className="mb-4">
               <div className="text-sm font-medium text-gray-300 mb-2">Docker Image</div>
@@ -382,6 +523,176 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({ mode, project, onS
                 + Build New Image
               </button>
             </div>
+
+            {/* Sandbox Type section */}
+            <div className="mb-4">
+              <div className="text-sm font-medium text-gray-300 mb-2">Sandbox Type</div>
+              <div className="flex gap-6">
+                <label className="flex items-center gap-2 cursor-pointer text-sm text-gray-300">
+                  <input
+                    type="radio"
+                    name="sandbox-type"
+                    value="container"
+                    checked={sandboxType === 'container'}
+                    onChange={() => setSandboxType('container')}
+                  />
+                  Container
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer text-sm text-gray-300">
+                  <input
+                    type="radio"
+                    name="sandbox-type"
+                    value="vm"
+                    checked={sandboxType === 'vm'}
+                    onChange={() => setSandboxType('vm')}
+                  />
+                  Virtual Machine
+                </label>
+              </div>
+              <p className="mt-1 text-xs text-gray-400">
+                {sandboxType === 'container'
+                  ? 'Run loops directly in a Docker container (default).'
+                  : 'Run loops inside an isolated Ubuntu VM via Multipass. Requires Multipass installed.'}
+              </p>
+            </div>
+
+            {/* VM Configuration — only shown when sandbox type is VM */}
+            {sandboxType === 'vm' && (
+              <div className="mb-4 border border-gray-600 rounded p-4 space-y-4">
+                <div className="text-sm font-semibold text-gray-200">VM Configuration</div>
+
+                {/* Multipass unavailable warning */}
+                {!multipassAvailable && (
+                  <div
+                    role="alert"
+                    className="p-3 bg-yellow-900 bg-opacity-50 border border-yellow-700 rounded text-yellow-200 text-sm"
+                  >
+                    Multipass is not installed. Visit{' '}
+                    <a
+                      href="https://multipass.run"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        window.open('https://multipass.run', '_blank');
+                      }}
+                      className="underline text-yellow-100 hover:text-white"
+                    >
+                      multipass.run
+                    </a>{' '}
+                    to install.
+                  </div>
+                )}
+
+                {/* VM Mode */}
+                <div>
+                  <div className="text-xs font-medium text-gray-400 mb-2">VM Mode</div>
+                  <div className="flex gap-6">
+                    <label className="flex items-center gap-2 cursor-pointer text-sm text-gray-300">
+                      <input
+                        type="radio"
+                        name="vm-mode"
+                        value="persistent"
+                        checked={vmMode === 'persistent'}
+                        onChange={() => setVmMode('persistent')}
+                      />
+                      Persistent
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer text-sm text-gray-300">
+                      <input
+                        type="radio"
+                        name="vm-mode"
+                        value="ephemeral"
+                        checked={vmMode === 'ephemeral'}
+                        onChange={() => setVmMode('ephemeral')}
+                      />
+                      Ephemeral
+                    </label>
+                  </div>
+                  <p className="mt-1 text-xs text-gray-400">
+                    {vmMode === 'persistent'
+                      ? 'VM persists between loop runs; start and stop independently.'
+                      : 'VM is created fresh each run and deleted when done.'}
+                  </p>
+                </div>
+
+                {/* Resources */}
+                <div>
+                  <div className="text-xs font-medium text-gray-400 mb-2">Resources</div>
+                  <div className="flex gap-4">
+                    <div className="flex-1">
+                      <label htmlFor="vm-cpus" className="block text-xs text-gray-400 mb-1">
+                        CPUs
+                      </label>
+                      <input
+                        id="vm-cpus"
+                        type="number"
+                        min={1}
+                        max={16}
+                        value={vmCpus}
+                        onChange={(e) => setVmCpus(Math.max(1, parseInt(e.target.value, 10) || 1))}
+                        className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded text-white focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                      />
+                    </div>
+                    <div className="flex-1">
+                      <label htmlFor="vm-memory" className="block text-xs text-gray-400 mb-1">
+                        Memory (GB)
+                      </label>
+                      <input
+                        id="vm-memory"
+                        type="number"
+                        min={1}
+                        max={64}
+                        value={vmMemoryGb}
+                        onChange={(e) => setVmMemoryGb(Math.max(1, parseInt(e.target.value, 10) || 1))}
+                        className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded text-white focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                      />
+                    </div>
+                    <div className="flex-1">
+                      <label htmlFor="vm-disk" className="block text-xs text-gray-400 mb-1">
+                        Disk (GB)
+                      </label>
+                      <input
+                        id="vm-disk"
+                        type="number"
+                        min={5}
+                        max={500}
+                        value={vmDiskGb}
+                        onChange={(e) => setVmDiskGb(Math.max(5, parseInt(e.target.value, 10) || 5))}
+                        className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded text-white focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Advanced: Cloud-init */}
+                <div>
+                  <button
+                    type="button"
+                    onClick={() => setShowVmAdvanced(!showVmAdvanced)}
+                    className="text-xs text-blue-400 hover:text-blue-300 transition-colors flex items-center gap-1"
+                  >
+                    Advanced {showVmAdvanced ? '▲' : '▼'}
+                  </button>
+                  {showVmAdvanced && (
+                    <div className="mt-2">
+                      <label htmlFor="vm-cloud-init" className="block text-xs text-gray-400 mb-1">
+                        Cloud-init YAML (optional override)
+                      </label>
+                      <textarea
+                        id="vm-cloud-init"
+                        value={vmCloudInit}
+                        onChange={(e) => setVmCloudInit(e.target.value)}
+                        rows={6}
+                        className="w-full px-3 py-2 bg-gray-900 border border-gray-600 rounded text-white font-mono text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 resize-y"
+                        placeholder="#cloud-config&#10;# Leave blank to use the built-in Docker install template"
+                      />
+                      <p className="mt-1 text-xs text-gray-400">
+                        Leave blank to use the built-in template that installs Docker inside the VM.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
 
             {/* Pre-Validation Scripts section */}
             <PreValidationSection

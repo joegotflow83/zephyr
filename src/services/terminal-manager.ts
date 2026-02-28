@@ -1,5 +1,8 @@
 import { randomUUID } from 'crypto';
+import { Duplex } from 'stream';
+
 import { DockerManager } from './docker-manager';
+import type { VMManager } from './vm-manager';
 import type { WebContents } from 'electron';
 
 /**
@@ -29,8 +32,11 @@ export interface TerminalSessionOpts {
  */
 interface SessionState {
   session: TerminalSession;
+  /** Docker exec ID, or empty string for VM sessions */
   execId: string;
   stream: NodeJS.ReadWriteStream;
+  /** Additional cleanup callback invoked on session close (e.g. kill child process) */
+  cleanup?: () => void;
 }
 
 /**
@@ -134,8 +140,9 @@ export class TerminalManager {
     // Remove from sessions map first to prevent double-cleanup from 'end' event
     this.sessions.delete(sessionId);
 
-    // End the stream (this may trigger 'end' event, but session already removed)
+    // End the stream and run any additional cleanup (e.g. kill child process)
     state.stream.end();
+    state.cleanup?.();
   }
 
   /**
@@ -167,8 +174,117 @@ export class TerminalManager {
       throw new Error(`Session ${sessionId} not found`);
     }
 
+    // VM sessions don't support PTY resize (no execId)
+    if (!state.execId) return;
+
     // Resize the Docker exec PTY
     await this.dockerManager.resizeExec(state.execId, rows, cols);
+  }
+
+  /**
+   * Open a terminal session to a Docker container running inside a Multipass VM.
+   *
+   * Routes I/O through: renderer ↔ IPC ↔ TerminalManager ↔ multipass exec ↔ docker exec ↔ container shell
+   *
+   * @param vmName - Multipass VM name (e.g. "zephyr-abc12345-xyz9")
+   * @param containerName - Docker container name inside the VM (e.g. "my-project")
+   * @param vm - VMManager instance for spawning the process
+   * @param opts - Session options (shell, user, dimensions)
+   * @returns Terminal session metadata
+   */
+  async openVMSession(
+    vmName: string,
+    containerName: string,
+    vm: VMManager,
+    opts?: TerminalSessionOpts,
+  ): Promise<TerminalSession> {
+    const shell = opts?.shell ?? 'bash';
+
+    // Build the docker exec command to run inside the VM.
+    // `docker exec -t` requires its own stdin to be a TTY, but multipass exec
+    // uses piped stdio on the host side. We wrap the command in `script -q -c`
+    // which allocates a PTY pair inside the VM so that docker exec -it sees a
+    // real TTY, enabling bash to run interactively with prompts and input echo.
+    const dockerArgs = ['docker', 'exec', '-it'];
+    if (opts?.user) {
+      dockerArgs.push('-u', opts.user);
+    }
+    dockerArgs.push(containerName, shell);
+    // Shell-quote each argument (single-quote style) to produce a safe shell
+    // command string for `script -c`. Our inputs are controlled (container
+    // names are sanitized; shell/user are from a fixed set).
+    const innerCmd = dockerArgs.map((a) => `'${a.replace(/'/g, "'\\''")}'`).join(' ');
+    const dockerExecCmd = ['script', '-q', '-c', innerCmd, '/dev/null'];
+
+    const child = vm.spawnInteractiveInVM(vmName, dockerExecCmd);
+
+    // Wrap child process stdio into a Duplex stream so SessionState can use
+    // the same write/end interface as Docker exec sessions.
+    const stream = new Duplex({
+      write(chunk, _encoding, callback) {
+        child.stdin!.write(chunk, callback);
+      },
+      final(callback) {
+        child.stdin!.end();
+        callback();
+      },
+      read() {
+        // Data is pushed from child.stdout event listener below
+      },
+    });
+
+    child.stdout!.on('data', (chunk: Buffer) => {
+      if (!stream.push(chunk)) {
+        child.stdout!.pause();
+      }
+    });
+    stream.on('resume', () => child.stdout!.resume());
+
+    child.stderr!.on('data', (chunk: Buffer) => {
+      // Merge stderr into the stream so the terminal shows errors too
+      stream.push(chunk);
+    });
+
+    child.on('close', () => stream.push(null));
+    child.on('error', (err) => stream.destroy(err));
+
+    const sessionId = randomUUID();
+    const session: TerminalSession = {
+      id: sessionId,
+      containerId: containerName,
+      user: opts?.user,
+      createdAt: new Date(),
+    };
+
+    this.sessions.set(sessionId, {
+      session,
+      execId: '', // No Docker exec ID for VM sessions
+      stream,
+      cleanup: () => { try { child.kill(); } catch { /* already dead */ } },
+    });
+
+    // Forward output to renderer
+    stream.on('data', (data: Buffer) => {
+      if (this.webContents && !this.webContents.isDestroyed()) {
+        this.webContents.send('terminal:data', sessionId, data.toString('utf-8'));
+      }
+    });
+
+    stream.on('end', () => {
+      if (this.webContents && !this.webContents.isDestroyed()) {
+        this.webContents.send('terminal:closed', sessionId);
+      }
+      this.sessions.delete(sessionId);
+    });
+
+    stream.on('error', (error: Error) => {
+      if (this.webContents && !this.webContents.isDestroyed()) {
+        this.webContents.send('terminal:error', sessionId, error.message);
+      }
+      this.sessions.delete(sessionId);
+    });
+
+    return session;
   }
 
   /**
