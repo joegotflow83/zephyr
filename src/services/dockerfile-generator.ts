@@ -11,6 +11,7 @@ const COMMON_TOOLS = [
   'vim',
   'jq',
   'ca-certificates',
+  'bc',
   'build-essential',
   'openssh-client',
   // Playwright runtime dependencies
