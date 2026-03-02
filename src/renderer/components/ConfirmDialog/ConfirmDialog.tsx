@@ -50,16 +50,16 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
       aria-modal="true"
       aria-labelledby="confirm-dialog-title"
     >
-      <div className="bg-gray-800 rounded-lg shadow-xl w-full max-w-md">
+      <div className="bg-gray-50 dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-md">
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-700">
-          <h2 id="confirm-dialog-title" className="text-xl font-bold text-white">
+        <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
+          <h2 id="confirm-dialog-title" className="text-xl font-bold text-gray-900 dark:text-white">
             {title}
           </h2>
           <button
             onClick={onCancel}
             disabled={loading}
-            className="text-gray-400 hover:text-white transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            className="text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
             aria-label="Close dialog"
           >
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -70,7 +70,7 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
 
         {/* Content */}
         <div className="p-6">
-          <p className="text-gray-300 whitespace-pre-wrap">{message}</p>
+          <p className="text-gray-700 dark:text-gray-300 whitespace-pre-wrap">{message}</p>
         </div>
 
         {/* Action buttons */}
@@ -79,7 +79,7 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
             type="button"
             onClick={onCancel}
             disabled={loading}
-            className="px-4 py-2 text-gray-300 hover:text-white transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            className="px-4 py-2 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
           >
             {cancelLabel}
           </button>

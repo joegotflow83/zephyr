@@ -12,7 +12,7 @@ export interface CredentialDialogProps {
   currentKey?: string | null;
   /** Called when user saves the API key */
   onSave: (key: string) => void;
-  /** Called when user requests login mode (optional) */
+  /** Called when user chooses browser login mode */
   onLoginMode?: () => void;
   /** Called when dialog should close */
   onClose: () => void;
@@ -31,7 +31,6 @@ const SERVICE_NAMES: Record<CredentialService, string> = {
  *
  * Features:
  * - Password-masked input for API keys
- * - Login mode toggle (browser-based OAuth)
  * - Validation for non-empty keys
  * - Keyboard shortcuts (Enter to save, Esc to cancel)
  */
@@ -71,12 +70,12 @@ export const CredentialDialog: React.FC<CredentialDialogProps> = ({
       onClick={onClose}
     >
       <div
-        className="bg-gray-800 rounded-lg shadow-xl max-w-md w-full mx-4"
+        className="bg-gray-50 dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full mx-4"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="px-6 py-4 border-b border-gray-700">
-          <h2 className="text-xl font-semibold text-white">
+        <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+          <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
             Configure {serviceName} Credentials
           </h2>
         </div>
@@ -86,14 +85,14 @@ export const CredentialDialog: React.FC<CredentialDialogProps> = ({
           {/* Current Key Display */}
           {currentKey && (
             <div className="text-sm">
-              <span className="text-gray-400">Current key: </span>
-              <span className="text-gray-300 font-mono">{currentKey}</span>
+              <span className="text-gray-500 dark:text-gray-400">Current key: </span>
+              <span className="text-gray-700 dark:text-gray-300 font-mono">{currentKey}</span>
             </div>
           )}
 
           {/* API Key Input */}
           <div>
-            <label className="block text-sm font-medium text-gray-300 mb-2">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               API Key
             </label>
             <div className="relative">
@@ -103,13 +102,13 @@ export const CredentialDialog: React.FC<CredentialDialogProps> = ({
                 onChange={(e) => setApiKey(e.target.value)}
                 onKeyDown={handleKeyDown}
                 placeholder={`Enter your ${serviceName} API key`}
-                className="w-full px-3 py-2 bg-gray-900 border border-gray-700 rounded text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 autoFocus
               />
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-300"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
                 tabIndex={-1}
               >
                 {showPassword ? (
@@ -150,42 +149,43 @@ export const CredentialDialog: React.FC<CredentialDialogProps> = ({
               </button>
             </div>
           </div>
-
-          {/* Divider */}
-          <div className="flex items-center">
-            <div className="flex-1 border-t border-gray-700"></div>
-            <span className="px-3 text-sm text-gray-400">OR</span>
-            <div className="flex-1 border-t border-gray-700"></div>
-          </div>
-
-          {/* Login Mode Button */}
-          <div>
-            <button
-              onClick={onLoginMode}
-              className="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded transition-colors"
-            >
-              Use Browser Login
-            </button>
-            <p className="text-xs text-gray-400 mt-2">
-              Login via browser to capture your session cookies. This is useful
-              if you prefer not to create API keys or want to use features that
-              require browser authentication.
-            </p>
-          </div>
         </div>
 
+        {/* OR divider + browser login */}
+        {onLoginMode && (
+          <div className="px-6 pb-4 space-y-3">
+            <div className="flex items-center">
+              <div className="flex-1 border-t border-gray-200 dark:border-gray-700" />
+              <span className="mx-3 text-xs text-gray-500 dark:text-gray-400">OR</span>
+              <div className="flex-1 border-t border-gray-200 dark:border-gray-700" />
+            </div>
+            <div>
+              <button
+                type="button"
+                onClick={onLoginMode}
+                className="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded transition-colors text-sm"
+              >
+                Use Browser Login
+              </button>
+              <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                Login via browser to capture your session cookies and authenticate automatically.
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* Footer */}
-        <div className="px-6 py-4 border-t border-gray-700 flex justify-end space-x-3">
+        <div className="px-6 py-4 border-t border-gray-200 dark:border-gray-700 flex justify-end space-x-3">
           <button
             onClick={onClose}
-            className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded transition-colors"
+            className="px-4 py-2 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-900 dark:text-white rounded transition-colors"
           >
             Cancel
           </button>
           <button
             onClick={handleSave}
             disabled={apiKey.trim().length === 0}
-            className="px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-700 disabled:text-gray-500 disabled:cursor-not-allowed text-white rounded transition-colors"
+            className="px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-100 dark:disabled:bg-gray-700 disabled:text-gray-500 disabled:cursor-not-allowed text-white rounded transition-colors"
           >
             Save API Key
           </button>

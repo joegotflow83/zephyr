@@ -111,11 +111,11 @@ export const GeneralSection: React.FC = () => {
         <div>
           <label
             htmlFor="notifications-toggle"
-            className="block text-sm font-medium text-gray-300"
+            className="block text-sm font-medium text-gray-700 dark:text-gray-300"
           >
             Desktop Notifications
           </label>
-          <p className="text-sm text-gray-400 mt-1">
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
             Show OS-native notifications for loop events and errors
           </p>
         </div>
@@ -142,7 +142,7 @@ export const GeneralSection: React.FC = () => {
       <div>
         <label
           htmlFor="log-level"
-          className="block text-sm font-medium text-gray-300 mb-2"
+          className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
         >
           Log Level
         </label>
@@ -150,7 +150,7 @@ export const GeneralSection: React.FC = () => {
           id="log-level"
           value={logLevel}
           onChange={handleLogLevelChange}
-          className="w-full px-3 py-2 bg-gray-800 text-gray-100 border border-gray-600 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-full px-3 py-2 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 border border-gray-200 dark:border-gray-600 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
           data-testid="log-level-select"
         >
           <option value="DEBUG">DEBUG - Detailed debugging information</option>
@@ -158,7 +158,7 @@ export const GeneralSection: React.FC = () => {
           <option value="WARNING">WARNING - Warning messages only</option>
           <option value="ERROR">ERROR - Error messages only</option>
         </select>
-        <p className="mt-2 text-sm text-gray-400">
+        <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
           Controls verbosity of application logs
         </p>
       </div>
@@ -167,7 +167,7 @@ export const GeneralSection: React.FC = () => {
       <div>
         <label
           htmlFor="theme"
-          className="block text-sm font-medium text-gray-300 mb-2"
+          className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
         >
           Theme
         </label>
@@ -175,29 +175,29 @@ export const GeneralSection: React.FC = () => {
           id="theme"
           value={theme}
           onChange={handleThemeChange}
-          className="w-full px-3 py-2 bg-gray-800 text-gray-100 border border-gray-600 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-full px-3 py-2 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 border border-gray-200 dark:border-gray-600 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
           data-testid="theme-select"
         >
           <option value="system">System - Follow OS preference</option>
           <option value="light">Light</option>
           <option value="dark">Dark</option>
         </select>
-        <p className="mt-2 text-sm text-gray-400">
+        <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
           UI color theme preference (system follows OS setting)
         </p>
       </div>
 
       {/* Saving Indicator */}
       {isSaving && (
-        <div className="text-sm text-gray-400">Saving changes...</div>
+        <div className="text-sm text-gray-500 dark:text-gray-400">Saving changes...</div>
       )}
 
       {/* App Version */}
-      <div className="pt-4 border-t border-gray-700">
-        <label className="block text-sm font-medium text-gray-300 mb-2">
+      <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
+        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
           Application Version
         </label>
-        <div className="text-gray-200" data-testid="app-version">
+        <div className="text-gray-800 dark:text-gray-200" data-testid="app-version">
           Zephyr Desktop v{appVersion}
         </div>
       </div>

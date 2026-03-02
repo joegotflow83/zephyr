@@ -25,21 +25,21 @@ const SettingsSection: React.FC<SettingsSectionProps> = ({
   const [isExpanded, setIsExpanded] = useState(defaultExpanded);
 
   return (
-    <div className="bg-gray-800 rounded-lg border border-gray-700 overflow-hidden">
+    <div className="bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
       {/* Section Header */}
       <button
         onClick={() => setIsExpanded(!isExpanded)}
-        className="w-full px-6 py-4 flex items-center justify-between hover:bg-gray-750 transition-colors"
+        className="w-full px-6 py-4 flex items-center justify-between hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
         aria-expanded={isExpanded}
       >
         <div className="text-left">
-          <h2 className="text-lg font-semibold text-white">{title}</h2>
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-white">{title}</h2>
           {description && (
-            <p className="text-sm text-gray-400 mt-1">{description}</p>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">{description}</p>
           )}
         </div>
         <svg
-          className={`w-5 h-5 text-gray-400 transition-transform ${
+          className={`w-5 h-5 text-gray-500 dark:text-gray-400 transition-transform ${
             isExpanded ? 'rotate-180' : ''
           }`}
           fill="none"
@@ -57,7 +57,7 @@ const SettingsSection: React.FC<SettingsSectionProps> = ({
 
       {/* Section Content */}
       {isExpanded && (
-        <div className="px-6 py-4 border-t border-gray-700">{children}</div>
+        <div className="px-6 py-4 border-t border-gray-200 dark:border-gray-700">{children}</div>
       )}
     </div>
   );
@@ -101,8 +101,8 @@ export const SettingsTab: React.FC = () => {
       <div className="max-w-4xl mx-auto p-6 space-y-4">
         {/* Page Header */}
         <div className="mb-6">
-          <h1 className="text-3xl font-bold text-white mb-2">Settings</h1>
-          <p className="text-gray-400">
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">Settings</h1>
+          <p className="text-gray-500 dark:text-gray-400">
             Configure credentials, Docker, application preferences, and updates
           </p>
         </div>

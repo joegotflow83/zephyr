@@ -37,9 +37,9 @@ describe('TabBar', () => {
     );
 
     const loopsButton = screen.getByText('Running Loops').closest('button');
-    expect(loopsButton).toHaveClass('text-blue-400');
+    expect(loopsButton).toHaveClass('text-blue-500');
     expect(loopsButton).toHaveClass('border-b-2');
-    expect(loopsButton).toHaveClass('border-blue-400');
+    expect(loopsButton).toHaveClass('border-blue-500');
   });
 
   it('calls onTabChange when tab is clicked', () => {
@@ -100,7 +100,7 @@ describe('TabBar', () => {
     render(<TabBar tabs={mockTabs} activeTab="projects" onTabChange={onTabChange} />);
 
     const loopsButton = screen.getByText('Running Loops').closest('button');
-    expect(loopsButton).toHaveClass('hover:text-gray-200');
-    expect(loopsButton).toHaveClass('hover:bg-gray-800');
+    expect(loopsButton).toHaveClass('dark:hover:text-gray-200');
+    expect(loopsButton).toHaveClass('dark:hover:bg-gray-800');
   });
 });

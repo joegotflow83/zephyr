@@ -62,15 +62,15 @@ export const ProjectRow: React.FC<ProjectRowProps> = ({
         loop.status === LoopStatus.COMPLETED ||
         loop.status === LoopStatus.FAILED) {
       return (
-        <span className="inline-flex items-center px-2 py-1 text-xs font-medium rounded bg-gray-700 text-gray-300">
+        <span className="inline-flex items-center px-2 py-1 text-xs font-medium rounded bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300">
           Idle
         </span>
       );
     }
 
     // Active states
-    let bgColor = 'bg-gray-700';
-    let textColor = 'text-gray-300';
+    let bgColor = 'bg-gray-100 dark:bg-gray-700';
+    let textColor = 'text-gray-700 dark:text-gray-300';
     let label: string = loop.status;
 
     switch (loop.status) {
@@ -110,7 +110,7 @@ export const ProjectRow: React.FC<ProjectRowProps> = ({
     return (
       <span
         className={`inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded ${
-          isVMRunning ? 'bg-green-900 text-green-300' : 'bg-gray-700 text-gray-400'
+          isVMRunning ? 'bg-green-900 text-green-300' : 'bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400'
         }`}
         title={`VM: ${vmInfo?.state ?? 'Unknown'}`}
       >
@@ -127,14 +127,14 @@ export const ProjectRow: React.FC<ProjectRowProps> = ({
   };
 
   return (
-    <tr className="border-b border-gray-700 hover:bg-gray-800">
-      <td className="px-4 py-3 text-sm font-medium text-white">
+    <tr className="border-b border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800">
+      <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-white">
         {project.name}
       </td>
-      <td className="px-4 py-3 text-sm text-gray-300 max-w-xs truncate" title={project.repo_url}>
+      <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300 max-w-xs truncate" title={project.repo_url}>
         {project.repo_url}
       </td>
-      <td className="px-4 py-3 text-sm text-gray-300 max-w-xs truncate" title={project.docker_image}>
+      <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300 max-w-xs truncate" title={project.docker_image}>
         {project.docker_image}
       </td>
       <td className="px-4 py-3 text-sm">
@@ -151,7 +151,7 @@ export const ProjectRow: React.FC<ProjectRowProps> = ({
               disabled={isStartingVM || vmInfo?.state === 'Running'}
               className={`px-3 py-1 rounded font-medium transition-colors ${
                 isStartingVM || vmInfo?.state === 'Running'
-                  ? 'bg-gray-700 text-gray-500 cursor-not-allowed'
+                  ? 'bg-gray-100 dark:bg-gray-700 text-gray-500 cursor-not-allowed'
                   : 'bg-green-700 text-white hover:bg-green-600'
               }`}
               title={isStartingVM ? 'Starting VM...' : vmInfo?.state === 'Running' ? 'VM is already running' : 'Start the VM'}
@@ -163,7 +163,7 @@ export const ProjectRow: React.FC<ProjectRowProps> = ({
               disabled={stopVMDisabled}
               className={`px-3 py-1 rounded font-medium transition-colors ${
                 stopVMDisabled
-                  ? 'bg-gray-700 text-gray-500 cursor-not-allowed'
+                  ? 'bg-gray-100 dark:bg-gray-700 text-gray-500 cursor-not-allowed'
                   : 'bg-yellow-700 text-white hover:bg-yellow-600'
               }`}
               title={
@@ -183,7 +183,7 @@ export const ProjectRow: React.FC<ProjectRowProps> = ({
           disabled={runDisabled}
           className={`px-3 py-1 rounded font-medium transition-colors ${
             runDisabled
-              ? 'bg-gray-700 text-gray-500 cursor-not-allowed'
+              ? 'bg-gray-100 dark:bg-gray-700 text-gray-500 cursor-not-allowed'
               : 'bg-blue-600 text-white hover:bg-blue-700'
           }`}
           title={getRunButtonTitle()}
@@ -192,7 +192,7 @@ export const ProjectRow: React.FC<ProjectRowProps> = ({
         </button>
         <button
           onClick={() => onEdit(project)}
-          className="px-3 py-1 bg-gray-700 text-white rounded font-medium hover:bg-gray-600 transition-colors"
+          className="px-3 py-1 bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white rounded font-medium hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
           title="Edit project"
         >
           Edit

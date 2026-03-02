@@ -21,7 +21,7 @@ export function StatusBar({ activeLoopCount = 0, appVersion }: StatusBarProps) {
   const { isConnected, dockerInfo } = useDockerStatus();
 
   return (
-    <div className="h-7 bg-gray-800 flex items-center justify-between px-4 text-sm text-gray-300">
+    <div className="h-7 bg-gray-50 dark:bg-gray-800 flex items-center justify-between px-4 text-sm text-gray-700 dark:text-gray-300">
       {/* Left section: Docker status */}
       <div className="flex items-center space-x-4">
         <div className="flex items-center space-x-2">
@@ -37,7 +37,7 @@ export function StatusBar({ activeLoopCount = 0, appVersion }: StatusBarProps) {
         </div>
 
         {isConnected && dockerInfo && (
-          <span className="text-xs text-gray-400">
+          <span className="text-xs text-gray-500 dark:text-gray-400">
             v{dockerInfo.version}
           </span>
         )}
@@ -57,7 +57,7 @@ export function StatusBar({ activeLoopCount = 0, appVersion }: StatusBarProps) {
 
       {/* Right section: App version */}
       {appVersion && (
-        <div className="text-xs text-gray-500">
+        <div className="text-xs text-gray-500 dark:text-gray-500">
           Zephyr v{appVersion}
         </div>
       )}

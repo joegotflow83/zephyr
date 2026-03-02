@@ -87,8 +87,8 @@ describe('Layout', () => {
     expect(rootDiv).toHaveClass('h-screen');
     expect(rootDiv).toHaveClass('flex');
     expect(rootDiv).toHaveClass('flex-col');
-    expect(rootDiv).toHaveClass('bg-gray-900');
-    expect(rootDiv).toHaveClass('text-gray-100');
+    expect(rootDiv).toHaveClass('dark:bg-gray-900');
+    expect(rootDiv).toHaveClass('dark:text-gray-100');
   });
 
   it('main content area has overflow auto', () => {

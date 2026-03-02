@@ -99,7 +99,7 @@ export const UpdatesSection: React.FC = () => {
       <div className="space-y-2">
         <label
           htmlFor="self-update-docker-image"
-          className="block text-sm font-medium text-gray-300"
+          className="block text-sm font-medium text-gray-700 dark:text-gray-300"
         >
           Self-Update Docker Image
         </label>
@@ -110,12 +110,12 @@ export const UpdatesSection: React.FC = () => {
           onChange={(e) => handleDockerImageChange(e.target.value)}
           onBlur={handleDockerImageBlur}
           placeholder={DEFAULT_DOCKER_IMAGE}
-          className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded text-gray-200 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          className="w-full px-3 py-2 bg-gray-100 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded text-gray-800 dark:text-gray-200 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           data-testid="docker-image-input"
         />
-        <p className="text-xs text-gray-500">
+        <p className="text-xs text-gray-500 dark:text-gray-500">
           Docker image used when running the self-update loop. Defaults to{' '}
-          <code className="text-gray-400">{DEFAULT_DOCKER_IMAGE}</code>.
+          <code className="text-gray-500 dark:text-gray-400">{DEFAULT_DOCKER_IMAGE}</code>.
         </p>
       </div>
 
@@ -145,18 +145,18 @@ export const UpdatesSection: React.FC = () => {
       {updateInfo && (
         <div className="space-y-4">
           {/* Version Information */}
-          <div className="p-4 bg-gray-800 border border-gray-700 rounded space-y-2">
+          <div className="p-4 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded space-y-2">
             <div className="flex items-center justify-between">
-              <span className="text-sm text-gray-400">Current Version:</span>
-              <span className="text-gray-200" data-testid="current-version">
+              <span className="text-sm text-gray-500 dark:text-gray-400">Current Version:</span>
+              <span className="text-gray-800 dark:text-gray-200" data-testid="current-version">
                 {updateInfo.currentVersion}
               </span>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-sm text-gray-400">Latest Version:</span>
+              <span className="text-sm text-gray-500 dark:text-gray-400">Latest Version:</span>
               <span
                 className={`font-medium ${
-                  updateInfo.available ? 'text-green-400' : 'text-gray-200'
+                  updateInfo.available ? 'text-green-400' : 'text-gray-800 dark:text-gray-200'
                 }`}
                 data-testid="latest-version"
               >
@@ -181,11 +181,11 @@ export const UpdatesSection: React.FC = () => {
               {/* Changelog */}
               {updateInfo.changelog && (
                 <div className="space-y-2">
-                  <label className="block text-sm font-medium text-gray-300">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                     What&apos;s New:
                   </label>
                   <div
-                    className="p-3 bg-gray-800 border border-gray-700 rounded text-sm text-gray-300 whitespace-pre-wrap max-h-48 overflow-y-auto"
+                    className="p-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap max-h-48 overflow-y-auto"
                     data-testid="changelog"
                   >
                     {updateInfo.changelog}
@@ -204,14 +204,14 @@ export const UpdatesSection: React.FC = () => {
               </button>
 
               {/* Update Note */}
-              <p className="text-sm text-gray-400">
+              <p className="text-sm text-gray-500 dark:text-gray-400">
                 Note: Clicking &quot;Update App&quot; will start a self-update loop. You can monitor
                 the progress in the Loops tab.
               </p>
             </div>
           ) : (
             <div
-              className="p-4 bg-gray-800 border border-gray-700 rounded text-gray-300"
+              className="p-4 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded text-gray-700 dark:text-gray-300"
               data-testid="no-update"
             >
               You&apos;re running the latest version of Zephyr Desktop.
@@ -222,7 +222,7 @@ export const UpdatesSection: React.FC = () => {
 
       {/* Initial State Message */}
       {!updateInfo && !error && !isChecking && (
-        <div className="text-sm text-gray-400" data-testid="initial-message">
+        <div className="text-sm text-gray-500 dark:text-gray-400" data-testid="initial-message">
           Click &quot;Check for Updates&quot; to see if a newer version is available.
         </div>
       )}

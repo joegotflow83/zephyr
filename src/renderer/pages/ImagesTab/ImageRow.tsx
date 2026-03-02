@@ -19,11 +19,11 @@ export const ImageRow: React.FC<ImageRowProps> = ({ image, buildActive, onRebuil
   };
 
   return (
-    <tr className="border-b border-gray-700 hover:bg-gray-800">
-      <td className="px-4 py-3 text-sm font-medium text-white">
+    <tr className="border-b border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800">
+      <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-white">
         {image.name}
       </td>
-      <td className="px-4 py-3 text-sm text-gray-300">
+      <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">
         {image.languages.length > 0 ? (
           <div className="flex flex-wrap gap-1">
             {image.languages.map((lang) => (
@@ -39,14 +39,14 @@ export const ImageRow: React.FC<ImageRowProps> = ({ image, buildActive, onRebuil
           <span className="text-gray-500">None</span>
         )}
       </td>
-      <td className="px-4 py-3 text-sm text-gray-300">
+      <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">
         {formatDate(image.builtAt)}
       </td>
       <td className="px-4 py-3 text-sm text-right space-x-2">
         <button
           onClick={() => onRebuild(image.id)}
           disabled={buildActive}
-          className="px-3 py-1 bg-gray-700 text-white rounded font-medium hover:bg-gray-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-1.5"
+          className="px-3 py-1 bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white rounded font-medium hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-1.5"
           title={buildActive ? 'A build is already in progress' : 'Rebuild image'}
         >
           {buildActive && (

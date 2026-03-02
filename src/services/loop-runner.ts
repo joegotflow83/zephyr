@@ -671,7 +671,7 @@ export class LoopRunner {
         await new Promise((resolve) => setTimeout(resolve, checkInterval));
 
         const state = this.states.get(projectId);
-        if (!state || isLoopTerminal(state.status)) {
+        if (!state || isLoopTerminal(state.status) || state.status === LoopStatus.STOPPING) {
           // Loop was stopped manually or already in terminal state
           return;
         }
@@ -1045,7 +1045,7 @@ export class LoopRunner {
     _exitCode: number,
   ): void {
     const state = this.states.get(projectId);
-    if (!state || isLoopTerminal(state.status)) {
+    if (!state || isLoopTerminal(state.status) || state.status === LoopStatus.STOPPING) {
       // Already handled (e.g., stopLoop was called manually)
       return;
     }

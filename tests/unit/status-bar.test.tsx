@@ -201,7 +201,7 @@ describe('StatusBar Component', () => {
       const { container } = render(<StatusBar />);
 
       const statusBar = container.firstChild as HTMLElement;
-      expect(statusBar).toHaveClass('h-7', 'bg-gray-800');
+      expect(statusBar).toHaveClass('h-7', 'dark:bg-gray-800');
     });
 
     it('uses flex layout for content positioning', () => {

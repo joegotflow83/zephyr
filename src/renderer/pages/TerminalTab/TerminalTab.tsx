@@ -315,18 +315,18 @@ export const TerminalTab: React.FC = () => {
   return (
     <div className="flex flex-col h-full">
       {/* Toolbar */}
-      <div className="p-4 border-b border-gray-700 bg-gray-800">
+      <div className="p-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800">
         <div className="flex items-center gap-4">
           {/* Container selector */}
           <div className="flex-1">
-            <label htmlFor="container-select" className="block text-sm text-gray-400 mb-1">
+            <label htmlFor="container-select" className="block text-sm text-gray-500 dark:text-gray-400 mb-1">
               Container
             </label>
             <select
               id="container-select"
               value={selectedTarget}
               onChange={(e) => setSelectedTarget(e.target.value)}
-              className="w-full bg-gray-700 text-white px-3 py-2 rounded border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white px-3 py-2 rounded border border-gray-200 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
               disabled={loading}
             >
               <option value="">Select a container...</option>
@@ -356,12 +356,12 @@ export const TerminalTab: React.FC = () => {
 
           {/* User selector */}
           <div className="w-40">
-            <label htmlFor="user-select" className="block text-sm text-gray-400 mb-1">User</label>
+            <label htmlFor="user-select" className="block text-sm text-gray-500 dark:text-gray-400 mb-1">User</label>
             <select
               id="user-select"
               value={selectedUser}
               onChange={(e) => setSelectedUser(e.target.value)}
-              className="w-full bg-gray-700 text-white px-3 py-2 rounded border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white px-3 py-2 rounded border border-gray-200 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
               disabled={loading}
             >
               <option value="default">Default</option>
@@ -399,7 +399,7 @@ export const TerminalTab: React.FC = () => {
 
       {/* Session tabs and controls */}
       {sessions.length > 0 && (
-        <div className="flex items-center justify-between px-4 py-2 bg-gray-800 border-b border-gray-700">
+        <div className="flex items-center justify-between px-4 py-2 bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
           <div className="flex items-center gap-2 overflow-x-auto">
             {sessions.map((session) => (
             <div
@@ -407,7 +407,7 @@ export const TerminalTab: React.FC = () => {
               className={`flex items-center gap-2 px-3 py-1 rounded cursor-pointer transition-colors ${
                 activeSessionId === session.id
                   ? 'bg-blue-600 text-white'
-                  : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                  : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
               } ${session.disconnected ? 'opacity-60' : ''}`}
               onClick={() => {
                 setActiveSessionId(session.id);
@@ -425,7 +425,7 @@ export const TerminalTab: React.FC = () => {
                   e.stopPropagation();
                   removeSession(session.id);
                 }}
-                className="text-gray-400 hover:text-white"
+                className="text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
                 aria-label="Close session"
               >
                 ✕
@@ -433,9 +433,9 @@ export const TerminalTab: React.FC = () => {
             </div>
           ))}
           </div>
-          <div className="flex items-center gap-2 text-xs text-gray-400">
+          <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
             <span>Font: {fontSize}px</span>
-            <span className="text-gray-600">|</span>
+            <span className="text-gray-300 dark:text-gray-600">|</span>
             <span title="Search: Ctrl+Shift+F">🔍</span>
             <span title="Copy: Ctrl+Shift+C">📋</span>
             <span title="Zoom: Ctrl+/-/0">🔍±</span>
@@ -444,9 +444,9 @@ export const TerminalTab: React.FC = () => {
       )}
 
       {/* Terminal display area */}
-      <div className="flex-1 bg-gray-900 overflow-hidden relative">
+      <div className="flex-1 bg-white dark:bg-gray-900 overflow-hidden relative">
         {sessions.length === 0 ? (
-          <div className="flex items-center justify-center h-full text-gray-400">
+          <div className="flex items-center justify-center h-full text-gray-500 dark:text-gray-400">
             <div className="text-center">
               <p className="text-lg mb-2">No active terminal sessions</p>
               <p className="text-sm">
@@ -463,7 +463,7 @@ export const TerminalTab: React.FC = () => {
               }`}
             >
               {session.disconnected ? (
-                <div className="flex items-center justify-center h-full bg-gray-900 text-gray-400">
+                <div className="flex items-center justify-center h-full bg-white dark:bg-gray-900 text-gray-500 dark:text-gray-400">
                   <div className="text-center">
                     <p className="text-lg mb-4">Session Disconnected</p>
                     <p className="text-sm mb-6">
@@ -480,7 +480,7 @@ export const TerminalTab: React.FC = () => {
                       </button>
                       <button
                         onClick={() => removeSession(session.id)}
-                        className="px-4 py-2 bg-gray-700 text-white rounded hover:bg-gray-600 transition-colors"
+                        className="px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white rounded hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
                       >
                         Close Session
                       </button>

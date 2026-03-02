@@ -92,10 +92,10 @@ export const PreValidationSection: React.FC<PreValidationSectionProps> = ({
 
   return (
     <div className="mb-4">
-      <div className="text-sm font-medium text-gray-300 mb-1">Pre-Validation Scripts</div>
-      <p className="text-xs text-gray-400 mb-3">
+      <div className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Pre-Validation Scripts</div>
+      <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
         Select scripts to place at the root of the project local path (
-        <code className="bg-gray-700 px-1 rounded">/workspace</code> in the container).
+        <code className="bg-gray-100 dark:bg-gray-700 px-1 rounded">/workspace</code> in the container).
         These run before git commits for validation.
       </p>
 
@@ -119,9 +119,9 @@ export const PreValidationSection: React.FC<PreValidationSectionProps> = ({
                 className="mt-0.5 flex-shrink-0"
               />
               <div>
-                <span className="text-sm text-gray-200">{script.filename}</span>
+                <span className="text-sm text-gray-800 dark:text-gray-200">{script.filename}</span>
                 {script.description && (
-                  <span className="ml-2 text-xs text-gray-400">— {script.description}</span>
+                  <span className="ml-2 text-xs text-gray-500 dark:text-gray-400">— {script.description}</span>
                 )}
                 {script.isBuiltIn && (
                   <span className="ml-1 text-xs text-blue-400">(built-in)</span>
@@ -134,15 +134,15 @@ export const PreValidationSection: React.FC<PreValidationSectionProps> = ({
 
       {/* Add Custom Script */}
       {showAddEditor ? (
-        <div className="mt-2 p-3 bg-gray-750 border border-gray-600 rounded space-y-2">
+        <div className="mt-2 p-3 bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded space-y-2">
           <div>
-            <label className="block text-xs text-gray-400 mb-1">Filename (.sh)</label>
+            <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">Filename (.sh)</label>
             <input
               type="text"
               value={newFilename}
               onChange={(e) => setNewFilename(e.target.value)}
               placeholder="my-check.sh"
-              className="w-full px-2 py-1 text-sm bg-gray-700 border border-gray-600 rounded text-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+              className="w-full px-2 py-1 text-sm bg-gray-100 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500"
             />
           </div>
           <div>
@@ -155,7 +155,7 @@ export const PreValidationSection: React.FC<PreValidationSectionProps> = ({
               onChange={(e) => setNewContent(e.target.value)}
               placeholder={'#!/bin/bash\n# Description: My custom check\necho "Running check..."'}
               rows={6}
-              className="w-full px-2 py-1 text-sm bg-gray-700 border border-gray-600 rounded text-white font-mono focus:outline-none focus:ring-1 focus:ring-blue-500"
+              className="w-full px-2 py-1 text-sm bg-gray-100 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded text-gray-900 dark:text-white font-mono focus:outline-none focus:ring-1 focus:ring-blue-500"
             />
           </div>
           {addError && <p className="text-xs text-red-400">{addError}</p>}
@@ -176,7 +176,7 @@ export const PreValidationSection: React.FC<PreValidationSectionProps> = ({
                 setNewContent('');
                 setAddError('');
               }}
-              className="px-3 py-1 text-sm text-gray-400 hover:text-white transition-colors"
+              className="px-3 py-1 text-sm text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors"
             >
               Cancel
             </button>

@@ -44,6 +44,9 @@ describe('App Navigation', () => {
         }),
         save: vi.fn().mockResolvedValue(undefined),
       },
+      projects: {
+        list: vi.fn().mockResolvedValue([]),
+      },
     } as any;
   });
 
@@ -53,7 +56,7 @@ describe('App Navigation', () => {
     // Check that Projects page content is visible
     expect(screen.getByRole('heading', { name: /projects/i })).toBeInTheDocument();
     const projectsButton = screen.getByRole('button', { name: /projects/i });
-    expect(projectsButton).toHaveClass('text-blue-400');
+    expect(projectsButton).toHaveClass('text-blue-500');
   });
 
   it('renders all five tabs', () => {
@@ -73,7 +76,7 @@ describe('App Navigation', () => {
     fireEvent.click(loopsButton);
 
     expect(screen.getByText(/no active or recent loops/i)).toBeInTheDocument();
-    expect(loopsButton).toHaveClass('text-blue-400');
+    expect(loopsButton).toHaveClass('text-blue-500');
   });
 
   it('switches to Terminal tab when clicked', () => {
@@ -85,7 +88,7 @@ describe('App Navigation', () => {
     // TerminalTab is now implemented, so check for actual content
     expect(screen.getByText('Container')).toBeInTheDocument();
     expect(screen.getByText('Open Terminal')).toBeInTheDocument();
-    expect(terminalButton).toHaveClass('text-blue-400');
+    expect(terminalButton).toHaveClass('text-blue-500');
   });
 
   it('switches to Settings tab when clicked', async () => {
@@ -101,7 +104,7 @@ describe('App Navigation', () => {
     });
 
     const activeSettingsButton = settingsButtons.find(btn => btn.getAttribute('aria-current') === 'page');
-    expect(activeSettingsButton).toHaveClass('text-blue-400');
+    expect(activeSettingsButton).toHaveClass('text-blue-500');
   });
 
   it('switches tabs with Ctrl+1 keyboard shortcut', () => {
@@ -113,7 +116,7 @@ describe('App Navigation', () => {
     });
 
     const projectsButton = screen.getByRole('button', { name: /projects/i });
-    expect(projectsButton).toHaveClass('text-blue-400');
+    expect(projectsButton).toHaveClass('text-blue-500');
   });
 
   it('switches tabs with Ctrl+2 keyboard shortcut', () => {
@@ -126,7 +129,7 @@ describe('App Navigation', () => {
 
     expect(screen.getByText(/no active or recent loops/i)).toBeInTheDocument();
     const loopsButton = screen.getByRole('button', { name: /running loops/i });
-    expect(loopsButton).toHaveClass('text-blue-400');
+    expect(loopsButton).toHaveClass('text-blue-500');
   });
 
   it('switches tabs with Ctrl+3 keyboard shortcut', () => {
@@ -143,7 +146,7 @@ describe('App Navigation', () => {
     // Get the tab button specifically (the one with emoji 💻)
     const terminalButtons = screen.getAllByRole('button', { name: /terminal/i });
     const terminalTabButton = terminalButtons.find(btn => btn.getAttribute('aria-current') === 'page');
-    expect(terminalTabButton).toHaveClass('text-blue-400');
+    expect(terminalTabButton).toHaveClass('text-blue-500');
   });
 
   it('switches tabs with Ctrl+4 keyboard shortcut', () => {
@@ -156,7 +159,7 @@ describe('App Navigation', () => {
 
     // Ctrl+4 now navigates to the Images tab
     const imagesButton = screen.getByRole('button', { name: /images/i });
-    expect(imagesButton).toHaveClass('text-blue-400');
+    expect(imagesButton).toHaveClass('text-blue-500');
   });
 
   it('switches tabs with Ctrl+5 keyboard shortcut', async () => {
@@ -173,7 +176,7 @@ describe('App Navigation', () => {
     // Get the tab button specifically (the one with aria-current='page')
     const settingsButtons = screen.getAllByRole('button', { name: /settings/i });
     const settingsTabButton = settingsButtons.find(btn => btn.getAttribute('aria-current') === 'page');
-    expect(settingsTabButton).toHaveClass('text-blue-400');
+    expect(settingsTabButton).toHaveClass('text-blue-500');
   });
 
   it('ignores keyboard shortcuts without Ctrl key', () => {
@@ -186,7 +189,7 @@ describe('App Navigation', () => {
 
     // Should still be on Projects tab
     const projectsButton = screen.getByRole('button', { name: /projects/i });
-    expect(projectsButton).toHaveClass('text-blue-400');
+    expect(projectsButton).toHaveClass('text-blue-500');
   });
 
   it('ignores invalid keyboard shortcuts', () => {
@@ -199,7 +202,7 @@ describe('App Navigation', () => {
 
     // Should still be on Projects tab
     const projectsButton = screen.getByRole('button', { name: /projects/i });
-    expect(projectsButton).toHaveClass('text-blue-400');
+    expect(projectsButton).toHaveClass('text-blue-500');
   });
 
   it('cleans up keyboard event listener on unmount', () => {

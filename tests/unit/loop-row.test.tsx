@@ -265,7 +265,7 @@ describe('LoopRow', () => {
 
       const badge = screen.getByText('Completed');
       expect(badge).toBeInTheDocument();
-      expect(badge).toHaveClass('bg-gray-700', 'text-gray-300');
+      expect(badge).toHaveClass('dark:bg-gray-700', 'dark:text-gray-300');
     });
 
     it('displays gray badge for STOPPED status', () => {
@@ -287,7 +287,7 @@ describe('LoopRow', () => {
 
       const badge = screen.getByText('Stopped');
       expect(badge).toBeInTheDocument();
-      expect(badge).toHaveClass('bg-gray-700', 'text-gray-300');
+      expect(badge).toHaveClass('dark:bg-gray-700', 'dark:text-gray-300');
     });
 
     it('displays yellow badge for PAUSED status', () => {
@@ -549,7 +549,7 @@ describe('LoopRow', () => {
       );
 
       const row = container.querySelector('tr');
-      expect(row).toHaveClass('bg-gray-800');
+      expect(row).toHaveClass('dark:bg-gray-800');
     });
 
     it('does not apply selected background when isSelected is false', () => {

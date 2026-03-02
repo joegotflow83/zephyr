@@ -215,7 +215,7 @@ export const LoopsTab: React.FC = () => {
         </div>
 
         {loading && (
-          <div className="px-6 py-4 text-gray-400">Loading loops...</div>
+          <div className="px-6 py-4 text-gray-500 dark:text-gray-400">Loading loops...</div>
         )}
 
         {error && (
@@ -223,7 +223,7 @@ export const LoopsTab: React.FC = () => {
         )}
 
         {!loading && !error && loops.length === 0 && (
-          <div className="px-6 py-4 text-gray-400">
+          <div className="px-6 py-4 text-gray-500 dark:text-gray-400">
             No active or recent loops. Start a project from the Projects tab.
           </div>
         )}
@@ -231,29 +231,29 @@ export const LoopsTab: React.FC = () => {
         {!loading && !error && loops.length > 0 && (
           <div className="px-6 flex-1 overflow-auto">
             <table className="min-w-full">
-              <thead className="bg-gray-800">
+              <thead className="bg-gray-50 dark:bg-gray-800">
                 <tr>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider">
                     Project Name
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider">
                     Status
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider">
                     Mode
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider">
                     Iteration
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider">
                     Started
                   </th>
-                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-300 uppercase tracking-wider">
+                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider">
                     Actions
                   </th>
                 </tr>
               </thead>
-              <tbody className="bg-gray-900">
+              <tbody className="bg-white dark:bg-gray-900">
                 {loops.map((loop) => {
                   const project = projects.find((p) => p.id === loop.projectId);
                   return (
@@ -276,17 +276,17 @@ export const LoopsTab: React.FC = () => {
 
       {/* Resizable splitter */}
       <div
-        className="h-1 bg-gray-700 hover:bg-blue-600 cursor-row-resize transition-colors"
+        className="h-1 bg-gray-200 dark:bg-gray-700 hover:bg-blue-400 dark:hover:bg-blue-600 cursor-row-resize transition-colors"
         onMouseDown={handleMouseDown}
       />
 
       {/* Lower panel: Log viewer with LogViewer component */}
       <div
         style={{ height: `${100 - splitterPosition}%` }}
-        className="flex flex-col bg-gray-900 overflow-hidden"
+        className="flex flex-col bg-white dark:bg-gray-900 overflow-hidden"
       >
-        <div className="px-4 py-2 border-b border-gray-700 bg-gray-800">
-          <h2 className="text-sm font-semibold text-white">
+        <div className="px-4 py-2 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800">
+          <h2 className="text-sm font-semibold text-gray-900 dark:text-white">
             {selectedLoop
               ? `Logs: ${projects.find((p) => p.id === selectedLoop.projectId)?.name || selectedLoop.projectId}`
               : 'Logs'}
@@ -296,7 +296,7 @@ export const LoopsTab: React.FC = () => {
           {selectedLoop ? (
             <LogViewer lines={parsedLogs} autoScroll={true} onExport={handleExport} />
           ) : (
-            <div className="flex items-center justify-center h-full text-gray-500">
+            <div className="flex items-center justify-center h-full text-gray-500 dark:text-gray-500">
               Select a loop to view logs
             </div>
           )}

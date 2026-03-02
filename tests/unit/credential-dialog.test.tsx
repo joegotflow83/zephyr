@@ -158,7 +158,7 @@ describe('CredentialDialog', () => {
     const onClose = vi.fn();
     render(<CredentialDialog {...defaultProps} onClose={onClose} />);
 
-    const dialog = screen.getByText('Configure Anthropic Credentials').closest('.bg-gray-800') as HTMLElement;
+    const dialog = screen.getByText('Configure Anthropic Credentials').closest('.rounded-lg') as HTMLElement;
     fireEvent.click(dialog);
 
     expect(onClose).not.toHaveBeenCalled();

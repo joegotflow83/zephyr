@@ -10,6 +10,7 @@ import { SettingsTab } from './pages/SettingsTab/SettingsTab';
 import { ImagesTab } from './pages/ImagesTab/ImagesTab';
 import { useActiveLoops } from './hooks/useActiveLoops';
 import { useToast } from './hooks/useToast';
+import { useAppStore } from './stores/app-store';
 
 const tabs: Tab[] = [
   { id: 'projects', label: 'Projects', icon: '📁' },
@@ -23,6 +24,30 @@ const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabId>('projects');
   const activeLoopCount = useActiveLoops();
   const { toasts, dismissToast, success, error, warning, info } = useToast();
+  const settings = useAppStore((s) => s.settings);
+
+  // Apply theme class to <html> element whenever settings.theme changes
+  useEffect(() => {
+    const theme = settings?.theme ?? 'system';
+    const root = document.documentElement;
+
+    const applyDark = (dark: boolean) => {
+      root.classList.toggle('dark', dark);
+    };
+
+    if (theme === 'dark') {
+      applyDark(true);
+    } else if (theme === 'light') {
+      applyDark(false);
+    } else {
+      // 'system' — follow OS preference
+      const mq = window.matchMedia('(prefers-color-scheme: dark)');
+      applyDark(mq.matches);
+      const handler = (e: MediaQueryListEvent) => applyDark(e.matches);
+      mq.addEventListener('change', handler);
+      return () => mq.removeEventListener('change', handler);
+    }
+  }, [settings?.theme]);
 
   // Keyboard shortcuts: Ctrl+1/2/3/4/5 for tab switching
   useEffect(() => {

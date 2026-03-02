@@ -40,11 +40,11 @@ export const OrphanedKeysSection: React.FC = () => {
   };
 
   if (loading) {
-    return <div className="text-sm text-gray-400">Checking for orphaned keys...</div>;
+    return <div className="text-sm text-gray-500 dark:text-gray-400">Checking for orphaned keys...</div>;
   }
 
   if (keys.length === 0) {
-    return <div className="text-sm text-gray-400">No orphaned deploy keys found.</div>;
+    return <div className="text-sm text-gray-500 dark:text-gray-400">No orphaned deploy keys found.</div>;
   }
 
   return (
@@ -58,7 +58,7 @@ export const OrphanedKeysSection: React.FC = () => {
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
-            <tr className="text-left text-gray-400 border-b border-gray-700">
+            <tr className="text-left text-gray-500 dark:text-gray-400 border-b border-gray-200 dark:border-gray-700">
               <th className="pb-2 pr-4 font-medium">Project</th>
               <th className="pb-2 pr-4 font-medium">Repository</th>
               <th className="pb-2 pr-4 font-medium">Created</th>
@@ -67,14 +67,14 @@ export const OrphanedKeysSection: React.FC = () => {
           </thead>
           <tbody>
             {keys.map((key) => (
-              <tr key={`${key.repo}-${key.key_id}`} className="border-b border-gray-700/50">
-                <td className="py-2 pr-4 text-white">{key.project_name}</td>
-                <td className="py-2 pr-4 text-gray-300 font-mono text-xs">{key.repo}</td>
-                <td className="py-2 pr-4 text-gray-400">{formatDate(key.created_at)}</td>
+              <tr key={`${key.repo}-${key.key_id}`} className="border-b border-gray-200/50 dark:border-gray-700/50">
+                <td className="py-2 pr-4 text-gray-900 dark:text-white">{key.project_name}</td>
+                <td className="py-2 pr-4 text-gray-700 dark:text-gray-300 font-mono text-xs">{key.repo}</td>
+                <td className="py-2 pr-4 text-gray-500 dark:text-gray-400">{formatDate(key.created_at)}</td>
                 <td className="py-2">
                   <button
                     onClick={() => handleViewOnGitHub(key.repo)}
-                    className="px-3 py-1 text-xs bg-gray-700 hover:bg-gray-600 text-white rounded border border-gray-600 transition-colors"
+                    className="px-3 py-1 text-xs bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-900 dark:text-white rounded border border-gray-200 dark:border-gray-600 transition-colors"
                   >
                     View on GitHub
                   </button>

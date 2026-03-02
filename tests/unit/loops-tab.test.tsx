@@ -382,7 +382,7 @@ describe('LoopsTab', () => {
       const { container } = render(<LoopsTab />);
 
       const splitter = container.querySelector('.cursor-row-resize');
-      expect(splitter).toHaveClass('hover:bg-blue-600');
+      expect(splitter).toHaveClass('dark:hover:bg-blue-600');
     });
   });
 });

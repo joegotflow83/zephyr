@@ -92,10 +92,10 @@ export const HooksSection: React.FC<HooksSectionProps> = ({ selected, onChange }
 
   return (
     <div className="mb-4">
-      <div className="text-sm font-medium text-gray-300 mb-1">Claude Hooks</div>
-      <p className="text-xs text-gray-400 mb-3">
+      <div className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Claude Hooks</div>
+      <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
         Select hook files to inject into the container at{' '}
-        <code className="bg-gray-700 px-1 rounded">~/.claude/hooks</code>.
+        <code className="bg-gray-100 dark:bg-gray-700 px-1 rounded">~/.claude/hooks</code>.
       </p>
 
       {loading ? (
@@ -115,9 +115,9 @@ export const HooksSection: React.FC<HooksSectionProps> = ({ selected, onChange }
                 className="mt-0.5 flex-shrink-0"
               />
               <div>
-                <span className="text-sm text-gray-200">{hook.filename}</span>
+                <span className="text-sm text-gray-800 dark:text-gray-200">{hook.filename}</span>
                 {hook.description && (
-                  <span className="ml-2 text-xs text-gray-400">— {hook.description}</span>
+                  <span className="ml-2 text-xs text-gray-500 dark:text-gray-400">— {hook.description}</span>
                 )}
               </div>
             </label>
@@ -127,15 +127,15 @@ export const HooksSection: React.FC<HooksSectionProps> = ({ selected, onChange }
 
       {/* Add Hook File */}
       {showAddEditor ? (
-        <div className="mt-2 p-3 bg-gray-750 border border-gray-600 rounded space-y-2">
+        <div className="mt-2 p-3 bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded space-y-2">
           <div>
-            <label className="block text-xs text-gray-400 mb-1">Filename (with extension)</label>
+            <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">Filename (with extension)</label>
             <input
               type="text"
               value={newFilename}
               onChange={(e) => setNewFilename(e.target.value)}
               placeholder="pre-tool-use.sh"
-              className="w-full px-2 py-1 text-sm bg-gray-700 border border-gray-600 rounded text-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+              className="w-full px-2 py-1 text-sm bg-gray-100 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500"
             />
           </div>
           <div>
@@ -148,7 +148,7 @@ export const HooksSection: React.FC<HooksSectionProps> = ({ selected, onChange }
               onChange={(e) => setNewContent(e.target.value)}
               placeholder={'#!/bin/bash\n# Description: My custom hook\necho "Hook triggered"'}
               rows={6}
-              className="w-full px-2 py-1 text-sm bg-gray-700 border border-gray-600 rounded text-white font-mono focus:outline-none focus:ring-1 focus:ring-blue-500"
+              className="w-full px-2 py-1 text-sm bg-gray-100 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded text-gray-900 dark:text-white font-mono focus:outline-none focus:ring-1 focus:ring-blue-500"
             />
           </div>
           {addError && <p className="text-xs text-red-400">{addError}</p>}
@@ -169,7 +169,7 @@ export const HooksSection: React.FC<HooksSectionProps> = ({ selected, onChange }
                 setNewContent('');
                 setAddError('');
               }}
-              className="px-3 py-1 text-sm text-gray-400 hover:text-white transition-colors"
+              className="px-3 py-1 text-sm text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors"
             >
               Cancel
             </button>

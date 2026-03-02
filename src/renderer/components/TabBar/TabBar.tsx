@@ -17,7 +17,7 @@ export interface TabBarProps {
 
 export const TabBar: React.FC<TabBarProps> = ({ tabs, activeTab, onTabChange }) => {
   return (
-    <div className="flex border-b border-gray-700 bg-gray-900">
+    <div className="flex border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900">
       {tabs.map((tab) => (
         <button
           key={tab.id}
@@ -26,8 +26,8 @@ export const TabBar: React.FC<TabBarProps> = ({ tabs, activeTab, onTabChange }) 
             px-6 py-3 text-sm font-medium transition-colors relative
             ${
               activeTab === tab.id
-                ? 'text-blue-400 border-b-2 border-blue-400 bg-gray-800'
-                : 'text-gray-400 hover:text-gray-200 hover:bg-gray-800'
+                ? 'text-blue-500 dark:text-blue-400 border-b-2 border-blue-500 dark:border-blue-400 bg-gray-100 dark:bg-gray-800'
+                : 'text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800'
             }
           `}
           aria-current={activeTab === tab.id ? 'page' : undefined}

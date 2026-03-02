@@ -81,17 +81,17 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ prompts, onChange })
   };
 
   return (
-    <div className="border border-gray-600 rounded p-4 bg-gray-750">
+    <div className="border border-gray-200 dark:border-gray-600 rounded p-4 bg-gray-100 dark:bg-gray-800">
       {/* List of existing prompts */}
       {Object.keys(prompts).length > 0 ? (
         <div className="space-y-2 mb-4">
           {Object.entries(prompts).map(([filename, content]) => (
-            <div key={filename} className="border border-gray-600 rounded p-3">
+            <div key={filename} className="border border-gray-200 dark:border-gray-600 rounded p-3">
               {editingKey === filename ? (
                 // Edit mode
                 <div>
                   <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm font-medium text-white">{filename}</span>
+                    <span className="text-sm font-medium text-gray-900 dark:text-white">{filename}</span>
                     <div className="flex gap-2">
                       <button
                         type="button"
@@ -103,7 +103,7 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ prompts, onChange })
                       <button
                         type="button"
                         onClick={handleCancelEdit}
-                        className="text-xs px-2 py-1 bg-gray-600 text-white rounded hover:bg-gray-700"
+                        className="text-xs px-2 py-1 bg-gray-200 dark:bg-gray-600 text-gray-900 dark:text-white rounded hover:bg-gray-300 dark:hover:bg-gray-700"
                       >
                         Cancel
                       </button>
@@ -113,7 +113,7 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ prompts, onChange })
                     value={editingContent}
                     onChange={(e) => setEditingContent(e.target.value)}
                     rows={8}
-                    className="w-full px-2 py-1 bg-gray-900 border border-gray-600 rounded text-white text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                    className="w-full px-2 py-1 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-600 rounded text-gray-900 dark:text-white text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
                     placeholder="Enter prompt content..."
                   />
                 </div>
@@ -121,7 +121,7 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ prompts, onChange })
                 // View mode
                 <div>
                   <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm font-medium text-white">{filename}</span>
+                    <span className="text-sm font-medium text-gray-900 dark:text-white">{filename}</span>
                     <div className="flex gap-2">
                       <button
                         type="button"
@@ -139,7 +139,7 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ prompts, onChange })
                       </button>
                     </div>
                   </div>
-                  <div className="text-xs text-gray-400 font-mono bg-gray-900 p-2 rounded max-h-24 overflow-y-auto">
+                  <div className="text-xs text-gray-500 dark:text-gray-400 font-mono bg-gray-50 dark:bg-gray-900 p-2 rounded max-h-24 overflow-y-auto">
                     {content || <span className="italic">Empty prompt</span>}
                   </div>
                 </div>
@@ -148,15 +148,15 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ prompts, onChange })
           ))}
         </div>
       ) : (
-        <div className="text-sm text-gray-400 mb-4 text-center py-2">
+        <div className="text-sm text-gray-500 dark:text-gray-400 mb-4 text-center py-2">
           No custom prompts yet
         </div>
       )}
 
       {/* Add new prompt form */}
       {showAddForm ? (
-        <div className="border border-gray-600 rounded p-3 bg-gray-800">
-          <label className="block text-sm font-medium text-gray-300 mb-2">
+        <div className="border border-gray-200 dark:border-gray-600 rounded p-3 bg-gray-50 dark:bg-gray-800">
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
             New Prompt Filename
           </label>
           <div className="flex gap-2">
@@ -173,7 +173,7 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ prompts, onChange })
                   setNewFilename('');
                 }
               }}
-              className="flex-1 px-2 py-1 bg-gray-700 border border-gray-600 rounded text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="flex-1 px-2 py-1 bg-gray-100 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               placeholder="custom-prompt.md"
               autoFocus
             />
@@ -190,12 +190,12 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ prompts, onChange })
                 setShowAddForm(false);
                 setNewFilename('');
               }}
-              className="px-3 py-1 bg-gray-600 text-white text-sm rounded hover:bg-gray-700"
+              className="px-3 py-1 bg-gray-200 dark:bg-gray-600 text-gray-900 dark:text-white text-sm rounded hover:bg-gray-300 dark:hover:bg-gray-700"
             >
               Cancel
             </button>
           </div>
-          <p className="text-xs text-gray-400 mt-1">
+          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
             Enter a filename (will add .md extension if missing)
           </p>
         </div>
@@ -203,7 +203,7 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ prompts, onChange })
         <button
           type="button"
           onClick={() => setShowAddForm(true)}
-          className="w-full px-3 py-2 border border-dashed border-gray-600 rounded text-sm text-gray-400 hover:text-white hover:border-gray-500 transition-colors"
+          className="w-full px-3 py-2 border border-dashed border-gray-200 dark:border-gray-600 rounded text-sm text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:border-gray-400 dark:hover:border-gray-500 transition-colors"
         >
           + Add New Prompt File
         </button>

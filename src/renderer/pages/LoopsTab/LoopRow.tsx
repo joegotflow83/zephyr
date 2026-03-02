@@ -36,8 +36,8 @@ export const LoopRow: React.FC<LoopRowProps> = ({
 
   // Status badge styling per spec: running=green, starting=blue, failed=red, completed=gray, stopping=yellow
   const getStatusBadge = () => {
-    let bgColor = 'bg-gray-700';
-    let textColor = 'text-gray-300';
+    let bgColor = 'bg-gray-100 dark:bg-gray-700';
+    let textColor = 'text-gray-700 dark:text-gray-300';
     let label: string = loop.status;
 
     switch (loop.status) {
@@ -67,18 +67,18 @@ export const LoopRow: React.FC<LoopRowProps> = ({
         label = 'Failed';
         break;
       case LoopStatus.COMPLETED:
-        bgColor = 'bg-gray-700';
-        textColor = 'text-gray-300';
+        bgColor = 'bg-gray-100 dark:bg-gray-700';
+        textColor = 'text-gray-700 dark:text-gray-300';
         label = 'Completed';
         break;
       case LoopStatus.STOPPED:
-        bgColor = 'bg-gray-700';
-        textColor = 'text-gray-300';
+        bgColor = 'bg-gray-100 dark:bg-gray-700';
+        textColor = 'text-gray-700 dark:text-gray-300';
         label = 'Stopped';
         break;
       case LoopStatus.IDLE:
-        bgColor = 'bg-gray-700';
-        textColor = 'text-gray-300';
+        bgColor = 'bg-gray-100 dark:bg-gray-700';
+        textColor = 'text-gray-700 dark:text-gray-300';
         label = 'Idle';
         break;
     }
@@ -113,24 +113,24 @@ export const LoopRow: React.FC<LoopRowProps> = ({
 
   return (
     <tr
-      className={`border-b border-gray-700 hover:bg-gray-800 cursor-pointer ${
-        isSelected ? 'bg-gray-800' : ''
+      className={`border-b border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer ${
+        isSelected ? 'bg-gray-100 dark:bg-gray-800' : ''
       }`}
       onClick={() => onSelect(loop)}
     >
-      <td className="px-4 py-3 text-sm font-medium text-white">
+      <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-white">
         {project?.name || loop.projectId}
       </td>
       <td className="px-4 py-3 text-sm">
         {getStatusBadge()}
       </td>
-      <td className="px-4 py-3 text-sm text-gray-300">
+      <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">
         {getModeLabel()}
       </td>
-      <td className="px-4 py-3 text-sm text-gray-300">
+      <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">
         {loop.iteration}
       </td>
-      <td className="px-4 py-3 text-sm text-gray-300">
+      <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">
         {getStartedLabel()}
       </td>
       <td className="px-4 py-3 text-sm text-right space-x-2">

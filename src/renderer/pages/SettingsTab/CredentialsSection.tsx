@@ -134,7 +134,7 @@ export const CredentialsSection: React.FC = () => {
   };
 
   if (loading) {
-    return <div className="text-gray-400 text-center py-4">Loading credentials...</div>;
+    return <div className="text-gray-500 dark:text-gray-400 text-center py-4">Loading credentials...</div>;
   }
 
   const activeMethod = settings?.anthropic_auth_method ?? 'api_key';
@@ -149,8 +149,8 @@ export const CredentialsSection: React.FC = () => {
 
       {/* ── Section 1: Anthropic API Access ─────────────────────────────── */}
       <div>
-        <h3 className="text-white font-semibold mb-1">Anthropic API Access</h3>
-        <p className="text-sm text-gray-400 mb-3">
+        <h3 className="text-gray-900 dark:text-white font-semibold mb-1">Anthropic API Access</h3>
+        <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">
           Choose how Claude Code inside containers authenticates with Anthropic.
           The selected method is automatically injected at loop start.
         </p>
@@ -219,16 +219,16 @@ export const CredentialsSection: React.FC = () => {
 
       {/* ── Section 2: GitHub ────────────────────────────────────────────── */}
       <div>
-        <h3 className="text-white font-semibold mb-1">GitHub</h3>
-        <p className="text-sm text-gray-400 mb-3">
+        <h3 className="text-gray-900 dark:text-white font-semibold mb-1">GitHub</h3>
+        <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">
           Repository access for cloning and pushing commits.
         </p>
 
-        <div className="bg-gray-900 rounded-lg border border-gray-700 p-4 flex items-center justify-between">
+        <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700 p-4 flex items-center justify-between">
           <div className="flex items-center space-x-3">
             <span className="text-2xl">🐙</span>
             <div>
-              <p className="text-xs text-gray-400">Personal access token</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400">Personal access token</p>
               {githubMaskedKey && (
                 <p className="text-xs text-gray-500 font-mono mt-1">{githubMaskedKey}</p>
               )}
@@ -240,7 +240,7 @@ export const CredentialsSection: React.FC = () => {
               className={`px-2 py-1 rounded text-xs font-medium ${
                 githubStored
                   ? 'bg-green-900 bg-opacity-30 text-green-400 border border-green-700'
-                  : 'bg-gray-700 text-gray-400'
+                  : 'bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400'
               }`}
             >
               {githubStored ? 'Configured' : 'Not Set'}
@@ -316,8 +316,8 @@ const AuthMethodCard: React.FC<AuthMethodCardProps> = ({
 }) => (
   <div
     onClick={onClick}
-    className={`bg-gray-900 rounded-lg border p-4 flex items-center justify-between cursor-pointer transition-colors ${
-      active ? 'border-blue-500' : 'border-gray-700 hover:border-gray-600'
+    className={`bg-white dark:bg-gray-900 rounded-lg border p-4 flex items-center justify-between cursor-pointer transition-colors ${
+      active ? 'border-blue-500' : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
     }`}
   >
     <div className="flex items-center space-x-3 flex-1 min-w-0">
@@ -328,8 +328,8 @@ const AuthMethodCard: React.FC<AuthMethodCardProps> = ({
         }`}
       />
       <div className="min-w-0">
-        <h4 className="text-white font-medium text-sm">{title}</h4>
-        <p className="text-xs text-gray-400 mt-0.5 truncate">{description}</p>
+        <h4 className="text-gray-900 dark:text-white font-medium text-sm">{title}</h4>
+        <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 truncate">{description}</p>
       </div>
     </div>
 
@@ -338,7 +338,7 @@ const AuthMethodCard: React.FC<AuthMethodCardProps> = ({
         className={`px-2 py-1 rounded text-xs font-medium ${
           statusOk
             ? 'bg-green-900 bg-opacity-30 text-green-400 border border-green-700'
-            : 'bg-gray-700 text-gray-400'
+            : 'bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400'
         }`}
       >
         {statusLabel}

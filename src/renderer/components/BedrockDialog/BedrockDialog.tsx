@@ -67,12 +67,12 @@ export const BedrockDialog: React.FC<BedrockDialogProps> = ({
       className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50"
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
-      <div className="bg-gray-800 rounded-lg border border-gray-700 p-6 w-full max-w-lg shadow-xl">
+      <div className="bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6 w-full max-w-lg shadow-xl">
         <div className="flex items-center justify-between mb-5">
-          <h2 className="text-white font-semibold text-lg">Configure AWS Bedrock</h2>
+          <h2 className="text-gray-900 dark:text-white font-semibold text-lg">Configure AWS Bedrock</h2>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-white transition-colors text-xl leading-none"
+            className="text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors text-xl leading-none"
             aria-label="Close"
           >
             &times;
@@ -88,7 +88,7 @@ export const BedrockDialog: React.FC<BedrockDialogProps> = ({
         <div className="space-y-4">
           {/* AWS Region */}
           <div>
-            <label className="block text-sm font-medium text-gray-300 mb-1">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               AWS Region <span className="text-red-400">*</span>
             </label>
             <input
@@ -96,13 +96,13 @@ export const BedrockDialog: React.FC<BedrockDialogProps> = ({
               value={region}
               onChange={(e) => setRegion(e.target.value)}
               placeholder="us-east-1"
-              className="w-full bg-gray-900 border border-gray-600 rounded px-3 py-2 text-white text-sm focus:outline-none focus:border-blue-500"
+              className="w-full bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-600 rounded px-3 py-2 text-gray-900 dark:text-white text-sm focus:outline-none focus:border-blue-500"
             />
           </div>
 
           {/* AWS Bearer Token */}
           <div>
-            <label className="block text-sm font-medium text-gray-300 mb-1">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               AWS Bearer Token <span className="text-red-400">*</span>
             </label>
             <div className="relative">
@@ -111,22 +111,22 @@ export const BedrockDialog: React.FC<BedrockDialogProps> = ({
                 value={bearerToken}
                 onChange={(e) => setBearerToken(e.target.value)}
                 placeholder="Stored encrypted"
-                className="w-full bg-gray-900 border border-gray-600 rounded px-3 py-2 pr-20 text-white text-sm focus:outline-none focus:border-blue-500"
+                className="w-full bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-600 rounded px-3 py-2 pr-20 text-gray-900 dark:text-white text-sm focus:outline-none focus:border-blue-500"
               />
               <button
                 type="button"
                 onClick={() => setShowToken((v) => !v)}
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-gray-400 hover:text-gray-200"
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200"
               >
                 {showToken ? 'Hide' : 'Show'}
               </button>
             </div>
-            <p className="text-xs text-gray-500 mt-1">Stored encrypted via system keychain</p>
+            <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">Stored encrypted via system keychain</p>
           </div>
 
           {/* ANTHROPIC_MODEL */}
           <div>
-            <label className="block text-sm font-medium text-gray-300 mb-1">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               ANTHROPIC_MODEL <span className="text-gray-500 font-normal">(optional)</span>
             </label>
             <input
@@ -134,13 +134,13 @@ export const BedrockDialog: React.FC<BedrockDialogProps> = ({
               value={model}
               onChange={(e) => setModel(e.target.value)}
               placeholder="e.g. anthropic.claude-3-5-sonnet-20241022-v2:0"
-              className="w-full bg-gray-900 border border-gray-600 rounded px-3 py-2 text-white text-sm focus:outline-none focus:border-blue-500"
+              className="w-full bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-600 rounded px-3 py-2 text-gray-900 dark:text-white text-sm focus:outline-none focus:border-blue-500"
             />
           </div>
 
           {/* ANTHROPIC_SMALL_FAST_MODEL */}
           <div>
-            <label className="block text-sm font-medium text-gray-300 mb-1">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               ANTHROPIC_SMALL_FAST_MODEL <span className="text-gray-500 font-normal">(optional)</span>
             </label>
             <input
@@ -148,13 +148,13 @@ export const BedrockDialog: React.FC<BedrockDialogProps> = ({
               value={smallFastModel}
               onChange={(e) => setSmallFastModel(e.target.value)}
               placeholder="e.g. anthropic.claude-3-5-haiku-20241022-v1:0"
-              className="w-full bg-gray-900 border border-gray-600 rounded px-3 py-2 text-white text-sm focus:outline-none focus:border-blue-500"
+              className="w-full bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-600 rounded px-3 py-2 text-gray-900 dark:text-white text-sm focus:outline-none focus:border-blue-500"
             />
           </div>
 
           {/* ANTHROPIC_LOG */}
           <div>
-            <label className="block text-sm font-medium text-gray-300 mb-1">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               ANTHROPIC_LOG <span className="text-gray-500 font-normal">(optional)</span>
             </label>
             <input
@@ -162,7 +162,7 @@ export const BedrockDialog: React.FC<BedrockDialogProps> = ({
               value={log}
               onChange={(e) => setLog(e.target.value)}
               placeholder="e.g. debug"
-              className="w-full bg-gray-900 border border-gray-600 rounded px-3 py-2 text-white text-sm focus:outline-none focus:border-blue-500"
+              className="w-full bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-600 rounded px-3 py-2 text-gray-900 dark:text-white text-sm focus:outline-none focus:border-blue-500"
             />
           </div>
         </div>
@@ -170,7 +170,7 @@ export const BedrockDialog: React.FC<BedrockDialogProps> = ({
         <div className="flex justify-end gap-3 mt-6">
           <button
             onClick={onClose}
-            className="px-4 py-2 text-sm text-gray-300 hover:text-white transition-colors"
+            className="px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors"
             disabled={saving}
           >
             Cancel

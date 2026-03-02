@@ -212,7 +212,7 @@ export const LogViewer: React.FC<LogViewerProps> = ({
 
       {/* Search bar */}
       {isSearchOpen && (
-        <div className="px-3 py-2 bg-gray-50 dark:bg-gray-750 border-b border-gray-300 dark:border-gray-700">
+        <div className="px-3 py-2 bg-gray-100 dark:bg-gray-800 border-b border-gray-300 dark:border-gray-700">
           <div className="flex items-center gap-2">
             <input
               ref={searchInputRef}
@@ -238,7 +238,7 @@ export const LogViewer: React.FC<LogViewerProps> = ({
       {/* Log content */}
       <div
         ref={parentRef}
-        className="flex-1 overflow-auto bg-gray-900 text-gray-100 font-mono text-xs"
+        className="flex-1 overflow-auto bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 font-mono text-xs"
         style={{ contain: 'strict' }}
       >
         {filteredLines.length === 0 ? (

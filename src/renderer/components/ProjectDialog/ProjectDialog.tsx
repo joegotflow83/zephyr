@@ -272,15 +272,15 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({ mode, project, onS
         className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[200]"
         onClick={handleBackdropClick}
       >
-        <div className="bg-gray-800 rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+        <div className="bg-gray-50 dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
           {/* Header */}
-          <div className="flex items-center justify-between p-6 border-b border-gray-700">
-            <h2 className="text-xl font-bold text-white">
+          <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
+            <h2 className="text-xl font-bold text-gray-900 dark:text-white">
               {mode === 'add' ? 'Add New Project' : 'Edit Project'}
             </h2>
             <button
               onClick={onClose}
-              className="text-gray-400 hover:text-white transition-colors"
+              className="text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors"
               aria-label="Close dialog"
             >
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -298,7 +298,7 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({ mode, project, onS
           <form onSubmit={handleSubmit} className="p-6">
             {/* Name field */}
             <div className="mb-4">
-              <label htmlFor="name" className="block text-sm font-medium text-gray-300 mb-2">
+              <label htmlFor="name" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Project Name <span className="text-red-400">*</span>
               </label>
               <input
@@ -309,9 +309,9 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({ mode, project, onS
                   setName(e.target.value);
                   setErrors((prev) => ({ ...prev, name: '' }));
                 }}
-                className={`w-full px-3 py-2 bg-gray-700 border ${
-                  errors.name ? 'border-red-500' : 'border-gray-600'
-                } rounded text-white focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                className={`w-full px-3 py-2 bg-gray-100 dark:bg-gray-700 border ${
+                  errors.name ? 'border-red-500' : 'border-gray-200 dark:border-gray-600'
+                } rounded text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500`}
                 placeholder="My AI Project"
                 autoFocus
               />
@@ -320,7 +320,7 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({ mode, project, onS
 
             {/* Repo URL field */}
             <div className="mb-4">
-              <label htmlFor="repoUrl" className="block text-sm font-medium text-gray-300 mb-2">
+              <label htmlFor="repoUrl" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Repository URL
               </label>
               <input
@@ -331,22 +331,22 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({ mode, project, onS
                   setRepoUrl(e.target.value);
                   setErrors((prev) => ({ ...prev, repoUrl: '' }));
                 }}
-                className={`w-full px-3 py-2 bg-gray-700 border ${
-                  errors.repoUrl ? 'border-red-500' : 'border-gray-600'
-                } rounded text-white focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                className={`w-full px-3 py-2 bg-gray-100 dark:bg-gray-700 border ${
+                  errors.repoUrl ? 'border-red-500' : 'border-gray-200 dark:border-gray-600'
+                } rounded text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500`}
                 placeholder="https://github.com/user/repo"
               />
               {errors.repoUrl && (
                 <p className="mt-1 text-sm text-red-400">{errors.repoUrl}</p>
               )}
-              <p className="mt-1 text-xs text-gray-400">
+              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                 Git repository URL (optional) — e.g. https://github.com/user/repo or git@github.com:user/repo
               </p>
             </div>
 
             {/* Local Path field */}
             <div className="mb-4">
-              <label htmlFor="localPath" className="block text-sm font-medium text-gray-300 mb-2">
+              <label htmlFor="localPath" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Local Path
               </label>
               <input
@@ -357,22 +357,22 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({ mode, project, onS
                   setLocalPath(e.target.value);
                   setErrors((prev) => ({ ...prev, localPath: '' }));
                 }}
-                className={`w-full px-3 py-2 bg-gray-700 border ${
-                  errors.localPath ? 'border-red-500' : 'border-gray-600'
-                } rounded text-white focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                className={`w-full px-3 py-2 bg-gray-100 dark:bg-gray-700 border ${
+                  errors.localPath ? 'border-red-500' : 'border-gray-200 dark:border-gray-600'
+                } rounded text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500`}
                 placeholder="/home/user/my-project"
               />
               {errors.localPath && (
                 <p className="mt-1 text-sm text-red-400">{errors.localPath}</p>
               )}
-              <p className="mt-1 text-xs text-gray-400">
-                Absolute path on your machine to mount into the container at <code className="bg-gray-700 px-1 rounded">/workspace</code> (optional)
+              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                Absolute path on your machine to mount into the container at <code className="bg-gray-100 dark:bg-gray-700 px-1 rounded">/workspace</code> (optional)
               </p>
             </div>
 
             {/* Additional Mount Points section */}
             <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-300 mb-2">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Additional Mount Points
               </label>
 
@@ -384,11 +384,11 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({ mode, project, onS
                     return (
                       <li
                         key={idx}
-                        className="flex items-center justify-between bg-gray-700 rounded px-3 py-1.5 text-sm"
+                        className="flex items-center justify-between bg-gray-100 dark:bg-gray-700 rounded px-3 py-1.5 text-sm"
                       >
-                        <span className="text-gray-200 font-mono truncate flex-1 mr-2">{hostPath}</span>
-                        <span className="text-gray-400 text-xs mr-3 shrink-0">
-                          → <code className="bg-gray-600 px-1 rounded">/mnt/{basename}</code>
+                        <span className="text-gray-800 dark:text-gray-200 font-mono truncate flex-1 mr-2">{hostPath}</span>
+                        <span className="text-gray-500 dark:text-gray-400 text-xs mr-3 shrink-0">
+                          → <code className="bg-gray-200 dark:bg-gray-600 px-1 rounded">/mnt/{basename}</code>
                         </span>
                         <button
                           type="button"
@@ -416,15 +416,15 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({ mode, project, onS
                     setMountErrors((prev) => { const next = { ...prev }; delete next.new; return next; });
                   }}
                   onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddMount(); } }}
-                  className={`flex-1 px-3 py-2 bg-gray-700 border ${
-                    mountErrors.new ? 'border-red-500' : 'border-gray-600'
-                  } rounded text-white focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm`}
+                  className={`flex-1 px-3 py-2 bg-gray-100 dark:bg-gray-700 border ${
+                    mountErrors.new ? 'border-red-500' : 'border-gray-200 dark:border-gray-600'
+                  } rounded text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm`}
                   placeholder="/home/user/data"
                 />
                 <button
                   type="button"
                   onClick={handleAddMount}
-                  className="px-3 py-2 bg-gray-600 hover:bg-gray-500 text-white rounded text-sm transition-colors shrink-0"
+                  className="px-3 py-2 bg-gray-200 dark:bg-gray-600 hover:bg-gray-300 dark:hover:bg-gray-500 text-gray-900 dark:text-white rounded text-sm transition-colors shrink-0"
                 >
                   Add
                 </button>
@@ -432,19 +432,19 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({ mode, project, onS
               {mountErrors.new && (
                 <p className="mt-1 text-sm text-red-400">{mountErrors.new}</p>
               )}
-              <p className="mt-1 text-xs text-gray-400">
+              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                 Extra host paths to mount into the container. Each path mounts at{' '}
-                <code className="bg-gray-700 px-1 rounded">/mnt/&lt;foldername&gt;</code>.
+                <code className="bg-gray-100 dark:bg-gray-700 px-1 rounded">/mnt/&lt;foldername&gt;</code>.
               </p>
             </div>
 
             {/* Docker Image section — library picker or custom text input */}
             <div className="mb-4">
-              <div className="text-sm font-medium text-gray-300 mb-2">Docker Image</div>
+              <div className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Docker Image</div>
 
               {/* Mode toggle: library vs custom */}
               <div className="flex gap-4 mb-3">
-                <label className="flex items-center gap-2 cursor-pointer text-sm text-gray-300">
+                <label className="flex items-center gap-2 cursor-pointer text-sm text-gray-700 dark:text-gray-300">
                   <input
                     type="radio"
                     value="library"
@@ -454,7 +454,7 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({ mode, project, onS
                   />
                   Select from Library
                 </label>
-                <label className="flex items-center gap-2 cursor-pointer text-sm text-gray-300">
+                <label className="flex items-center gap-2 cursor-pointer text-sm text-gray-700 dark:text-gray-300">
                   <input
                     type="radio"
                     value="custom"
@@ -473,7 +473,7 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({ mode, project, onS
                     aria-label="Docker Image"
                     value={imageId ?? ''}
                     onChange={(e) => setImageId(e.target.value || undefined)}
-                    className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 bg-gray-100 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
                     <option value="">-- Select an image --</option>
                     {images.map((img) => (
@@ -483,7 +483,7 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({ mode, project, onS
                     ))}
                   </select>
                   {images.length === 0 && (
-                    <p className="mt-1 text-xs text-gray-400">
+                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                       No images in library. Use &quot;+ Build New Image&quot; to create one.
                     </p>
                   )}
@@ -500,7 +500,7 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({ mode, project, onS
                     value={dockerImage}
                     onChange={(e) => setDockerImage(e.target.value)}
                     list="docker-images"
-                    className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 bg-gray-100 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                     placeholder="ubuntu:24.04"
                   />
                   <datalist id="docker-images">
@@ -508,7 +508,7 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({ mode, project, onS
                       <option key={img} value={img} />
                     ))}
                   </datalist>
-                  <p className="mt-1 text-xs text-gray-400">
+                  <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                     Docker image to use for this project&apos;s container
                   </p>
                 </div>
@@ -526,9 +526,9 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({ mode, project, onS
 
             {/* Sandbox Type section */}
             <div className="mb-4">
-              <div className="text-sm font-medium text-gray-300 mb-2">Sandbox Type</div>
+              <div className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Sandbox Type</div>
               <div className="flex gap-6">
-                <label className="flex items-center gap-2 cursor-pointer text-sm text-gray-300">
+                <label className="flex items-center gap-2 cursor-pointer text-sm text-gray-700 dark:text-gray-300">
                   <input
                     type="radio"
                     name="sandbox-type"
@@ -538,7 +538,7 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({ mode, project, onS
                   />
                   Container
                 </label>
-                <label className="flex items-center gap-2 cursor-pointer text-sm text-gray-300">
+                <label className="flex items-center gap-2 cursor-pointer text-sm text-gray-700 dark:text-gray-300">
                   <input
                     type="radio"
                     name="sandbox-type"
@@ -549,7 +549,7 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({ mode, project, onS
                   Virtual Machine
                 </label>
               </div>
-              <p className="mt-1 text-xs text-gray-400">
+              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                 {sandboxType === 'container'
                   ? 'Run loops directly in a Docker container (default).'
                   : 'Run loops inside an isolated Ubuntu VM via Multipass. Requires Multipass installed.'}
@@ -558,8 +558,8 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({ mode, project, onS
 
             {/* VM Configuration — only shown when sandbox type is VM */}
             {sandboxType === 'vm' && (
-              <div className="mb-4 border border-gray-600 rounded p-4 space-y-4">
-                <div className="text-sm font-semibold text-gray-200">VM Configuration</div>
+              <div className="mb-4 border border-gray-200 dark:border-gray-600 rounded p-4 space-y-4">
+                <div className="text-sm font-semibold text-gray-800 dark:text-gray-200">VM Configuration</div>
 
                 {/* Multipass unavailable warning */}
                 {!multipassAvailable && (
@@ -584,9 +584,9 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({ mode, project, onS
 
                 {/* VM Mode */}
                 <div>
-                  <div className="text-xs font-medium text-gray-400 mb-2">VM Mode</div>
+                  <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2">VM Mode</div>
                   <div className="flex gap-6">
-                    <label className="flex items-center gap-2 cursor-pointer text-sm text-gray-300">
+                    <label className="flex items-center gap-2 cursor-pointer text-sm text-gray-700 dark:text-gray-300">
                       <input
                         type="radio"
                         name="vm-mode"
@@ -596,7 +596,7 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({ mode, project, onS
                       />
                       Persistent
                     </label>
-                    <label className="flex items-center gap-2 cursor-pointer text-sm text-gray-300">
+                    <label className="flex items-center gap-2 cursor-pointer text-sm text-gray-700 dark:text-gray-300">
                       <input
                         type="radio"
                         name="vm-mode"
@@ -607,7 +607,7 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({ mode, project, onS
                       Ephemeral
                     </label>
                   </div>
-                  <p className="mt-1 text-xs text-gray-400">
+                  <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                     {vmMode === 'persistent'
                       ? 'VM persists between loop runs; start and stop independently.'
                       : 'VM is created fresh each run and deleted when done.'}
@@ -616,10 +616,10 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({ mode, project, onS
 
                 {/* Resources */}
                 <div>
-                  <div className="text-xs font-medium text-gray-400 mb-2">Resources</div>
+                  <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2">Resources</div>
                   <div className="flex gap-4">
                     <div className="flex-1">
-                      <label htmlFor="vm-cpus" className="block text-xs text-gray-400 mb-1">
+                      <label htmlFor="vm-cpus" className="block text-xs text-gray-500 dark:text-gray-400 mb-1">
                         CPUs
                       </label>
                       <input
@@ -629,11 +629,11 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({ mode, project, onS
                         max={16}
                         value={vmCpus}
                         onChange={(e) => setVmCpus(Math.max(1, parseInt(e.target.value, 10) || 1))}
-                        className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded text-white focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                        className="w-full px-3 py-2 bg-gray-100 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                       />
                     </div>
                     <div className="flex-1">
-                      <label htmlFor="vm-memory" className="block text-xs text-gray-400 mb-1">
+                      <label htmlFor="vm-memory" className="block text-xs text-gray-500 dark:text-gray-400 mb-1">
                         Memory (GB)
                       </label>
                       <input
@@ -643,11 +643,11 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({ mode, project, onS
                         max={64}
                         value={vmMemoryGb}
                         onChange={(e) => setVmMemoryGb(Math.max(1, parseInt(e.target.value, 10) || 1))}
-                        className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded text-white focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                        className="w-full px-3 py-2 bg-gray-100 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                       />
                     </div>
                     <div className="flex-1">
-                      <label htmlFor="vm-disk" className="block text-xs text-gray-400 mb-1">
+                      <label htmlFor="vm-disk" className="block text-xs text-gray-500 dark:text-gray-400 mb-1">
                         Disk (GB)
                       </label>
                       <input
@@ -657,7 +657,7 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({ mode, project, onS
                         max={500}
                         value={vmDiskGb}
                         onChange={(e) => setVmDiskGb(Math.max(5, parseInt(e.target.value, 10) || 5))}
-                        className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded text-white focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                        className="w-full px-3 py-2 bg-gray-100 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                       />
                     </div>
                   </div>
@@ -674,7 +674,7 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({ mode, project, onS
                   </button>
                   {showVmAdvanced && (
                     <div className="mt-2">
-                      <label htmlFor="vm-cloud-init" className="block text-xs text-gray-400 mb-1">
+                      <label htmlFor="vm-cloud-init" className="block text-xs text-gray-500 dark:text-gray-400 mb-1">
                         Cloud-init YAML (optional override)
                       </label>
                       <textarea
@@ -682,12 +682,13 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({ mode, project, onS
                         value={vmCloudInit}
                         onChange={(e) => setVmCloudInit(e.target.value)}
                         rows={6}
-                        className="w-full px-3 py-2 bg-gray-900 border border-gray-600 rounded text-white font-mono text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 resize-y"
+                        className="w-full px-3 py-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-600 rounded text-gray-900 dark:text-white font-mono text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 resize-y"
                         placeholder="#cloud-config&#10;# Leave blank to use the built-in Docker install template"
                       />
-                      <p className="mt-1 text-xs text-gray-400">
+                      <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                         Leave blank to use the built-in template that installs Docker inside the VM.
                       </p>
+
                     </div>
                   )}
                 </div>
@@ -707,7 +708,7 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({ mode, project, onS
             {isGithubRepo && (
               <div className="mb-4">
                 <div className="flex items-center justify-between mb-2">
-                  <label className="block text-sm font-medium text-gray-300">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                     GitHub SSH Access
                   </label>
                   <button
@@ -724,7 +725,7 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({ mode, project, onS
                 )}
 
                 {showGithubSection && (
-                  <div className="bg-gray-750 border border-gray-600 rounded p-4 space-y-3">
+                  <div className="bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded p-4 space-y-3">
                     <div>
                       <input
                         id="githubPat"
@@ -732,10 +733,10 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({ mode, project, onS
                         value={githubPat}
                         onChange={(e) => setGithubPat(e.target.value)}
                         placeholder={hasStoredPat ? '••••••••••••  (leave blank to keep existing)' : 'github_pat_…'}
-                        className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded text-white focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                        className="w-full px-3 py-2 bg-gray-100 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                         autoComplete="off"
                       />
-                      <p className="mt-1 text-xs text-gray-400">
+                      <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                         Fine-grained PAT with read/write access to repository deploy keys. Scoped to this repo only.{' '}
                         <a
                           href="https://github.com/settings/personal-access-tokens/new"
@@ -772,7 +773,7 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({ mode, project, onS
             {/* Custom Prompts section */}
             <div className="mb-6">
               <div className="flex items-center justify-between mb-2">
-                <label className="block text-sm font-medium text-gray-300">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                   Custom Prompts
                 </label>
                 <button
@@ -785,7 +786,7 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({ mode, project, onS
               </div>
 
               {Object.keys(customPrompts).length > 0 && (
-                <div className="text-sm text-gray-400 mb-2">
+                <div className="text-sm text-gray-500 dark:text-gray-400 mb-2">
                   {Object.keys(customPrompts).length} custom prompt(s) configured
                 </div>
               )}
@@ -796,11 +797,11 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({ mode, project, onS
             </div>
 
             {/* Action buttons */}
-            <div className="flex justify-end gap-3 pt-4 border-t border-gray-700">
+            <div className="flex justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
               <button
                 type="button"
                 onClick={onClose}
-                className="px-4 py-2 text-gray-300 hover:text-white transition-colors"
+                className="px-4 py-2 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors"
               >
                 Cancel
               </button>

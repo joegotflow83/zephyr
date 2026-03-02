@@ -3,6 +3,7 @@
 // All handlers run in the main process and delegate to service instances.
 
 import * as fs from 'fs/promises';
+import * as os from 'os';
 import * as path from 'path';
 import { ipcMain, BrowserWindow } from 'electron';
 import { IPC } from '../../shared/ipc-channels';
@@ -97,6 +98,90 @@ export function registerLoopHandlers(services: LoopServices): void {
         }
       }
 
+      // For VM loops: hook files and custom prompt files cannot be injected via
+      // `docker exec` after the container starts (there is no containerId for
+      // VM-backed containers). Instead, write everything to a per-project temp
+      // directory and mount it at /root/.claude. Hooks go into hooks/ and
+      // prompt files sit at the directory root so Claude Code can read them.
+      if (opts.sandboxType === 'vm' && project) {
+        const hasHooks = project.hooks.length > 0 && !!hooksStore;
+        const hasPrompts = Object.keys(project.custom_prompts).length > 0;
+
+        if (hasHooks || hasPrompts) {
+          const claudeDir = path.join(os.tmpdir(), `zephyr-claude-${opts.projectId}`);
+          try {
+            await fs.mkdir(path.join(claudeDir, 'hooks'), { recursive: true });
+
+            if (hasHooks && hooksStore) {
+              for (const filename of project.hooks) {
+                try {
+                  const content = await hooksStore.getHook(filename);
+                  if (content) {
+                    const safe = path.basename(filename);
+                    await fs.writeFile(path.join(claudeDir, 'hooks', safe), content, { mode: 0o755 });
+                  }
+                } catch (err) {
+                  logger.warn(`Failed to write hook ${filename} for VM mount`, { err });
+                }
+              }
+            }
+
+            if (hasPrompts) {
+              for (const [filename, content] of Object.entries(project.custom_prompts)) {
+                try {
+                  const safe = path.basename(filename);
+                  await fs.writeFile(path.join(claudeDir, safe), content, 'utf8');
+                } catch (err) {
+                  logger.warn(`Failed to write custom prompt ${filename} for VM mount`, { err });
+                }
+              }
+            }
+
+            opts = {
+              ...opts,
+              volumeMounts: [...(opts.volumeMounts ?? []), `${claudeDir}:/root/.claude`],
+            };
+          } catch (err) {
+            logger.warn('Failed to prepare .claude directory for VM loop', { err });
+          }
+        }
+      }
+
+      // For VM loops: pre-validation scripts must also reach the container.
+      // They are normally written to project.local_path (which is volume-mounted
+      // as /workspace), but that requires local_path to be set. When it is not,
+      // write them to a temp directory and mount that directory at /workspace so
+      // they are still accessible to the agent at /workspace/<script>.
+      if (
+        opts.sandboxType === 'vm' &&
+        project &&
+        project.pre_validation_scripts.length > 0 &&
+        preValidationStore &&
+        !project.local_path
+      ) {
+        const pvDir = path.join(os.tmpdir(), `zephyr-pv-${opts.projectId}`);
+        try {
+          await fs.mkdir(pvDir, { recursive: true });
+          for (const filename of project.pre_validation_scripts) {
+            try {
+              const content = await preValidationStore.getScript(filename);
+              if (content) {
+                await fs.writeFile(path.join(pvDir, path.basename(filename)), content, { mode: 0o755 });
+              }
+            } catch (err) {
+              logger.warn(`Failed to write pre-validation script ${filename} for VM mount`, { err });
+            }
+          }
+          opts = {
+            ...opts,
+            volumeMounts: [...(opts.volumeMounts ?? []), `${pvDir}:/workspace`],
+            workDir: opts.workDir ?? '/workspace',
+          };
+        } catch (err) {
+          logger.warn('Failed to prepare pre-validation scripts directory for VM loop', { err });
+        }
+      }
+
       const state = await loopRunner.startLoop(opts);
 
       // Register container with cleanup manager for automatic cleanup on shutdown
@@ -149,6 +234,32 @@ export function registerLoopHandlers(services: LoopServices): void {
           }
         } catch (err) {
           logger.warn('Failed to create ~/.claude/hooks in container', { err });
+        }
+      }
+
+      // Inject custom prompt files into ~/.claude/ inside the container.
+      // Uses base64 to safely transfer file contents via docker exec.
+      // VM-backed loops handle this via volume mount above; this covers containers only.
+      if (project && Object.keys(project.custom_prompts).length > 0 && state.containerId && dockerManager) {
+        try {
+          await dockerManager.execCommand(state.containerId, [
+            'sh', '-c', 'mkdir -p ~/.claude',
+          ]);
+
+          for (const [filename, content] of Object.entries(project.custom_prompts)) {
+            try {
+              const encoded = Buffer.from(content).toString('base64');
+              const safe = path.basename(filename);
+              await dockerManager.execCommand(state.containerId, [
+                'sh', '-c',
+                `printf '%s' '${encoded}' | base64 -d > ~/.claude/${safe}`,
+              ]);
+            } catch (err) {
+              logger.warn(`Failed to inject custom prompt ${filename} into container`, { err });
+            }
+          }
+        } catch (err) {
+          logger.warn('Failed to create ~/.claude in container for custom prompts', { err });
         }
       }
 

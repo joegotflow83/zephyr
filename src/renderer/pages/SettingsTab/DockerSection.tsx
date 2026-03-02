@@ -68,7 +68,7 @@ export const DockerSection: React.FC = () => {
     <div className="space-y-6">
       {/* Connection Status */}
       <div>
-        <label className="block text-sm font-medium text-gray-300 mb-2">
+        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
           Connection Status
         </label>
         <div className="flex items-center">
@@ -78,7 +78,7 @@ export const DockerSection: React.FC = () => {
             }`}
             data-testid="docker-status-indicator"
           />
-          <span className="text-gray-200">
+          <span className="text-gray-800 dark:text-gray-200">
             {isConnected ? 'Connected' : 'Disconnected'}
           </span>
         </div>
@@ -88,7 +88,7 @@ export const DockerSection: React.FC = () => {
       <div>
         <label
           htmlFor="max-containers"
-          className="block text-sm font-medium text-gray-300 mb-2"
+          className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
         >
           Max Concurrent Containers
         </label>
@@ -98,7 +98,7 @@ export const DockerSection: React.FC = () => {
               type="button"
               onClick={decrementMaxContainers}
               disabled={maxContainers <= 1}
-              className="px-3 py-2 bg-gray-700 text-gray-200 rounded-l border border-gray-600 hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-3 py-2 bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-l border border-gray-200 dark:border-gray-600 hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
               aria-label="Decrease max containers"
             >
               -
@@ -110,24 +110,24 @@ export const DockerSection: React.FC = () => {
               max="20"
               value={maxContainers}
               onChange={handleMaxContainersChange}
-              className="w-20 px-3 py-2 bg-gray-800 text-gray-100 border-t border-b border-gray-600 text-center focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-20 px-3 py-2 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 border-t border-b border-gray-200 dark:border-gray-600 text-center focus:outline-none focus:ring-2 focus:ring-blue-500"
               data-testid="max-containers-input"
             />
             <button
               type="button"
               onClick={incrementMaxContainers}
               disabled={maxContainers >= 20}
-              className="px-3 py-2 bg-gray-700 text-gray-200 rounded-r border border-gray-600 hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-3 py-2 bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-r border border-gray-200 dark:border-gray-600 hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
               aria-label="Increase max containers"
             >
               +
             </button>
           </div>
           {isSaving && (
-            <span className="ml-3 text-sm text-gray-400">Saving...</span>
+            <span className="ml-3 text-sm text-gray-500 dark:text-gray-400">Saving...</span>
           )}
         </div>
-        <p className="mt-2 text-sm text-gray-400">
+        <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
           Maximum number of Docker containers that can run simultaneously
         </p>
       </div>
@@ -135,32 +135,32 @@ export const DockerSection: React.FC = () => {
       {/* Docker Info */}
       {isConnected && dockerInfo && (
         <div>
-          <label className="block text-sm font-medium text-gray-300 mb-2">
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
             Docker Information
           </label>
-          <div className="bg-gray-900 rounded p-4 space-y-2 text-sm">
+          <div className="bg-gray-50 dark:bg-gray-900 rounded p-4 space-y-2 text-sm">
             <div className="flex justify-between">
-              <span className="text-gray-400">Version:</span>
-              <span className="text-gray-200">{dockerInfo.version}</span>
+              <span className="text-gray-500 dark:text-gray-400">Version:</span>
+              <span className="text-gray-800 dark:text-gray-200">{dockerInfo.version}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-gray-400">Running Containers:</span>
-              <span className="text-gray-200">{dockerInfo.containers}</span>
+              <span className="text-gray-500 dark:text-gray-400">Running Containers:</span>
+              <span className="text-gray-800 dark:text-gray-200">{dockerInfo.containers}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-gray-400">Images:</span>
-              <span className="text-gray-200">{dockerInfo.images}</span>
+              <span className="text-gray-500 dark:text-gray-400">Images:</span>
+              <span className="text-gray-800 dark:text-gray-200">{dockerInfo.images}</span>
             </div>
             {dockerInfo.osType && (
               <div className="flex justify-between">
-                <span className="text-gray-400">OS Type:</span>
-                <span className="text-gray-200">{dockerInfo.osType}</span>
+                <span className="text-gray-500 dark:text-gray-400">OS Type:</span>
+                <span className="text-gray-800 dark:text-gray-200">{dockerInfo.osType}</span>
               </div>
             )}
             {dockerInfo.architecture && (
               <div className="flex justify-between">
-                <span className="text-gray-400">Architecture:</span>
-                <span className="text-gray-200">{dockerInfo.architecture}</span>
+                <span className="text-gray-500 dark:text-gray-400">Architecture:</span>
+                <span className="text-gray-800 dark:text-gray-200">{dockerInfo.architecture}</span>
               </div>
             )}
           </div>
