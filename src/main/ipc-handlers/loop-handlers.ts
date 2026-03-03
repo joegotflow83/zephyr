@@ -54,9 +54,9 @@ export function registerLoopHandlers(services: LoopServices): void {
   const logger = getLogger('loop');
 
   // In-memory map tracking active deploy keys for cleanup on loop termination.
-  // Maps projectId -> { keyId, repoUrl, pat } so we can delete keys from GitHub
-  // when the loop stops, fails, or completes.
-  const activeDeployKeys = new Map<string, { keyId: number; repoUrl: string; pat: string }>();
+  // Maps projectId -> { keyId, repoUrl, pat, service } so we can delete keys from
+  // GitHub or GitLab when the loop stops, fails, or completes.
+  const activeDeployKeys = new Map<string, { keyId: number; repoUrl: string; pat: string; service: 'github' | 'gitlab' }>();
 
   // ── Loop lifecycle ────────────────────────────────────────────────────────
 
@@ -291,15 +291,56 @@ export function registerLoopHandlers(services: LoopServices): void {
                 project_name: opts.projectName,
                 loop_id: state.containerId,
                 created_at: new Date().toISOString(),
+                service: 'github',
               });
             }
 
             await sshKeyManager.injectIntoContainer(state.containerId, privateKey);
-            activeDeployKeys.set(opts.projectId, { keyId, repoUrl: project.repo_url, pat });
+            activeDeployKeys.set(opts.projectId, { keyId, repoUrl: project.repo_url, pat, service: 'github' });
             logger.info('SSH deploy key injected into container', { projectId: opts.projectId, keyId });
           }
         } catch (err) {
           logger.warn('Failed to set up SSH deploy key; loop continues without GitHub SSH access', { err });
+        }
+      }
+
+      // Inject ephemeral SSH deploy key for GitLab repos.
+      // Only runs when: project has a GitLab repo_url, a PAT is stored, and
+      // the container has started (containerId is set). Failures are non-fatal.
+      if (
+        project &&
+        project.repo_url &&
+        sshKeyManager?.isGitlabUrl(project.repo_url) &&
+        credentialManager &&
+        state.containerId
+      ) {
+        try {
+          const pat = await credentialManager.getGitlabPat(opts.projectId);
+          if (pat) {
+            const { privateKey, publicKey } = sshKeyManager.generateKeyPair();
+            const keyTitle = `zephyr-${opts.projectId.slice(0, 8)}-${Date.now()}`;
+            const keyId = await sshKeyManager.addGitlabDeployKey(pat, project.repo_url, publicKey, keyTitle);
+
+            // Record in store before injection so a mid-injection crash leaves a traceable entry
+            if (deployKeyStore) {
+              const { owner, repo } = sshKeyManager.parseGitlabRepo(project.repo_url);
+              deployKeyStore.record({
+                key_id: keyId,
+                repo: `${owner}/${repo}`,
+                project_id: opts.projectId,
+                project_name: opts.projectName,
+                loop_id: state.containerId,
+                created_at: new Date().toISOString(),
+                service: 'gitlab',
+              });
+            }
+
+            await sshKeyManager.injectIntoContainerForGitlab(state.containerId, privateKey);
+            activeDeployKeys.set(opts.projectId, { keyId, repoUrl: project.repo_url, pat, service: 'gitlab' });
+            logger.info('GitLab SSH deploy key injected into container', { projectId: opts.projectId, keyId });
+          }
+        } catch (err) {
+          logger.warn('Failed to set up SSH deploy key; loop continues without GitLab SSH access', { err });
         }
       }
 
@@ -375,14 +416,20 @@ export function registerLoopHandlers(services: LoopServices): void {
     activeDeployKeys.delete(state.projectId);
 
     try {
-      await sshKeyManager.removeDeployKey(keyInfo.pat, keyInfo.repoUrl, keyInfo.keyId);
+      if (keyInfo.service === 'gitlab') {
+        await sshKeyManager.removeGitlabDeployKey(keyInfo.pat, keyInfo.repoUrl, keyInfo.keyId);
+        logger.info('SSH deploy key removed from GitLab', { projectId: state.projectId, keyId: keyInfo.keyId });
+      } else {
+        await sshKeyManager.removeDeployKey(keyInfo.pat, keyInfo.repoUrl, keyInfo.keyId);
+        logger.info('SSH deploy key removed from GitHub', { projectId: state.projectId, keyId: keyInfo.keyId });
+      }
       deployKeyStore?.markCleaned(keyInfo.keyId);
-      logger.info('SSH deploy key removed from GitHub', { projectId: state.projectId, keyId: keyInfo.keyId });
     } catch (err) {
-      logger.warn('Failed to remove deploy key from GitHub (key may need manual cleanup)', {
+      logger.warn('Failed to remove deploy key (key may need manual cleanup)', {
         err,
         projectId: state.projectId,
         keyId: keyInfo.keyId,
+        service: keyInfo.service,
       });
     }
   });

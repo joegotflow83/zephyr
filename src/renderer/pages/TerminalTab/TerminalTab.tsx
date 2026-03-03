@@ -79,10 +79,15 @@ export const TerminalTab: React.FC = () => {
     return () => clearInterval(interval);
   }, [selectedTarget]);
 
-  // Set up global terminal event listeners
+  // Keep a ref so IPC callbacks always see the latest sessions without
+  // needing to be re-registered (which would create brief data-loss windows).
+  const sessionsRef = React.useRef(sessions);
+  sessionsRef.current = sessions;
+
+  // Set up global terminal event listeners — registered once, never torn down.
   useEffect(() => {
     const cleanupData = window.api.terminal.onData((sessionId, data) => {
-      const session = sessions.find((s) => s.id === sessionId);
+      const session = sessionsRef.current.find((s) => s.id === sessionId);
       if (session?.terminalRef.current) {
         session.terminalRef.current.write(data);
       }
@@ -105,7 +110,7 @@ export const TerminalTab: React.FC = () => {
       cleanupClosed();
       cleanupError();
     };
-  }, [sessions]);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const openTerminal = async () => {
     if (!selectedTarget) {

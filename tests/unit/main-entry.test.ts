@@ -147,7 +147,6 @@ const {
   mockScheduler,
   mockLogExporter,
   mockTerminalManager,
-  mockGitManager,
   mockSelfUpdater,
   mockCleanupManager,
   mockPreValidationStore,
@@ -165,7 +164,6 @@ const {
   MockLoopScheduler,
   MockLogExporter,
   MockTerminalManager,
-  MockGitManager,
   MockSelfUpdater,
   MockCleanupManager,
   MockPreValidationStore,
@@ -255,12 +253,6 @@ const {
     setWebContents: vi.fn(),
   };
 
-  const mockGitManager = {
-    clone: vi.fn(),
-    pull: vi.fn(),
-    getCurrentBranch: vi.fn(),
-  };
-
   const mockSelfUpdater = {
     checkForUpdates: vi.fn(),
     applyUpdate: vi.fn(),
@@ -287,7 +279,6 @@ const {
   const MockLoopScheduler = vi.fn(function() { return mockScheduler; });
   const MockLogExporter = vi.fn(function() { return mockLogExporter; });
   const MockTerminalManager = vi.fn(function() { return mockTerminalManager; });
-  const MockGitManager = vi.fn(function() { return mockGitManager; });
   const MockSelfUpdater = vi.fn(function() { return mockSelfUpdater; });
   const MockCleanupManager = vi.fn(function() { return mockCleanupManager; });
 
@@ -317,7 +308,6 @@ const {
     mockScheduler,
     mockLogExporter,
     mockTerminalManager,
-    mockGitManager,
     mockSelfUpdater,
     mockCleanupManager,
     mockPreValidationStore,
@@ -335,7 +325,6 @@ const {
     MockLoopScheduler,
     MockLogExporter,
     MockTerminalManager,
-    MockGitManager,
     MockSelfUpdater,
     MockCleanupManager,
     MockPreValidationStore,
@@ -390,10 +379,6 @@ vi.mock('../../src/services/log-exporter', () => ({
 
 vi.mock('../../src/services/terminal-manager', () => ({
   TerminalManager: MockTerminalManager,
-}));
-
-vi.mock('../../src/services/git-manager', () => ({
-  GitManager: MockGitManager,
 }));
 
 vi.mock('../../src/services/self-updater', () => ({
@@ -613,12 +598,8 @@ describe('Main Entry Point', () => {
       expect(MockTerminalManager).toHaveBeenCalledWith(mockDockerManager);
     });
 
-    it('should instantiate GitManager', () => {
-      expect(MockGitManager).toHaveBeenCalled();
-    });
-
-    it('should instantiate SelfUpdater with GitManager, LoopRunner, and app path', () => {
-      expect(MockSelfUpdater).toHaveBeenCalledWith(mockGitManager, '/mock/app/path', mockLoopRunner);
+    it('should instantiate SelfUpdater with app path and LoopRunner', () => {
+      expect(MockSelfUpdater).toHaveBeenCalledWith('/mock/app/path', mockLoopRunner);
     });
 
     it('should instantiate CleanupManager with DockerManager', () => {

@@ -1,6 +1,6 @@
 /**
  * Unit tests for SelfUpdater service.
- * Mocks GitManager and LoopRunner to avoid real operations.
+ * Mocks fetch and LoopRunner to avoid real operations.
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
@@ -19,16 +19,15 @@ vi.mock('fs', () => {
 
 // Import after mocks are set up
 import { SelfUpdater, UpdateInfo, SELF_UPDATE_PROJECT_ID } from '../../src/services/self-updater';
-import { GitManager } from '../../src/services/git-manager';
 import type { LoopRunner } from '../../src/services/loop-runner';
 import { LoopMode } from '../../src/shared/loop-types';
 import { readFileSync } from 'fs';
 
 describe('SelfUpdater', () => {
   let updater: SelfUpdater;
-  let mockGitManager: GitManager;
   let mockLoopRunner: Partial<LoopRunner>;
   let mockReadFileSync: any;
+  let mockFetch: any;
 
   const appDir = '/test/app';
   const packageJsonContent = JSON.stringify({
@@ -38,16 +37,6 @@ describe('SelfUpdater', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-
-    // Mock GitManager
-    mockGitManager = {
-      validateRepo: vi.fn(),
-      getRepoInfo: vi.fn(),
-      getRecentCommits: vi.fn(),
-      cloneRepo: vi.fn(),
-      fetchRemote: vi.fn(),
-      getRemoteFileContent: vi.fn(),
-    } as any;
 
     // Mock LoopRunner
     mockLoopRunner = {
@@ -59,7 +48,11 @@ describe('SelfUpdater', () => {
     mockReadFileSync = readFileSync as any;
     mockReadFileSync.mockReturnValue(packageJsonContent);
 
-    updater = new SelfUpdater(mockGitManager, appDir);
+    // Mock fetch
+    mockFetch = vi.fn();
+    globalThis.fetch = mockFetch;
+
+    updater = new SelfUpdater(appDir);
   });
 
   describe('constructor', () => {
@@ -68,11 +61,7 @@ describe('SelfUpdater', () => {
     });
 
     it('should create instance with LoopRunner', () => {
-      const updaterWithRunner = new SelfUpdater(
-        mockGitManager,
-        appDir,
-        mockLoopRunner as LoopRunner
-      );
+      const updaterWithRunner = new SelfUpdater(appDir, mockLoopRunner as LoopRunner);
       expect(updaterWithRunner).toBeDefined();
     });
   });
@@ -119,32 +108,17 @@ describe('SelfUpdater', () => {
   });
 
   describe('checkForUpdates', () => {
+    const makeRelease = (version: string, body?: string) => ({
+      tag_name: `v${version}`,
+      body: body ?? '',
+    });
+
     beforeEach(() => {
-      (mockGitManager.validateRepo as any).mockResolvedValue(true);
-      (mockGitManager.fetchRemote as any).mockResolvedValue(undefined);
-      (mockGitManager.getRepoInfo as any).mockResolvedValue({
-        branch: 'main',
-        remoteUrl: 'https://github.com/example/zephyr.git',
-        isDirty: false,
+      // Default: same version as current — no update
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: async () => makeRelease('0.1.0', 'Some release notes'),
       });
-      // Default: remote version equals local version — no update
-      (mockGitManager.getRemoteFileContent as any).mockResolvedValue(
-        JSON.stringify({ name: 'zephyr-desktop', version: '0.1.0' })
-      );
-      (mockGitManager.getRecentCommits as any).mockResolvedValue([
-        {
-          hash: 'abc123',
-          message: 'Add feature X',
-          author: 'test@example.com',
-          date: '2026-02-19T10:00:00Z',
-        },
-        {
-          hash: 'def456',
-          message: 'Fix bug Y',
-          author: 'test@example.com',
-          date: '2026-02-18T15:00:00Z',
-        },
-      ]);
     });
 
     it('should check for updates successfully (no update available)', async () => {
@@ -154,23 +128,17 @@ describe('SelfUpdater', () => {
       expect(updateInfo.available).toBe(false);
       expect(updateInfo.currentVersion).toBe('0.1.0');
       expect(updateInfo.latestVersion).toBe('0.1.0');
-      expect(updateInfo.changelog).toContain('Add feature X');
-      expect(updateInfo.changelog).toContain('abc123');
-      expect(mockGitManager.validateRepo).toHaveBeenCalledWith(appDir);
-      expect(mockGitManager.fetchRemote).toHaveBeenCalledWith(appDir);
-      expect(mockGitManager.getRepoInfo).toHaveBeenCalledWith(appDir);
-      expect(mockGitManager.getRemoteFileContent).toHaveBeenCalledWith(
-        appDir,
-        'origin/HEAD',
-        'package.json'
+      expect(mockFetch).toHaveBeenCalledWith(
+        'https://api.github.com/repos/joegotflow83/zephyr/releases/latest',
+        expect.objectContaining({ headers: expect.any(Object) })
       );
-      expect(mockGitManager.getRecentCommits).toHaveBeenCalledWith(appDir, 5);
     });
 
     it('should return available=true when remote version is newer', async () => {
-      (mockGitManager.getRemoteFileContent as any).mockResolvedValue(
-        JSON.stringify({ name: 'zephyr-desktop', version: '0.2.0' })
-      );
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: async () => makeRelease('0.2.0'),
+      });
 
       const updateInfo = await updater.checkForUpdates();
 
@@ -180,9 +148,10 @@ describe('SelfUpdater', () => {
     });
 
     it('should return available=false when remote version matches current', async () => {
-      (mockGitManager.getRemoteFileContent as any).mockResolvedValue(
-        JSON.stringify({ name: 'zephyr-desktop', version: '0.1.0' })
-      );
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: async () => makeRelease('0.1.0'),
+      });
 
       const updateInfo = await updater.checkForUpdates();
 
@@ -191,9 +160,10 @@ describe('SelfUpdater', () => {
     });
 
     it('should return available=false when remote version is older', async () => {
-      (mockGitManager.getRemoteFileContent as any).mockResolvedValue(
-        JSON.stringify({ name: 'zephyr-desktop', version: '0.0.9' })
-      );
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: async () => makeRelease('0.0.9'),
+      });
 
       const updateInfo = await updater.checkForUpdates();
 
@@ -201,83 +171,58 @@ describe('SelfUpdater', () => {
       expect(updateInfo.latestVersion).toBe('0.0.9');
     });
 
-    it('should handle unreadable remote package.json gracefully', async () => {
-      (mockGitManager.getRemoteFileContent as any).mockRejectedValue(
-        new Error('ref not found')
-      );
+    it('should strip leading v from tag_name', async () => {
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: async () => ({ tag_name: 'v0.2.0', body: '' }),
+      });
 
       const updateInfo = await updater.checkForUpdates();
 
-      // Falls back to no update available
-      expect(updateInfo.available).toBe(false);
-      expect(updateInfo.latestVersion).toBe('0.1.0');
+      expect(updateInfo.latestVersion).toBe('0.2.0');
     });
 
-    it('should handle malformed remote package.json gracefully', async () => {
-      (mockGitManager.getRemoteFileContent as any).mockResolvedValue(
-        'not valid json {'
-      );
+    it('should include changelog from release body', async () => {
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: async () => makeRelease('0.2.0', 'New feature: Terminal support\nBug fix: Memory leak'),
+      });
 
       const updateInfo = await updater.checkForUpdates();
 
-      expect(updateInfo.available).toBe(false);
-      expect(updateInfo.latestVersion).toBe('0.1.0');
+      expect(updateInfo.changelog).toContain('New feature: Terminal support');
+      expect(updateInfo.changelog).toContain('Bug fix: Memory leak');
     });
 
-    it('should handle remote package.json missing version field gracefully', async () => {
-      (mockGitManager.getRemoteFileContent as any).mockResolvedValue(
-        JSON.stringify({ name: 'zephyr-desktop' })
-      );
-
-      const updateInfo = await updater.checkForUpdates();
-
-      expect(updateInfo.available).toBe(false);
-      expect(updateInfo.latestVersion).toBe('0.1.0');
-    });
-
-    it('should throw error if app directory is not a git repo', async () => {
-      (mockGitManager.validateRepo as any).mockResolvedValue(false);
-
-      await expect(updater.checkForUpdates()).rejects.toThrow(
-        'Application directory is not a valid Git repository'
-      );
-    });
-
-    it('should throw error if fetchRemote fails', async () => {
-      (mockGitManager.fetchRemote as any).mockRejectedValue(
-        new Error('Network error')
-      );
-
-      await expect(updater.checkForUpdates()).rejects.toThrow(
-        'Failed to check for updates'
-      );
-    });
-
-    it('should throw error if getRepoInfo fails', async () => {
-      (mockGitManager.getRepoInfo as any).mockRejectedValue(
-        new Error('git error')
-      );
-
-      await expect(updater.checkForUpdates()).rejects.toThrow(
-        'Failed to check for updates'
-      );
-    });
-
-    it('should include changelog with recent commits', async () => {
-      const updateInfo = await updater.checkForUpdates();
-
-      expect(updateInfo.changelog).toContain('Add feature X');
-      expect(updateInfo.changelog).toContain('Fix bug Y');
-      expect(updateInfo.changelog).toContain('abc123');
-      expect(updateInfo.changelog).toContain('def456');
-    });
-
-    it('should handle empty commit history', async () => {
-      (mockGitManager.getRecentCommits as any).mockResolvedValue([]);
+    it('should return empty changelog when release body is absent', async () => {
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: async () => ({ tag_name: 'v0.1.0' }),
+      });
 
       const updateInfo = await updater.checkForUpdates();
 
       expect(updateInfo.changelog).toBe('');
+    });
+
+    it('should throw error when GitHub API returns non-ok status', async () => {
+      mockFetch.mockResolvedValue({
+        ok: false,
+        status: 404,
+        statusText: 'Not Found',
+      });
+
+      await expect(updater.checkForUpdates()).rejects.toThrow(
+        'Failed to check for updates'
+      );
+    });
+
+    it('should throw error when fetch fails (network error)', async () => {
+      mockFetch.mockRejectedValue(new Error('Network error'));
+
+      await expect(updater.checkForUpdates()).rejects.toThrow(
+        'Failed to check for updates'
+      );
     });
 
     it('should return current version as latest when no updates', async () => {
@@ -305,7 +250,7 @@ describe('SelfUpdater', () => {
     });
 
     it('should throw error if no LoopRunner configured', async () => {
-      const updaterNoRunner = new SelfUpdater(mockGitManager, appDir);
+      const updaterNoRunner = new SelfUpdater(appDir);
 
       await expect(
         updaterNoRunner.startSelfUpdate(dockerImage)

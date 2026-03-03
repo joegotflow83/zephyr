@@ -32,6 +32,12 @@ export interface GithubRepo {
   repo: string;
 }
 
+/** Parsed GitLab repository coordinates. */
+export interface GitlabRepo {
+  owner: string;
+  repo: string;
+}
+
 /**
  * GitHub's hardcoded ED25519 host fingerprint.
  * Pinning this prevents MITM on the very first `git push` inside the container.
@@ -41,10 +47,22 @@ const GITHUB_KNOWN_HOST =
   'github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl';
 
 /**
+ * GitLab's hardcoded ED25519 host fingerprint.
+ * Source: https://docs.gitlab.com/ee/user/gitlab_com/index.html#ssh-known_hosts-entries
+ */
+const GITLAB_KNOWN_HOST =
+  'gitlab.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAfuCHKVTjquxvt6CM6tdG4SLp1Btn/nOeHHE5UOzRdf';
+
+/**
  * SSH config written to ~/.ssh/config inside the container.
  * Forces use of the injected key and strict host key checking.
  */
 const SSH_CONFIG = `Host github.com
+  IdentityFile ~/.ssh/id_ed25519
+  StrictHostKeyChecking yes
+`;
+
+const GITLAB_SSH_CONFIG = `Host gitlab.com
   IdentityFile ~/.ssh/id_ed25519
   StrictHostKeyChecking yes
 `;
@@ -129,6 +147,105 @@ export class SSHKeyManager {
   }
 
   /**
+   * Returns true if the given URL points to a GitLab repository.
+   */
+  isGitlabUrl(url: string): boolean {
+    return /gitlab\.com[:/]/.test(url);
+  }
+
+  /**
+   * Parse a GitLab repository URL into `{ owner, repo }`.
+   *
+   * Handles:
+   * - HTTPS: `https://gitlab.com/owner/repo` or `https://gitlab.com/owner/repo.git`
+   * - SSH: `git@gitlab.com:owner/repo.git`
+   *
+   * @throws if the URL cannot be parsed as a GitLab repo URL
+   */
+  parseGitlabRepo(url: string): GitlabRepo {
+    // SSH format: git@gitlab.com:owner/repo.git
+    const sshMatch = url.match(/^git@gitlab\.com:([^/]+)\/([^/]+?)(?:\.git)?$/);
+    if (sshMatch) {
+      return { owner: sshMatch[1], repo: sshMatch[2] };
+    }
+
+    // HTTPS format: https://gitlab.com/owner/repo or https://gitlab.com/owner/repo.git
+    const httpsMatch = url.match(/^https?:\/\/gitlab\.com\/([^/]+)\/([^/]+?)(?:\.git)?(?:\/.*)?$/);
+    if (httpsMatch) {
+      return { owner: httpsMatch[1], repo: httpsMatch[2] };
+    }
+
+    throw new Error(`Cannot parse GitLab repo from URL: ${url}`);
+  }
+
+  /**
+   * Register a public key as a deploy key on a GitLab repository.
+   *
+   * @param pat - GitLab Personal Access Token with api or write_repository scope
+   * @param repoUrl - Repository URL (HTTPS or SSH format)
+   * @param publicKey - OpenSSH public key string (`ssh-ed25519 AAAA...`)
+   * @param title - Display name shown in GitLab's deploy keys list
+   * @returns The numeric key ID assigned by GitLab (needed for later deletion)
+   */
+  async addGitlabDeployKey(
+    pat: string,
+    repoUrl: string,
+    publicKey: string,
+    title: string
+  ): Promise<number> {
+    const { owner, repo } = this.parseGitlabRepo(repoUrl);
+    const projectPath = encodeURIComponent(`${owner}/${repo}`);
+
+    const body = JSON.stringify({
+      title,
+      key: publicKey,
+      can_push: true,
+    });
+
+    const response = await this.gitlabApiRequest(
+      'POST',
+      `/api/v4/projects/${projectPath}/deploy_keys`,
+      pat,
+      body
+    );
+
+    if (response.statusCode !== 201) {
+      throw new Error(
+        `GitLab deploy key creation failed: HTTP ${response.statusCode} — ${response.body}`
+      );
+    }
+
+    const data = JSON.parse(response.body) as { id: number };
+    return data.id;
+  }
+
+  /**
+   * Delete a deploy key from a GitLab repository.
+   *
+   * @param pat - GitLab Personal Access Token with api or write_repository scope
+   * @param repoUrl - Repository URL (HTTPS or SSH format)
+   * @param keyId - The numeric key ID returned by `addGitlabDeployKey`
+   */
+  async removeGitlabDeployKey(pat: string, repoUrl: string, keyId: number): Promise<void> {
+    const { owner, repo } = this.parseGitlabRepo(repoUrl);
+    const projectPath = encodeURIComponent(`${owner}/${repo}`);
+
+    const response = await this.gitlabApiRequest(
+      'DELETE',
+      `/api/v4/projects/${projectPath}/deploy_keys/${keyId}`,
+      pat,
+      null
+    );
+
+    // 204 No Content on success; 404 if already deleted (idempotent)
+    if (response.statusCode !== 204 && response.statusCode !== 404) {
+      throw new Error(
+        `GitLab deploy key deletion failed: HTTP ${response.statusCode} — ${response.body}`
+      );
+    }
+  }
+
+  /**
    * Register a public key as a deploy key on a GitHub repository.
    *
    * @param pat - GitHub Personal Access Token with repo deploy key write access
@@ -188,7 +305,7 @@ export class SSHKeyManager {
   }
 
   /**
-   * Inject an ED25519 private key into a running container's SSH directory.
+   * Inject an ED25519 private key into a running container's SSH directory for GitHub.
    *
    * Sets up:
    * - `~/.ssh/id_ed25519` (chmod 600) — private key for authentication
@@ -202,8 +319,32 @@ export class SSHKeyManager {
    * @param privateKey - PKCS#8 PEM private key string
    */
   async injectIntoContainer(containerId: string, privateKey: string): Promise<void> {
+    return this.injectIntoContainerForHost(containerId, privateKey, 'github');
+  }
+
+  /**
+   * Inject an ED25519 private key into a running container's SSH directory for GitLab.
+   *
+   * @param containerId - Running Docker container ID
+   * @param privateKey - PKCS#8 PEM private key string
+   */
+  async injectIntoContainerForGitlab(containerId: string, privateKey: string): Promise<void> {
+    return this.injectIntoContainerForHost(containerId, privateKey, 'gitlab');
+  }
+
+  /**
+   * Shared implementation for injecting an SSH key into a container for a given host.
+   */
+  private async injectIntoContainerForHost(
+    containerId: string,
+    privateKey: string,
+    provider: 'github' | 'gitlab'
+  ): Promise<void> {
     const exec = (cmd: string) =>
       this.dockerManager.execCommand(containerId, ['sh', '-c', cmd]);
+
+    const knownHost = provider === 'github' ? GITHUB_KNOWN_HOST : GITLAB_KNOWN_HOST;
+    const sshConfig = provider === 'github' ? SSH_CONFIG : GITLAB_SSH_CONFIG;
 
     // Create SSH directory with restrictive permissions
     const mkdirResult = await exec('mkdir -p ~/.ssh && chmod 700 ~/.ssh');
@@ -220,8 +361,8 @@ export class SSHKeyManager {
       throw new Error(`Failed to write SSH private key to container: ${writeKeyResult.stderr}`);
     }
 
-    // Write hardcoded GitHub known_hosts to prevent MITM on first connection
-    const knownHostsB64 = Buffer.from(GITHUB_KNOWN_HOST + '\n').toString('base64');
+    // Write hardcoded known_hosts fingerprint to prevent MITM on first connection
+    const knownHostsB64 = Buffer.from(knownHost + '\n').toString('base64');
     const writeKnownHostsResult = await exec(
       `printf '%s' '${knownHostsB64}' | base64 -d > ~/.ssh/known_hosts && chmod 644 ~/.ssh/known_hosts`
     );
@@ -229,8 +370,8 @@ export class SSHKeyManager {
       throw new Error(`Failed to write SSH known_hosts to container: ${writeKnownHostsResult.stderr}`);
     }
 
-    // Write SSH config to bind the key to github.com
-    const sshConfigB64 = Buffer.from(SSH_CONFIG).toString('base64');
+    // Write SSH config to bind the key to the host
+    const sshConfigB64 = Buffer.from(sshConfig).toString('base64');
     const writeConfigResult = await exec(
       `printf '%s' '${sshConfigB64}' | base64 -d > ~/.ssh/config && chmod 644 ~/.ssh/config`
     );
@@ -264,6 +405,56 @@ export class SSHKeyManager {
           Authorization: `Bearer ${pat}`,
           Accept: 'application/vnd.github+json',
           'X-GitHub-Api-Version': '2022-11-28',
+          'User-Agent': 'Zephyr-Desktop',
+          ...(body !== null
+            ? { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) }
+            : {}),
+        },
+      };
+
+      const req = https.request(options, (res) => {
+        const chunks: Buffer[] = [];
+        res.on('data', (chunk: Buffer) => chunks.push(chunk));
+        res.on('end', () => {
+          resolve({
+            statusCode: res.statusCode ?? 0,
+            body: Buffer.concat(chunks).toString('utf-8'),
+          });
+        });
+      });
+
+      req.on('error', reject);
+
+      if (body !== null) {
+        req.write(body);
+      }
+      req.end();
+    });
+  }
+
+  /**
+   * Make a GitLab REST API request.
+   *
+   * @param method - HTTP method (POST, DELETE, etc.)
+   * @param path - API path (e.g., `/api/v4/projects/owner%2Frepo/deploy_keys`)
+   * @param pat - Personal Access Token for PRIVATE-TOKEN header
+   * @param body - JSON request body (null for DELETE)
+   * @returns Status code and response body string
+   */
+  private gitlabApiRequest(
+    method: string,
+    path: string,
+    pat: string,
+    body: string | null
+  ): Promise<{ statusCode: number; body: string }> {
+    return new Promise((resolve, reject) => {
+      const options: https.RequestOptions = {
+        hostname: 'gitlab.com',
+        port: 443,
+        path,
+        method,
+        headers: {
+          'PRIVATE-TOKEN': pat,
           'User-Agent': 'Zephyr-Desktop',
           ...(body !== null
             ? { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) }

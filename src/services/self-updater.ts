@@ -7,7 +7,6 @@
  * project ID "zephyr-self-update".
  */
 
-import { GitManager } from './git-manager';
 import type { LoopRunner } from './loop-runner';
 import { LoopMode } from '../shared/loop-types';
 import path from 'path';
@@ -50,31 +49,28 @@ function compareVersions(a: string, b: string): number {
   return aPat - bPat;
 }
 
+const GITHUB_RELEASES_API = 'https://api.github.com/repos/joegotflow83/zephyr/releases/latest';
+
 /**
  * Manages application self-updates.
  *
- * Uses GitManager to check for new versions by fetching and comparing
- * the remote repository. Can trigger a self-update loop via LoopRunner
- * using the reserved project ID.
+ * Checks for new versions via the GitHub releases API and can trigger
+ * a self-update loop via LoopRunner using the reserved project ID.
  */
 export class SelfUpdater {
-  private gitManager: GitManager;
   private loopRunner: LoopRunner | null;
   private appDir: string;
 
   /**
    * Create a new SelfUpdater.
    *
-   * @param gitManager - GitManager instance for repository operations
    * @param appDir - Root directory of the application (contains package.json)
    * @param loopRunner - Optional LoopRunner for triggering self-update loops
    */
   constructor(
-    gitManager: GitManager,
     appDir: string,
     loopRunner: LoopRunner | null = null
   ) {
-    this.gitManager = gitManager;
     this.appDir = appDir;
     this.loopRunner = loopRunner;
   }
@@ -106,63 +102,32 @@ export class SelfUpdater {
   }
 
   /**
-   * Check for available updates.
+   * Check for available updates via the GitHub releases API.
    *
-   * Validates that the app directory is a git repository, fetches the latest
-   * remote commits, and compares version strings. If the remote has a newer
-   * version in package.json, returns UpdateInfo with available=true.
+   * Fetches the latest release from GitHub and compares its tag version
+   * against the current installed version.
    *
    * @returns Update information with availability status
-   * @throws Error if the app directory is not a valid git repository
-   * @throws Error if git operations fail (network, auth, etc.)
+   * @throws Error if the GitHub API request fails
    */
   async checkForUpdates(): Promise<UpdateInfo> {
-    // Validate that appDir is a git repository
-    const isRepo = await this.gitManager.validateRepo(this.appDir);
-    if (!isRepo) {
-      throw new Error(
-        'Application directory is not a valid Git repository. Cannot check for updates.'
-      );
-    }
-
-    // Get current version
     const currentVersion = this.getCurrentVersion();
 
     try {
-      // Fetch the latest remote changes so origin/HEAD is up to date
-      await this.gitManager.fetchRemote(this.appDir);
+      const response = await fetch(GITHUB_RELEASES_API, {
+        headers: {
+          Accept: 'application/vnd.github+json',
+          'User-Agent': 'zephyr-desktop',
+        },
+      });
 
-      // Verify repo info is accessible
-      await this.gitManager.getRepoInfo(this.appDir);
-
-      // Read remote package.json to get the latest published version
-      let latestVersion = currentVersion;
-      try {
-        const remoteContent = await this.gitManager.getRemoteFileContent(
-          this.appDir,
-          'origin/HEAD',
-          'package.json'
-        );
-        const remotePkg = JSON.parse(remoteContent);
-        if (remotePkg.version) {
-          latestVersion = remotePkg.version;
-        }
-      } catch {
-        // If the remote package.json cannot be read (e.g., no network, missing
-        // file), treat as no update available — don't surface a hard error.
-        latestVersion = currentVersion;
+      if (!response.ok) {
+        throw new Error(`GitHub API returned ${response.status}: ${response.statusText}`);
       }
 
-      // Get recent commits for changelog
-      const commits = await this.gitManager.getRecentCommits(this.appDir, 5);
-      let changelog = '';
-      if (commits.length > 0) {
-        changelog = commits
-          .map((c) => `- ${c.message} (${c.hash.slice(0, 7)})`)
-          .join('\n');
-      }
-
-      // An update is available only when the remote version is strictly newer
+      const release = (await response.json()) as { tag_name: string; body?: string };
+      const latestVersion = release.tag_name.replace(/^v/, '');
+      const changelog = release.body || '';
       const available = compareVersions(latestVersion, currentVersion) > 0;
 
       return {

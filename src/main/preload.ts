@@ -180,9 +180,17 @@ contextBridge.exposeInMainWorld('api', {
     delete: (projectId: string) => ipcRenderer.invoke(IPC.GITHUB_PAT_DELETE, projectId),
   },
 
+  gitlabPat: {
+    set: (projectId: string, pat: string) =>
+      ipcRenderer.invoke(IPC.GITLAB_PAT_SET, projectId, pat),
+    has: (projectId: string) => ipcRenderer.invoke(IPC.GITLAB_PAT_GET, projectId),
+    delete: (projectId: string) => ipcRenderer.invoke(IPC.GITLAB_PAT_DELETE, projectId),
+  },
+
   deployKeys: {
     listOrphaned: () => ipcRenderer.invoke(IPC.DEPLOY_KEYS_LIST_ORPHANED),
-    getUrl: (repo: string) => ipcRenderer.invoke(IPC.DEPLOY_KEYS_GET_URL, repo),
+    getUrl: (repo: string, service?: 'github' | 'gitlab') =>
+      ipcRenderer.invoke(IPC.DEPLOY_KEYS_GET_URL, repo, service),
   },
 
   shell: {

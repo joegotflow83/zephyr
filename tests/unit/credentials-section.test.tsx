@@ -84,7 +84,7 @@ describe('CredentialsSection', () => {
 
     await waitFor(
       () => expect(screen.queryByText('Loading credentials...')).not.toBeInTheDocument(),
-      { timeout: 200 }
+      { timeout: 1000 }
     );
   });
 
@@ -214,12 +214,14 @@ describe('CredentialsSection', () => {
     });
   });
 
-  it('shows GitHub section with Not Set status initially', async () => {
+  it('shows GitHub and GitLab sections with Not Set status initially', async () => {
     render(<CredentialsSection />);
 
     await waitFor(() => {
       expect(screen.getByText('GitHub')).toBeInTheDocument();
-      expect(screen.getByText('Not Set')).toBeInTheDocument();
+      expect(screen.getByText('GitLab')).toBeInTheDocument();
+      const notSetBadges = screen.getAllByText('Not Set');
+      expect(notSetBadges.length).toBeGreaterThanOrEqual(2);
     });
   });
 

@@ -229,16 +229,18 @@ export class TerminalManager {
         callback();
       },
       read() {
-        // Data is pushed from child.stdout event listener below
+        // Called by Node.js when the consumer wants more data.
+        // Resume child.stdout in case it was paused by backpressure.
+        child.stdout!.resume();
       },
     });
 
     child.stdout!.on('data', (chunk: Buffer) => {
       if (!stream.push(chunk)) {
+        // Backpressure: pause the source until stream.read() is called again.
         child.stdout!.pause();
       }
     });
-    stream.on('resume', () => child.stdout!.resume());
 
     child.stderr!.on('data', (chunk: Buffer) => {
       // Merge stderr into the stream so the terminal shows errors too

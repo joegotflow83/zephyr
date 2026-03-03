@@ -19,9 +19,12 @@ export function registerDeployKeyHandlers(services: DeployKeyServices): void {
     return deployKeyStore.listOrphaned();
   });
 
-  // ── Get GitHub Deploy Keys URL ────────────────────────────────────────────
+  // ── Get Deploy Keys URL (GitHub or GitLab) ───────────────────────────────
 
-  ipcMain.handle(IPC.DEPLOY_KEYS_GET_URL, async (_event, repo: string): Promise<string> => {
-    return deployKeyStore.getGithubKeysUrl(repo);
-  });
+  ipcMain.handle(
+    IPC.DEPLOY_KEYS_GET_URL,
+    async (_event, repo: string, service?: 'github' | 'gitlab'): Promise<string> => {
+      return deployKeyStore.getDeployKeysUrl(repo, service);
+    },
+  );
 }

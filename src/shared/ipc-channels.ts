@@ -111,6 +111,11 @@ export const IPC = {
   GITHUB_PAT_GET: 'github-pat:get',
   GITHUB_PAT_DELETE: 'github-pat:delete',
 
+  // GitLab PAT storage per project (for deploy key management)
+  GITLAB_PAT_SET: 'gitlab-pat:set',
+  GITLAB_PAT_GET: 'gitlab-pat:get',
+  GITLAB_PAT_DELETE: 'gitlab-pat:delete',
+
   // VM management
   VM_STATUS: 'vm:status',
   VM_LIST: 'vm:list',

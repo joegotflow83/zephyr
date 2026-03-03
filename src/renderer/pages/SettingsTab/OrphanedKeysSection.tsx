@@ -26,8 +26,8 @@ export const OrphanedKeysSection: React.FC = () => {
     fetchKeys();
   }, [fetchKeys]);
 
-  const handleViewOnGitHub = async (repo: string) => {
-    const url = await window.api.deployKeys.getUrl(repo);
+  const handleViewOnService = async (repo: string, service?: 'github' | 'gitlab') => {
+    const url = await window.api.deployKeys.getUrl(repo, service);
     await window.api.shell.openExternal(url);
   };
 
@@ -50,9 +50,9 @@ export const OrphanedKeysSection: React.FC = () => {
   return (
     <div className="space-y-3">
       <p className="text-sm text-yellow-400">
-        The following deploy keys were registered on GitHub but were never removed — likely
-        because the app crashed or was force-quit. Please delete them manually from GitHub
-        to keep your repositories secure.
+        The following deploy keys were registered on GitHub or GitLab but were never removed
+        — likely because the app crashed or was force-quit. Please delete them manually from
+        the respective service to keep your repositories secure.
       </p>
 
       <div className="overflow-x-auto">
@@ -61,6 +61,7 @@ export const OrphanedKeysSection: React.FC = () => {
             <tr className="text-left text-gray-500 dark:text-gray-400 border-b border-gray-200 dark:border-gray-700">
               <th className="pb-2 pr-4 font-medium">Project</th>
               <th className="pb-2 pr-4 font-medium">Repository</th>
+              <th className="pb-2 pr-4 font-medium">Service</th>
               <th className="pb-2 pr-4 font-medium">Created</th>
               <th className="pb-2 font-medium"></th>
             </tr>
@@ -70,13 +71,14 @@ export const OrphanedKeysSection: React.FC = () => {
               <tr key={`${key.repo}-${key.key_id}`} className="border-b border-gray-200/50 dark:border-gray-700/50">
                 <td className="py-2 pr-4 text-gray-900 dark:text-white">{key.project_name}</td>
                 <td className="py-2 pr-4 text-gray-700 dark:text-gray-300 font-mono text-xs">{key.repo}</td>
+                <td className="py-2 pr-4 text-gray-500 dark:text-gray-400 capitalize">{key.service ?? 'github'}</td>
                 <td className="py-2 pr-4 text-gray-500 dark:text-gray-400">{formatDate(key.created_at)}</td>
                 <td className="py-2">
                   <button
-                    onClick={() => handleViewOnGitHub(key.repo)}
+                    onClick={() => handleViewOnService(key.repo, key.service)}
                     className="px-3 py-1 text-xs bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-900 dark:text-white rounded border border-gray-200 dark:border-gray-600 transition-colors"
                   >
-                    View on GitHub
+                    View on {key.service === 'gitlab' ? 'GitLab' : 'GitHub'}
                   </button>
                 </td>
               </tr>

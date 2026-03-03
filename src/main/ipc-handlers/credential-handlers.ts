@@ -117,4 +117,28 @@ export function registerCredentialHandlers(services: CredentialServices): void {
       await credentialManager.deleteGithubPat(projectId);
     },
   );
+
+  // ── GitLab PAT (per-project) ──────────────────────────────────────────────
+
+  ipcMain.handle(
+    IPC.GITLAB_PAT_SET,
+    async (_event, projectId: string, pat: string): Promise<void> => {
+      await credentialManager.setGitlabPat(projectId, pat);
+    },
+  );
+
+  ipcMain.handle(
+    IPC.GITLAB_PAT_GET,
+    async (_event, projectId: string): Promise<boolean> => {
+      const pat = await credentialManager.getGitlabPat(projectId);
+      return pat !== null;
+    },
+  );
+
+  ipcMain.handle(
+    IPC.GITLAB_PAT_DELETE,
+    async (_event, projectId: string): Promise<void> => {
+      await credentialManager.deleteGitlabPat(projectId);
+    },
+  );
 }

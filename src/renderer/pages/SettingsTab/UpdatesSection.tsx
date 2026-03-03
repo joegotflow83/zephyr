@@ -1,7 +1,6 @@
-import React, { useState, useEffect } from 'react';
-import { useSettings } from '../../hooks/useSettings';
+import React, { useState } from 'react';
 
-const DEFAULT_DOCKER_IMAGE = 'zephyr-desktop:latest';
+const RELEASES_URL = 'https://github.com/joegotflow83/zephyr/releases';
 
 /**
  * UpdateInfo type (matches src/services/self-updater.ts)
@@ -17,46 +16,14 @@ interface UpdateInfo {
  * UpdatesSection component for Settings tab
  *
  * Displays:
- * - Docker image input for self-update (configurable by user)
  * - "Check for Updates" button
  * - Current version vs. available version
- * - "Update App" button (triggers self-update loop)
- * - Update progress/status display
- *
- * Wired to window.api.updates.check() and window.api.updates.apply()
- * Docker image persisted via window.api.settings (AppSettings.self_update_docker_image)
+ * - Link to GitHub releases page when an update is available
  */
 export const UpdatesSection: React.FC = () => {
-  const { settings, update } = useSettings();
   const [isChecking, setIsChecking] = useState(false);
-  const [isUpdating, setIsUpdating] = useState(false);
   const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [dockerImage, setDockerImage] = useState(DEFAULT_DOCKER_IMAGE);
-
-  // Sync docker image from persisted settings
-  useEffect(() => {
-    if (settings?.self_update_docker_image) {
-      setDockerImage(settings.self_update_docker_image);
-    }
-  }, [settings]);
-
-  const handleDockerImageChange = (value: string) => {
-    setDockerImage(value);
-  };
-
-  const handleDockerImageBlur = () => {
-    const trimmed = dockerImage.trim() || DEFAULT_DOCKER_IMAGE;
-    if (trimmed !== dockerImage) {
-      setDockerImage(trimmed);
-    }
-    const effective = trimmed;
-    if (effective !== (settings?.self_update_docker_image ?? DEFAULT_DOCKER_IMAGE)) {
-      update({ self_update_docker_image: effective }).catch((err) => {
-        console.error('Failed to save Docker image setting:', err);
-      });
-    }
-  };
 
   const handleCheckForUpdates = async () => {
     setIsChecking(true);
@@ -73,52 +40,8 @@ export const UpdatesSection: React.FC = () => {
     }
   };
 
-  const handleApplyUpdate = async () => {
-    if (!updateInfo?.available) return;
-
-    setIsUpdating(true);
-    setError(null);
-
-    const image = dockerImage.trim() || DEFAULT_DOCKER_IMAGE;
-
-    try {
-      await window.api.updates.apply(image);
-      // Note: The actual update is triggered as a loop in the Loops tab
-      // This just starts the self-update process
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to start update');
-      console.error('Failed to start update:', err);
-    } finally {
-      setIsUpdating(false);
-    }
-  };
-
   return (
     <div className="space-y-6">
-      {/* Docker Image Configuration */}
-      <div className="space-y-2">
-        <label
-          htmlFor="self-update-docker-image"
-          className="block text-sm font-medium text-gray-700 dark:text-gray-300"
-        >
-          Self-Update Docker Image
-        </label>
-        <input
-          id="self-update-docker-image"
-          type="text"
-          value={dockerImage}
-          onChange={(e) => handleDockerImageChange(e.target.value)}
-          onBlur={handleDockerImageBlur}
-          placeholder={DEFAULT_DOCKER_IMAGE}
-          className="w-full px-3 py-2 bg-gray-100 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded text-gray-800 dark:text-gray-200 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          data-testid="docker-image-input"
-        />
-        <p className="text-xs text-gray-500 dark:text-gray-500">
-          Docker image used when running the self-update loop. Defaults to{' '}
-          <code className="text-gray-500 dark:text-gray-400">{DEFAULT_DOCKER_IMAGE}</code>.
-        </p>
-      </div>
-
       {/* Check for Updates Button */}
       <div>
         <button
@@ -193,21 +116,16 @@ export const UpdatesSection: React.FC = () => {
                 </div>
               )}
 
-              {/* Update Button */}
-              <button
-                onClick={handleApplyUpdate}
-                disabled={isUpdating}
-                className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 focus:ring-offset-gray-800"
-                data-testid="apply-update-button"
+              {/* Download Link */}
+              <a
+                href={RELEASES_URL}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-block px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 focus:ring-offset-gray-800"
+                data-testid="releases-link"
               >
-                {isUpdating ? 'Starting Update...' : 'Update App'}
-              </button>
-
-              {/* Update Note */}
-              <p className="text-sm text-gray-500 dark:text-gray-400">
-                Note: Clicking &quot;Update App&quot; will start a self-update loop. You can monitor
-                the progress in the Loops tab.
-              </p>
+                Download Latest Release
+              </a>
             </div>
           ) : (
             <div

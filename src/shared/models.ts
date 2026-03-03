@@ -129,6 +129,14 @@ export interface ProjectConfig {
    */
   github_pat?: string;
   /**
+   * GitLab Personal Access Token for ephemeral deploy key management.
+   * Required only when repo_url points to a GitLab repository and the agent
+   * needs to push commits. The actual PAT is stored encrypted in credentials.json
+   * via CredentialManager.setGitlabPat(); this flag indicates a PAT is configured.
+   * PAT with api or write_repository scope, scoped to the repo.
+   */
+  gitlab_pat?: string;
+  /**
    * Additional host paths to mount into the container.
    * Each path is mounted at /mnt/<basename> inside the container.
    * e.g. ["/home/user/data"] mounts at /mnt/data
@@ -163,8 +171,6 @@ export interface AppSettings {
   theme: 'system' | 'light' | 'dark';
   /** Logging verbosity level */
   log_level: 'DEBUG' | 'INFO' | 'WARNING' | 'ERROR';
-  /** Docker image used when running the self-update loop */
-  self_update_docker_image?: string;
   /** Which Anthropic auth method to inject into containers */
   anthropic_auth_method: AnthropicAuthMethod;
   /** AWS region for Bedrock access */
@@ -186,7 +192,6 @@ export function createDefaultSettings(): AppSettings {
     notification_enabled: true,
     theme: 'system',
     log_level: 'INFO',
-    self_update_docker_image: 'zephyr-desktop:latest',
     anthropic_auth_method: 'api_key',
   };
 }
@@ -233,6 +238,7 @@ export function createProjectConfig(partial: Partial<ProjectConfig> = {}): Proje
     created_at: partial.created_at ?? now,
     updated_at: partial.updated_at ?? now,
     github_pat: partial.github_pat,
+    gitlab_pat: partial.gitlab_pat,
     additional_mounts: partial.additional_mounts,
     sandbox_type: partial.sandbox_type,
     vm_config: partial.vm_config,

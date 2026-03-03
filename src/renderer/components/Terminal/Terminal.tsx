@@ -40,6 +40,11 @@ export const Terminal = forwardRef<TerminalHandle, TerminalProps>(
     const searchAddonRef = useRef<SearchAddon | null>(null);
     const currentFontSizeRef = useRef<number>(fontSize);
     const defaultFontSizeRef = useRef<number>(fontSize);
+    // Always-current refs so xterm callbacks never close over stale props.
+    const onDataRef = useRef(onData);
+    onDataRef.current = onData;
+    const onResizeRef = useRef(onResize);
+    onResizeRef.current = onResize;
 
     useImperativeHandle(ref, () => ({
       write: (data: string) => {
@@ -174,25 +179,18 @@ export const Terminal = forwardRef<TerminalHandle, TerminalProps>(
       // Focus the terminal so keyboard input works immediately
       terminal.focus();
 
-      // Handle data events
-      if (onData) {
-        const dataDisposable = terminal.onData((data) => {
-          onData(data);
-        });
+      // Handle data events — use ref so we always call the current prop even
+      // if the parent re-renders with a new callback (e.g. after reconnect).
+      const dataDisposable = terminal.onData((data) => {
+        onDataRef.current?.(data);
+      });
+      (terminal as any)._dataDisposable = dataDisposable;
 
-        // Store disposable for cleanup
-        (terminal as any)._dataDisposable = dataDisposable;
-      }
-
-      // Handle resize events
-      if (onResize) {
-        const resizeDisposable = terminal.onResize(({ cols, rows }) => {
-          onResize(cols, rows);
-        });
-
-        // Store disposable for cleanup
-        (terminal as any)._resizeDisposable = resizeDisposable;
-      }
+      // Handle resize events — same ref pattern.
+      const resizeDisposable = terminal.onResize(({ cols, rows }) => {
+        onResizeRef.current?.(cols, rows);
+      });
+      (terminal as any)._resizeDisposable = resizeDisposable;
 
       // Cleanup on unmount
       return () => {

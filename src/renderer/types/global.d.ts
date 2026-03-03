@@ -233,11 +233,20 @@ declare global {
         delete: (projectId: string) => Promise<void>;
       };
 
+      gitlabPat: {
+        /** Store a GitLab PAT for a project (encrypted) */
+        set: (projectId: string, pat: string) => Promise<void>;
+        /** Check whether a GitLab PAT is stored for a project. Returns true if stored. */
+        has: (projectId: string) => Promise<boolean>;
+        /** Delete the GitLab PAT for a project */
+        delete: (projectId: string) => Promise<void>;
+      };
+
       deployKeys: {
         /** List all orphaned deploy keys (keys that were never cleaned up) */
         listOrphaned: () => Promise<DeployKeyRecord[]>;
-        /** Get the GitHub deploy keys management URL for a repo (owner/repo format) */
-        getUrl: (repo: string) => Promise<string>;
+        /** Get the deploy keys management URL for a repo. Pass service to get GitLab URL. */
+        getUrl: (repo: string, service?: 'github' | 'gitlab') => Promise<string>;
       };
 
       shell: {

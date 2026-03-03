@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 /**
  * Service type for credential management
  */
-export type CredentialService = 'anthropic' | 'github';
+export type CredentialService = 'anthropic' | 'github' | 'gitlab';
 
 export interface CredentialDialogProps {
   /** The service to configure */
@@ -24,6 +24,7 @@ export interface CredentialDialogProps {
 const SERVICE_NAMES: Record<CredentialService, string> = {
   anthropic: 'Anthropic',
   github: 'GitHub',
+  gitlab: 'GitLab',
 };
 
 /**

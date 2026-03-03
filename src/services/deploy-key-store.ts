@@ -23,6 +23,7 @@ export interface DeployKeyRecord {
   loop_id: string;
   created_at: string;   // ISO8601
   status: 'active' | 'cleaned' | 'orphaned';
+  service?: 'github' | 'gitlab';
 }
 
 interface DeployKeyStorage {
@@ -112,6 +113,27 @@ export class DeployKeyStore {
    */
   getGithubKeysUrl(repo: string): string {
     return `https://github.com/${repo}/settings/keys`;
+  }
+
+  /**
+   * Build the GitLab URL to the deploy keys management page for a repository.
+   *
+   * @param repo - Repository in "owner/repo" format
+   * @returns URL to https://gitlab.com/{owner}/{repo}/-/settings/repository (deploy keys section)
+   */
+  getGitlabKeysUrl(repo: string): string {
+    return `https://gitlab.com/${repo}/-/settings/repository#js-deploy-keys-settings`;
+  }
+
+  /**
+   * Build the appropriate deploy keys URL based on the service.
+   *
+   * @param repo - Repository in "owner/repo" format
+   * @param service - 'github' or 'gitlab' (defaults to 'github')
+   * @returns URL to the deploy keys management page
+   */
+  getDeployKeysUrl(repo: string, service?: 'github' | 'gitlab'): string {
+    return service === 'gitlab' ? this.getGitlabKeysUrl(repo) : this.getGithubKeysUrl(repo);
   }
 
   // ── Private helpers ──────────────────────────────────────────────────────

@@ -95,9 +95,15 @@ describe('ProjectDialog', () => {
   const mockOnSave = vi.fn();
   const mockOnClose = vi.fn();
 
-  // Mock window.api.githubPat for all tests — the component calls it in useEffect
-  // when editing a project with a GitHub repo URL.
+  // Mock window.api.githubPat and window.api.gitlabPat for all tests — the component
+  // calls both in useEffect when editing a project.
   const mockGithubPat = {
+    has: vi.fn().mockResolvedValue(false),
+    set: vi.fn().mockResolvedValue(undefined),
+    delete: vi.fn().mockResolvedValue(undefined),
+  };
+
+  const mockGitlabPat = {
     has: vi.fn().mockResolvedValue(false),
     set: vi.fn().mockResolvedValue(undefined),
     delete: vi.fn().mockResolvedValue(undefined),
@@ -111,8 +117,12 @@ describe('ProjectDialog', () => {
     mockGithubPat.has.mockResolvedValue(false);
     mockGithubPat.set.mockResolvedValue(undefined);
     mockGithubPat.delete.mockResolvedValue(undefined);
+    // Reset gitlabPat mocks to defaults
+    mockGitlabPat.has.mockResolvedValue(false);
+    mockGitlabPat.set.mockResolvedValue(undefined);
+    mockGitlabPat.delete.mockResolvedValue(undefined);
     Object.defineProperty(window, 'api', {
-      value: { githubPat: mockGithubPat },
+      value: { githubPat: mockGithubPat, gitlabPat: mockGitlabPat },
       writable: true,
       configurable: true,
     });

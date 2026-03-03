@@ -3,16 +3,9 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import { UpdatesSection } from '../../src/renderer/pages/SettingsTab/UpdatesSection';
 
-// Mock useSettings hook — controls what settings the component sees
-const mockUseSettings = vi.fn();
-vi.mock('../../src/renderer/hooks/useSettings', () => ({
-  useSettings: () => mockUseSettings(),
-}));
-
 // Mock window.api.updates
 const mockUpdates = {
   check: vi.fn(),
-  apply: vi.fn(),
 };
 
 // @ts-expect-error - mocking window.api
@@ -21,31 +14,14 @@ globalThis.window.api = {
   updates: mockUpdates,
 };
 
-const DEFAULT_IMAGE = 'zephyr-desktop:latest';
-
 describe('UpdatesSection', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    // Default: settings loaded with no custom docker image
-    mockUseSettings.mockReturnValue({
-      settings: {
-        max_concurrent_containers: 5,
-        notification_enabled: true,
-        theme: 'system',
-        log_level: 'INFO',
-        self_update_docker_image: DEFAULT_IMAGE,
-      },
-      loading: false,
-      error: null,
-      refresh: vi.fn(),
-      update: vi.fn().mockResolvedValue(undefined),
-    });
     mockUpdates.check.mockResolvedValue({
       available: false,
       currentVersion: '0.1.0',
       latestVersion: '0.1.0',
     });
-    mockUpdates.apply.mockResolvedValue(undefined);
   });
 
   describe('Initial State', () => {
@@ -64,141 +40,11 @@ describe('UpdatesSection', () => {
       expect(screen.queryByTestId('latest-version')).not.toBeInTheDocument();
       expect(screen.queryByTestId('update-available')).not.toBeInTheDocument();
     });
-  });
 
-  describe('Docker Image Configuration', () => {
-    it('should render docker image input with default value', () => {
+    it('should not render docker image input', () => {
       render(<UpdatesSection />);
 
-      const input = screen.getByTestId('docker-image-input');
-      expect(input).toBeInTheDocument();
-      expect(input).toHaveValue(DEFAULT_IMAGE);
-    });
-
-    it('should load docker image from settings', () => {
-      mockUseSettings.mockReturnValue({
-        settings: {
-          max_concurrent_containers: 5,
-          notification_enabled: true,
-          theme: 'system',
-          log_level: 'INFO',
-          self_update_docker_image: 'my-custom-image:v2',
-        },
-        loading: false,
-        error: null,
-        refresh: vi.fn(),
-        update: vi.fn().mockResolvedValue(undefined),
-      });
-
-      render(<UpdatesSection />);
-
-      expect(screen.getByTestId('docker-image-input')).toHaveValue('my-custom-image:v2');
-    });
-
-    it('should default to zephyr-desktop:latest when settings has no docker image', () => {
-      mockUseSettings.mockReturnValue({
-        settings: {
-          max_concurrent_containers: 5,
-          notification_enabled: true,
-          theme: 'system',
-          log_level: 'INFO',
-        },
-        loading: false,
-        error: null,
-        refresh: vi.fn(),
-        update: vi.fn().mockResolvedValue(undefined),
-      });
-
-      render(<UpdatesSection />);
-
-      expect(screen.getByTestId('docker-image-input')).toHaveValue(DEFAULT_IMAGE);
-    });
-
-    it('should update docker image input value when user types', () => {
-      render(<UpdatesSection />);
-
-      const input = screen.getByTestId('docker-image-input');
-      fireEvent.change(input, { target: { value: 'my-image:latest' } });
-
-      expect(input).toHaveValue('my-image:latest');
-    });
-
-    it('should save updated docker image on blur', async () => {
-      const mockUpdate = vi.fn().mockResolvedValue(undefined);
-      mockUseSettings.mockReturnValue({
-        settings: {
-          max_concurrent_containers: 5,
-          notification_enabled: true,
-          theme: 'system',
-          log_level: 'INFO',
-          self_update_docker_image: DEFAULT_IMAGE,
-        },
-        loading: false,
-        error: null,
-        refresh: vi.fn(),
-        update: mockUpdate,
-      });
-
-      render(<UpdatesSection />);
-
-      const input = screen.getByTestId('docker-image-input');
-      fireEvent.change(input, { target: { value: 'my-image:v3' } });
-      fireEvent.blur(input);
-
-      await waitFor(() => {
-        expect(mockUpdate).toHaveBeenCalledWith({ self_update_docker_image: 'my-image:v3' });
-      });
-    });
-
-    it('should not save if docker image value is unchanged on blur', async () => {
-      const mockUpdate = vi.fn().mockResolvedValue(undefined);
-      mockUseSettings.mockReturnValue({
-        settings: {
-          max_concurrent_containers: 5,
-          notification_enabled: true,
-          theme: 'system',
-          log_level: 'INFO',
-          self_update_docker_image: DEFAULT_IMAGE,
-        },
-        loading: false,
-        error: null,
-        refresh: vi.fn(),
-        update: mockUpdate,
-      });
-
-      render(<UpdatesSection />);
-
-      const input = screen.getByTestId('docker-image-input');
-      fireEvent.blur(input);
-
-      expect(mockUpdate).not.toHaveBeenCalled();
-    });
-
-    it('should use default image when input is blank on blur', async () => {
-      const mockUpdate = vi.fn().mockResolvedValue(undefined);
-      mockUseSettings.mockReturnValue({
-        settings: {
-          max_concurrent_containers: 5,
-          notification_enabled: true,
-          theme: 'system',
-          log_level: 'INFO',
-          self_update_docker_image: DEFAULT_IMAGE,
-        },
-        loading: false,
-        error: null,
-        refresh: vi.fn(),
-        update: mockUpdate,
-      });
-
-      render(<UpdatesSection />);
-
-      const input = screen.getByTestId('docker-image-input');
-      fireEvent.change(input, { target: { value: '   ' } });
-      fireEvent.blur(input);
-
-      await waitFor(() => {
-        expect(input).toHaveValue(DEFAULT_IMAGE);
-      });
+      expect(screen.queryByTestId('docker-image-input')).not.toBeInTheDocument();
     });
   });
 
@@ -319,7 +165,7 @@ describe('UpdatesSection', () => {
       });
     });
 
-    it('should not show update button when no update available', async () => {
+    it('should not show releases link when no update available', async () => {
       mockUpdates.check.mockResolvedValue({
         available: false,
         currentVersion: '0.1.0',
@@ -331,7 +177,7 @@ describe('UpdatesSection', () => {
       fireEvent.click(screen.getByTestId('check-updates-button'));
 
       await waitFor(() => {
-        expect(screen.queryByTestId('apply-update-button')).not.toBeInTheDocument();
+        expect(screen.queryByTestId('releases-link')).not.toBeInTheDocument();
       });
     });
   });
@@ -410,7 +256,7 @@ describe('UpdatesSection', () => {
       });
     });
 
-    it('should display update button when update available', async () => {
+    it('should display releases link when update available', async () => {
       mockUpdates.check.mockResolvedValue({
         available: true,
         currentVersion: '0.1.0',
@@ -422,207 +268,15 @@ describe('UpdatesSection', () => {
       fireEvent.click(screen.getByTestId('check-updates-button'));
 
       await waitFor(() => {
-        expect(screen.getByTestId('apply-update-button')).toBeInTheDocument();
-        expect(screen.getByTestId('apply-update-button')).toHaveTextContent('Update App');
+        const link = screen.getByTestId('releases-link');
+        expect(link).toBeInTheDocument();
+        expect(link).toHaveTextContent('Download Latest Release');
+        expect(link).toHaveAttribute('href', 'https://github.com/joegotflow83/zephyr/releases');
       });
-    });
-  });
-
-  describe('Apply Update', () => {
-    it('should call window.api.updates.apply with configured docker image', async () => {
-      mockUpdates.check.mockResolvedValue({
-        available: true,
-        currentVersion: '0.1.0',
-        latestVersion: '0.2.0',
-      });
-      mockUpdates.apply.mockResolvedValue(undefined);
-
-      render(<UpdatesSection />);
-
-      // First check for updates
-      fireEvent.click(screen.getByTestId('check-updates-button'));
-
-      await waitFor(() => {
-        expect(screen.getByTestId('apply-update-button')).toBeInTheDocument();
-      });
-
-      // Then apply update
-      fireEvent.click(screen.getByTestId('apply-update-button'));
-
-      await waitFor(() => {
-        expect(mockUpdates.apply).toHaveBeenCalledTimes(1);
-        expect(mockUpdates.apply).toHaveBeenCalledWith(DEFAULT_IMAGE);
-      });
-    });
-
-    it('should call apply with custom docker image when configured', async () => {
-      mockUseSettings.mockReturnValue({
-        settings: {
-          max_concurrent_containers: 5,
-          notification_enabled: true,
-          theme: 'system',
-          log_level: 'INFO',
-          self_update_docker_image: 'custom-image:v2',
-        },
-        loading: false,
-        error: null,
-        refresh: vi.fn(),
-        update: vi.fn().mockResolvedValue(undefined),
-      });
-      mockUpdates.check.mockResolvedValue({
-        available: true,
-        currentVersion: '0.1.0',
-        latestVersion: '0.2.0',
-      });
-      mockUpdates.apply.mockResolvedValue(undefined);
-
-      render(<UpdatesSection />);
-
-      fireEvent.click(screen.getByTestId('check-updates-button'));
-      await waitFor(() => {
-        expect(screen.getByTestId('apply-update-button')).toBeInTheDocument();
-      });
-
-      fireEvent.click(screen.getByTestId('apply-update-button'));
-
-      await waitFor(() => {
-        expect(mockUpdates.apply).toHaveBeenCalledWith('custom-image:v2');
-      });
-    });
-
-    it('should disable update button while updating', async () => {
-      mockUpdates.check.mockResolvedValue({
-        available: true,
-        currentVersion: '0.1.0',
-        latestVersion: '0.2.0',
-      });
-      mockUpdates.apply.mockImplementation(
-        () => new Promise(() => {}) // Never resolves — avoids dangling timers causing act() errors
-      );
-
-      render(<UpdatesSection />);
-
-      // First check for updates
-      fireEvent.click(screen.getByTestId('check-updates-button'));
-      await waitFor(() => {
-        expect(screen.getByTestId('apply-update-button')).toBeInTheDocument();
-      });
-
-      // Then apply update
-      const updateButton = screen.getByTestId('apply-update-button');
-      fireEvent.click(updateButton);
-
-      expect(updateButton).toBeDisabled();
-      expect(updateButton).toHaveTextContent('Starting Update...');
-    });
-
-    it('should display error message on update failure', async () => {
-      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-      mockUpdates.check.mockResolvedValue({
-        available: true,
-        currentVersion: '0.1.0',
-        latestVersion: '0.2.0',
-      });
-      mockUpdates.apply.mockRejectedValue(new Error('Failed to start update'));
-
-      render(<UpdatesSection />);
-
-      // First check for updates
-      fireEvent.click(screen.getByTestId('check-updates-button'));
-      await waitFor(() => {
-        expect(screen.getByTestId('apply-update-button')).toBeInTheDocument();
-      });
-
-      // Then apply update
-      fireEvent.click(screen.getByTestId('apply-update-button'));
-
-      await waitFor(() => {
-        expect(screen.getByTestId('update-error')).toBeInTheDocument();
-        expect(screen.getByTestId('update-error')).toHaveTextContent(
-          'Failed to start update'
-        );
-      });
-
-      expect(consoleErrorSpy).toHaveBeenCalledWith(
-        'Failed to start update:',
-        expect.any(Error)
-      );
-
-      consoleErrorSpy.mockRestore();
-    });
-
-    it('should clear error when applying update again', async () => {
-      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-      mockUpdates.check.mockResolvedValue({
-        available: true,
-        currentVersion: '0.1.0',
-        latestVersion: '0.2.0',
-      });
-      mockUpdates.apply.mockRejectedValueOnce(new Error('Failed to start update'));
-
-      render(<UpdatesSection />);
-
-      // First check for updates
-      fireEvent.click(screen.getByTestId('check-updates-button'));
-      await waitFor(() => {
-        expect(screen.getByTestId('apply-update-button')).toBeInTheDocument();
-      });
-
-      // First update attempt fails
-      fireEvent.click(screen.getByTestId('apply-update-button'));
-      await waitFor(() => {
-        expect(screen.getByTestId('update-error')).toBeInTheDocument();
-      });
-
-      // Second update attempt succeeds
-      mockUpdates.apply.mockResolvedValue(undefined);
-      fireEvent.click(screen.getByTestId('apply-update-button'));
-
-      await waitFor(() => {
-        expect(screen.queryByTestId('update-error')).not.toBeInTheDocument();
-      });
-
-      consoleErrorSpy.mockRestore();
-    });
-
-    it('should not allow update when no update available', async () => {
-      mockUpdates.check.mockResolvedValue({
-        available: false,
-        currentVersion: '0.1.0',
-        latestVersion: '0.1.0',
-      });
-
-      render(<UpdatesSection />);
-
-      fireEvent.click(screen.getByTestId('check-updates-button'));
-
-      await waitFor(() => {
-        expect(screen.queryByTestId('apply-update-button')).not.toBeInTheDocument();
-      });
-
-      expect(mockUpdates.apply).not.toHaveBeenCalled();
     });
   });
 
   describe('UI Elements', () => {
-    it('should display informative note about update process', async () => {
-      mockUpdates.check.mockResolvedValue({
-        available: true,
-        currentVersion: '0.1.0',
-        latestVersion: '0.2.0',
-      });
-
-      render(<UpdatesSection />);
-
-      fireEvent.click(screen.getByTestId('check-updates-button'));
-
-      await waitFor(() => {
-        expect(
-          screen.getByText(/will start a self-update loop.*monitor.*Loops tab/)
-        ).toBeInTheDocument();
-      });
-    });
-
     it('should hide initial message after checking', async () => {
       mockUpdates.check.mockResolvedValue({
         available: false,

@@ -13,7 +13,6 @@ import { LoopRunner } from '../services/loop-runner';
 import { LoopScheduler } from '../services/scheduler';
 import { LogExporter } from '../services/log-exporter';
 import { TerminalManager } from '../services/terminal-manager';
-import { GitManager } from '../services/git-manager';
 import { SelfUpdater } from '../services/self-updater';
 import { CleanupManager } from '../services/cleanup-manager';
 import { getAutoUpdater } from '../services/auto-updater';
@@ -79,8 +78,7 @@ const loopRunner = new LoopRunner(dockerManager, logParser, 3, vmManager); // De
 const scheduler = new LoopScheduler(loopRunner);
 const logExporter = new LogExporter();
 const terminalManager = new TerminalManager(dockerManager);
-const gitManager = new GitManager();
-const selfUpdater = new SelfUpdater(gitManager, app.getAppPath(), loopRunner);
+const selfUpdater = new SelfUpdater(app.getAppPath(), loopRunner);
 const cleanupManager = new CleanupManager(dockerManager);
 const autoUpdater = getAutoUpdater();
 const imageStore = new ImageStore(configManager);

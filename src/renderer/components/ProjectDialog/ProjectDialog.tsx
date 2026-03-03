@@ -56,6 +56,11 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({ mode, project, onS
   const [hasStoredPat, setHasStoredPat] = useState(false);
   const [showGithubSection, setShowGithubSection] = useState(false);
 
+  // GitLab SSH Access state
+  const [gitlabPat, setGitlabPat] = useState('');
+  const [hasStoredGitlabPat, setHasStoredGitlabPat] = useState(false);
+  const [showGitlabSection, setShowGitlabSection] = useState(false);
+
   // Additional mount points
   const [additionalMounts, setAdditionalMounts] = useState<string[]>([]);
   const [newMountPath, setNewMountPath] = useState('');
@@ -95,6 +100,8 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({ mode, project, onS
       setImageMode(project.image_id ? 'library' : images.length > 0 ? 'library' : 'custom');
       // Check if a GitHub PAT is already stored for this project
       void window.api.githubPat.has(project.id).then(setHasStoredPat);
+      // Check if a GitLab PAT is already stored for this project
+      void window.api.gitlabPat.has(project.id).then(setHasStoredGitlabPat);
       // VM config
       setSandboxType(project.sandbox_type ?? 'container');
       setVmMode(project.vm_config?.vm_mode ?? 'persistent');
@@ -110,6 +117,7 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({ mode, project, onS
       setHooks([]);
       setAdditionalMounts([]);
       setHasStoredPat(false);
+      setHasStoredGitlabPat(false);
       // VM defaults
       setSandboxType('container');
       setVmMode('persistent');
@@ -119,6 +127,7 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({ mode, project, onS
       setVmCloudInit('');
     }
     setGithubPat('');
+    setGitlabPat('');
   }, [mode, project, images.length]);
 
   // Validate repo URL (git/remote URLs only)
@@ -155,8 +164,9 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({ mode, project, onS
     setAdditionalMounts((prev) => prev.filter((_, i) => i !== index));
   };
 
-  // Check whether the current repo URL points to GitHub (drives GitHub SSH Access section visibility)
+  // Check whether the current repo URL points to GitHub or GitLab (drives SSH Access section visibility)
   const isGithubRepo = repoUrl.trim().toLowerCase().includes('github.com');
+  const isGitlabRepo = repoUrl.trim().toLowerCase().includes('gitlab.com');
 
   // Handle form submission
   const handleSubmit = async (e: React.FormEvent) => {
@@ -237,6 +247,11 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({ mode, project, onS
     // Store GitHub PAT if the user entered one (uses config.id so it works in both add and edit mode)
     if (githubPat.trim()) {
       await window.api.githubPat.set(config.id, githubPat.trim());
+    }
+
+    // Store GitLab PAT if the user entered one
+    if (gitlabPat.trim()) {
+      await window.api.gitlabPat.set(config.id, gitlabPat.trim());
     }
 
     onSave(config);
@@ -758,6 +773,72 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({ mode, project, onS
                             await window.api.githubPat.delete(project.id);
                             setHasStoredPat(false);
                             setGithubPat('');
+                          }
+                        }}
+                        className="text-xs text-red-400 hover:text-red-300 transition-colors"
+                      >
+                        Remove stored token
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* GitLab SSH Access section — only shown when repo URL is a GitLab URL */}
+            {isGitlabRepo && (
+              <div className="mb-4">
+                <div className="flex items-center justify-between mb-2">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                    GitLab SSH Access
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setShowGitlabSection(!showGitlabSection)}
+                    className="text-sm text-blue-400 hover:text-blue-300 transition-colors"
+                  >
+                    {showGitlabSection ? 'Hide' : hasStoredGitlabPat ? 'Update Token' : 'Set Up'}
+                  </button>
+                </div>
+
+                {!showGitlabSection && hasStoredGitlabPat && (
+                  <p className="text-xs text-green-400">Token stored — deploy keys will be created automatically on loop start.</p>
+                )}
+
+                {showGitlabSection && (
+                  <div className="bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded p-4 space-y-3">
+                    <div>
+                      <input
+                        id="gitlabPat"
+                        type="password"
+                        value={gitlabPat}
+                        onChange={(e) => setGitlabPat(e.target.value)}
+                        placeholder={hasStoredGitlabPat ? '••••••••••••  (leave blank to keep existing)' : 'glpat-…'}
+                        className="w-full px-3 py-2 bg-gray-100 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                        autoComplete="off"
+                      />
+                      <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                        PAT with <code className="bg-gray-200 dark:bg-gray-700 px-1 rounded">api</code> or <code className="bg-gray-200 dark:bg-gray-700 px-1 rounded">write_repository</code> scope for deploy key management.{' '}
+                        <a
+                          href="https://gitlab.com/-/user_settings/personal_access_tokens"
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-blue-400 hover:text-blue-300 underline"
+                          onClick={(e) => { e.preventDefault(); window.open('https://gitlab.com/-/user_settings/personal_access_tokens', '_blank'); }}
+                        >
+                          Create token on GitLab
+                        </a>
+                      </p>
+                    </div>
+
+                    {hasStoredGitlabPat && (
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          if (mode === 'edit' && project) {
+                            await window.api.gitlabPat.delete(project.id);
+                            setHasStoredGitlabPat(false);
+                            setGitlabPat('');
                           }
                         }}
                         className="text-xs text-red-400 hover:text-red-300 transition-colors"

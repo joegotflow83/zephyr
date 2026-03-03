@@ -16,7 +16,7 @@ import { safeStorage } from 'electron';
 import fs from 'fs';
 import path from 'path';
 
-export type CredentialService = 'anthropic' | 'github' | 'anthropic_bedrock' | 'anthropic_session';
+export type CredentialService = 'anthropic' | 'github' | 'gitlab' | 'anthropic_bedrock' | 'anthropic_session';
 
 interface CredentialStorage {
   [service: string]: string; // encrypted base64
@@ -162,6 +162,69 @@ export class CredentialManager {
   async deleteGithubPat(projectId: string): Promise<void> {
     const credentials = this.loadCredentials();
     const key = `github_pat_${projectId}`;
+
+    if (credentials[key]) {
+      delete credentials[key];
+      this.saveCredentials(credentials);
+    }
+  }
+
+  /**
+   * Store a GitLab PAT for a specific project (encrypted with safeStorage).
+   * The PAT is keyed as `gitlab_pat_<projectId>` so each project has its own entry.
+   * Used for ephemeral deploy key management — the PAT is used to register/delete
+   * ED25519 deploy keys on GitLab at loop start/stop.
+   */
+  async setGitlabPat(projectId: string, pat: string): Promise<void> {
+    if (!pat || pat.trim().length === 0) {
+      throw new Error('GitLab PAT cannot be empty');
+    }
+
+    if (!safeStorage.isEncryptionAvailable()) {
+      throw new Error('Encryption not available on this system');
+    }
+
+    const encrypted = safeStorage.encryptString(pat);
+    const base64 = encrypted.toString('base64');
+
+    const credentials = this.loadCredentials();
+    credentials[`gitlab_pat_${projectId}`] = base64;
+    this.saveCredentials(credentials);
+  }
+
+  /**
+   * Retrieve the GitLab PAT for a specific project (decrypted).
+   * Returns null if no PAT is stored for this project.
+   */
+  async getGitlabPat(projectId: string): Promise<string | null> {
+    const credentials = this.loadCredentials();
+    const encrypted = credentials[`gitlab_pat_${projectId}`];
+
+    if (!encrypted) {
+      return null;
+    }
+
+    if (!safeStorage.isEncryptionAvailable()) {
+      throw new Error('Encryption not available on this system');
+    }
+
+    try {
+      const buffer = Buffer.from(encrypted, 'base64');
+      return safeStorage.decryptString(buffer);
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error(`[CredentialManager] Failed to decrypt GitLab PAT for project ${projectId}:`, err);
+      return null;
+    }
+  }
+
+  /**
+   * Delete the GitLab PAT for a specific project.
+   * Called when a project is deleted to prevent credential accumulation.
+   */
+  async deleteGitlabPat(projectId: string): Promise<void> {
+    const credentials = this.loadCredentials();
+    const key = `gitlab_pat_${projectId}`;
 
     if (credentials[key]) {
       delete credentials[key];
