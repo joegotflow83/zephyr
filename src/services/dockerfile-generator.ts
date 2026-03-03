@@ -12,6 +12,7 @@ const COMMON_TOOLS = [
   'jq',
   'ca-certificates',
   'bc',
+  'python-is-python3',
   'build-essential',
   'openssh-client',
   // Playwright runtime dependencies
