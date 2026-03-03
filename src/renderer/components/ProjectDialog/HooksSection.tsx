@@ -3,7 +3,8 @@
  *
  * Displays all hook files from ~/.zephyr/hooks/ with checkboxes.
  * Selected hook filenames are stored in ProjectConfig.hooks.
- * Also provides an "Add Hook File" inline editor for user-authored hooks.
+ * Also provides an "Add Hook File" inline editor for user-authored hooks,
+ * and Edit/Delete actions for existing hook files.
  *
  * Hook files are injected into containers at ~/.claude/hooks/ so the
  * Claude agent can invoke them during execution.
@@ -37,6 +38,12 @@ export const HooksSection: React.FC<HooksSectionProps> = ({ selected, onChange }
   const [addError, setAddError] = useState('');
   const [saving, setSaving] = useState(false);
 
+  // Edit state
+  const [editingFilename, setEditingFilename] = useState<string | null>(null);
+  const [editingContent, setEditingContent] = useState('');
+  const [editError, setEditError] = useState('');
+  const [editSaving, setEditSaving] = useState(false);
+
   const loadHooks = async () => {
     try {
       const list = await window.api.hooks.list();
@@ -57,6 +64,57 @@ export const HooksSection: React.FC<HooksSectionProps> = ({ selected, onChange }
       onChange(selected.filter((f) => f !== filename));
     } else {
       onChange([...selected, filename]);
+    }
+  };
+
+  const handleEdit = async (filename: string) => {
+    setShowAddEditor(false);
+    setEditError('');
+    try {
+      const content = await window.api.hooks.get(filename);
+      setEditingFilename(filename);
+      setEditingContent(content ?? '');
+    } catch {
+      setEditError('Failed to load hook file content');
+    }
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editingFilename) return;
+    setEditError('');
+    setEditSaving(true);
+    try {
+      await window.api.hooks.add(editingFilename, editingContent);
+      setEditingFilename(null);
+      setEditingContent('');
+      await loadHooks();
+    } catch (err) {
+      setEditError(err instanceof Error ? err.message : 'Failed to save hook file');
+    } finally {
+      setEditSaving(false);
+    }
+  };
+
+  const handleCancelEdit = () => {
+    setEditingFilename(null);
+    setEditingContent('');
+    setEditError('');
+  };
+
+  const handleDelete = async (filename: string) => {
+    if (!confirm(`Delete hook file "${filename}"?`)) return;
+    try {
+      await window.api.hooks.remove(filename);
+      if (selected.includes(filename)) {
+        onChange(selected.filter((f) => f !== filename));
+      }
+      if (editingFilename === filename) {
+        setEditingFilename(null);
+        setEditingContent('');
+      }
+      await loadHooks();
+    } catch {
+      // Non-fatal
     }
   };
 
@@ -107,20 +165,80 @@ export const HooksSection: React.FC<HooksSectionProps> = ({ selected, onChange }
       ) : (
         <div className="space-y-2 mb-3">
           {hooks.map((hook) => (
-            <label key={hook.filename} className="flex items-start gap-2 cursor-pointer group">
-              <input
-                type="checkbox"
-                checked={selected.includes(hook.filename)}
-                onChange={() => handleToggle(hook.filename)}
-                className="mt-0.5 flex-shrink-0"
-              />
-              <div>
-                <span className="text-sm text-gray-800 dark:text-gray-200">{hook.filename}</span>
-                {hook.description && (
-                  <span className="ml-2 text-xs text-gray-500 dark:text-gray-400">— {hook.description}</span>
-                )}
-              </div>
-            </label>
+            <div key={hook.filename} className="group">
+              {editingFilename === hook.filename ? (
+                // Inline edit mode
+                <div className="p-3 bg-gray-100 dark:bg-gray-800 border border-blue-400 dark:border-blue-500 rounded space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium text-gray-900 dark:text-white">
+                      {hook.filename}
+                    </span>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={handleSaveEdit}
+                        disabled={editSaving}
+                        className="text-xs px-2 py-1 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50 transition-colors"
+                      >
+                        {editSaving ? 'Saving…' : 'Save'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleCancelEdit}
+                        className="text-xs px-2 py-1 bg-gray-200 dark:bg-gray-600 text-gray-900 dark:text-white rounded hover:bg-gray-300 dark:hover:bg-gray-700 transition-colors"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                  <textarea
+                    value={editingContent}
+                    onChange={(e) => setEditingContent(e.target.value)}
+                    rows={8}
+                    className="w-full px-2 py-1 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-600 rounded text-gray-900 dark:text-white text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                  />
+                  {editError && <p className="text-xs text-red-400">{editError}</p>}
+                </div>
+              ) : (
+                // View mode
+                <div className="flex items-start gap-2">
+                  <label className="flex items-start gap-2 cursor-pointer flex-1 min-w-0">
+                    <input
+                      type="checkbox"
+                      checked={selected.includes(hook.filename)}
+                      onChange={() => handleToggle(hook.filename)}
+                      className="mt-0.5 flex-shrink-0"
+                    />
+                    <div className="min-w-0">
+                      <span className="text-sm text-gray-800 dark:text-gray-200">
+                        {hook.filename}
+                      </span>
+                      {hook.description && (
+                        <span className="ml-2 text-xs text-gray-500 dark:text-gray-400">
+                          — {hook.description}
+                        </span>
+                      )}
+                    </div>
+                  </label>
+                  <div className="flex gap-2 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button
+                      type="button"
+                      onClick={() => handleEdit(hook.filename)}
+                      className="text-xs text-blue-400 hover:text-blue-300 transition-colors"
+                    >
+                      Edit
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDelete(hook.filename)}
+                      className="text-xs text-red-400 hover:text-red-300 transition-colors"
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
           ))}
         </div>
       )}
@@ -178,7 +296,11 @@ export const HooksSection: React.FC<HooksSectionProps> = ({ selected, onChange }
       ) : (
         <button
           type="button"
-          onClick={() => setShowAddEditor(true)}
+          onClick={() => {
+            setEditingFilename(null);
+            setEditingContent('');
+            setShowAddEditor(true);
+          }}
           className="text-sm text-blue-400 hover:text-blue-300 transition-colors"
         >
           + Add Hook File
