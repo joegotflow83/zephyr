@@ -121,6 +121,15 @@ export class SelfUpdater {
         },
       });
 
+      // No releases published yet — treat as up to date
+      if (response.status === 404) {
+        return {
+          available: false,
+          currentVersion,
+          latestVersion: currentVersion,
+        };
+      }
+
       if (!response.ok) {
         throw new Error(`GitHub API returned ${response.status}: ${response.statusText}`);
       }
