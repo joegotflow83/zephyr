@@ -28,7 +28,11 @@ function deriveContainerName(loop: LoopState): string {
   );
 }
 
-export const TerminalTab: React.FC = () => {
+interface TerminalTabProps {
+  isActive?: boolean;
+}
+
+export const TerminalTab: React.FC<TerminalTabProps> = ({ isActive }) => {
   const { settings } = useAppStore();
   const [containers, setContainers] = useState<ContainerInfo[]>([]);
   const [vmLoops, setVmLoops] = useState<LoopState[]>([]);
@@ -83,6 +87,18 @@ export const TerminalTab: React.FC = () => {
   // needing to be re-registered (which would create brief data-loss windows).
   const sessionsRef = React.useRef(sessions);
   sessionsRef.current = sessions;
+
+  // Refocus the active terminal whenever the terminal tab becomes visible.
+  // When the user switches away and back, the tab-bar click focuses the tab
+  // button; this effect hands focus back to xterm so vi / interactive programs
+  // capture keystrokes immediately without requiring an extra click.
+  useEffect(() => {
+    if (!isActive) return;
+    const activeSession = sessions.find((s) => s.id === activeSessionId);
+    if (activeSession && !activeSession.disconnected) {
+      setTimeout(() => activeSession.terminalRef.current?.focus(), 50);
+    }
+  }, [isActive]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Set up global terminal event listeners — registered once, never torn down.
   useEffect(() => {

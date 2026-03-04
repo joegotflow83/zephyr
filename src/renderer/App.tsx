@@ -80,7 +80,7 @@ const App: React.FC = () => {
         <LoopsTab />
       </div>
       <div style={{ display: activeTab === 'terminal' ? undefined : 'none', height: '100%' }}>
-        <TerminalTab />
+        <TerminalTab isActive={activeTab === 'terminal'} />
       </div>
       <div style={{ display: activeTab === 'images' ? undefined : 'none', height: '100%' }}>
         <ImagesTab />

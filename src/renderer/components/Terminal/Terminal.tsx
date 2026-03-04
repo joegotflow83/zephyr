@@ -179,6 +179,15 @@ export const Terminal = forwardRef<TerminalHandle, TerminalProps>(
       // Focus the terminal so keyboard input works immediately
       terminal.focus();
 
+      // Restore focus when the user mousedowns anywhere on the terminal container.
+      // In Electron, xterm's textarea can lose focus when the terminal emits a
+      // rapid burst of output (e.g. vi drawing its initial screen). Catching
+      // mousedown at the container level re-focuses the hidden textarea so
+      // keystrokes are captured again without requiring a precise click.
+      const containerEl = containerRef.current!;
+      const handleMouseDown = () => terminal.focus();
+      containerEl.addEventListener('mousedown', handleMouseDown);
+
       // Handle data events — use ref so we always call the current prop even
       // if the parent re-renders with a new callback (e.g. after reconnect).
       const dataDisposable = terminal.onData((data) => {
@@ -194,6 +203,7 @@ export const Terminal = forwardRef<TerminalHandle, TerminalProps>(
 
       // Cleanup on unmount
       return () => {
+        containerEl.removeEventListener('mousedown', handleMouseDown);
         (terminal as any)._dataDisposable?.dispose();
         (terminal as any)._resizeDisposable?.dispose();
         searchAddon.dispose();

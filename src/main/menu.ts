@@ -28,7 +28,7 @@ export function buildApplicationMenu(): Menu {
         },
         {
           label: 'Export Config...',
-          accelerator: 'CmdOrCtrl+S',
+          accelerator: 'CmdOrCtrl+Shift+S',
           click: async () => {
             // Trigger the export handler which shows the file dialog
             const mainWindow = BrowserWindow.getFocusedWindow();

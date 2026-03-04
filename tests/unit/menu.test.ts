@@ -122,7 +122,7 @@ describe('menu.ts', () => {
       expect(importItem?.accelerator).toBe('CmdOrCtrl+O');
 
       const exportItem = submenu.find((item) => item.label === 'Export Config...');
-      expect(exportItem?.accelerator).toBe('CmdOrCtrl+S');
+      expect(exportItem?.accelerator).toBe('CmdOrCtrl+Shift+S');
     });
 
     it('assigns accelerator to Quit (CmdOrCtrl+Q)', () => {
