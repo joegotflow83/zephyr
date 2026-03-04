@@ -405,8 +405,13 @@ describe('ProjectsTab', () => {
 
       render(<ProjectsTab toast={mockToast} onRunProject={onRunProject} />);
 
-      const runButton = screen.getByRole('button', { name: /Run/i });
+      // Click Run to open the RunModeDialog, then confirm
+      const runButton = screen.getByRole('button', { name: /^Run$/ });
       await user.click(runButton);
+
+      // Dialog opens — click the Run button inside it to confirm
+      const dialogRunButton = screen.getAllByRole('button', { name: /^Run$/ }).at(-1)!;
+      await user.click(dialogRunButton);
 
       await waitFor(() => {
         expect(onRunProject).toHaveBeenCalled();
@@ -482,8 +487,13 @@ describe('ProjectsTab', () => {
 
       render(<ProjectsTab toast={mockToast} />);
 
-      const runButton = screen.getByRole('button', { name: /Run/i });
+      // Click Run to open the RunModeDialog, then confirm
+      const runButton = screen.getByRole('button', { name: /^Run$/ });
       await user.click(runButton);
+
+      // Dialog opens — click the Run button inside it to confirm
+      const dialogRunButton = screen.getAllByRole('button', { name: /^Run$/ }).at(-1)!;
+      await user.click(dialogRunButton);
 
       await waitFor(() => {
         expect(global.window.api.loops.start).toHaveBeenCalled();

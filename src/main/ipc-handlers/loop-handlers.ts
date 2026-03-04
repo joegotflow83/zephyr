@@ -10,7 +10,7 @@ import { IPC } from '../../shared/ipc-channels';
 import type { LoopRunner } from '../../services/loop-runner';
 import type { LoopScheduler } from '../../services/scheduler';
 import type { LoopState, LoopStartOpts } from '../../shared/loop-types';
-import { isLoopTerminal } from '../../shared/loop-types';
+import { isLoopTerminal, LoopMode } from '../../shared/loop-types';
 import type { ScheduledLoop } from '../../services/scheduler';
 import type { ProjectConfig } from '../../shared/models';
 import type { PreValidationStore } from '../../services/pre-validation-store';
@@ -98,12 +98,18 @@ export function registerLoopHandlers(services: LoopServices): void {
         }
       }
 
-      // For VM loops: hook files and custom prompt files cannot be injected via
-      // `docker exec` after the container starts (there is no containerId for
-      // VM-backed containers). Instead, write everything to a per-project temp
-      // directory and mount it at /root/.claude. Hooks go into hooks/ and
-      // prompt files sit at the directory root so Claude Code can read them.
-      if (opts.sandboxType === 'vm' && project) {
+      // For VM loops and single-mode container loops: hook files and custom
+      // prompt files cannot be injected via `docker exec` after the container
+      // starts because:
+      //   - VM loops have no containerId to exec into
+      //   - Single-mode container loops start the agent as their CMD, so exec
+      //     injection would race against (or miss) the agent startup
+      // Instead, write everything to a per-project temp directory and mount it
+      // at /root/.claude. Hooks go into hooks/ and prompt files sit at the
+      // directory root so Claude Code can read them.
+      const isVm = opts.sandboxType === 'vm';
+      const isSingleContainer = opts.mode === LoopMode.SINGLE && !isVm;
+      if ((isVm || isSingleContainer) && project) {
         const hasHooks = project.hooks.length > 0 && !!hooksStore;
         const hasPrompts = Object.keys(project.custom_prompts).length > 0;
 
@@ -121,7 +127,7 @@ export function registerLoopHandlers(services: LoopServices): void {
                     await fs.writeFile(path.join(claudeDir, 'hooks', safe), content, { mode: 0o755 });
                   }
                 } catch (err) {
-                  logger.warn(`Failed to write hook ${filename} for VM mount`, { err });
+                  logger.warn(`Failed to write hook ${filename} for .claude mount`, { err });
                 }
               }
             }
@@ -132,7 +138,7 @@ export function registerLoopHandlers(services: LoopServices): void {
                   const safe = path.basename(filename);
                   await fs.writeFile(path.join(claudeDir, safe), content, 'utf8');
                 } catch (err) {
-                  logger.warn(`Failed to write custom prompt ${filename} for VM mount`, { err });
+                  logger.warn(`Failed to write custom prompt ${filename} for .claude mount`, { err });
                 }
               }
             }
@@ -142,7 +148,7 @@ export function registerLoopHandlers(services: LoopServices): void {
               volumeMounts: [...(opts.volumeMounts ?? []), `${claudeDir}:/root/.claude`],
             };
           } catch (err) {
-            logger.warn('Failed to prepare .claude directory for VM loop', { err });
+            logger.warn('Failed to prepare .claude directory for loop', { err });
           }
         }
       }
@@ -210,7 +216,9 @@ export function registerLoopHandlers(services: LoopServices): void {
 
       // Inject hook files into ~/.claude/hooks inside the container.
       // Uses base64 to safely transfer file contents via docker exec.
-      if (project && project.hooks.length > 0 && state.containerId && hooksStore && dockerManager) {
+      // Skipped for single-mode container runs: those already have hooks pre-mounted
+      // as a volume (handled above), and the agent CMD starts before exec can run.
+      if (project && project.hooks.length > 0 && state.containerId && hooksStore && dockerManager && opts.mode !== LoopMode.SINGLE) {
         try {
           await dockerManager.execCommand(state.containerId, [
             'sh', '-c', 'mkdir -p ~/.claude/hooks',
@@ -239,8 +247,9 @@ export function registerLoopHandlers(services: LoopServices): void {
 
       // Inject custom prompt files into ~/.claude/ inside the container.
       // Uses base64 to safely transfer file contents via docker exec.
-      // VM-backed loops handle this via volume mount above; this covers containers only.
-      if (project && Object.keys(project.custom_prompts).length > 0 && state.containerId && dockerManager) {
+      // VM-backed loops and single-mode container loops handle this via volume mount
+      // above; this exec path covers continuous container runs only.
+      if (project && Object.keys(project.custom_prompts).length > 0 && state.containerId && dockerManager && opts.mode !== LoopMode.SINGLE) {
         try {
           await dockerManager.execCommand(state.containerId, [
             'sh', '-c', 'mkdir -p ~/.claude',

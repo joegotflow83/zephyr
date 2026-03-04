@@ -122,6 +122,13 @@ export interface LoopStartOpts {
 
   /** VM configuration; only used when sandboxType === 'vm' */
   vmConfig?: VMConfig;
+
+  /**
+   * Command override for the container.
+   * When set, replaces the image's default CMD (e.g. "sleep infinity").
+   * Used for single-mode runs to execute a specific agent task and exit.
+   */
+  cmd?: string[];
 }
 
 /**

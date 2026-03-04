@@ -5,8 +5,9 @@ import { useLoops } from '../../hooks/useLoops';
 import { useAppStore } from '../../stores/app-store';
 import { ProjectDialog } from '../../components/ProjectDialog/ProjectDialog';
 import { ConfirmDialog } from '../../components/ConfirmDialog/ConfirmDialog';
+import { RunModeDialog } from '../../components/RunModeDialog/RunModeDialog';
+import type { RunModeSelection } from '../../components/RunModeDialog/RunModeDialog';
 import type { ProjectConfig } from '../../../shared/models';
-import { LoopMode } from '../../../shared/loop-types';
 
 interface ToastMethods {
   success: (message: string) => void;
@@ -45,6 +46,9 @@ export const ProjectsTab: React.FC<ProjectsTabProps> = ({ onRunProject, toast })
   const [actionLoading, setActionLoading] = useState<{
     [key: string]: boolean;
   }>({});
+
+  // Run mode dialog state
+  const [runModeProject, setRunModeProject] = useState<ProjectConfig | null>(null);
 
   // Load projects on mount
   useEffect(() => {
@@ -89,11 +93,18 @@ export const ProjectsTab: React.FC<ProjectsTabProps> = ({ onRunProject, toast })
     setConfirmDialog(null);
   };
 
-  const handleRun = async (project: ProjectConfig) => {
+  const handleRun = (project: ProjectConfig) => {
     if (project.sandbox_type === 'vm' && !multipassAvailable) {
       toast.error('Multipass is not installed. Visit multipass.run to install.');
       return;
     }
+    setRunModeProject(project);
+  };
+
+  const handleRunModeConfirm = async (selection: RunModeSelection) => {
+    const project = runModeProject;
+    setRunModeProject(null);
+    if (!project) return;
 
     setActionLoading({ ...actionLoading, [`run-${project.id}`]: true });
 
@@ -106,7 +117,8 @@ export const ProjectsTab: React.FC<ProjectsTabProps> = ({ onRunProject, toast })
         projectId: project.id,
         projectName: project.name,
         dockerImage: project.docker_image,
-        mode: LoopMode.CONTINUOUS,
+        mode: selection.mode,
+        ...(selection.cmd ? { cmd: selection.cmd } : {}),
         ...(project.local_path || extraMounts.length > 0
           ? {
               volumeMounts: [
@@ -323,6 +335,16 @@ export const ProjectsTab: React.FC<ProjectsTabProps> = ({ onRunProject, toast })
           loading={!!actionLoading[`delete-${confirmDialog.project.id}`]}
           onConfirm={handleConfirmDelete}
           onCancel={handleCancelDelete}
+        />
+      )}
+
+      {/* Run Mode Dialog */}
+      {runModeProject && (
+        <RunModeDialog
+          projectName={runModeProject.name}
+          promptFiles={Object.keys(runModeProject.custom_prompts)}
+          onConfirm={handleRunModeConfirm}
+          onCancel={() => setRunModeProject(null)}
         />
       )}
     </div>

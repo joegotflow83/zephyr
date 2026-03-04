@@ -159,6 +159,7 @@ export class LoopRunner {
         image: opts.dockerImage,
         projectId: opts.projectId,
         name: containerName,
+        cmd: opts.cmd,
         env: opts.envVars,
         workingDir: opts.workDir,
         volumes: this.parseVolumeMounts(opts.volumeMounts),

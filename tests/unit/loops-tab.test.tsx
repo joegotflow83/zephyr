@@ -271,12 +271,17 @@ describe('LoopsTab', () => {
 
       render(<LoopsTab />);
 
+      // Click Start to open the RunModeDialog, then confirm with default (continuous)
       await user.click(screen.getByText('Start'));
-      expect(mockLoops.start).toHaveBeenCalledWith({
-        projectId: project1.id,
-        projectName: project1.name,
-        mode: LoopMode.CONTINUOUS,
-        dockerImage: project1.docker_image,
+      await user.click(screen.getByRole('button', { name: /^Run$/ }));
+
+      await waitFor(() => {
+        expect(mockLoops.start).toHaveBeenCalledWith({
+          projectId: project1.id,
+          projectName: project1.name,
+          mode: LoopMode.CONTINUOUS,
+          dockerImage: project1.docker_image,
+        });
       });
     });
 
@@ -311,7 +316,9 @@ describe('LoopsTab', () => {
 
       render(<LoopsTab />);
 
+      // Click Start to open the RunModeDialog, then confirm to trigger the start
       await user.click(screen.getByText('Start'));
+      await user.click(screen.getByRole('button', { name: /^Run$/ }));
 
       await waitFor(() => {
         expect(consoleErrorSpy).toHaveBeenCalledWith(

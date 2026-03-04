@@ -3,8 +3,11 @@ import { useLoops } from '../../hooks/useLoops';
 import { useProjects } from '../../hooks/useProjects';
 import { LoopRow } from './LoopRow';
 import { LogViewer, type ParsedLogLine } from '../../components/LogViewer/LogViewer';
+import { RunModeDialog } from '../../components/RunModeDialog/RunModeDialog';
+import type { RunModeSelection } from '../../components/RunModeDialog/RunModeDialog';
 import type { LoopStartOpts } from '../../../shared/loop-types';
-import { LoopStatus, LoopMode } from '../../../shared/loop-types';
+import { LoopStatus } from '../../../shared/loop-types';
+import type { ProjectConfig } from '../../../shared/models';
 
 /**
  * Simple log parser to convert raw log strings to ParsedLogLine format.
@@ -76,6 +79,7 @@ export const LoopsTab: React.FC = () => {
   const [selectedLoopId, setSelectedLoopId] = useState<string | null>(null);
   const [splitterPosition, setSplitterPosition] = useState(60); // Percentage for upper panel
   const [isDragging, setIsDragging] = useState(false);
+  const [runModeProject, setRunModeProject] = useState<ProjectConfig | null>(null);
 
   // Auto-select first running loop on tab switch or when loops update
   useEffect(() => {
@@ -112,26 +116,40 @@ export const LoopsTab: React.FC = () => {
     }
   };
 
-  const handleStart = async (projectId: string) => {
+  const handleStart = (projectId: string) => {
+    const project = projects.find((p) => p.id === projectId);
+    if (project) {
+      setRunModeProject(project);
+    }
+  };
+
+  const handleRunModeConfirm = async (selection: RunModeSelection) => {
+    const project = runModeProject;
+    setRunModeProject(null);
+    if (!project) return;
+
     try {
-      const project = projects.find((p) => p.id === projectId);
-      const extraMounts = (project?.additional_mounts ?? []).map((hostPath) => {
+      const extraMounts = (project.additional_mounts ?? []).map((hostPath) => {
         const basename = hostPath.split('/').filter(Boolean).pop() ?? hostPath;
         return `${hostPath}:/mnt/${basename}`;
       });
       const opts: LoopStartOpts = {
-        projectId,
-        projectName: project?.name || projectId,
-        mode: LoopMode.CONTINUOUS,
-        dockerImage: project?.docker_image || '',
-        ...(project?.local_path || extraMounts.length > 0
+        projectId: project.id,
+        projectName: project.name,
+        mode: selection.mode,
+        ...(selection.cmd ? { cmd: selection.cmd } : {}),
+        dockerImage: project.docker_image || '',
+        ...(project.local_path || extraMounts.length > 0
           ? {
               volumeMounts: [
-                ...(project?.local_path ? [`${project.local_path}:/workspace`] : []),
+                ...(project.local_path ? [`${project.local_path}:/workspace`] : []),
                 ...extraMounts,
               ],
-              ...(project?.local_path ? { workDir: '/workspace' } : {}),
+              ...(project.local_path ? { workDir: '/workspace' } : {}),
             }
+          : {}),
+        ...(project.sandbox_type === 'vm'
+          ? { sandboxType: 'vm', vmConfig: project.vm_config }
           : {}),
       };
       await start(opts);
@@ -302,6 +320,16 @@ export const LoopsTab: React.FC = () => {
           )}
         </div>
       </div>
+
+      {/* Run Mode Dialog */}
+      {runModeProject && (
+        <RunModeDialog
+          projectName={runModeProject.name}
+          promptFiles={Object.keys(runModeProject.custom_prompts)}
+          onConfirm={handleRunModeConfirm}
+          onCancel={() => setRunModeProject(null)}
+        />
+      )}
     </div>
   );
 };
