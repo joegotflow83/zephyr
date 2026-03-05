@@ -2,6 +2,11 @@
 
 A native Electron + React + TypeScript desktop application for managing and orchestrating AI loops via Docker containers.
 
+## Credit
+
+Credit for creating the ralph philosophy goes to [@GeoffreyHuntley](https://x.com/GeoffreyHuntley)] and credit for creating the ralph
+playbook goes to [ClaytonFarr](https://github.com/ClaytonFarr/ralph-playbook?tab=readme-ov-file)
+
 ## What It Does
 
 Zephyr Desktop provides a graphical interface for:
