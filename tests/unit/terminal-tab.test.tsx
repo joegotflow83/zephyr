@@ -130,7 +130,7 @@ describe('TerminalTab', () => {
 
   describe('Initial Rendering', () => {
     it('should render the terminal tab with toolbar', async () => {
-      render(<TerminalTab />);
+      render(<TerminalTab isActive />);
       await waitFor(() => {
         expect(screen.getByText('Container')).toBeInTheDocument();
         expect(screen.getByText('User')).toBeInTheDocument();
@@ -139,14 +139,14 @@ describe('TerminalTab', () => {
     });
 
     it('should load containers on mount', async () => {
-      render(<TerminalTab />);
+      render(<TerminalTab isActive />);
       await waitFor(() => {
         expect(mockListContainers).toHaveBeenCalled();
       });
     });
 
     it('should display empty state message when no sessions are open', async () => {
-      render(<TerminalTab />);
+      render(<TerminalTab isActive />);
       await waitFor(() => {
         expect(screen.getByText('No active terminal sessions')).toBeInTheDocument();
       });
@@ -154,7 +154,7 @@ describe('TerminalTab', () => {
 
     it('should show info message when no containers are available', async () => {
       mockListContainers.mockResolvedValue([]);
-      render(<TerminalTab />);
+      render(<TerminalTab isActive />);
       await waitFor(() => {
         expect(
           screen.getByText(/No running containers found/i)
@@ -165,7 +165,7 @@ describe('TerminalTab', () => {
 
   describe('Container Selection', () => {
     it('should populate container dropdown with available containers', async () => {
-      render(<TerminalTab />);
+      render(<TerminalTab isActive />);
       await waitFor(() => {
         expect(mockListContainers).toHaveBeenCalled();
       });
@@ -176,7 +176,7 @@ describe('TerminalTab', () => {
     });
 
     it('should auto-select first container if available', async () => {
-      render(<TerminalTab />);
+      render(<TerminalTab isActive />);
       await waitFor(() => {
         const select = screen.getByLabelText(/container/i) as HTMLSelectElement;
         expect(select.value).toBe('docker:container1');
@@ -184,7 +184,7 @@ describe('TerminalTab', () => {
     });
 
     it('should allow changing selected container', async () => {
-      render(<TerminalTab />);
+      render(<TerminalTab isActive />);
 
       await waitFor(() => {
         expect(mockListContainers).toHaveBeenCalled();
@@ -201,7 +201,7 @@ describe('TerminalTab', () => {
 
   describe('User Selection', () => {
     it('should render user selector with default and root options', async () => {
-      render(<TerminalTab />);
+      render(<TerminalTab isActive />);
       await waitFor(() => {
         expect(screen.getByLabelText(/user/i)).toBeInTheDocument();
       });
@@ -213,7 +213,7 @@ describe('TerminalTab', () => {
     });
 
     it('should default to "default" user', async () => {
-      render(<TerminalTab />);
+      render(<TerminalTab isActive />);
       await waitFor(() => {
         const select = screen.getByLabelText(/user/i) as HTMLSelectElement;
         expect(select.value).toBe('default');
@@ -221,7 +221,7 @@ describe('TerminalTab', () => {
     });
 
     it('should allow changing user selection', async () => {
-      render(<TerminalTab />);
+      render(<TerminalTab isActive />);
 
       await waitFor(() => {
         expect(screen.getByLabelText(/user/i)).toBeInTheDocument();
@@ -243,7 +243,7 @@ describe('TerminalTab', () => {
         session: mockSession,
       });
 
-      render(<TerminalTab />);
+      render(<TerminalTab isActive />);
 
       await waitFor(() => {
         expect(mockListContainers).toHaveBeenCalled();
@@ -268,7 +268,7 @@ describe('TerminalTab', () => {
         session: mockSession,
       });
 
-      render(<TerminalTab />);
+      render(<TerminalTab isActive />);
 
       await waitFor(() => {
         expect(mockListContainers).toHaveBeenCalled();
@@ -296,7 +296,7 @@ describe('TerminalTab', () => {
         resolveOpen = resolve;
       }));
 
-      render(<TerminalTab />);
+      render(<TerminalTab isActive />);
 
       await waitFor(() => {
         expect(mockListContainers).toHaveBeenCalled();
@@ -318,7 +318,7 @@ describe('TerminalTab', () => {
         error: 'Container not running',
       });
 
-      render(<TerminalTab />);
+      render(<TerminalTab isActive />);
 
       await waitFor(() => {
         expect(mockListContainers).toHaveBeenCalled();
@@ -338,7 +338,7 @@ describe('TerminalTab', () => {
       // the user from attempting to open a terminal with no container selected.
       mockListContainers.mockResolvedValue([]);
 
-      render(<TerminalTab />);
+      render(<TerminalTab isActive />);
 
       await waitFor(() => {
         expect(mockListContainers).toHaveBeenCalled();
@@ -354,7 +354,7 @@ describe('TerminalTab', () => {
         session: mockSession,
       });
 
-      render(<TerminalTab />);
+      render(<TerminalTab isActive />);
 
       await waitFor(() => {
         expect(mockListContainers).toHaveBeenCalled();
@@ -376,7 +376,7 @@ describe('TerminalTab', () => {
         session: mockSession,
       });
 
-      render(<TerminalTab />);
+      render(<TerminalTab isActive />);
 
       await waitFor(() => {
         expect(mockListContainers).toHaveBeenCalled();
@@ -396,7 +396,7 @@ describe('TerminalTab', () => {
         session: { ...mockSession, user: 'root' },
       });
 
-      render(<TerminalTab />);
+      render(<TerminalTab isActive />);
 
       await waitFor(() => {
         expect(mockListContainers).toHaveBeenCalled();
@@ -417,7 +417,7 @@ describe('TerminalTab', () => {
       });
       mockTerminalClose.mockResolvedValue({ success: true });
 
-      render(<TerminalTab />);
+      render(<TerminalTab isActive />);
 
       await waitFor(() => {
         expect(mockListContainers).toHaveBeenCalled();
@@ -446,7 +446,7 @@ describe('TerminalTab', () => {
         session: mockSession,
       });
 
-      render(<TerminalTab />);
+      render(<TerminalTab isActive />);
 
       await waitFor(() => {
         expect(mockListContainers).toHaveBeenCalled();
@@ -475,7 +475,7 @@ describe('TerminalTab', () => {
       });
       mockTerminalResize.mockResolvedValue({ success: true });
 
-      render(<TerminalTab />);
+      render(<TerminalTab isActive />);
 
       await waitFor(() => {
         expect(mockListContainers).toHaveBeenCalled();
@@ -509,7 +509,7 @@ describe('TerminalTab', () => {
         session: mockSession,
       });
 
-      render(<TerminalTab />);
+      render(<TerminalTab isActive />);
 
       await waitFor(() => {
         expect(mockListContainers).toHaveBeenCalled();
@@ -539,7 +539,7 @@ describe('TerminalTab', () => {
         session: mockSession,
       });
 
-      render(<TerminalTab />);
+      render(<TerminalTab isActive />);
 
       await waitFor(() => {
         expect(mockListContainers).toHaveBeenCalled();
@@ -568,7 +568,7 @@ describe('TerminalTab', () => {
       // Skipped: Requires vi.useFakeTimers() which conflicts with React 18's internal
       // scheduler that also uses setTimeout/MessageChannel. This causes React's
       // concurrent rendering to break in the test environment.
-      render(<TerminalTab />);
+      render(<TerminalTab isActive />);
 
       await waitFor(() => {
         expect(mockListContainers).toHaveBeenCalledTimes(1);
@@ -608,7 +608,7 @@ describe('TerminalTab', () => {
 
   describe('Event Listener Cleanup', () => {
     it('should setup terminal event listeners', async () => {
-      render(<TerminalTab />);
+      render(<TerminalTab isActive />);
 
       await waitFor(() => {
         expect(mockOnData).toHaveBeenCalled();

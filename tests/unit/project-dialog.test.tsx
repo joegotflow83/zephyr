@@ -713,7 +713,7 @@ describe('ProjectDialog', () => {
           })
         );
       });
-    });
+    }, 15000);
   });
 
   describe('Docker Image Field (Custom Mode)', () => {

@@ -24,7 +24,7 @@ export class DockerHealthMonitor {
   private intervalId: NodeJS.Timeout | null = null;
   private lastKnownStatus: boolean | null = null;
   private callbacks: DockerStatusChangeCallback[] = [];
-  private defaultIntervalMs = 30000; // 30 seconds
+  private defaultIntervalMs = 5000; // 5 seconds
 
   /**
    * Create a new DockerHealthMonitor
