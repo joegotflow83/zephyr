@@ -7,6 +7,7 @@
 
 import { useAppStore } from '../stores/app-store';
 import type { LoopState, LoopStartOpts } from '../../shared/loop-types';
+import { getLoopKey } from '../../shared/loop-types';
 import type { ScheduledLoop } from '../../services/scheduler';
 
 export interface UseLoopsResult {
@@ -15,9 +16,11 @@ export interface UseLoopsResult {
   error: string | null;
   refresh: () => Promise<void>;
   start: (opts: LoopStartOpts) => Promise<LoopState>;
-  stop: (projectId: string) => Promise<void>;
-  remove: (projectId: string) => Promise<void>;
-  get: (projectId: string) => LoopState | undefined;
+  stop: (projectId: string, role?: string) => Promise<void>;
+  remove: (projectId: string, role?: string) => Promise<void>;
+  get: (projectId: string, role?: string) => LoopState | undefined;
+  factoryStart: (projectId: string, baseOpts: LoopStartOpts) => Promise<LoopState[]>;
+  factoryStop: (projectId: string) => Promise<void>;
   schedule: (
     projectId: string,
     schedule: string,
@@ -45,18 +48,32 @@ export function useLoops(): UseLoopsResult {
     return state;
   };
 
-  const stop = async (projectId: string): Promise<void> => {
-    await window.api.loops.stop(projectId);
+  const stop = async (projectId: string, role?: string): Promise<void> => {
+    await window.api.loops.stop(projectId, role);
     // State will be updated via IPC event listener
   };
 
-  const remove = async (projectId: string): Promise<void> => {
-    await window.api.loops.remove(projectId);
-    removeFromStore(projectId);
+  const remove = async (projectId: string, role?: string): Promise<void> => {
+    await window.api.loops.remove(projectId, role);
+    removeFromStore(projectId, role);
   };
 
-  const get = (projectId: string): LoopState | undefined => {
-    return loops.find((l) => l.projectId === projectId);
+  const get = (projectId: string, role?: string): LoopState | undefined => {
+    const key = getLoopKey(projectId, role);
+    return loops.find((l) => getLoopKey(l) === key);
+  };
+
+  const factoryStart = async (projectId: string, baseOpts: LoopStartOpts): Promise<LoopState[]> => {
+    const states = await window.api.factory.start(projectId, baseOpts);
+    for (const state of states) {
+      updateInStore(state);
+    }
+    return states;
+  };
+
+  const factoryStop = async (projectId: string): Promise<void> => {
+    await window.api.factory.stop(projectId);
+    // States will be updated via IPC event listeners
   };
 
   const schedule = async (
@@ -84,6 +101,8 @@ export function useLoops(): UseLoopsResult {
     stop,
     remove,
     get,
+    factoryStart,
+    factoryStop,
     schedule,
     cancelSchedule,
     listScheduled,

@@ -54,6 +54,10 @@ export const IPC = {
   LOOP_STATE_CHANGED: 'loop:state-changed',
   LOOP_LOG_LINE: 'loop:log-line',
 
+  // Factory (multi-container coding factory)
+  FACTORY_START: 'factory:start',
+  FACTORY_STOP: 'factory:stop',
+
   // Log export
   LOGS_EXPORT: 'logs:export',
   LOGS_EXPORT_ALL: 'logs:export-all',

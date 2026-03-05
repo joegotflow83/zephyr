@@ -259,7 +259,7 @@ describe('LoopsTab', () => {
       render(<LoopsTab />);
 
       await user.click(screen.getByText('Stop'));
-      expect(mockLoops.stop).toHaveBeenCalledWith(project1.id);
+      expect(mockLoops.stop).toHaveBeenCalledWith(project1.id, undefined);
     });
 
     it('calls start when Start button is clicked', async () => {

@@ -48,8 +48,10 @@ export const TerminalTab: React.FC<TerminalTabProps> = ({ isActive }) => {
   // Determine theme from settings
   const theme = settings?.theme === 'light' ? 'light' : 'dark';
 
-  // Load running containers and VM loops on mount, refresh every 5 seconds
+  // Load running containers and VM loops; refresh every 10s only while tab is active
   useEffect(() => {
+    if (!isActive) return;
+
     const load = async () => {
       try {
         const [containerList, loopList] = await Promise.all([
@@ -79,9 +81,9 @@ export const TerminalTab: React.FC<TerminalTabProps> = ({ isActive }) => {
     };
 
     load();
-    const interval = setInterval(load, 5000);
+    const interval = setInterval(load, 10000);
     return () => clearInterval(interval);
-  }, [selectedTarget]);
+  }, [isActive, selectedTarget]);
 
   // Keep a ref so IPC callbacks always see the latest sessions without
   // needing to be re-registered (which would create brief data-loss windows).

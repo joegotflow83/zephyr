@@ -69,10 +69,10 @@ contextBridge.exposeInMainWorld('api', {
 
   loops: {
     start: (opts: unknown) => ipcRenderer.invoke(IPC.LOOP_START, opts),
-    stop: (projectId: string) => ipcRenderer.invoke(IPC.LOOP_STOP, projectId),
+    stop: (projectId: string, role?: string) => ipcRenderer.invoke(IPC.LOOP_STOP, projectId, role),
     list: () => ipcRenderer.invoke(IPC.LOOP_LIST),
-    get: (projectId: string) => ipcRenderer.invoke(IPC.LOOP_GET, projectId),
-    remove: (projectId: string) => ipcRenderer.invoke(IPC.LOOP_REMOVE, projectId),
+    get: (projectId: string, role?: string) => ipcRenderer.invoke(IPC.LOOP_GET, projectId, role),
+    remove: (projectId: string, role?: string) => ipcRenderer.invoke(IPC.LOOP_REMOVE, projectId, role),
     schedule: (projectId: string, schedule: string, loopOpts: unknown) =>
       ipcRenderer.invoke(IPC.LOOP_SCHEDULE, projectId, schedule, loopOpts),
     cancelSchedule: (projectId: string) =>
@@ -93,6 +93,13 @@ contextBridge.exposeInMainWorld('api', {
       // Return cleanup function
       return () => ipcRenderer.removeListener(IPC.LOOP_LOG_LINE, listener);
     },
+  },
+
+  factory: {
+    start: (projectId: string, baseOpts: unknown) =>
+      ipcRenderer.invoke(IPC.FACTORY_START, projectId, baseOpts),
+    stop: (projectId: string) =>
+      ipcRenderer.invoke(IPC.FACTORY_STOP, projectId),
   },
 
   logs: {

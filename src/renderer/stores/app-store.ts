@@ -14,6 +14,7 @@
 import { create } from 'zustand';
 import type { ProjectConfig, AppSettings, ZephyrImage, ImageBuildConfig } from '../../shared/models';
 import type { LoopState } from '../../shared/loop-types';
+import { getLoopKey } from '../../shared/loop-types';
 import type { DockerInfo } from '../../services/docker-manager';
 import type { VMInfo } from '../../services/vm-manager';
 
@@ -64,7 +65,7 @@ export interface AppState {
   setLoopsLoading: (loading: boolean) => void;
   setLoopsError: (error: string | null) => void;
   updateLoop: (state: LoopState) => void;
-  removeLoop: (projectId: string) => void;
+  removeLoop: (projectId: string, role?: string) => void;
   refreshLoops: () => Promise<void>;
 
   setSettings: (settings: AppSettings) => void;
@@ -164,12 +165,13 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   updateLoop: (state) =>
     set((prevState) => {
-      const existing = prevState.loops.find((l) => l.projectId === state.projectId);
+      const key = getLoopKey(state);
+      const existing = prevState.loops.find((l) => getLoopKey(l) === key);
       if (existing) {
         // Update existing loop
         return {
           loops: prevState.loops.map((l) =>
-            l.projectId === state.projectId ? state : l
+            getLoopKey(l) === key ? state : l
           ),
         };
       } else {
@@ -180,10 +182,13 @@ export const useAppStore = create<AppState>((set, get) => ({
       }
     }),
 
-  removeLoop: (projectId) =>
-    set((state) => ({
-      loops: state.loops.filter((l) => l.projectId !== projectId),
-    })),
+  removeLoop: (projectId, role?: string) =>
+    set((state) => {
+      const key = getLoopKey(projectId, role);
+      return {
+        loops: state.loops.filter((l) => getLoopKey(l) !== key),
+      };
+    }),
 
   refreshLoops: async () => {
     set({ loopsLoading: true, loopsError: null });

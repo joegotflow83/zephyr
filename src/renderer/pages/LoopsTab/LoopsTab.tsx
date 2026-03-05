@@ -5,8 +5,8 @@ import { LoopRow } from './LoopRow';
 import { LogViewer, type ParsedLogLine } from '../../components/LogViewer/LogViewer';
 import { RunModeDialog } from '../../components/RunModeDialog/RunModeDialog';
 import type { RunModeSelection } from '../../components/RunModeDialog/RunModeDialog';
-import type { LoopStartOpts } from '../../../shared/loop-types';
-import { LoopStatus } from '../../../shared/loop-types';
+import type { LoopState, LoopStartOpts } from '../../../shared/loop-types';
+import { LoopStatus, getLoopKey } from '../../../shared/loop-types';
 import type { ProjectConfig } from '../../../shared/models';
 
 /**
@@ -74,7 +74,7 @@ function parseLogLine(rawLine: string): ParsedLogLine {
  * Split layout: upper table + lower log viewer (resizable).
  */
 export const LoopsTab: React.FC = () => {
-  const { loops, loading, error, stop, start } = useLoops();
+  const { loops, loading, error, stop, start, factoryStart } = useLoops();
   const { projects } = useProjects();
   const [selectedLoopId, setSelectedLoopId] = useState<string | null>(null);
   const [splitterPosition, setSplitterPosition] = useState(60); // Percentage for upper panel
@@ -89,28 +89,76 @@ export const LoopsTab: React.FC = () => {
     }
 
     // If no selection, or selected loop no longer exists, auto-select first running loop
-    const stillExists = loops.some((l) => l.projectId === selectedLoopId);
+    const stillExists = loops.some((l) => getLoopKey(l) === selectedLoopId);
     if (!selectedLoopId || !stillExists) {
       const runningLoop = loops.find(
         (l) => l.status === LoopStatus.RUNNING || l.status === LoopStatus.STARTING
       );
-      setSelectedLoopId(runningLoop?.projectId || loops[0].projectId);
+      setSelectedLoopId(runningLoop ? getLoopKey(runningLoop) : getLoopKey(loops[0]));
     }
   }, [loops, selectedLoopId]);
 
-  const selectedLoop = loops.find((l) => l.projectId === selectedLoopId);
+  const selectedLoop = loops.find((l) => getLoopKey(l) === selectedLoopId);
 
-  // Parse raw logs into ParsedLogLine format for LogViewer
+  // Parse raw logs into ParsedLogLine format for LogViewer.
+  // Depend on the logs array reference, not the entire loop object,
+  // so status/iteration/error changes don't re-trigger parsing.
+  const selectedLoopLogs = selectedLoop?.logs;
   const parsedLogs = useMemo(() => {
-    if (!selectedLoop || !selectedLoop.logs) {
+    if (!selectedLoopLogs) {
       return [];
     }
-    return selectedLoop.logs.map((rawLine) => parseLogLine(rawLine));
-  }, [selectedLoop]);
+    return selectedLoopLogs.map((rawLine) => parseLogLine(rawLine));
+  }, [selectedLoopLogs]);
 
-  const handleStop = async (projectId: string) => {
+  // Group factory loops by project with visual headers; regular loops appear first in original order
+  type LoopDisplayRow =
+    | { kind: 'loop'; loop: LoopState }
+    | { kind: 'header'; projectId: string; projectName: string; roleLoops: LoopState[] };
+
+  const displayRows = useMemo((): LoopDisplayRow[] => {
+    const factoryByProject = new Map<string, LoopState[]>();
+    const projectOrder: string[] = [];
+    const nonFactoryLoops: LoopState[] = [];
+
+    for (const loop of loops) {
+      if (loop.role) {
+        if (!factoryByProject.has(loop.projectId)) {
+          projectOrder.push(loop.projectId);
+          factoryByProject.set(loop.projectId, []);
+        }
+        factoryByProject.get(loop.projectId)!.push(loop);
+      } else {
+        nonFactoryLoops.push(loop);
+      }
+    }
+
+    const result: LoopDisplayRow[] = [];
+
+    for (const loop of nonFactoryLoops) {
+      result.push({ kind: 'loop', loop });
+    }
+
+    for (const projectId of projectOrder) {
+      const roleLoops = factoryByProject.get(projectId)!;
+      const project = projects.find((p) => p.id === projectId);
+      result.push({
+        kind: 'header',
+        projectId,
+        projectName: project?.name ?? roleLoops[0].projectName,
+        roleLoops,
+      });
+      for (const loop of roleLoops) {
+        result.push({ kind: 'loop', loop });
+      }
+    }
+
+    return result;
+  }, [loops, projects]);
+
+  const handleStop = async (projectId: string, role?: string) => {
     try {
-      await stop(projectId);
+      await stop(projectId, role);
     } catch (err) {
       console.error('Failed to stop loop:', err);
     }
@@ -152,7 +200,11 @@ export const LoopsTab: React.FC = () => {
           ? { sandboxType: 'vm', vmConfig: project.vm_config }
           : {}),
       };
-      await start(opts);
+      if (selection.factory) {
+        await factoryStart(project.id, opts);
+      } else {
+        await start(opts);
+      }
     } catch (err) {
       console.error('Failed to start loop:', err);
     }
@@ -272,15 +324,50 @@ export const LoopsTab: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="bg-white dark:bg-gray-900">
-                {loops.map((loop) => {
+                {displayRows.map((row) => {
+                  if (row.kind === 'header') {
+                    const activeRoleLoops = row.roleLoops.filter(
+                      (l) => l.status === LoopStatus.RUNNING || l.status === LoopStatus.STARTING
+                    );
+                    return (
+                      <tr
+                        key={`factory-header-${row.projectId}`}
+                        className="bg-purple-950/30 border-b border-purple-800/40"
+                      >
+                        <td colSpan={6} className="px-4 py-2">
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                              <span className="inline-flex items-center px-2 py-0.5 text-xs font-medium rounded bg-purple-900 text-purple-300">
+                                Factory
+                              </span>
+                              {row.projectName}
+                            </span>
+                            {activeRoleLoops.length > 0 && (
+                              <button
+                                onClick={async () => {
+                                  for (const loop of activeRoleLoops) {
+                                    await handleStop(loop.projectId, loop.role);
+                                  }
+                                }}
+                                className="px-2 py-1 text-xs bg-red-700 text-white rounded hover:bg-red-600 transition-colors"
+                              >
+                                Stop All
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  }
+                  const loop = row.loop;
                   const project = projects.find((p) => p.id === loop.projectId);
                   return (
                     <LoopRow
-                      key={loop.projectId}
+                      key={getLoopKey(loop)}
                       loop={loop}
                       project={project}
-                      isSelected={loop.projectId === selectedLoopId}
-                      onSelect={(l) => setSelectedLoopId(l.projectId)}
+                      isSelected={getLoopKey(loop) === selectedLoopId}
+                      onSelect={(l) => setSelectedLoopId(getLoopKey(l))}
                       onStop={handleStop}
                       onStart={handleStart}
                     />
@@ -326,6 +413,7 @@ export const LoopsTab: React.FC = () => {
         <RunModeDialog
           projectName={runModeProject.name}
           promptFiles={Object.keys(runModeProject.custom_prompts)}
+          factoryEnabled={!!runModeProject.factory_config?.enabled}
           onConfirm={handleRunModeConfirm}
           onCancel={() => setRunModeProject(null)}
         />

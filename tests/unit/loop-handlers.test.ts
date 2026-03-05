@@ -208,7 +208,7 @@ describe('registerLoopHandlers', () => {
 
       await invoke(IPC.LOOP_STOP, 'test-project');
 
-      expect(mockLoopRunner.stopLoop).toHaveBeenCalledWith('test-project');
+      expect(mockLoopRunner.stopLoop).toHaveBeenCalledWith('test-project', undefined);
     });
   });
 
@@ -272,7 +272,7 @@ describe('registerLoopHandlers', () => {
 
       const result = await invoke(IPC.LOOP_GET, 'test-project');
 
-      expect(mockLoopRunner.getLoopState).toHaveBeenCalledWith('test-project');
+      expect(mockLoopRunner.getLoopState).toHaveBeenCalledWith('test-project', undefined);
       expect(result).toEqual(mockState);
     });
 
@@ -281,7 +281,7 @@ describe('registerLoopHandlers', () => {
 
       const result = await invoke(IPC.LOOP_GET, 'nonexistent');
 
-      expect(mockLoopRunner.getLoopState).toHaveBeenCalledWith('nonexistent');
+      expect(mockLoopRunner.getLoopState).toHaveBeenCalledWith('nonexistent', undefined);
       expect(result).toBeNull();
     });
   });
@@ -292,7 +292,7 @@ describe('registerLoopHandlers', () => {
 
       await invoke(IPC.LOOP_REMOVE, 'test-project');
 
-      expect(mockLoopRunner.removeLoop).toHaveBeenCalledWith('test-project');
+      expect(mockLoopRunner.removeLoop).toHaveBeenCalledWith('test-project', undefined);
     });
   });
 
@@ -387,7 +387,8 @@ describe('registerLoopHandlers', () => {
       );
     });
 
-    it('should register onLogLine callback that broadcasts to all windows', () => {
+    it('should register onLogLine callback that broadcasts to all windows', async () => {
+      vi.useFakeTimers();
       expect(mockLoopRunner.onLogLine).toHaveBeenCalledTimes(1);
 
       const callback = mockLoopRunner.onLogLine.mock.calls[0][0];
@@ -399,12 +400,17 @@ describe('registerLoopHandlers', () => {
 
       callback('test-project', testLine);
 
+      // Log lines are batched and flushed after 250ms
+      vi.advanceTimersByTime(250);
+
       expect(mockBrowserWindow.getAllWindows).toHaveBeenCalled();
       expect(mockWebContentsSend).toHaveBeenCalledWith(
         IPC.LOOP_LOG_LINE,
         'test-project',
         testLine,
       );
+
+      vi.useRealTimers();
     });
   });
 });

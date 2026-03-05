@@ -25,6 +25,7 @@ import {
   createLoopState,
   validateLoopStartOpts,
   isLoopTerminal,
+  getLoopKey,
 } from '../shared/loop-types';
 
 /**
@@ -56,6 +57,8 @@ export class LoopRunner {
   private stateCallbacks: Set<StateChangeCallback> = new Set();
   private logCallbacks: Set<LogLineCallback> = new Set();
   private logAbortControllers: Map<string, AbortController> = new Map();
+  /** Throttle timers for batching log-driven state broadcasts */
+  private logBroadcastTimers: Map<string, NodeJS.Timeout> = new Map();
   /** Stores the VM name for each persistent-VM project across loop runs */
   private persistentVMNames: Map<string, string> = new Map();
 
@@ -107,14 +110,16 @@ export class LoopRunner {
     // Validate options
     validateLoopStartOpts(opts);
 
+    const key = getLoopKey(opts.projectId, opts.role);
+
     // Check if already actively running — terminal states (COMPLETED, FAILED, STOPPED) can be restarted
-    const existingState = this.states.get(opts.projectId);
+    const existingState = this.states.get(key);
     if (existingState && !isLoopTerminal(existingState.status)) {
-      throw new Error(`Loop for project ${opts.projectId} is already running`);
+      throw new Error(`Loop for project ${opts.projectId}${opts.role ? ` (${opts.role})` : ''} is already running`);
     }
     // Clear stale terminal state so we start fresh
     if (existingState) {
-      this.states.delete(opts.projectId);
+      this.states.delete(key);
     }
 
     // Check concurrency limit
@@ -126,8 +131,8 @@ export class LoopRunner {
     }
 
     // Initialize state as IDLE
-    const state = createLoopState(opts.projectId, opts.mode, opts.projectName);
-    this.states.set(opts.projectId, state);
+    const state = createLoopState(opts.projectId, opts.mode, opts.projectName, opts.role);
+    this.states.set(key, state);
 
     // Branch to VM execution if requested
     if (opts.sandboxType === 'vm') {
@@ -136,7 +141,7 @@ export class LoopRunner {
 
     try {
       // Transition to STARTING
-      this.updateState(opts.projectId, {
+      this.updateState(key, {
         status: LoopStatus.STARTING,
         startedAt: new Date().toISOString(),
       });
@@ -144,11 +149,12 @@ export class LoopRunner {
       // Derive a stable, Docker-safe container name from the project name.
       // Docker names must match [a-zA-Z0-9][a-zA-Z0-9_.-]*, so we lowercase,
       // replace any invalid characters with hyphens, and trim leading hyphens.
+      // For factory roles, append the role to avoid name collisions.
       const safeName = opts.projectName
         .toLowerCase()
         .replace(/[^a-z0-9_.-]+/g, '-')
         .replace(/^-+/, '') || opts.projectId.substring(0, 8);
-      const containerName = `zephyr-${safeName}`;
+      const containerName = opts.role ? `zephyr-${safeName}-${opts.role}` : `zephyr-${safeName}`;
 
       // Remove any stale (stopped/exited) container with this name so we can
       // reuse it on subsequent runs.
@@ -166,22 +172,22 @@ export class LoopRunner {
         autoRemove: false, // We manage cleanup
       });
 
-      this.updateState(opts.projectId, { containerId });
+      this.updateState(key, { containerId });
 
       // Start container
       await this.docker.startContainer(containerId);
 
       // Transition to RUNNING
-      this.updateState(opts.projectId, { status: LoopStatus.RUNNING });
+      this.updateState(key, { status: LoopStatus.RUNNING });
 
       // Start log streaming
-      this.startLogStream(opts.projectId, containerId, opts.mode);
+      this.startLogStream(key, containerId, opts.mode);
 
-      return this.states.get(opts.projectId)!;
+      return this.states.get(key)!;
     } catch (error) {
       // Mark as FAILED
       const errorMessage = error instanceof Error ? error.message : String(error);
-      this.updateState(opts.projectId, {
+      this.updateState(key, {
         status: LoopStatus.FAILED,
         error: `Failed to start loop: ${errorMessage}`,
         stoppedAt: new Date().toISOString(),
@@ -199,24 +205,25 @@ export class LoopRunner {
    * @param projectId - Project ID of the loop to stop
    * @throws Error if loop is not running or does not exist
    */
-  async stopLoop(projectId: string): Promise<void> {
-    const state = this.states.get(projectId);
+  async stopLoop(projectId: string, role?: string): Promise<void> {
+    const key = getLoopKey(projectId, role);
+    const state = this.states.get(key);
     if (!state) {
-      throw new Error(`No loop found for project ${projectId}`);
+      throw new Error(`No loop found for project ${projectId}${role ? ` (${role})` : ''}`);
     }
 
     if (isLoopTerminal(state.status)) {
-      throw new Error(`Loop for project ${projectId} is already in terminal state ${state.status}`);
+      throw new Error(`Loop for project ${projectId}${role ? ` (${role})` : ''} is already in terminal state ${state.status}`);
     }
 
     // VM-backed loop path
     if (state.sandboxType === 'vm' && state.vmName) {
-      return this.vmStopLoop(projectId, state.vmName);
+      return this.vmStopLoop(key, state.vmName);
     }
 
     if (!state.containerId) {
       // No container created yet, just mark as stopped
-      this.updateState(projectId, {
+      this.updateState(key, {
         status: LoopStatus.STOPPED,
         stoppedAt: new Date().toISOString(),
       });
@@ -225,26 +232,27 @@ export class LoopRunner {
 
     try {
       // Transition to STOPPING
-      this.updateState(projectId, { status: LoopStatus.STOPPING });
+      this.updateState(key, { status: LoopStatus.STOPPING });
 
-      // Abort log streaming
-      const abortController = this.logAbortControllers.get(projectId);
+      // Abort log streaming and pending broadcast
+      const abortController = this.logAbortControllers.get(key);
       if (abortController) {
         abortController.abort();
-        this.logAbortControllers.delete(projectId);
+        this.logAbortControllers.delete(key);
       }
+      this.clearLogBroadcastTimer(key);
 
       // Stop container (10 second timeout)
       await this.docker.stopContainer(state.containerId, 10);
 
       // Transition to STOPPED
-      this.updateState(projectId, {
+      this.updateState(key, {
         status: LoopStatus.STOPPED,
         stoppedAt: new Date().toISOString(),
       });
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
-      this.updateState(projectId, {
+      this.updateState(key, {
         status: LoopStatus.FAILED,
         error: `Failed to stop loop: ${errorMessage}`,
         stoppedAt: new Date().toISOString(),
@@ -259,8 +267,8 @@ export class LoopRunner {
    * @param projectId - Project ID to query
    * @returns Loop state or null if not found
    */
-  getLoopState(projectId: string): LoopState | null {
-    return this.states.get(projectId) || null;
+  getLoopState(projectId: string, role?: string): LoopState | null {
+    return this.states.get(getLoopKey(projectId, role)) || null;
   }
 
   /**
@@ -282,6 +290,13 @@ export class LoopRunner {
   }
 
   /**
+   * List all loops belonging to a given project (used for factory multi-container projects).
+   */
+  listByProject(projectId: string): LoopState[] {
+    return Array.from(this.states.values()).filter((s) => s.projectId === projectId);
+  }
+
+  /**
    * Remove a loop from tracking.
    *
    * Only works for loops in terminal states (STOPPED, FAILED, COMPLETED).
@@ -289,17 +304,19 @@ export class LoopRunner {
    * @param projectId - Project ID to remove
    * @throws Error if loop is still active
    */
-  removeLoop(projectId: string): void {
-    const state = this.states.get(projectId);
+  removeLoop(projectId: string, role?: string): void {
+    const key = getLoopKey(projectId, role);
+    const state = this.states.get(key);
     if (!state) {
       return; // Already removed
     }
 
     if (!isLoopTerminal(state.status)) {
-      throw new Error(`Cannot remove active loop for project ${projectId}`);
+      throw new Error(`Cannot remove active loop for project ${projectId}${role ? ` (${role})` : ''}`);
     }
 
-    this.states.delete(projectId);
+    this.clearLogBroadcastTimer(key);
+    this.states.delete(key);
   }
 
   /**
@@ -534,8 +551,8 @@ export class LoopRunner {
   /**
    * Update loop state and notify listeners.
    */
-  private updateState(projectId: string, updates: Partial<LoopState>): void {
-    const state = this.states.get(projectId);
+  private updateState(loopKey: string, updates: Partial<LoopState>): void {
+    const state = this.states.get(loopKey);
     if (!state) {
       return;
     }
@@ -557,23 +574,23 @@ export class LoopRunner {
    * Start streaming logs from a container.
    */
   private async startLogStream(
-    projectId: string,
+    loopKey: string,
     containerId: string,
     mode: LoopMode,
   ): Promise<void> {
     try {
       const abortController = await this.docker.streamLogs(
         containerId,
-        (line) => this.handleLogLine(projectId, line),
+        (line) => this.handleLogLine(loopKey, line),
       );
 
-      this.logAbortControllers.set(projectId, abortController);
+      this.logAbortControllers.set(loopKey, abortController);
 
       // When container exits, update state accordingly
-      this.monitorContainerExit(projectId, containerId, mode);
+      this.monitorContainerExit(loopKey, containerId, mode);
     } catch (error) {
-      console.error(`Failed to start log stream for ${projectId}:`, error);
-      this.updateState(projectId, {
+      console.error(`Failed to start log stream for ${loopKey}:`, error);
+      this.updateState(loopKey, {
         status: LoopStatus.FAILED,
         error: `Log streaming failed: ${error instanceof Error ? error.message : String(error)}`,
         stoppedAt: new Date().toISOString(),
@@ -589,7 +606,7 @@ export class LoopRunner {
    * Throws errors to allow the caller to handle recovery failures.
    */
   private async resumeLogStream(
-    projectId: string,
+    loopKey: string,
     containerId: string,
     sinceTimestamp: string,
   ): Promise<void> {
@@ -598,21 +615,26 @@ export class LoopRunner {
 
     const abortController = await this.docker.streamLogs(
       containerId,
-      (line) => this.handleLogLine(projectId, line),
+      (line) => this.handleLogLine(loopKey, line),
       since,
     );
 
-    this.logAbortControllers.set(projectId, abortController);
+    this.logAbortControllers.set(loopKey, abortController);
 
     // Monitor container exit (assuming CONTINUOUS mode for recovered loops)
-    this.monitorContainerExit(projectId, containerId, LoopMode.CONTINUOUS);
+    this.monitorContainerExit(loopKey, containerId, LoopMode.CONTINUOUS);
   }
 
   /**
    * Handle a single log line from a container.
+   *
+   * PERFORMANCE: Log buffer updates are done in-place without broadcasting
+   * state changes. A throttled timer broadcasts the full state at most once
+   * per second, preventing IPC storms when logs stream at 100+ lines/sec.
+   * Meaningful events (commits, errors, iterations) still broadcast immediately.
    */
-  private handleLogLine(projectId: string, line: string): void {
-    const state = this.states.get(projectId);
+  private handleLogLine(loopKey: string, line: string): void {
+    const state = this.states.get(loopKey);
     if (!state) {
       return;
     }
@@ -620,35 +642,48 @@ export class LoopRunner {
     // Parse the line
     const parsed = this.parser.parseLine(line);
 
-    // Update state based on parsed content
+    // Update state for meaningful events (broadcast immediately)
     if (parsed.type === 'commit' && parsed.commit_hash) {
-      // Track commit
       if (!state.commits.includes(parsed.commit_hash)) {
         state.commits.push(parsed.commit_hash);
-        this.updateState(projectId, { commits: [...state.commits] });
+        this.updateState(loopKey, { commits: [...state.commits] });
       }
     } else if (parsed.type === 'error') {
-      // Increment error count
-      this.updateState(projectId, { errors: state.errors + 1 });
+      this.updateState(loopKey, { errors: state.errors + 1 });
     }
 
-    // Check for iteration boundary
     const iteration = this.parser.parseIterationBoundary(line);
     if (iteration !== null && iteration > state.iteration) {
-      this.updateState(projectId, { iteration });
+      this.updateState(loopKey, { iteration });
     }
 
-    // Append to log buffer (limit to last 1000 lines to prevent memory issues)
-    const logs = [...state.logs, line];
-    if (logs.length > 1000) {
-      logs.shift();
+    // Update log buffer in-place (no broadcast per line)
+    state.logs.push(line);
+    if (state.logs.length > 1000) {
+      state.logs.shift();
     }
-    this.updateState(projectId, { logs });
+
+    // Schedule a throttled state broadcast for log updates (once per second)
+    if (!this.logBroadcastTimers.has(loopKey)) {
+      this.logBroadcastTimers.set(loopKey, setTimeout(() => {
+        this.logBroadcastTimers.delete(loopKey);
+        const currentState = this.states.get(loopKey);
+        if (currentState) {
+          this.stateCallbacks.forEach((callback) => {
+            try {
+              callback({ ...currentState });
+            } catch (error) {
+              console.error('Error in state change callback:', error);
+            }
+          });
+        }
+      }, 1000));
+    }
 
     // Notify log listeners
     this.logCallbacks.forEach((callback) => {
       try {
-        callback(projectId, parsed);
+        callback(state.projectId, parsed);
       } catch (error) {
         console.error('Error in log line callback:', error);
       }
@@ -656,22 +691,33 @@ export class LoopRunner {
   }
 
   /**
+   * Clear a pending log broadcast timer for a loop.
+   */
+  private clearLogBroadcastTimer(loopKey: string): void {
+    const timer = this.logBroadcastTimers.get(loopKey);
+    if (timer) {
+      clearTimeout(timer);
+      this.logBroadcastTimers.delete(loopKey);
+    }
+  }
+
+  /**
    * Monitor container exit and update loop state accordingly.
    */
   private async monitorContainerExit(
-    projectId: string,
+    loopKey: string,
     containerId: string,
     mode: LoopMode,
   ): Promise<void> {
     try {
       // Poll container status until it exits
-      const checkInterval = 2000; // 2 seconds
-      const maxPolls = 3600; // 2 hours max (2s * 3600 = 7200s)
+      const checkInterval = 8000; // 8 seconds
 
-      for (let i = 0; i < maxPolls; i++) {
+      // eslint-disable-next-line no-constant-condition
+      while (true) {
         await new Promise((resolve) => setTimeout(resolve, checkInterval));
 
-        const state = this.states.get(projectId);
+        const state = this.states.get(loopKey);
         if (!state || isLoopTerminal(state.status) || state.status === LoopStatus.STOPPING) {
           // Loop was stopped manually or already in terminal state
           return;
@@ -686,42 +732,37 @@ export class LoopRunner {
 
             // Determine final status based on mode and exit code
             if (mode === LoopMode.SINGLE) {
-              this.updateState(projectId, {
+              this.updateState(loopKey, {
                 status: LoopStatus.COMPLETED,
                 stoppedAt,
               });
             } else {
               // CONTINUOUS or SCHEDULED mode shouldn't exit normally
-              this.updateState(projectId, {
+              this.updateState(loopKey, {
                 status: LoopStatus.FAILED,
                 error: 'Container exited unexpectedly',
                 stoppedAt,
               });
             }
 
-            // Clean up abort controller
-            this.logAbortControllers.delete(projectId);
+            // Clean up
+            this.logAbortControllers.delete(loopKey);
+            this.clearLogBroadcastTimer(loopKey);
             return;
           }
         } catch (error) {
           // Container no longer exists
           const errorMessage = error instanceof Error ? error.message : String(error);
-          this.updateState(projectId, {
+          this.updateState(loopKey, {
             status: LoopStatus.FAILED,
             error: `Container lost: ${errorMessage}`,
             stoppedAt: new Date().toISOString(),
           });
-          this.logAbortControllers.delete(projectId);
+          this.logAbortControllers.delete(loopKey);
+          this.clearLogBroadcastTimer(loopKey);
           return;
         }
       }
-
-      // Timeout reached (2 hours)
-      this.updateState(projectId, {
-        status: LoopStatus.FAILED,
-        error: 'Container monitoring timeout (2 hours)',
-        stoppedAt: new Date().toISOString(),
-      });
     } catch (error) {
       console.error(`Error monitoring container ${containerId}:`, error);
     }
@@ -820,9 +861,10 @@ export class LoopRunner {
    * State transitions: IDLE -> STARTING -> RUNNING (then COMPLETED/FAILED/STOPPED on exit)
    */
   private async vmStartLoop(opts: LoopStartOpts): Promise<LoopState> {
+    const key = getLoopKey(opts.projectId, opts.role);
     if (!this.vm) {
       const errorMessage = 'VMManager is not configured';
-      this.updateState(opts.projectId, {
+      this.updateState(key, {
         status: LoopStatus.FAILED,
         error: errorMessage,
         stoppedAt: new Date().toISOString(),
@@ -834,7 +876,7 @@ export class LoopRunner {
     const vmMode = opts.vmConfig?.vm_mode ?? 'ephemeral';
 
     try {
-      this.updateState(projectId, {
+      this.updateState(key, {
         status: LoopStatus.STARTING,
         startedAt: new Date().toISOString(),
         sandboxType: 'vm',
@@ -885,7 +927,7 @@ export class LoopRunner {
       }
 
       // Record VM name in state
-      this.updateState(projectId, { vmName });
+      this.updateState(key, { vmName });
 
       // If the image exists locally on the host (e.g. a locally-built Zephyr image),
       // export it and load it into the VM. Otherwise pull from the registry inside the VM.
@@ -928,26 +970,26 @@ export class LoopRunner {
       const dockerRunArgs = this.buildDockerRunArgs(opts);
 
       // Transition to RUNNING before starting the stream
-      this.updateState(projectId, { status: LoopStatus.RUNNING });
+      this.updateState(key, { status: LoopStatus.RUNNING });
 
       // Stream docker run output from inside the VM
       const abortController = await this.vm.streamExecInVM(
         vmName,
         ['docker', 'run', '--rm', '--name', containerName, ...dockerRunArgs, opts.dockerImage],
-        (line) => this.handleLogLine(projectId, line),
+        (line) => this.handleLogLine(key, line),
         {
           onExit: (exitCode) => {
-            this.handleVMContainerExit(projectId, vmName, containerName, mode, vmMode, exitCode);
+            this.handleVMContainerExit(key, vmName, containerName, mode, vmMode, exitCode);
           },
         },
       );
 
-      this.logAbortControllers.set(projectId, abortController);
+      this.logAbortControllers.set(key, abortController);
 
-      return this.states.get(projectId)!;
+      return this.states.get(key)!;
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
-      this.updateState(projectId, {
+      this.updateState(key, {
         status: LoopStatus.FAILED,
         error: `Failed to start VM loop: ${errorMessage}`,
         stoppedAt: new Date().toISOString(),
@@ -985,17 +1027,17 @@ export class LoopRunner {
    * Aborts the stream, stops the Docker container inside the VM, and for
    * ephemeral VMs also deletes the VM. Persistent VMs keep running.
    */
-  private async vmStopLoop(projectId: string, vmName: string): Promise<void> {
-    const state = this.states.get(projectId)!;
+  private async vmStopLoop(loopKey: string, vmName: string): Promise<void> {
+    const state = this.states.get(loopKey)!;
 
     try {
-      this.updateState(projectId, { status: LoopStatus.STOPPING });
+      this.updateState(loopKey, { status: LoopStatus.STOPPING });
 
       // Abort log streaming
-      const abortController = this.logAbortControllers.get(projectId);
+      const abortController = this.logAbortControllers.get(loopKey);
       if (abortController) {
         abortController.abort();
-        this.logAbortControllers.delete(projectId);
+        this.logAbortControllers.delete(loopKey);
       }
 
       // Stop the docker container running inside the VM
@@ -1004,7 +1046,7 @@ export class LoopRunner {
 
       // For ephemeral VMs, delete the VM on stop; for persistent VMs, unmount
       // host directories that were mounted for this loop run.
-      const isPersistent = this.persistentVMNames.has(projectId);
+      const isPersistent = this.persistentVMNames.has(state.projectId);
       if (!isPersistent) {
         await this.vm!.deleteVM(vmName, true).catch((err) => {
           console.error(`Failed to delete ephemeral VM ${vmName} on stop:`, err);
@@ -1015,13 +1057,13 @@ export class LoopRunner {
         });
       }
 
-      this.updateState(projectId, {
+      this.updateState(loopKey, {
         status: LoopStatus.STOPPED,
         stoppedAt: new Date().toISOString(),
       });
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
-      this.updateState(projectId, {
+      this.updateState(loopKey, {
         status: LoopStatus.FAILED,
         error: `Failed to stop VM loop: ${errorMessage}`,
         stoppedAt: new Date().toISOString(),
@@ -1038,14 +1080,14 @@ export class LoopRunner {
    * process terminates. Skips update if state is already terminal (manual stop).
    */
   private handleVMContainerExit(
-    projectId: string,
+    loopKey: string,
     vmName: string,
     _containerName: string,
     mode: LoopMode,
     vmMode: 'persistent' | 'ephemeral',
     _exitCode: number,
   ): void {
-    const state = this.states.get(projectId);
+    const state = this.states.get(loopKey);
     if (!state || isLoopTerminal(state.status) || state.status === LoopStatus.STOPPING) {
       // Already handled (e.g., stopLoop was called manually)
       return;
@@ -1054,20 +1096,21 @@ export class LoopRunner {
     const stoppedAt = new Date().toISOString();
 
     if (mode === LoopMode.SINGLE) {
-      this.updateState(projectId, {
+      this.updateState(loopKey, {
         status: LoopStatus.COMPLETED,
         stoppedAt,
       });
     } else {
       // CONTINUOUS or SCHEDULED should not exit on their own
-      this.updateState(projectId, {
+      this.updateState(loopKey, {
         status: LoopStatus.FAILED,
         error: 'Container exited unexpectedly',
         stoppedAt,
       });
     }
 
-    this.logAbortControllers.delete(projectId);
+    this.logAbortControllers.delete(loopKey);
+    this.clearLogBroadcastTimer(loopKey);
 
     // Clean up after the loop ends: delete ephemeral VMs; unmount host
     // directories from persistent VMs.

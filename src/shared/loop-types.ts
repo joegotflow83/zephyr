@@ -87,6 +87,9 @@ export interface LoopState {
 
   /** Sandbox type for this loop ('container' default, 'vm' for VM-backed) */
   sandboxType?: 'container' | 'vm';
+
+  /** Factory role when this loop is part of a coding factory */
+  role?: string;
 }
 
 /**
@@ -129,6 +132,22 @@ export interface LoopStartOpts {
    * Used for single-mode runs to execute a specific agent task and exit.
    */
   cmd?: string[];
+
+  /** Factory role when starting a loop as part of a coding factory */
+  role?: string;
+}
+
+/**
+ * Derive a unique key for a loop from its project ID and optional factory role.
+ * Non-factory loops use just the projectId; factory loops use "projectId:role".
+ */
+export function getLoopKey(projectIdOrState: string | { projectId: string; role?: string }, role?: string): string {
+  if (typeof projectIdOrState === 'string') {
+    return role ? `${projectIdOrState}:${role}` : projectIdOrState;
+  }
+  return projectIdOrState.role
+    ? `${projectIdOrState.projectId}:${projectIdOrState.role}`
+    : projectIdOrState.projectId;
 }
 
 /**
@@ -138,6 +157,7 @@ export function createLoopState(
   projectId: string,
   mode: LoopMode = LoopMode.SINGLE,
   projectName = '',
+  role?: string,
 ): LoopState {
   return {
     projectId,
@@ -152,6 +172,7 @@ export function createLoopState(
     commits: [],
     errors: 0,
     error: null,
+    role,
   };
 }
 

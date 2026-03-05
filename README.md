@@ -4,7 +4,7 @@ A native Electron + React + TypeScript desktop application for managing and orch
 
 ## Credit
 
-Credit for creating the ralph philosophy goes to [@GeoffreyHuntley](https://x.com/GeoffreyHuntley)] and credit for creating the ralph
+Credit for creating the ralph philosophy goes to [@GeoffreyHuntley](https://x.com/GeoffreyHuntley) and credit for creating the ralph
 playbook goes to [ClaytonFarr](https://github.com/ClaytonFarr/ralph-playbook?tab=readme-ov-file)
 
 ## What It Does
@@ -23,11 +23,14 @@ Zephyr Desktop provides a graphical interface for:
 - **Self-update** -- check for and apply updates via `electron-updater`
 - **Desktop notifications** -- get notified when loops complete or fail
 - **Log export** -- export individual or all loop logs to disk
+- **Coding Factory** -- run multiple AI agent roles (coder, reviewer, tester, planner) in parallel on a single project; each role gets its own container with shared workspace
+- **VM Sandbox** -- run Docker containers inside Multipass VMs for full admin access, nested Docker, and system-level testing; supports persistent VMs (created once, reused) and ephemeral VMs (fresh per loop run)
 
 ## Requirements
 
 - Node.js 18+
 - Docker Desktop (for loop execution; project management works without it)
+- Multipass (optional; required for VM Sandbox mode)
 
 ## Installation
 
@@ -88,6 +91,7 @@ src/
     ssh-key-manager.ts    # Ephemeral GitHub SSH deploy key management
     import-export.ts      # Project configuration import/export
     logging.ts            # Application-wide logging (electron-log)
+    vm-manager.ts         # Multipass VM lifecycle and Docker-in-VM execution
   shared/
     ipc-channels.ts       # IPC channel name constants
     models.ts             # Shared data models

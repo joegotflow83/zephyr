@@ -5,12 +5,16 @@ export interface RunModeSelection {
   mode: LoopMode;
   /** CMD override for single-mode runs; undefined for continuous */
   cmd?: string[];
+  /** When true, start as a factory (multiple role containers) */
+  factory?: boolean;
 }
 
 interface RunModeDialogProps {
   projectName: string;
   /** Filenames present in custom_prompts (e.g. ["PROMPT_plan.md", "PROMPT_build.md"]) */
   promptFiles: string[];
+  /** Whether factory mode is available for this project */
+  factoryEnabled?: boolean;
   onConfirm: (selection: RunModeSelection) => void;
   onCancel: () => void;
 }
@@ -29,12 +33,16 @@ interface RunModeDialogProps {
 export const RunModeDialog: React.FC<RunModeDialogProps> = ({
   projectName,
   promptFiles,
+  factoryEnabled = false,
   onConfirm,
   onCancel,
 }) => {
-  const [selected, setSelected] = useState<string>('continuous');
+  const [selected, setSelected] = useState<string>(factoryEnabled ? 'factory' : 'continuous');
 
   const buildSelection = (): RunModeSelection => {
+    if (selected === 'factory') {
+      return { mode: LoopMode.CONTINUOUS, factory: true };
+    }
     if (selected === 'continuous') {
       return { mode: LoopMode.CONTINUOUS };
     }
@@ -76,6 +84,28 @@ export const RunModeDialog: React.FC<RunModeDialogProps> = ({
         </p>
 
         <div className="space-y-2 mb-6">
+          {/* Factory option - only when factory is configured */}
+          {factoryEnabled && (
+            <label className="flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 has-[:checked]:border-blue-500 has-[:checked]:bg-blue-50 dark:has-[:checked]:bg-blue-900/20">
+              <input
+                type="radio"
+                name="run-mode"
+                value="factory"
+                checked={selected === 'factory'}
+                onChange={() => setSelected('factory')}
+                className="mt-0.5 accent-blue-600"
+              />
+              <div>
+                <div className="text-sm font-medium text-gray-900 dark:text-white">
+                  Coding Factory
+                </div>
+                <div className="text-xs text-gray-500 dark:text-gray-400">
+                  Start all configured roles in parallel
+                </div>
+              </div>
+            </label>
+          )}
+
           {/* Continuous option */}
           <label className="flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 has-[:checked]:border-blue-500 has-[:checked]:bg-blue-50 dark:has-[:checked]:bg-blue-900/20">
             <input

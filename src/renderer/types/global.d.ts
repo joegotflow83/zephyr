@@ -108,14 +108,14 @@ declare global {
       loops: {
         /** Start a new loop execution */
         start: (opts: LoopStartOpts) => Promise<LoopState>;
-        /** Stop a running loop */
-        stop: (projectId: string) => Promise<void>;
+        /** Stop a running loop. Pass role for factory loops. */
+        stop: (projectId: string, role?: string) => Promise<void>;
         /** List all loop states (running and terminal) */
         list: () => Promise<LoopState[]>;
-        /** Get a single loop state by project ID */
-        get: (projectId: string) => Promise<LoopState | null>;
-        /** Remove a loop from tracking (only terminal states) */
-        remove: (projectId: string) => Promise<void>;
+        /** Get a single loop state by project ID and optional role */
+        get: (projectId: string, role?: string) => Promise<LoopState | null>;
+        /** Remove a loop from tracking (only terminal states). Pass role for factory loops. */
+        remove: (projectId: string, role?: string) => Promise<void>;
         /** Schedule a loop for recurring execution */
         schedule: (
           projectId: string,
@@ -134,6 +134,13 @@ declare global {
         onLogLine: (
           callback: (projectId: string, line: ParsedLogLine) => void,
         ) => () => void;
+      };
+
+      factory: {
+        /** Start all factory roles for a project */
+        start: (projectId: string, baseOpts: LoopStartOpts) => Promise<LoopState[]>;
+        /** Stop all factory roles for a project */
+        stop: (projectId: string) => Promise<void>;
       };
 
       logs: {

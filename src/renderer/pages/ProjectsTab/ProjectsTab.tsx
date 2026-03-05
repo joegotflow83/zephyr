@@ -8,6 +8,7 @@ import { ConfirmDialog } from '../../components/ConfirmDialog/ConfirmDialog';
 import { RunModeDialog } from '../../components/RunModeDialog/RunModeDialog';
 import type { RunModeSelection } from '../../components/RunModeDialog/RunModeDialog';
 import type { ProjectConfig } from '../../../shared/models';
+import type { LoopStartOpts } from '../../../shared/loop-types';
 
 interface ToastMethods {
   success: (message: string) => void;
@@ -27,7 +28,7 @@ interface ProjectsTabProps {
  */
 export const ProjectsTab: React.FC<ProjectsTabProps> = ({ onRunProject, toast }) => {
   const { projects, loading, error, refresh } = useProjects();
-  const { get: getLoop } = useLoops();
+  const { get: getLoop, factoryStart } = useLoops();
   const removeLoop = useAppStore((state) => state.removeLoop);
   const vmInfos = useAppStore((state) => state.vmInfos);
   const multipassAvailable = useAppStore((state) => state.multipassAvailable);
@@ -113,10 +114,10 @@ export const ProjectsTab: React.FC<ProjectsTabProps> = ({ onRunProject, toast })
         const basename = hostPath.split('/').filter(Boolean).pop() ?? hostPath;
         return `${hostPath}:/mnt/${basename}`;
       });
-      await window.api.loops.start({
+      const opts: LoopStartOpts = {
         projectId: project.id,
         projectName: project.name,
-        dockerImage: project.docker_image,
+        dockerImage: project.docker_image || '',
         mode: selection.mode,
         ...(selection.cmd ? { cmd: selection.cmd } : {}),
         ...(project.local_path || extraMounts.length > 0
@@ -131,7 +132,12 @@ export const ProjectsTab: React.FC<ProjectsTabProps> = ({ onRunProject, toast })
         ...(project.sandbox_type === 'vm'
           ? { sandboxType: 'vm', vmConfig: project.vm_config }
           : {}),
-      });
+      };
+      if (selection.factory) {
+        await factoryStart(project.id, opts);
+      } else {
+        await window.api.loops.start(opts);
+      }
       toast.success(`Loop started for "${project.name}"`);
       if (onRunProject) {
         onRunProject();
@@ -343,6 +349,7 @@ export const ProjectsTab: React.FC<ProjectsTabProps> = ({ onRunProject, toast })
         <RunModeDialog
           projectName={runModeProject.name}
           promptFiles={Object.keys(runModeProject.custom_prompts)}
+          factoryEnabled={!!runModeProject.factory_config?.enabled}
           onConfirm={handleRunModeConfirm}
           onCancel={() => setRunModeProject(null)}
         />

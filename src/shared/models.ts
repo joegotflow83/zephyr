@@ -78,6 +78,38 @@ export interface ZephyrImage {
 }
 
 /**
+ * Predefined roles for a coding factory.
+ * Each role maps to a separate container running a dedicated AI agent.
+ */
+export type FactoryRole = 'project_manager' | 'coder' | 'security' | 'qa';
+
+/**
+ * All available factory roles, in pipeline order.
+ */
+export const FACTORY_ROLES: FactoryRole[] = ['project_manager', 'coder', 'security', 'qa'];
+
+/**
+ * Human-readable labels for factory roles.
+ */
+export const FACTORY_ROLE_LABELS: Record<FactoryRole, string> = {
+  project_manager: 'Project Manager',
+  coder: 'Coder',
+  security: 'Security',
+  qa: 'QA',
+};
+
+/**
+ * Configuration for running a project as a coding factory.
+ * When enabled, the project runs multiple containers — one per role.
+ */
+export interface FactoryConfig {
+  /** Whether factory mode is enabled for this project */
+  enabled: boolean;
+  /** Which roles to start when the factory launches */
+  roles: FactoryRole[];
+}
+
+/**
  * VM configuration for a project using VM-backed sandbox execution.
  */
 export interface VMConfig {
@@ -149,6 +181,12 @@ export interface ProjectConfig {
   sandbox_type?: 'container' | 'vm';
   /** VM configuration; only relevant when sandbox_type === 'vm' */
   vm_config?: VMConfig;
+  /**
+   * Coding factory configuration.
+   * When enabled, the project runs multiple containers — one per role —
+   * with shared team coordination files in /workspace.
+   */
+  factory_config?: FactoryConfig;
 }
 
 /**
@@ -242,5 +280,6 @@ export function createProjectConfig(partial: Partial<ProjectConfig> = {}): Proje
     additional_mounts: partial.additional_mounts,
     sandbox_type: partial.sandbox_type,
     vm_config: partial.vm_config,
+    factory_config: partial.factory_config,
   };
 }

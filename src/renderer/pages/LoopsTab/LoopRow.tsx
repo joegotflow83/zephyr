@@ -1,14 +1,15 @@
 import React from 'react';
 import type { LoopState } from '../../../shared/loop-types';
 import { LoopStatus, LoopMode } from '../../../shared/loop-types';
-import type { ProjectConfig } from '../../../shared/models';
+import type { ProjectConfig, FactoryRole } from '../../../shared/models';
+import { FACTORY_ROLE_LABELS } from '../../../shared/models';
 
 interface LoopRowProps {
   loop: LoopState;
   project?: ProjectConfig;
   isSelected: boolean;
   onSelect: (loop: LoopState) => void;
-  onStop: (projectId: string) => void;
+  onStop: (projectId: string, role?: string) => void;
   onStart: (projectId: string) => void;
 }
 
@@ -119,7 +120,12 @@ export const LoopRow: React.FC<LoopRowProps> = ({
       onClick={() => onSelect(loop)}
     >
       <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-white">
-        {project?.name || loop.projectId}
+        <span>{project?.name || loop.projectId}</span>
+        {loop.role && (
+          <span className="ml-2 inline-flex items-center px-2 py-0.5 text-xs font-medium rounded bg-purple-900 text-purple-300">
+            {FACTORY_ROLE_LABELS[loop.role as FactoryRole] ?? loop.role}
+          </span>
+        )}
       </td>
       <td className="px-4 py-3 text-sm">
         {getStatusBadge()}
@@ -138,7 +144,7 @@ export const LoopRow: React.FC<LoopRowProps> = ({
           <button
             onClick={(e) => {
               e.stopPropagation();
-              onStop(loop.projectId);
+              onStop(loop.projectId, loop.role);
             }}
             className="px-3 py-1 bg-red-700 text-white rounded font-medium hover:bg-red-600 transition-colors"
             title="Stop loop"

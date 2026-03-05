@@ -10,7 +10,9 @@ import { IPC } from '../../shared/ipc-channels';
 import type { LoopRunner } from '../../services/loop-runner';
 import type { LoopScheduler } from '../../services/scheduler';
 import type { LoopState, LoopStartOpts } from '../../shared/loop-types';
-import { isLoopTerminal, LoopMode } from '../../shared/loop-types';
+import { isLoopTerminal, LoopMode, getLoopKey } from '../../shared/loop-types';
+import type { FactoryRole } from '../../shared/models';
+import { FACTORY_ROLES } from '../../shared/models';
 import type { ScheduledLoop } from '../../services/scheduler';
 import type { ProjectConfig } from '../../shared/models';
 import type { PreValidationStore } from '../../services/pre-validation-store';
@@ -56,13 +58,17 @@ export function registerLoopHandlers(services: LoopServices): void {
   // In-memory map tracking active deploy keys for cleanup on loop termination.
   // Maps projectId -> { keyId, repoUrl, pat, service } so we can delete keys from
   // GitHub or GitLab when the loop stops, fails, or completes.
+  // Maps loopKey -> deploy key info for cleanup on loop termination.
   const activeDeployKeys = new Map<string, { keyId: number; repoUrl: string; pat: string; service: 'github' | 'gitlab' }>();
 
   // ── Loop lifecycle ────────────────────────────────────────────────────────
 
-  ipcMain.handle(
-    IPC.LOOP_START,
-    async (_event, rawOpts: LoopStartOpts): Promise<LoopState> => {
+  /**
+   * Core loop start logic. Handles pre-validation scripts, auth injection,
+   * hooks/prompts mounting, deploy keys, etc. Called by both LOOP_START and
+   * FACTORY_START handlers.
+   */
+  async function startLoopCore(rawOpts: LoopStartOpts): Promise<LoopState> {
       let opts = rawOpts;
       const project = projectStore?.getProject(opts.projectId) ?? null;
 
@@ -305,7 +311,7 @@ export function registerLoopHandlers(services: LoopServices): void {
             }
 
             await sshKeyManager.injectIntoContainer(state.containerId, privateKey);
-            activeDeployKeys.set(opts.projectId, { keyId, repoUrl: project.repo_url, pat, service: 'github' });
+            activeDeployKeys.set(getLoopKey(opts.projectId, opts.role), { keyId, repoUrl: project.repo_url, pat, service: 'github' });
             logger.info('SSH deploy key injected into container', { projectId: opts.projectId, keyId });
           }
         } catch (err) {
@@ -345,7 +351,7 @@ export function registerLoopHandlers(services: LoopServices): void {
             }
 
             await sshKeyManager.injectIntoContainerForGitlab(state.containerId, privateKey);
-            activeDeployKeys.set(opts.projectId, { keyId, repoUrl: project.repo_url, pat, service: 'gitlab' });
+            activeDeployKeys.set(getLoopKey(opts.projectId, opts.role), { keyId, repoUrl: project.repo_url, pat, service: 'gitlab' });
             logger.info('GitLab SSH deploy key injected into container', { projectId: opts.projectId, keyId });
           }
         } catch (err) {
@@ -354,13 +360,19 @@ export function registerLoopHandlers(services: LoopServices): void {
       }
 
       return state;
+  }
+
+  ipcMain.handle(
+    IPC.LOOP_START,
+    async (_event, rawOpts: LoopStartOpts): Promise<LoopState> => {
+      return startLoopCore(rawOpts);
     },
   );
 
   ipcMain.handle(
     IPC.LOOP_STOP,
-    async (_event, projectId: string): Promise<void> => {
-      return loopRunner.stopLoop(projectId);
+    async (_event, projectId: string, role?: string): Promise<void> => {
+      return loopRunner.stopLoop(projectId, role);
     },
   );
 
@@ -370,15 +382,15 @@ export function registerLoopHandlers(services: LoopServices): void {
 
   ipcMain.handle(
     IPC.LOOP_GET,
-    async (_event, projectId: string): Promise<LoopState | null> => {
-      return loopRunner.getLoopState(projectId);
+    async (_event, projectId: string, role?: string): Promise<LoopState | null> => {
+      return loopRunner.getLoopState(projectId, role);
     },
   );
 
   ipcMain.handle(
     IPC.LOOP_REMOVE,
-    async (_event, projectId: string): Promise<void> => {
-      return loopRunner.removeLoop(projectId);
+    async (_event, projectId: string, role?: string): Promise<void> => {
+      return loopRunner.removeLoop(projectId, role);
     },
   );
 
@@ -407,6 +419,109 @@ export function registerLoopHandlers(services: LoopServices): void {
     return scheduler.listScheduled();
   });
 
+  // ── Factory (multi-container coding factory) ────────────────────────────
+
+  /**
+   * Scaffold the team coordination file/folder structure inside a workspace.
+   * Creates files only if they don't already exist so user edits are preserved.
+   */
+  async function scaffoldTeamFiles(workspacePath: string): Promise<void> {
+    // Create directory tree
+    await fs.mkdir(path.join(workspacePath, 'team', 'handovers'), { recursive: true });
+    await fs.mkdir(path.join(workspacePath, 'team', 'tasks', 'pending'), { recursive: true });
+
+    // Files to create with default content (only if missing)
+    const files: Record<string, string> = {
+      '@feature_requests.md': '# Feature Requests\n\nAdd feature requests here. Each entry should include:\n- Description of the feature\n- Priority (high/medium/low)\n- Acceptance criteria\n',
+      '@team_plan.md': '# Team Plan\n\nOverall plan and current sprint objectives.\n',
+      'team/handovers/coder_to_security.md': '# Coder to Security Handover\n\nDocument code changes that need security review.\n',
+      'team/handovers/security_to_qa.md': '# Security to QA Handover\n\nDocument security findings and items cleared for QA testing.\n',
+      'team/handovers/qa_feedback.md': '# QA Feedback\n\nDocument test results, bugs found, and items that need rework.\n',
+      'team/handovers/status.log': '',
+    };
+
+    for (const [filePath, defaultContent] of Object.entries(files)) {
+      const fullPath = path.join(workspacePath, filePath);
+      try {
+        await fs.access(fullPath);
+        // File exists — don't overwrite
+      } catch {
+        await fs.writeFile(fullPath, defaultContent, 'utf8');
+      }
+    }
+  }
+
+  ipcMain.handle(
+    IPC.FACTORY_START,
+    async (_event, projectId: string, baseOpts: LoopStartOpts): Promise<LoopState[]> => {
+      const project = projectStore?.getProject(projectId) ?? null;
+      if (!project) {
+        throw new Error(`Project ${projectId} not found`);
+      }
+
+      const factoryConfig = project.factory_config;
+      if (!factoryConfig?.enabled || !factoryConfig.roles.length) {
+        throw new Error('Factory mode is not enabled or has no roles configured for this project');
+      }
+
+      // Scaffold team coordination files in the workspace
+      if (project.local_path) {
+        try {
+          await scaffoldTeamFiles(project.local_path);
+          logger.info('Team coordination files scaffolded', { projectId, path: project.local_path });
+        } catch (err) {
+          logger.warn('Failed to scaffold team files', { err, projectId });
+        }
+      }
+
+      // Start one loop per configured role.
+      // Each role gets its own prompt if one exists with the naming convention PROMPT_<role>.md
+      const results: LoopState[] = [];
+      for (const role of factoryConfig.roles) {
+        const roleOpts: LoopStartOpts = {
+          ...baseOpts,
+          projectId,
+          projectName: project.name,
+          role,
+        };
+
+        try {
+          // Delegate to the shared startLoopCore function which handles all injection
+          // (auth, hooks, prompts, deploy keys) for each individual container
+          const state = await startLoopCore(roleOpts);
+          results.push(state);
+        } catch (err) {
+          logger.warn(`Failed to start factory role ${role} for project ${projectId}`, { err });
+          // Continue starting other roles — partial factory is better than none
+        }
+      }
+
+      return results;
+    },
+  );
+
+  ipcMain.handle(
+    IPC.FACTORY_STOP,
+    async (_event, projectId: string): Promise<void> => {
+      // Find all running loops for this project and stop them
+      const projectLoops = loopRunner.listByProject(projectId);
+      const activeLoops = projectLoops.filter((l) => !isLoopTerminal(l.status));
+
+      const errors: Error[] = [];
+      for (const loop of activeLoops) {
+        try {
+          await loopRunner.stopLoop(loop.projectId, loop.role);
+        } catch (err) {
+          errors.push(err instanceof Error ? err : new Error(String(err)));
+        }
+      }
+
+      if (errors.length > 0) {
+        throw new Error(`Failed to stop ${errors.length} factory loop(s): ${errors.map((e) => e.message).join('; ')}`);
+      }
+    },
+  );
+
   // ── Event broadcasting ────────────────────────────────────────────────────
 
   // Clean up GitHub deploy keys when a loop reaches a terminal state.
@@ -416,13 +531,14 @@ export function registerLoopHandlers(services: LoopServices): void {
       return;
     }
 
-    const keyInfo = activeDeployKeys.get(state.projectId);
+    const loopKey = getLoopKey(state);
+    const keyInfo = activeDeployKeys.get(loopKey);
     if (!keyInfo || !sshKeyManager) {
       return;
     }
 
     // Remove from local map first so a re-entrant terminal state change is a no-op
-    activeDeployKeys.delete(state.projectId);
+    activeDeployKeys.delete(loopKey);
 
     try {
       if (keyInfo.service === 'gitlab') {
@@ -452,10 +568,27 @@ export function registerLoopHandlers(services: LoopServices): void {
     });
   });
 
+  // Throttle log line IPC broadcasts: buffer lines and flush every 250ms
+  // to avoid overwhelming the renderer with individual IPC messages.
+  let logLineBuffer: { projectId: string; line: unknown }[] = [];
+  let logLineFlushTimer: NodeJS.Timeout | null = null;
+
   loopRunner.onLogLine((projectId, line) => {
-    const windows = BrowserWindow.getAllWindows();
-    windows.forEach((win) => {
-      win.webContents.send(IPC.LOOP_LOG_LINE, projectId, line);
-    });
+    logLineBuffer.push({ projectId, line });
+
+    if (!logLineFlushTimer) {
+      logLineFlushTimer = setTimeout(() => {
+        const windows = BrowserWindow.getAllWindows();
+        const batch = logLineBuffer;
+        logLineBuffer = [];
+        logLineFlushTimer = null;
+
+        for (const entry of batch) {
+          windows.forEach((win) => {
+            win.webContents.send(IPC.LOOP_LOG_LINE, entry.projectId, entry.line);
+          });
+        }
+      }, 250);
+    }
   });
 }

@@ -208,8 +208,8 @@ describe('SelfUpdater', () => {
     it('should throw error when GitHub API returns non-ok status', async () => {
       mockFetch.mockResolvedValue({
         ok: false,
-        status: 404,
-        statusText: 'Not Found',
+        status: 500,
+        statusText: 'Internal Server Error',
       });
 
       await expect(updater.checkForUpdates()).rejects.toThrow(

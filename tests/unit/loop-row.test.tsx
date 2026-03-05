@@ -459,7 +459,7 @@ describe('LoopRow', () => {
       );
 
       await user.click(screen.getByText('Stop'));
-      expect(mockOnStop).toHaveBeenCalledWith(defaultLoop.projectId);
+      expect(mockOnStop).toHaveBeenCalledWith(defaultLoop.projectId, undefined);
       expect(mockOnStop).toHaveBeenCalledTimes(1);
     });
 

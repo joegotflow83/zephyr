@@ -11,7 +11,8 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { ProjectConfig, VMConfig, createProjectConfig } from '../../../shared/models';
+import { ProjectConfig, VMConfig, createProjectConfig, FACTORY_ROLES, FACTORY_ROLE_LABELS } from '../../../shared/models';
+import type { FactoryRole, FactoryConfig } from '../../../shared/models';
 import type { ZephyrImage } from '../../../shared/models';
 import { PromptEditor } from './PromptEditor';
 import { PreValidationSection } from './PreValidationSection';
@@ -75,6 +76,10 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({ mode, project, onS
   const [vmCloudInit, setVmCloudInit] = useState('');
   const [showVmAdvanced, setShowVmAdvanced] = useState(false);
 
+  // Factory state
+  const [factoryEnabled, setFactoryEnabled] = useState(false);
+  const [factoryRoles, setFactoryRoles] = useState<FactoryRole[]>([...FACTORY_ROLES]);
+
   // Validation state
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [showPromptEditor, setShowPromptEditor] = useState(false);
@@ -109,6 +114,9 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({ mode, project, onS
       setVmMemoryGb(project.vm_config?.memory_gb ?? 4);
       setVmDiskGb(project.vm_config?.disk_gb ?? 20);
       setVmCloudInit(project.vm_config?.cloud_init ?? '');
+      // Factory config
+      setFactoryEnabled(project.factory_config?.enabled ?? false);
+      setFactoryRoles(project.factory_config?.roles ?? [...FACTORY_ROLES]);
     } else {
       // Add mode: default to library if images exist, custom if empty
       setImageMode(images.length > 0 ? 'library' : 'custom');
@@ -125,6 +133,9 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({ mode, project, onS
       setVmMemoryGb(4);
       setVmDiskGb(20);
       setVmCloudInit('');
+      // Factory defaults
+      setFactoryEnabled(false);
+      setFactoryRoles([...FACTORY_ROLES]);
     }
     setGithubPat('');
     setGitlabPat('');
@@ -212,6 +223,12 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({ mode, project, onS
           }
         : undefined;
 
+    // Build factory config
+    const effectiveFactoryConfig: FactoryConfig | undefined =
+      factoryEnabled
+        ? { enabled: true, roles: factoryRoles }
+        : undefined;
+
     // Build config object
     const config: ProjectConfig =
       mode === 'edit' && project
@@ -229,6 +246,7 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({ mode, project, onS
             updated_at: new Date().toISOString(),
             sandbox_type: sandboxType,
             vm_config: effectiveVmConfig,
+            factory_config: effectiveFactoryConfig,
           }
         : createProjectConfig({
             name: name.trim(),
@@ -242,6 +260,7 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({ mode, project, onS
             additional_mounts: additionalMounts.length > 0 ? additionalMounts : undefined,
             sandbox_type: sandboxType,
             vm_config: effectiveVmConfig,
+            factory_config: effectiveFactoryConfig,
           });
 
     // Store GitHub PAT if the user entered one (uses config.id so it works in both add and edit mode)
@@ -709,6 +728,64 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({ mode, project, onS
                 </div>
               </div>
             )}
+
+            {/* Coding Factory section */}
+            <div className="mb-4">
+              <div className="flex items-center gap-3 mb-2">
+                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Coding Factory
+                </label>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={factoryEnabled}
+                    onChange={(e) => setFactoryEnabled(e.target.checked)}
+                    className="sr-only peer"
+                  />
+                  <div className="w-9 h-5 bg-gray-300 dark:bg-gray-600 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-500 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
+                </label>
+              </div>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
+                Run multiple AI agents in parallel — each with a dedicated role and shared workspace.
+              </p>
+
+              {factoryEnabled && (
+                <div className="border border-gray-200 dark:border-gray-600 rounded p-4 space-y-3">
+                  <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2">
+                    Active Roles
+                  </div>
+                  <div className="space-y-2">
+                    {FACTORY_ROLES.map((role) => (
+                      <label
+                        key={role}
+                        className="flex items-center gap-3 cursor-pointer text-sm text-gray-700 dark:text-gray-300"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={factoryRoles.includes(role)}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setFactoryRoles((prev) => [...prev, role]);
+                            } else {
+                              setFactoryRoles((prev) => prev.filter((r) => r !== role));
+                            }
+                          }}
+                          className="accent-blue-600"
+                        />
+                        <span className="font-medium">{FACTORY_ROLE_LABELS[role]}</span>
+                        <span className="text-xs text-gray-400">
+                          — uses PROMPT_{role}.md if present
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                    Team coordination files (@feature_requests.md, @team_plan.md, team/handovers/*, team/tasks/pending/)
+                    will be created in the workspace automatically.
+                  </p>
+                </div>
+              )}
+            </div>
 
             {/* Pre-Validation Scripts section */}
             <PreValidationSection
