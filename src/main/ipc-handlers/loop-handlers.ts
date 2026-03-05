@@ -11,8 +11,6 @@ import type { LoopRunner } from '../../services/loop-runner';
 import type { LoopScheduler } from '../../services/scheduler';
 import type { LoopState, LoopStartOpts } from '../../shared/loop-types';
 import { isLoopTerminal, LoopMode, getLoopKey } from '../../shared/loop-types';
-import type { FactoryRole } from '../../shared/models';
-import { FACTORY_ROLES } from '../../shared/models';
 import type { ScheduledLoop } from '../../services/scheduler';
 import type { ProjectConfig } from '../../shared/models';
 import type { PreValidationStore } from '../../services/pre-validation-store';

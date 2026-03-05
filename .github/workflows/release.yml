@@ -96,7 +96,9 @@ jobs:
           echo "VERSION=$VERSION" >> "$GITHUB_OUTPUT"
 
       - name: Install system dependencies
-        run: sudo apt-get install -y libgtk-3-0 libxss1 libasound2 libgbm1 rpm fakeroot dpkg
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-3-0 libxss1 libasound2 libgbm1 rpm fakeroot dpkg
 
       - name: Install dependencies
         run: npm ci
