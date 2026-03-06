@@ -461,6 +461,8 @@ describe('LoopRunner', () => {
     });
 
     it('does not throw if callback throws', async () => {
+      const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+
       const badCallback = vi.fn(() => {
         throw new Error('Callback error');
       });
@@ -475,8 +477,14 @@ describe('LoopRunner', () => {
         mode: LoopMode.SINGLE,
       });
 
-      // Good callback should still be called
+      // Good callback should still be called despite bad callback throwing
       expect(goodCallback).toHaveBeenCalled();
+      // Error should be logged, not re-thrown
+      expect(consoleError).toHaveBeenCalledWith(
+        'Error in state change callback:',
+        expect.any(Error),
+      );
+      consoleError.mockRestore();
     });
   });
 
