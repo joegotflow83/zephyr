@@ -30,6 +30,7 @@ import { ImageStore } from '../services/image-store';
 import { ImageBuilder } from '../services/image-builder';
 import { PreValidationStore } from '../services/pre-validation-store';
 import { HooksStore } from '../services/hooks-store';
+import { LoopScriptsStore } from '../services/loop-scripts-store';
 import { AuthInjector } from '../services/auth-injector';
 import { DeployKeyStore } from '../services/deploy-key-store';
 import { SSHKeyManager } from '../services/ssh-key-manager';
@@ -85,12 +86,13 @@ const imageStore = new ImageStore(configManager);
 const imageBuilder = new ImageBuilder(dockerManager, imageStore);
 const preValidationStore = new PreValidationStore(configManager);
 const hooksStore = new HooksStore(configManager);
+const loopScriptsStore = new LoopScriptsStore(configManager);
 const authInjector = new AuthInjector(configManager, credentialManager);
 const deployKeyStore = new DeployKeyStore(path.join(os.homedir(), '.zephyr'));
 const sshKeyManager = new SSHKeyManager(dockerManager);
 
 // Register all IPC handlers before the window is created.
-registerDataHandlers({ configManager, projectStore, importExport, preValidationStore, hooksStore, loopRunner, dockerManager, credentialManager });
+registerDataHandlers({ configManager, projectStore, importExport, preValidationStore, hooksStore, loopScriptsStore, loopRunner, dockerManager, credentialManager });
 registerDockerHandlers({ dockerManager, dockerHealth });
 registerCredentialHandlers({ credentialManager, loginManager });
 registerLoopHandlers({

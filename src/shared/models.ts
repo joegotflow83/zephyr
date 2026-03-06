@@ -146,6 +146,8 @@ export interface ProjectConfig {
   pre_validation_scripts: string[];
   /** Filenames of hook files to inject into ~/.claude/hooks in the container */
   hooks: string[];
+  /** Filename of the loop script to use as the container command (optional, single selection) */
+  loop_script?: string;
   /** Map of prompt filename → content for custom agent instructions */
   custom_prompts: Record<string, string>;
   /** ISO 8601 creation timestamp */
@@ -187,6 +189,12 @@ export interface ProjectConfig {
    * with shared team coordination files in /workspace.
    */
   factory_config?: FactoryConfig;
+  /**
+   * Initial content to write to @feature_requests.md when scaffolding the
+   * coding factory workspace. If omitted, the default template is used.
+   * The file is never overwritten if it already exists on disk.
+   */
+  feature_requests_content?: string;
 }
 
 /**
@@ -272,6 +280,7 @@ export function createProjectConfig(partial: Partial<ProjectConfig> = {}): Proje
     image_id: partial.image_id,
     pre_validation_scripts: partial.pre_validation_scripts ?? [],
     hooks: partial.hooks ?? [],
+    loop_script: partial.loop_script,
     custom_prompts: partial.custom_prompts ?? {},
     created_at: partial.created_at ?? now,
     updated_at: partial.updated_at ?? now,
@@ -281,5 +290,6 @@ export function createProjectConfig(partial: Partial<ProjectConfig> = {}): Proje
     sandbox_type: partial.sandbox_type,
     vm_config: partial.vm_config,
     factory_config: partial.factory_config,
+    feature_requests_content: partial.feature_requests_content,
   };
 }

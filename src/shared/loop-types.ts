@@ -90,6 +90,9 @@ export interface LoopState {
 
   /** Factory role when this loop is part of a coding factory */
   role?: string;
+
+  /** Unix timestamp (ms) of the last received log line — used for activity detection */
+  lastLogAt?: number;
 }
 
 /**

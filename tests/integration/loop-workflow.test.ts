@@ -376,8 +376,11 @@ describe('Loop Workflow Integration', () => {
       {
         id: 'existing-container-123',
         name: 'zephyr-existing',
+        image: 'ubuntu:22.04',
+        state: 'running',
+        status: 'Up 1 minute',
         projectId: project.id,
-        projectName: project.name,        created: new Date(Date.now() - 60000).toISOString(), // Started 1 minute ago
+        created: new Date(Date.now() - 60000).toISOString(), // Started 1 minute ago
       },
     ];
 
@@ -427,6 +430,9 @@ describe('Loop Workflow Integration', () => {
       {
         id: 'orphaned-container',
         name: 'zephyr-orphaned',
+        image: 'ubuntu:22.04',
+        state: 'running',
+        status: 'Up',
         projectId: deletedProjectId,
         created: new Date().toISOString(),
       },
@@ -448,9 +454,9 @@ describe('Loop Workflow Integration', () => {
 
     // Simulate 3 running containers (but limit is 2)
     const mockContainers: ContainerInfo[] = [
-      { id: 'c1', name: 'zephyr-c1', projectId: p1.id, created: new Date().toISOString() },
-      { id: 'c2', name: 'zephyr-c2', projectId: p2.id, created: new Date().toISOString() },
-      { id: 'c3', name: 'zephyr-c3', projectId: p3.id, created: new Date().toISOString() },
+      { id: 'c1', name: 'zephyr-c1', image: 'ubuntu:22.04', state: 'running', status: 'Up', projectId: p1.id, created: new Date().toISOString() },
+      { id: 'c2', name: 'zephyr-c2', image: 'ubuntu:22.04', state: 'running', status: 'Up', projectId: p2.id, created: new Date().toISOString() },
+      { id: 'c3', name: 'zephyr-c3', image: 'ubuntu:22.04', state: 'running', status: 'Up', projectId: p3.id, created: new Date().toISOString() },
     ];
 
     const recovered = await loopRunner.recoverLoops(mockContainers, projectStore);

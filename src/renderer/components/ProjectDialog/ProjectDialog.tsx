@@ -17,6 +17,7 @@ import type { ZephyrImage } from '../../../shared/models';
 import { PromptEditor } from './PromptEditor';
 import { PreValidationSection } from './PreValidationSection';
 import { HooksSection } from './HooksSection';
+import { LoopScriptsSection } from './LoopScriptsSection';
 import { useImages } from '../../hooks/useImages';
 import { ImageBuilderDialog } from '../ImageBuilderDialog/ImageBuilderDialog';
 import { useAppStore } from '../../stores/app-store';
@@ -46,6 +47,7 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({ mode, project, onS
   const [customPrompts, setCustomPrompts] = useState<Record<string, string>>({});
   const [preValidationScripts, setPreValidationScripts] = useState<string[]>([]);
   const [hooks, setHooks] = useState<string[]>([]);
+  const [loopScript, setLoopScript] = useState<string | undefined>(undefined);
 
   // Image picker state: library = pick from ZephyrImage library, custom = free-text
   const [imageMode, setImageMode] = useState<ImageMode>('custom');
@@ -79,6 +81,7 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({ mode, project, onS
   // Factory state
   const [factoryEnabled, setFactoryEnabled] = useState(false);
   const [factoryRoles, setFactoryRoles] = useState<FactoryRole[]>([...FACTORY_ROLES]);
+  const [featureRequestsContent, setFeatureRequestsContent] = useState('');
 
   // Validation state
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -100,6 +103,7 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({ mode, project, onS
       setCustomPrompts(project.custom_prompts);
       setPreValidationScripts(project.pre_validation_scripts ?? []);
       setHooks(project.hooks ?? []);
+      setLoopScript(project.loop_script);
       setAdditionalMounts(project.additional_mounts ?? []);
       setImageId(project.image_id);
       setImageMode(project.image_id ? 'library' : images.length > 0 ? 'library' : 'custom');
@@ -117,12 +121,14 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({ mode, project, onS
       // Factory config
       setFactoryEnabled(project.factory_config?.enabled ?? false);
       setFactoryRoles(project.factory_config?.roles ?? [...FACTORY_ROLES]);
+      setFeatureRequestsContent(project.feature_requests_content ?? '');
     } else {
       // Add mode: default to library if images exist, custom if empty
       setImageMode(images.length > 0 ? 'library' : 'custom');
       setImageId(undefined);
       setPreValidationScripts([]);
       setHooks([]);
+      setLoopScript(undefined);
       setAdditionalMounts([]);
       setHasStoredPat(false);
       setHasStoredGitlabPat(false);
@@ -136,6 +142,7 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({ mode, project, onS
       // Factory defaults
       setFactoryEnabled(false);
       setFactoryRoles([...FACTORY_ROLES]);
+      setFeatureRequestsContent('');
     }
     setGithubPat('');
     setGitlabPat('');
@@ -229,6 +236,8 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({ mode, project, onS
         ? { enabled: true, roles: factoryRoles }
         : undefined;
 
+    const effectiveFeatureRequestsContent = featureRequestsContent.trim() || undefined;
+
     // Build config object
     const config: ProjectConfig =
       mode === 'edit' && project
@@ -241,12 +250,14 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({ mode, project, onS
             image_id: effectiveImageId,
             pre_validation_scripts: preValidationScripts,
             hooks,
+            loop_script: loopScript,
             custom_prompts: customPrompts,
             additional_mounts: additionalMounts.length > 0 ? additionalMounts : undefined,
             updated_at: new Date().toISOString(),
             sandbox_type: sandboxType,
             vm_config: effectiveVmConfig,
             factory_config: effectiveFactoryConfig,
+            feature_requests_content: effectiveFeatureRequestsContent,
           }
         : createProjectConfig({
             name: name.trim(),
@@ -256,11 +267,13 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({ mode, project, onS
             image_id: effectiveImageId,
             pre_validation_scripts: preValidationScripts,
             hooks,
+            loop_script: loopScript,
             custom_prompts: customPrompts,
             additional_mounts: additionalMounts.length > 0 ? additionalMounts : undefined,
             sandbox_type: sandboxType,
             vm_config: effectiveVmConfig,
             factory_config: effectiveFactoryConfig,
+            feature_requests_content: effectiveFeatureRequestsContent,
           });
 
     // Store GitHub PAT if the user entered one (uses config.id so it works in both add and edit mode)
@@ -779,6 +792,23 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({ mode, project, onS
                       </label>
                     ))}
                   </div>
+                  <div className="mt-3">
+                    <label htmlFor="feature-requests-content" className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
+                      @feature_requests.md content (optional)
+                    </label>
+                    <textarea
+                      id="feature-requests-content"
+                      value={featureRequestsContent}
+                      onChange={(e) => setFeatureRequestsContent(e.target.value)}
+                      rows={5}
+                      placeholder={'# Feature Requests\n\nAdd feature requests here...'}
+                      className="w-full px-2 py-1.5 text-sm bg-gray-100 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded text-gray-900 dark:text-white font-mono focus:outline-none focus:ring-1 focus:ring-blue-500 resize-y"
+                    />
+                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                      Pre-populate <code className="bg-gray-200 dark:bg-gray-600 px-1 rounded">@feature_requests.md</code> with your requirements. Leave blank to use the default template. The file is never overwritten if it already exists on disk.
+                    </p>
+                  </div>
+
                   <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
                     Team coordination files (@feature_requests.md, @team_plan.md, team/handovers/*, team/tasks/pending/)
                     will be created in the workspace automatically.
@@ -795,6 +825,9 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({ mode, project, onS
 
             {/* Claude Hooks section */}
             <HooksSection selected={hooks} onChange={setHooks} />
+
+            {/* Loop Scripts section */}
+            <LoopScriptsSection selected={loopScript} onChange={setLoopScript} />
 
             {/* GitHub SSH Access section — only shown when repo URL is a GitHub URL */}
             {isGithubRepo && (

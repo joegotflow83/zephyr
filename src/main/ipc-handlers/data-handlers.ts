@@ -9,6 +9,7 @@ import type { ProjectStore } from '../../services/project-store';
 import type { ImportExportService } from '../../services/import-export';
 import type { PreValidationStore } from '../../services/pre-validation-store';
 import type { HooksStore } from '../../services/hooks-store';
+import type { LoopScriptsStore } from '../../services/loop-scripts-store';
 import type { LoopRunner } from '../../services/loop-runner';
 import type { DockerManager } from '../../services/docker-manager';
 import type { CredentialManager } from '../../services/credential-manager';
@@ -33,13 +34,14 @@ export interface DataServices {
   importExport: ImportExportService;
   preValidationStore: PreValidationStore;
   hooksStore: HooksStore;
+  loopScriptsStore: LoopScriptsStore;
   loopRunner: LoopRunner;
   dockerManager: DockerManager;
   credentialManager: CredentialManager;
 }
 
 export function registerDataHandlers(services: DataServices): void {
-  const { configManager, projectStore, importExport, preValidationStore, hooksStore, loopRunner, dockerManager, credentialManager } =
+  const { configManager, projectStore, importExport, preValidationStore, hooksStore, loopScriptsStore, loopRunner, dockerManager, credentialManager } =
     services;
   const logger = getLogger('ipc');
 
@@ -204,5 +206,26 @@ export function registerDataHandlers(services: DataServices): void {
 
   ipcMain.handle(IPC.HOOKS_REMOVE, async (_event, filename: string): Promise<boolean> => {
     return hooksStore.removeHook(filename);
+  });
+
+  // ── Loop scripts ───────────────────────────────────────────────────────────
+
+  ipcMain.handle(IPC.LOOP_SCRIPTS_LIST, async () => {
+    return loopScriptsStore.listScripts();
+  });
+
+  ipcMain.handle(IPC.LOOP_SCRIPTS_GET, async (_event, filename: string) => {
+    return loopScriptsStore.getScript(filename);
+  });
+
+  ipcMain.handle(
+    IPC.LOOP_SCRIPTS_ADD,
+    async (_event, filename: string, content: string): Promise<void> => {
+      await loopScriptsStore.addScript(filename, content);
+    },
+  );
+
+  ipcMain.handle(IPC.LOOP_SCRIPTS_REMOVE, async (_event, filename: string): Promise<boolean> => {
+    return loopScriptsStore.removeScript(filename);
   });
 }

@@ -13,6 +13,7 @@ const COMMON_TOOLS = [
   'ca-certificates',
   'bc',
   'python-is-python3',
+  'python3-pip',
   'build-essential',
   'openssh-client',
   // Playwright runtime dependencies
@@ -44,6 +45,16 @@ export function generateDockerfile(config: ImageBuildConfig): string {
   // Common tools
   sections.push(
     `RUN apt-get update && apt-get install -y \\\n    ${COMMON_TOOLS.join(' ')} \\\n    && rm -rf /var/lib/apt/lists/*`
+  );
+  sections.push('');
+
+  // Security tools: trivy (via official apt repo), semgrep + bandit (via pip)
+  sections.push(
+    'RUN wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | gpg --dearmor | tee /usr/share/keyrings/trivy.gpg > /dev/null && \\\n' +
+    '    echo "deb [signed-by=/usr/share/keyrings/trivy.gpg] https://aquasecurity.github.io/trivy-repo/deb generic main" | tee /etc/apt/sources.list.d/trivy.list && \\\n' +
+    '    apt-get update && apt-get install -y trivy && \\\n' +
+    '    rm -rf /var/lib/apt/lists/* && \\\n' +
+    '    pip3 install --break-system-packages semgrep bandit'
   );
   sections.push('');
 

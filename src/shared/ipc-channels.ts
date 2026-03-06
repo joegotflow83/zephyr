@@ -106,6 +106,12 @@ export const IPC = {
   HOOKS_ADD: 'hooks:add',
   HOOKS_REMOVE: 'hooks:remove',
 
+  // Loop scripts
+  LOOP_SCRIPTS_LIST: 'loop-scripts:list',
+  LOOP_SCRIPTS_GET: 'loop-scripts:get',
+  LOOP_SCRIPTS_ADD: 'loop-scripts:add',
+  LOOP_SCRIPTS_REMOVE: 'loop-scripts:remove',
+
   // Deploy keys (ephemeral GitHub SSH deploy keys for container access)
   DEPLOY_KEYS_LIST_ORPHANED: 'deploy-keys:list-orphaned',
   DEPLOY_KEYS_GET_URL: 'deploy-keys:get-url',

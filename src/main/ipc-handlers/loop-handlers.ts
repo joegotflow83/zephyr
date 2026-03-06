@@ -199,6 +199,55 @@ export function registerLoopHandlers(services: LoopServices): void {
         cleanupManager.registerContainer(state.containerId);
       }
 
+      // Install workspace dependencies into the container so libraries are available
+      // system-wide before the agent starts. Runs as root so pip can write to
+      // system site-packages. Failures are non-fatal — the loop continues without them.
+      if (state.containerId && dockerManager) {
+        // Python: install any requirements.txt / requirements-*.txt in /workspace
+        try {
+          await dockerManager.execCommand(
+            state.containerId,
+            ['sh', '-c', 'find /workspace -maxdepth 1 -name "requirements*.txt" | while read f; do pip3 install --break-system-packages -q -r "$f"; done'],
+            { user: 'root' },
+          );
+        } catch (err) {
+          logger.warn('Failed to install Python workspace dependencies', { err });
+        }
+
+        // Node.js: run npm install if package.json exists in /workspace
+        try {
+          await dockerManager.execCommand(
+            state.containerId,
+            ['sh', '-c', '[ -f /workspace/package.json ] && cd /workspace && npm install 2>&1 || true'],
+            { user: 'root' },
+          );
+        } catch (err) {
+          logger.warn('Failed to install Node.js workspace dependencies', { err });
+        }
+
+        // Rust: fetch Cargo dependencies if Cargo.toml exists in /workspace
+        try {
+          await dockerManager.execCommand(
+            state.containerId,
+            ['sh', '-c', '[ -f /workspace/Cargo.toml ] && cd /workspace && cargo fetch 2>&1 || true'],
+            { user: 'ralph' },
+          );
+        } catch (err) {
+          logger.warn('Failed to fetch Rust workspace dependencies', { err });
+        }
+
+        // Go: download module dependencies if go.mod exists in /workspace
+        try {
+          await dockerManager.execCommand(
+            state.containerId,
+            ['sh', '-c', '[ -f /workspace/go.mod ] && cd /workspace && go mod download 2>&1 || true'],
+            { user: 'ralph' },
+          );
+        } catch (err) {
+          logger.warn('Failed to download Go workspace dependencies', { err });
+        }
+      }
+
       // For browser_session auth: exec-write captured claude.ai cookies to ~/.claude.json
       if (authMethod === 'browser_session' && state.containerId && credentialManager && dockerManager) {
         try {
@@ -422,15 +471,19 @@ export function registerLoopHandlers(services: LoopServices): void {
   /**
    * Scaffold the team coordination file/folder structure inside a workspace.
    * Creates files only if they don't already exist so user edits are preserved.
+   * @param featureRequestsContent - Optional custom content for @feature_requests.md.
+   *   Defaults to the built-in template when omitted or empty.
    */
-  async function scaffoldTeamFiles(workspacePath: string): Promise<void> {
+  async function scaffoldTeamFiles(workspacePath: string, featureRequestsContent?: string): Promise<void> {
     // Create directory tree
     await fs.mkdir(path.join(workspacePath, 'team', 'handovers'), { recursive: true });
     await fs.mkdir(path.join(workspacePath, 'team', 'tasks', 'pending'), { recursive: true });
 
+    const defaultFeatureRequests = '# Feature Requests\n\nAdd feature requests here. Each entry should include:\n- Description of the feature\n- Priority (high/medium/low)\n- Acceptance criteria\n';
+
     // Files to create with default content (only if missing)
     const files: Record<string, string> = {
-      '@feature_requests.md': '# Feature Requests\n\nAdd feature requests here. Each entry should include:\n- Description of the feature\n- Priority (high/medium/low)\n- Acceptance criteria\n',
+      '@feature_requests.md': featureRequestsContent?.trim() ? featureRequestsContent : defaultFeatureRequests,
       '@team_plan.md': '# Team Plan\n\nOverall plan and current sprint objectives.\n',
       'team/handovers/coder_to_security.md': '# Coder to Security Handover\n\nDocument code changes that need security review.\n',
       'team/handovers/security_to_qa.md': '# Security to QA Handover\n\nDocument security findings and items cleared for QA testing.\n',
@@ -465,7 +518,7 @@ export function registerLoopHandlers(services: LoopServices): void {
       // Scaffold team coordination files in the workspace
       if (project.local_path) {
         try {
-          await scaffoldTeamFiles(project.local_path);
+          await scaffoldTeamFiles(project.local_path, project.feature_requests_content);
           logger.info('Team coordination files scaffolded', { projectId, path: project.local_path });
         } catch (err) {
           logger.warn('Failed to scaffold team files', { err, projectId });

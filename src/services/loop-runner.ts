@@ -657,6 +657,9 @@ export class LoopRunner {
       this.updateState(loopKey, { iteration });
     }
 
+    // Track last log activity timestamp for activity detection
+    state.lastLogAt = Date.now();
+
     // Update log buffer in-place (no broadcast per line)
     state.logs.push(line);
     if (state.logs.length > 1000) {

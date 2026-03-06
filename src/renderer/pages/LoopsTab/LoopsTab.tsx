@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useLoops } from '../../hooks/useLoops';
 import { useProjects } from '../../hooks/useProjects';
 import { LoopRow } from './LoopRow';
+import { FactoryFlowView } from './FactoryFlowView';
 import { LogViewer, type ParsedLogLine } from '../../components/LogViewer/LogViewer';
 import { RunModeDialog } from '../../components/RunModeDialog/RunModeDialog';
 import type { RunModeSelection } from '../../components/RunModeDialog/RunModeDialog';
@@ -156,6 +157,20 @@ export const LoopsTab: React.FC = () => {
     return result;
   }, [loops, projects]);
 
+  // Collect factory project groups for the pipeline flow view
+  const factoryGroups = useMemo(() => {
+    const groups = new Map<string, LoopState[]>();
+    for (const loop of loops) {
+      if (loop.role) {
+        if (!groups.has(loop.projectId)) {
+          groups.set(loop.projectId, []);
+        }
+        groups.get(loop.projectId)!.push(loop);
+      }
+    }
+    return groups;
+  }, [loops]);
+
   const handleStop = async (projectId: string, role?: string) => {
     try {
       await stop(projectId, role);
@@ -283,6 +298,32 @@ export const LoopsTab: React.FC = () => {
             Export All
           </button>
         </div>
+
+        {/* Factory pipeline flow views */}
+        {factoryGroups.size > 0 && (
+          <div className="border-b border-gray-200 dark:border-gray-700">
+            {Array.from(factoryGroups.entries()).map(([projectId, factoryLoops]) => {
+              const project = projects.find((p) => p.id === projectId);
+              return (
+                <div key={projectId}>
+                  <div className="px-6 pt-3 pb-1 flex items-center gap-2">
+                    <span className="inline-flex items-center px-2 py-0.5 text-xs font-medium rounded bg-purple-900 text-purple-300">
+                      Factory
+                    </span>
+                    <span className="text-sm font-semibold text-gray-900 dark:text-white">
+                      {project?.name ?? factoryLoops[0].projectName}
+                    </span>
+                  </div>
+                  <FactoryFlowView
+                    loops={factoryLoops}
+                    selectedLoopKey={selectedLoopId}
+                    onSelectLoop={(l) => setSelectedLoopId(getLoopKey(l))}
+                  />
+                </div>
+              );
+            })}
+          </div>
+        )}
 
         {loading && (
           <div className="px-6 py-4 text-gray-500 dark:text-gray-400">Loading loops...</div>

@@ -5,6 +5,7 @@ import type { AppSettings, ProjectConfig, VMConfig, ZephyrImage, ImageBuildConfi
 import type { DeployKeyRecord } from '../../services/deploy-key-store';
 import type { PreValidationScript } from '../../services/pre-validation-store';
 import type { HookFile } from '../../services/hooks-store';
+import type { LoopScript } from '../../services/loop-scripts-store';
 import type {
   DockerInfo,
   ContainerCreateOpts,
@@ -228,6 +229,17 @@ declare global {
         /** Add or overwrite a hook file */
         add: (filename: string, content: string) => Promise<void>;
         /** Remove a hook file. Returns true if deleted, false if not found. */
+        remove: (filename: string) => Promise<boolean>;
+      };
+
+      loopScripts: {
+        /** List all loop scripts in ~/.zephyr/loop_scripts/ */
+        list: () => Promise<LoopScript[]>;
+        /** Get the content of a specific loop script */
+        get: (filename: string) => Promise<string | null>;
+        /** Add or overwrite a loop script */
+        add: (filename: string, content: string) => Promise<void>;
+        /** Remove a loop script. Returns true if deleted, false if not found. */
         remove: (filename: string) => Promise<boolean>;
       };
 
