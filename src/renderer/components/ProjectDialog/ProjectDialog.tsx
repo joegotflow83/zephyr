@@ -18,6 +18,7 @@ import { PromptEditor } from './PromptEditor';
 import { PreValidationSection } from './PreValidationSection';
 import { HooksSection } from './HooksSection';
 import { LoopScriptsSection } from './LoopScriptsSection';
+import { ClaudeSettingsSection } from './ClaudeSettingsSection';
 import { useImages } from '../../hooks/useImages';
 import { ImageBuilderDialog } from '../ImageBuilderDialog/ImageBuilderDialog';
 import { useAppStore } from '../../stores/app-store';
@@ -48,6 +49,7 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({ mode, project, onS
   const [preValidationScripts, setPreValidationScripts] = useState<string[]>([]);
   const [hooks, setHooks] = useState<string[]>([]);
   const [loopScript, setLoopScript] = useState<string | undefined>(undefined);
+  const [claudeSettingsFile, setClaudeSettingsFile] = useState<string | undefined>(undefined);
 
   // Image picker state: library = pick from ZephyrImage library, custom = free-text
   const [imageMode, setImageMode] = useState<ImageMode>('custom');
@@ -104,6 +106,7 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({ mode, project, onS
       setPreValidationScripts(project.pre_validation_scripts ?? []);
       setHooks(project.hooks ?? []);
       setLoopScript(project.loop_script);
+      setClaudeSettingsFile(project.claude_settings_file);
       setAdditionalMounts(project.additional_mounts ?? []);
       setImageId(project.image_id);
       setImageMode(project.image_id ? 'library' : images.length > 0 ? 'library' : 'custom');
@@ -251,6 +254,7 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({ mode, project, onS
             pre_validation_scripts: preValidationScripts,
             hooks,
             loop_script: loopScript,
+            claude_settings_file: claudeSettingsFile,
             custom_prompts: customPrompts,
             additional_mounts: additionalMounts.length > 0 ? additionalMounts : undefined,
             updated_at: new Date().toISOString(),
@@ -268,6 +272,7 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({ mode, project, onS
             pre_validation_scripts: preValidationScripts,
             hooks,
             loop_script: loopScript,
+            claude_settings_file: claudeSettingsFile,
             custom_prompts: customPrompts,
             additional_mounts: additionalMounts.length > 0 ? additionalMounts : undefined,
             sandbox_type: sandboxType,
@@ -828,6 +833,9 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({ mode, project, onS
 
             {/* Loop Scripts section */}
             <LoopScriptsSection selected={loopScript} onChange={setLoopScript} />
+
+            {/* Claude Settings section */}
+            <ClaudeSettingsSection selected={claudeSettingsFile} onChange={setClaudeSettingsFile} />
 
             {/* GitHub SSH Access section — only shown when repo URL is a GitHub URL */}
             {isGithubRepo && (

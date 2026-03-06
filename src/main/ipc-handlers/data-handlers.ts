@@ -10,6 +10,7 @@ import type { ImportExportService } from '../../services/import-export';
 import type { PreValidationStore } from '../../services/pre-validation-store';
 import type { HooksStore } from '../../services/hooks-store';
 import type { LoopScriptsStore } from '../../services/loop-scripts-store';
+import type { ClaudeSettingsStore } from '../../services/claude-settings-store';
 import type { LoopRunner } from '../../services/loop-runner';
 import type { DockerManager } from '../../services/docker-manager';
 import type { CredentialManager } from '../../services/credential-manager';
@@ -35,13 +36,14 @@ export interface DataServices {
   preValidationStore: PreValidationStore;
   hooksStore: HooksStore;
   loopScriptsStore: LoopScriptsStore;
+  claudeSettingsStore: ClaudeSettingsStore;
   loopRunner: LoopRunner;
   dockerManager: DockerManager;
   credentialManager: CredentialManager;
 }
 
 export function registerDataHandlers(services: DataServices): void {
-  const { configManager, projectStore, importExport, preValidationStore, hooksStore, loopScriptsStore, loopRunner, dockerManager, credentialManager } =
+  const { configManager, projectStore, importExport, preValidationStore, hooksStore, loopScriptsStore, claudeSettingsStore, loopRunner, dockerManager, credentialManager } =
     services;
   const logger = getLogger('ipc');
 
@@ -227,5 +229,26 @@ export function registerDataHandlers(services: DataServices): void {
 
   ipcMain.handle(IPC.LOOP_SCRIPTS_REMOVE, async (_event, filename: string): Promise<boolean> => {
     return loopScriptsStore.removeScript(filename);
+  });
+
+  // ── Claude settings files ──────────────────────────────────────────────────
+
+  ipcMain.handle(IPC.CLAUDE_SETTINGS_LIST, async () => {
+    return claudeSettingsStore.listFiles();
+  });
+
+  ipcMain.handle(IPC.CLAUDE_SETTINGS_GET, async (_event, filename: string) => {
+    return claudeSettingsStore.getFile(filename);
+  });
+
+  ipcMain.handle(
+    IPC.CLAUDE_SETTINGS_ADD,
+    async (_event, filename: string, content: string): Promise<void> => {
+      await claudeSettingsStore.addFile(filename, content);
+    },
+  );
+
+  ipcMain.handle(IPC.CLAUDE_SETTINGS_REMOVE, async (_event, filename: string): Promise<boolean> => {
+    return claudeSettingsStore.removeFile(filename);
   });
 }

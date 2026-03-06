@@ -15,6 +15,7 @@ import type { ScheduledLoop } from '../../services/scheduler';
 import type { ProjectConfig } from '../../shared/models';
 import type { PreValidationStore } from '../../services/pre-validation-store';
 import type { HooksStore } from '../../services/hooks-store';
+import type { ClaudeSettingsStore } from '../../services/claude-settings-store';
 import type { DockerManager } from '../../services/docker-manager';
 import type { AuthInjector } from '../../services/auth-injector';
 import type { CredentialManager } from '../../services/credential-manager';
@@ -29,6 +30,7 @@ export interface LoopServices {
   projectStore?: { getProject: (id: string) => ProjectConfig | null };
   preValidationStore?: PreValidationStore;
   hooksStore?: HooksStore;
+  claudeSettingsStore?: ClaudeSettingsStore;
   dockerManager?: Pick<DockerManager, 'execCommand'>;
   authInjector?: AuthInjector;
   credentialManager?: CredentialManager;
@@ -44,6 +46,7 @@ export function registerLoopHandlers(services: LoopServices): void {
     projectStore,
     preValidationStore,
     hooksStore,
+    claudeSettingsStore,
     dockerManager,
     authInjector,
     credentialManager,
@@ -116,8 +119,9 @@ export function registerLoopHandlers(services: LoopServices): void {
       if ((isVm || isSingleContainer) && project) {
         const hasHooks = project.hooks.length > 0 && !!hooksStore;
         const hasPrompts = Object.keys(project.custom_prompts).length > 0;
+        const hasClaudeSettings = !!project.claude_settings_file && !!claudeSettingsStore;
 
-        if (hasHooks || hasPrompts) {
+        if (hasHooks || hasPrompts || hasClaudeSettings) {
           const claudeDir = path.join(os.tmpdir(), `zephyr-claude-${opts.projectId}`);
           try {
             await fs.mkdir(path.join(claudeDir, 'hooks'), { recursive: true });
@@ -144,6 +148,17 @@ export function registerLoopHandlers(services: LoopServices): void {
                 } catch (err) {
                   logger.warn(`Failed to write custom prompt ${filename} for .claude mount`, { err });
                 }
+              }
+            }
+
+            if (hasClaudeSettings && project.claude_settings_file && claudeSettingsStore) {
+              try {
+                const content = await claudeSettingsStore.getFile(project.claude_settings_file);
+                if (content) {
+                  await fs.writeFile(path.join(claudeDir, 'settings.json'), content, 'utf8');
+                }
+              } catch (err) {
+                logger.warn(`Failed to write claude settings.json for .claude mount`, { err });
               }
             }
 
@@ -322,6 +337,25 @@ export function registerLoopHandlers(services: LoopServices): void {
           }
         } catch (err) {
           logger.warn('Failed to create ~/.claude in container for custom prompts', { err });
+        }
+      }
+
+      // Inject claude settings.json into ~/.claude/settings.json inside the container.
+      // Uses base64 to safely transfer file contents via docker exec.
+      // Skipped for single-mode container and VM runs: those already have the file
+      // pre-mounted as a volume (handled above).
+      if (project && project.claude_settings_file && state.containerId && claudeSettingsStore && dockerManager && opts.mode !== LoopMode.SINGLE) {
+        try {
+          const content = await claudeSettingsStore.getFile(project.claude_settings_file);
+          if (content) {
+            const encoded = Buffer.from(content).toString('base64');
+            await dockerManager.execCommand(state.containerId, [
+              'sh', '-c',
+              `mkdir -p ~/.claude && printf '%s' '${encoded}' | base64 -d > ~/.claude/settings.json`,
+            ]);
+          }
+        } catch (err) {
+          logger.warn('Failed to inject claude settings.json into container', { err });
         }
       }
 

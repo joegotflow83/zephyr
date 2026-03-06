@@ -152,6 +152,7 @@ const {
   mockPreValidationStore,
   mockHooksStore,
   mockLoopScriptsStore,
+  mockClaudeSettingsStore,
   mockVmManager,
   MockConfigManager,
   MockProjectStore,
@@ -170,6 +171,7 @@ const {
   MockPreValidationStore,
   MockHooksStore,
   MockLoopScriptsStore,
+  MockClaudeSettingsStore,
   MockVMManager,
 } = vi.hoisted(() => {
   const mockConfigManager = {
@@ -293,6 +295,9 @@ const {
   const mockLoopScriptsStore = {};
   const MockLoopScriptsStore = vi.fn(function() { return mockLoopScriptsStore; });
 
+  const mockClaudeSettingsStore = {};
+  const MockClaudeSettingsStore = vi.fn(function() { return mockClaudeSettingsStore; });
+
   const mockVmManager = {
     isMultipassAvailable: vi.fn().mockResolvedValue(false),
     listVMs: vi.fn().mockResolvedValue([]),
@@ -318,6 +323,7 @@ const {
     mockPreValidationStore,
     mockHooksStore,
     mockLoopScriptsStore,
+    mockClaudeSettingsStore,
     mockVmManager,
     MockConfigManager,
     MockProjectStore,
@@ -336,6 +342,7 @@ const {
     MockPreValidationStore,
     MockHooksStore,
     MockLoopScriptsStore,
+    MockClaudeSettingsStore,
     MockVMManager,
   };
 });
@@ -406,6 +413,10 @@ vi.mock('../../src/services/hooks-store', () => ({
 
 vi.mock('../../src/services/loop-scripts-store', () => ({
   LoopScriptsStore: MockLoopScriptsStore,
+}));
+
+vi.mock('../../src/services/claude-settings-store', () => ({
+  ClaudeSettingsStore: MockClaudeSettingsStore,
 }));
 
 vi.mock('../../src/services/vm-manager', () => ({
@@ -627,6 +638,7 @@ describe('Main Entry Point', () => {
         preValidationStore: mockPreValidationStore,
         hooksStore: mockHooksStore,
         loopScriptsStore: mockLoopScriptsStore,
+        claudeSettingsStore: mockClaudeSettingsStore,
         loopRunner: mockLoopRunner,
         dockerManager: mockDockerManager,
         credentialManager: mockCredentialManager,

@@ -188,6 +188,14 @@ contextBridge.exposeInMainWorld('api', {
     remove: (filename: string) => ipcRenderer.invoke(IPC.LOOP_SCRIPTS_REMOVE, filename),
   },
 
+  claudeSettings: {
+    list: () => ipcRenderer.invoke(IPC.CLAUDE_SETTINGS_LIST),
+    get: (filename: string) => ipcRenderer.invoke(IPC.CLAUDE_SETTINGS_GET, filename),
+    add: (filename: string, content: string) =>
+      ipcRenderer.invoke(IPC.CLAUDE_SETTINGS_ADD, filename, content),
+    remove: (filename: string) => ipcRenderer.invoke(IPC.CLAUDE_SETTINGS_REMOVE, filename),
+  },
+
   githubPat: {
     set: (projectId: string, pat: string) =>
       ipcRenderer.invoke(IPC.GITHUB_PAT_SET, projectId, pat),

@@ -148,6 +148,8 @@ export interface ProjectConfig {
   hooks: string[];
   /** Filename of the loop script to use as the container command (optional, single selection) */
   loop_script?: string;
+  /** Filename of the Claude settings file to inject into ~/.claude/settings.json (optional, single selection) */
+  claude_settings_file?: string;
   /** Map of prompt filename → content for custom agent instructions */
   custom_prompts: Record<string, string>;
   /** ISO 8601 creation timestamp */
@@ -281,6 +283,7 @@ export function createProjectConfig(partial: Partial<ProjectConfig> = {}): Proje
     pre_validation_scripts: partial.pre_validation_scripts ?? [],
     hooks: partial.hooks ?? [],
     loop_script: partial.loop_script,
+    claude_settings_file: partial.claude_settings_file,
     custom_prompts: partial.custom_prompts ?? {},
     created_at: partial.created_at ?? now,
     updated_at: partial.updated_at ?? now,

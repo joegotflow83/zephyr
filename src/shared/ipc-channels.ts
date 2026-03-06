@@ -112,6 +112,12 @@ export const IPC = {
   LOOP_SCRIPTS_ADD: 'loop-scripts:add',
   LOOP_SCRIPTS_REMOVE: 'loop-scripts:remove',
 
+  // Claude settings.json files
+  CLAUDE_SETTINGS_LIST: 'claude-settings:list',
+  CLAUDE_SETTINGS_GET: 'claude-settings:get',
+  CLAUDE_SETTINGS_ADD: 'claude-settings:add',
+  CLAUDE_SETTINGS_REMOVE: 'claude-settings:remove',
+
   // Deploy keys (ephemeral GitHub SSH deploy keys for container access)
   DEPLOY_KEYS_LIST_ORPHANED: 'deploy-keys:list-orphaned',
   DEPLOY_KEYS_GET_URL: 'deploy-keys:get-url',

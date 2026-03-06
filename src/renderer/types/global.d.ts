@@ -6,6 +6,7 @@ import type { DeployKeyRecord } from '../../services/deploy-key-store';
 import type { PreValidationScript } from '../../services/pre-validation-store';
 import type { HookFile } from '../../services/hooks-store';
 import type { LoopScript } from '../../services/loop-scripts-store';
+import type { ClaudeSettingsFile } from '../../services/claude-settings-store';
 import type {
   DockerInfo,
   ContainerCreateOpts,
@@ -240,6 +241,17 @@ declare global {
         /** Add or overwrite a loop script */
         add: (filename: string, content: string) => Promise<void>;
         /** Remove a loop script. Returns true if deleted, false if not found. */
+        remove: (filename: string) => Promise<boolean>;
+      };
+
+      claudeSettings: {
+        /** List all Claude settings files in ~/.zephyr/claude_settings/ */
+        list: () => Promise<ClaudeSettingsFile[]>;
+        /** Get the content of a specific settings file */
+        get: (filename: string) => Promise<string | null>;
+        /** Add or overwrite a settings file */
+        add: (filename: string, content: string) => Promise<void>;
+        /** Remove a settings file. Returns true if deleted, false if not found. */
         remove: (filename: string) => Promise<boolean>;
       };
 
