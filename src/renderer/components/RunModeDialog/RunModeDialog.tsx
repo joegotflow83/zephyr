@@ -7,7 +7,20 @@ export interface RunModeSelection {
   cmd?: string[];
   /** When true, start as a factory (multiple role containers) */
   factory?: boolean;
+  /** Schedule expression for SCHEDULED mode (e.g. "every 30 minutes", "every 2 hours", "daily 09:00") */
+  scheduleExpression?: string;
 }
+
+const SCHEDULE_PRESETS = [
+  { label: 'Every 15 minutes', value: '*/15 minutes' },
+  { label: 'Every 30 minutes', value: '*/30 minutes' },
+  { label: 'Every hour', value: 'every 1 hour' },
+  { label: 'Every 2 hours', value: 'every 2 hours' },
+  { label: 'Every 6 hours', value: 'every 6 hours' },
+  { label: 'Every 12 hours', value: 'every 12 hours' },
+  { label: 'Daily at...', value: 'daily' },
+  { label: 'Custom...', value: 'custom' },
+];
 
 interface RunModeDialogProps {
   projectName: string;
@@ -38,6 +51,15 @@ export const RunModeDialog: React.FC<RunModeDialogProps> = ({
   onCancel,
 }) => {
   const [selected, setSelected] = useState<string>(factoryEnabled ? 'factory' : 'continuous');
+  const [schedulePreset, setSchedulePreset] = useState<string>('*/30 minutes');
+  const [dailyTime, setDailyTime] = useState<string>('09:00');
+  const [customSchedule, setCustomSchedule] = useState<string>('');
+
+  const getScheduleExpression = (): string => {
+    if (schedulePreset === 'daily') return `daily ${dailyTime}`;
+    if (schedulePreset === 'custom') return customSchedule;
+    return schedulePreset;
+  };
 
   const buildSelection = (): RunModeSelection => {
     if (selected === 'factory') {
@@ -46,11 +68,14 @@ export const RunModeDialog: React.FC<RunModeDialogProps> = ({
     if (selected === 'continuous') {
       return { mode: LoopMode.CONTINUOUS };
     }
+    if (selected === 'scheduled') {
+      return { mode: LoopMode.SCHEDULED, scheduleExpression: getScheduleExpression() };
+    }
     // selected is a prompt filename
     const cmd = [
       'bash',
       '-c',
-      `claude --print "$(cat /root/.claude/${selected})"`,
+      `claude --print "$(cat /workspace/${selected})"`,
     ];
     return { mode: LoopMode.SINGLE, cmd };
   };
@@ -123,6 +148,56 @@ export const RunModeDialog: React.FC<RunModeDialogProps> = ({
               <div className="text-xs text-gray-500 dark:text-gray-400">
                 Run indefinitely until manually stopped
               </div>
+            </div>
+          </label>
+
+          {/* Scheduled option */}
+          <label className="flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 has-[:checked]:border-blue-500 has-[:checked]:bg-blue-50 dark:has-[:checked]:bg-blue-900/20">
+            <input
+              type="radio"
+              name="run-mode"
+              value="scheduled"
+              checked={selected === 'scheduled'}
+              onChange={() => setSelected('scheduled')}
+              className="mt-0.5 accent-blue-600"
+            />
+            <div className="flex-1 min-w-0">
+              <div className="text-sm font-medium text-gray-900 dark:text-white">
+                Scheduled
+              </div>
+              <div className="text-xs text-gray-500 dark:text-gray-400">
+                Run automatically on a repeating schedule
+              </div>
+              {selected === 'scheduled' && (
+                <div className="mt-2 space-y-2" onClick={(e) => e.stopPropagation()}>
+                  <select
+                    value={schedulePreset}
+                    onChange={(e) => setSchedulePreset(e.target.value)}
+                    className="w-full text-xs rounded border border-gray-300 dark:border-gray-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  >
+                    {SCHEDULE_PRESETS.map((p) => (
+                      <option key={p.value} value={p.value}>{p.label}</option>
+                    ))}
+                  </select>
+                  {schedulePreset === 'daily' && (
+                    <input
+                      type="time"
+                      value={dailyTime}
+                      onChange={(e) => setDailyTime(e.target.value)}
+                      className="w-full text-xs rounded border border-gray-300 dark:border-gray-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    />
+                  )}
+                  {schedulePreset === 'custom' && (
+                    <input
+                      type="text"
+                      value={customSchedule}
+                      onChange={(e) => setCustomSchedule(e.target.value)}
+                      placeholder='e.g. "*/10 minutes" or "every 3 hours"'
+                      className="w-full text-xs rounded border border-gray-300 dark:border-gray-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-500 placeholder-gray-400"
+                    />
+                  )}
+                </div>
+              )}
             </div>
           </label>
 

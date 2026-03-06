@@ -7,7 +7,7 @@ import { LogViewer, type ParsedLogLine } from '../../components/LogViewer/LogVie
 import { RunModeDialog } from '../../components/RunModeDialog/RunModeDialog';
 import type { RunModeSelection } from '../../components/RunModeDialog/RunModeDialog';
 import type { LoopState, LoopStartOpts } from '../../../shared/loop-types';
-import { LoopStatus, getLoopKey } from '../../../shared/loop-types';
+import { LoopMode, LoopStatus, getLoopKey } from '../../../shared/loop-types';
 import type { ProjectConfig } from '../../../shared/models';
 
 /**
@@ -75,7 +75,7 @@ function parseLogLine(rawLine: string): ParsedLogLine {
  * Split layout: upper table + lower log viewer (resizable).
  */
 export const LoopsTab: React.FC = () => {
-  const { loops, loading, error, stop, start, factoryStart } = useLoops();
+  const { loops, loading, error, stop, start, factoryStart, schedule } = useLoops();
   const { projects } = useProjects();
   const [selectedLoopId, setSelectedLoopId] = useState<string | null>(null);
   const [splitterPosition, setSplitterPosition] = useState(60); // Percentage for upper panel
@@ -196,11 +196,9 @@ export const LoopsTab: React.FC = () => {
         const basename = hostPath.split('/').filter(Boolean).pop() ?? hostPath;
         return `${hostPath}:/mnt/${basename}`;
       });
-      const opts: LoopStartOpts = {
+      const baseOpts = {
         projectId: project.id,
         projectName: project.name,
-        mode: selection.mode,
-        ...(selection.cmd ? { cmd: selection.cmd } : {}),
         dockerImage: project.docker_image || '',
         ...(project.local_path || extraMounts.length > 0
           ? {
@@ -212,12 +210,19 @@ export const LoopsTab: React.FC = () => {
             }
           : {}),
         ...(project.sandbox_type === 'vm'
-          ? { sandboxType: 'vm', vmConfig: project.vm_config }
+          ? { sandboxType: 'vm' as const, vmConfig: project.vm_config }
           : {}),
       };
-      if (selection.factory) {
-        await factoryStart(project.id, opts);
+      if (selection.mode === LoopMode.SCHEDULED && selection.scheduleExpression) {
+        await schedule(project.id, selection.scheduleExpression, baseOpts);
+      } else if (selection.factory) {
+        await factoryStart(project.id, { ...baseOpts, mode: selection.mode });
       } else {
+        const opts: LoopStartOpts = {
+          ...baseOpts,
+          mode: selection.mode,
+          ...(selection.cmd ? { cmd: selection.cmd } : {}),
+        };
         await start(opts);
       }
     } catch (err) {

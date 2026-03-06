@@ -9,6 +9,7 @@ import { RunModeDialog } from '../../components/RunModeDialog/RunModeDialog';
 import type { RunModeSelection } from '../../components/RunModeDialog/RunModeDialog';
 import type { ProjectConfig } from '../../../shared/models';
 import type { LoopStartOpts } from '../../../shared/loop-types';
+import { LoopMode } from '../../../shared/loop-types';
 
 interface ToastMethods {
   success: (message: string) => void;
@@ -28,7 +29,7 @@ interface ProjectsTabProps {
  */
 export const ProjectsTab: React.FC<ProjectsTabProps> = ({ onRunProject, toast }) => {
   const { projects, loading, error, refresh } = useProjects();
-  const { get: getLoop, factoryStart } = useLoops();
+  const { get: getLoop, factoryStart, schedule } = useLoops();
   const removeLoop = useAppStore((state) => state.removeLoop);
   const vmInfos = useAppStore((state) => state.vmInfos);
   const multipassAvailable = useAppStore((state) => state.multipassAvailable);
@@ -114,12 +115,10 @@ export const ProjectsTab: React.FC<ProjectsTabProps> = ({ onRunProject, toast })
         const basename = hostPath.split('/').filter(Boolean).pop() ?? hostPath;
         return `${hostPath}:/mnt/${basename}`;
       });
-      const opts: LoopStartOpts = {
+      const baseOpts = {
         projectId: project.id,
         projectName: project.name,
         dockerImage: project.docker_image || '',
-        mode: selection.mode,
-        ...(selection.cmd ? { cmd: selection.cmd } : {}),
         ...(project.local_path || extraMounts.length > 0
           ? {
               volumeMounts: [
@@ -130,15 +129,24 @@ export const ProjectsTab: React.FC<ProjectsTabProps> = ({ onRunProject, toast })
             }
           : {}),
         ...(project.sandbox_type === 'vm'
-          ? { sandboxType: 'vm', vmConfig: project.vm_config }
+          ? { sandboxType: 'vm' as const, vmConfig: project.vm_config }
           : {}),
       };
-      if (selection.factory) {
-        await factoryStart(project.id, opts);
+      if (selection.mode === LoopMode.SCHEDULED && selection.scheduleExpression) {
+        await schedule(project.id, selection.scheduleExpression, baseOpts);
+        toast.success(`Loop scheduled for "${project.name}"`);
+      } else if (selection.factory) {
+        await factoryStart(project.id, { ...baseOpts, mode: selection.mode });
+        toast.success(`Loop started for "${project.name}"`);
       } else {
+        const opts: LoopStartOpts = {
+          ...baseOpts,
+          mode: selection.mode,
+          ...(selection.cmd ? { cmd: selection.cmd } : {}),
+        };
         await window.api.loops.start(opts);
+        toast.success(`Loop started for "${project.name}"`);
       }
-      toast.success(`Loop started for "${project.name}"`);
       if (onRunProject) {
         onRunProject();
       }
