@@ -13,6 +13,7 @@ describe('Build Script', () => {
   });
 
   it('should be executable', () => {
+    if (process.platform === 'win32') return;
     const stats = fs.statSync(buildScriptPath);
     // Check if file has execute permission (octal 0o100 for owner execute)
     expect(stats.mode & 0o100).not.toBe(0);
@@ -22,7 +23,7 @@ describe('Build Script', () => {
     const content = fs.readFileSync(buildScriptPath, 'utf-8');
 
     // Check for key build steps
-    expect(content).toContain('npm ci');
+    expect(content).toContain('npm install');
     expect(content).toContain('npm run lint');
     expect(content).toContain('npm run test:unit');
     expect(content).toContain('npm run make');

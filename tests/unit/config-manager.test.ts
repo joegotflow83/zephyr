@@ -11,6 +11,7 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import path from 'path';
 
 // vi.hoisted ensures these variables are available when vi.mock factory runs
 const {
@@ -64,7 +65,7 @@ describe('ConfigManager', () => {
 
     it('falls back to ~/.zephyr when no dir is provided', () => {
       const cm = new ConfigManager();
-      expect(cm.getConfigDir()).toBe('/home/testuser/.zephyr');
+      expect(cm.getConfigDir()).toBe(path.join('/home/testuser', '.zephyr'));
     });
   });
 
@@ -96,7 +97,7 @@ describe('ConfigManager', () => {
       const cm = new ConfigManager(TEST_DIR);
       cm.loadJson('projects.json');
       expect(mockReadFileSync).toHaveBeenCalledWith(
-        `${TEST_DIR}/projects.json`,
+        path.join(TEST_DIR, 'projects.json'),
         'utf-8'
       );
     });
@@ -163,7 +164,7 @@ describe('ConfigManager', () => {
       const cm = new ConfigManager(TEST_DIR);
       cm.saveJson('projects.json', { data: 1 });
       expect(mockWriteFileSync).toHaveBeenCalledWith(
-        `${TEST_DIR}/projects.json.tmp`,
+        path.join(TEST_DIR, 'projects.json.tmp'),
         expect.any(String),
         'utf-8'
       );
@@ -173,8 +174,8 @@ describe('ConfigManager', () => {
       const cm = new ConfigManager(TEST_DIR);
       cm.saveJson('projects.json', {});
       expect(mockRenameSync).toHaveBeenCalledWith(
-        `${TEST_DIR}/projects.json.tmp`,
-        `${TEST_DIR}/projects.json`
+        path.join(TEST_DIR, 'projects.json.tmp'),
+        path.join(TEST_DIR, 'projects.json')
       );
     });
 
@@ -200,7 +201,7 @@ describe('ConfigManager', () => {
       });
       const cm = new ConfigManager(TEST_DIR);
       expect(() => cm.saveJson('projects.json', {})).toThrow('Disk full');
-      expect(mockUnlinkSync).toHaveBeenCalledWith(`${TEST_DIR}/projects.json.tmp`);
+      expect(mockUnlinkSync).toHaveBeenCalledWith(path.join(TEST_DIR, 'projects.json.tmp'));
     });
 
     it('cleans up .tmp file if renameSync throws', () => {
@@ -209,7 +210,7 @@ describe('ConfigManager', () => {
       });
       const cm = new ConfigManager(TEST_DIR);
       expect(() => cm.saveJson('projects.json', {})).toThrow('Rename failed');
-      expect(mockUnlinkSync).toHaveBeenCalledWith(`${TEST_DIR}/projects.json.tmp`);
+      expect(mockUnlinkSync).toHaveBeenCalledWith(path.join(TEST_DIR, 'projects.json.tmp'));
     });
 
     it('rethrows errors after cleanup', () => {

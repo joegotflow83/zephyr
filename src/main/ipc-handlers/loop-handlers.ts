@@ -105,15 +105,13 @@ export function registerLoopHandlers(services: LoopServices): void {
         }
       }
 
-      // For VM loops and single-mode container loops: hook files and custom
-      // prompt files cannot be injected via `docker exec` after the container
-      // starts because:
+      // For VM loops and single-mode container loops: hook files and settings
+      // cannot be injected via `docker exec` after the container starts because:
       //   - VM loops have no containerId to exec into
       //   - Single-mode container loops start the agent as their CMD, so exec
       //     injection would race against (or miss) the agent startup
-      // Instead, write everything to a per-project temp directory and mount it
-      // at /root/.claude. Hooks go into hooks/ and prompt files sit at the
-      // directory root so Claude Code can read them.
+      // Hooks and settings go into a temp dir mounted at /root/.claude.
+      // Prompt files for single-mode container runs go to /workspace (see below).
       const isVm = opts.sandboxType === 'vm';
       const isSingleContainer = opts.mode === LoopMode.SINGLE && !isVm;
       if ((isVm || isSingleContainer) && project) {
@@ -121,7 +119,7 @@ export function registerLoopHandlers(services: LoopServices): void {
         const hasPrompts = Object.keys(project.custom_prompts).length > 0;
         const hasClaudeSettings = !!project.claude_settings_file && !!claudeSettingsStore;
 
-        if (hasHooks || hasPrompts || hasClaudeSettings) {
+        if (hasHooks || hasClaudeSettings) {
           const claudeDir = path.join(os.tmpdir(), `zephyr-claude-${opts.projectId}`);
           try {
             await fs.mkdir(path.join(claudeDir, 'hooks'), { recursive: true });
@@ -136,17 +134,6 @@ export function registerLoopHandlers(services: LoopServices): void {
                   }
                 } catch (err) {
                   logger.warn(`Failed to write hook ${filename} for .claude mount`, { err });
-                }
-              }
-            }
-
-            if (hasPrompts) {
-              for (const [filename, content] of Object.entries(project.custom_prompts)) {
-                try {
-                  const safe = path.basename(filename);
-                  await fs.writeFile(path.join(claudeDir, safe), content, 'utf8');
-                } catch (err) {
-                  logger.warn(`Failed to write custom prompt ${filename} for .claude mount`, { err });
                 }
               }
             }
@@ -168,6 +155,40 @@ export function registerLoopHandlers(services: LoopServices): void {
             };
           } catch (err) {
             logger.warn('Failed to prepare .claude directory for loop', { err });
+          }
+        }
+
+        // For single-mode container runs: write prompt files to /workspace so the
+        // claude CMD can read them at /workspace/<filename>. Writing to /root/.claude
+        // causes permission denied because the container process may not run as root.
+        // Prefer project.local_path (already volume-mounted as /workspace); fall back
+        // to a temp dir mounted as /workspace when local_path is absent.
+        if (isSingleContainer && hasPrompts) {
+          if (project.local_path) {
+            for (const [filename, content] of Object.entries(project.custom_prompts)) {
+              try {
+                const safe = path.basename(filename);
+                await fs.writeFile(path.join(project.local_path, safe), content, 'utf8');
+              } catch (err) {
+                logger.warn(`Failed to write prompt ${filename} to local_path for single-mode run`, { err });
+              }
+            }
+          } else {
+            const promptsDir = path.join(os.tmpdir(), `zephyr-prompts-${opts.projectId}`);
+            try {
+              await fs.mkdir(promptsDir, { recursive: true });
+              for (const [filename, content] of Object.entries(project.custom_prompts)) {
+                const safe = path.basename(filename);
+                await fs.writeFile(path.join(promptsDir, safe), content, 'utf8');
+              }
+              opts = {
+                ...opts,
+                volumeMounts: [...(opts.volumeMounts ?? []), `${promptsDir}:/workspace`],
+                workDir: opts.workDir ?? '/workspace',
+              };
+            } catch (err) {
+              logger.warn('Failed to prepare prompt files directory for single-mode run', { err });
+            }
           }
         }
       }

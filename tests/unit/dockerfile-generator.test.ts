@@ -1,5 +1,6 @@
 // @vitest-environment node
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import path from 'path';
 
 import {
   generateDockerfile,
@@ -333,12 +334,12 @@ describe('writeDockerfile', () => {
   it('writes Dockerfile to the specified directory', async () => {
     const content = 'FROM ubuntu:24.04\n';
     await writeDockerfile('/tmp/mybuild', content);
-    expect(mockWriteFile).toHaveBeenCalledWith('/tmp/mybuild/Dockerfile', content, 'utf-8');
+    expect(mockWriteFile).toHaveBeenCalledWith(path.join('/tmp/mybuild', 'Dockerfile'), content, 'utf-8');
   });
 
   it('returns the path to the written Dockerfile', async () => {
     const filePath = await writeDockerfile('/tmp/mybuild', 'FROM ubuntu:24.04\n');
-    expect(filePath).toBe('/tmp/mybuild/Dockerfile');
+    expect(filePath).toBe(path.join('/tmp/mybuild', 'Dockerfile'));
   });
 
   it('uses path.join so path separators are correct', async () => {

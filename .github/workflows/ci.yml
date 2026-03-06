@@ -66,7 +66,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y \
-            libgtk-3-0 libxss1 libasound2 libgbm1 \
+            libgtk-3-0 libxss1 libasound2t64 libgbm1 \
             xvfb x11-utils
 
       - name: Install dependencies

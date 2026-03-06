@@ -3,6 +3,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import path from 'path';
 import { DiskChecker } from '../../src/services/disk-checker';
 import checkDiskSpace from 'check-disk-space';
 
@@ -50,7 +51,7 @@ describe('DiskChecker', () => {
         size: 100 * 1024 * 1024 * 1024,
         used: 90 * 1024 * 1024 * 1024,
       });
-      expect(mockCheckDiskSpace).toHaveBeenCalledWith(testPath);
+      expect(mockCheckDiskSpace).toHaveBeenCalledWith(path.resolve(testPath));
     });
 
     it('should throw error if path does not exist', async () => {
