@@ -25,7 +25,7 @@ test.describe('Electron app launch', () => {
     const appInfo = parseElectronApp(latestBuild);
 
     electronApp = await electron.launch({
-      args: [appInfo.main],
+      args: [appInfo.main, ...(process.env.CI ? ['--no-sandbox'] : [])],
       executablePath: appInfo.executable,
     });
   });

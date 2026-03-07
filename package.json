@@ -58,6 +58,7 @@
     "autoprefixer": "^10.4.24",
     "electron": "40.4.1",
     "electron-playwright-helpers": "^2.1.0",
+    "electron-winstaller": "^5.4.0",
     "eslint": "^8.57.1",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-import": "^2.32.0",

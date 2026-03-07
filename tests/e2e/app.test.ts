@@ -32,7 +32,7 @@ test.describe('Zephyr Desktop E2E', () => {
     const appInfo = parseElectronApp(latestBuild);
 
     electronApp = await electron.launch({
-      args: [appInfo.main],
+      args: [appInfo.main, ...(process.env.CI ? ['--no-sandbox'] : [])],
       executablePath: appInfo.executable,
     });
 
