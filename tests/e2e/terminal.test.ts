@@ -38,9 +38,12 @@ test.describe('Terminal E2E', () => {
     // For packaged apps the executable loads from its embedded asar automatically.
     // Do NOT pass appInfo.main as args — that file is inside the asar and not on disk,
     // which causes Electron to silently exit (OnlyLoadAppFromAsar fuse blocks it).
+    console.log('appInfo:', JSON.stringify(appInfo, null, 2));
     electronApp = await electron.launch({
       executablePath: appInfo.executable,
-      args: process.env.CI ? ['--no-sandbox', '--disable-gpu', '--disable-dev-shm-usage'] : [],
+      args: process.env.CI
+        ? ['--no-sandbox', '--disable-gpu', '--disable-dev-shm-usage', '--enable-logging', '--v=1']
+        : [],
       timeout: 90_000,
     });
 

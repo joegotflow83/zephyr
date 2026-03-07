@@ -79,7 +79,17 @@ jobs:
         run: npm run package
 
       - name: Verify packaged app
-        run: ls -la out/
+        run: |
+          echo "=== Build output ==="
+          ls -laR out/ | head -40
+          BINARY=$(find out/ -name 'zephyr-desktop' -type f ! -path '*/resource*' | head -1)
+          echo "=== Binary: $BINARY ==="
+          file "$BINARY"
+          echo "=== Missing libraries ==="
+          ldd "$BINARY" 2>&1 | grep -i "not found" || echo "All libraries found"
+          echo "=== Smoke test: launch binary for 5s ==="
+          dbus-run-session -- xvfb-run --auto-servernum timeout 5 \
+            "$BINARY" --no-sandbox --disable-gpu --enable-logging --v=1 2>&1 | tail -40 || true
 
       - name: Run E2E tests
         env:
