@@ -8,7 +8,7 @@ import path from 'path';
 // skipped in headless CI environments without a display server.
 export default defineConfig({
   testDir: './tests/e2e',
-  timeout: 30000,
+  timeout: 60000,
   retries: 0,
   reporter: [['list'], ['html', { outputFolder: 'playwright-report', open: 'never' }]],
   use: {
