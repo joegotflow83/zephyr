@@ -35,10 +35,14 @@ export default defineConfig({
       // Externalize all node_modules so Rollup never attempts to bundle them.
       // Electron Forge packages node_modules alongside the app so require()
       // resolves them at runtime.
+      // Note: Vite may resolve bare imports (e.g. 'cpu-features') to absolute
+      // paths before calling this function, so we also check for node_modules
+      // in the resolved path.
       external: (id: string) =>
         id === 'electron' ||
         id.startsWith('node:') ||
         id.endsWith('.node') ||
+        id.includes('/node_modules/') ||
         (!id.startsWith('.') && !id.startsWith('/') && !id.startsWith('\0')),
     },
   },
