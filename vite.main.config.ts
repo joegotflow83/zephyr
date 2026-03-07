@@ -8,12 +8,14 @@ export default defineConfig({
   logLevel: 'error',
   build: {
     rollupOptions: {
-      external: [
-        'electron',
-        // Treat all native Node addons as external so Rollup never tries to
-        // parse the ELF/PE binary as JavaScript.
-        /\.node$/,
-      ],
+      // Externalize all node_modules so Rollup never attempts to bundle them.
+      // This prevents native .node addons (e.g. sshcrypto.node from ssh2/docker-modem)
+      // from being treated as JavaScript. Electron Forge packages node_modules
+      // alongside the app so require() resolves them at runtime.
+      external: (id: string) =>
+        id === 'electron' ||
+        id.startsWith('node:') ||
+        (!id.startsWith('.') && !id.startsWith('/') && !id.startsWith('\0')),
     },
   },
 });

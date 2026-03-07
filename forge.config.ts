@@ -25,7 +25,11 @@ if (process.platform === 'darwin') {
 
 const config: ForgeConfig = {
   packagerConfig: {
-    asar: true,
+    asar: {
+      // Native .node addons cannot be loaded from inside an asar archive.
+      // Unpack them so Electron can require() them at runtime.
+      unpack: '**/*.node',
+    },
     name: 'Zephyr Desktop',
     executableName: 'zephyr-desktop',
     appBundleId: 'com.zephyr.desktop',
