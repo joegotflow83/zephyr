@@ -31,9 +31,12 @@ test.describe('Zephyr Desktop E2E', () => {
     const latestBuild = findLatestBuild('out');
     const appInfo = parseElectronApp(latestBuild);
 
+    // For packaged apps the executable loads from its embedded asar automatically.
+    // Do NOT pass appInfo.main as args — that file is inside the asar and not on disk,
+    // which causes Electron to silently exit (OnlyLoadAppFromAsar fuse blocks it).
     electronApp = await electron.launch({
-      args: [appInfo.main, ...(process.env.CI ? ['--no-sandbox', '--disable-gpu', '--disable-dev-shm-usage'] : [])],
       executablePath: appInfo.executable,
+      args: process.env.CI ? ['--no-sandbox', '--disable-gpu', '--disable-dev-shm-usage'] : [],
     });
 
     page = await electronApp.firstWindow();
