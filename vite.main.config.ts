@@ -1,16 +1,23 @@
 import { defineConfig } from 'vite';
 import type { Plugin } from 'vite';
 
-// The @rollup/plugin-commonjs resolver tries to read and parse .node binaries
-// before Rollup's external function is consulted, causing a parse error.
-// This plugin intercepts .node files in the resolveId phase (which runs first)
-// and marks them external so the commonjs plugin never attempts to load them.
+// Prevent Rollup/Vite from loading and parsing native .node addon binaries.
+// enforce:'pre' ensures this runs before Vite's bundled commonjs plugin.
+// The load hook is a safety net: if a .node file somehow bypasses resolveId
+// (e.g. resolved to an absolute path by another plugin), we return an empty
+// module instead of letting Rollup read the binary from disk.
 function nativeNodeModulesPlugin(): Plugin {
   return {
     name: 'native-node-modules',
+    enforce: 'pre',
     resolveId(id) {
       if (id.endsWith('.node')) {
         return { id, external: true };
+      }
+    },
+    load(id) {
+      if (id.endsWith('.node')) {
+        return 'export default {};';
       }
     },
   };
