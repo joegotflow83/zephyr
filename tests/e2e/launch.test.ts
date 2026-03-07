@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { findLatestBuild, parseElectronApp } from 'electron-playwright-helpers';
 import { ElectronApplication, _electron as electron } from 'playwright';
+import { spawn } from 'child_process';
 import path from 'path';
 
 // E2E smoke test: verify the Electron app window opens and renders the main UI.
@@ -28,6 +29,27 @@ test.describe('Electron app launch', () => {
     // Do NOT pass appInfo.main as args — that file is inside the asar and not on disk,
     // which causes Electron to silently exit (OnlyLoadAppFromAsar fuse blocks it).
     console.log('appInfo:', JSON.stringify(appInfo, null, 2));
+
+    // Diagnostic: spawn the binary briefly to capture stderr (Playwright doesn't expose it)
+    if (process.env.CI) {
+      await new Promise<void>((resolve) => {
+        console.log('=== Diagnostic: spawning binary for 5s ===');
+        const proc = spawn(appInfo.executable, [
+          '--no-sandbox', '--disable-gpu', '--disable-dev-shm-usage',
+          '--enable-logging', '--v=1',
+        ], { timeout: 5000, env: { ...process.env, ELECTRON_ENABLE_LOGGING: 'true' } });
+        proc.stdout.on('data', (d: Buffer) => console.log('ELECTRON STDOUT:', d.toString()));
+        proc.stderr.on('data', (d: Buffer) => console.log('ELECTRON STDERR:', d.toString()));
+        proc.on('error', (err) => console.log('ELECTRON SPAWN ERROR:', err.message));
+        proc.on('close', (code, signal) => {
+          console.log(`=== Diagnostic done: exit code=${code}, signal=${signal} ===`);
+          resolve();
+        });
+        // Force kill after 5s in case timeout doesn't work
+        setTimeout(() => { try { proc.kill('SIGKILL'); } catch {} }, 5000);
+      });
+    }
+
     electronApp = await electron.launch({
       executablePath: appInfo.executable,
       args: process.env.CI
