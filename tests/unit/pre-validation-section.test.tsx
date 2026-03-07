@@ -149,10 +149,9 @@ describe('PreValidationSection', () => {
     render(
       <PreValidationSection selected={['python-lint.sh']} onChange={onChangeMock} />,
     );
-    await waitFor(() => expect(mockList).toHaveBeenCalled());
+    // findByText waits for the async script list to load and render
+    await screen.findByText('python-lint.sh');
 
-    const checkboxes = screen.getAllByRole('checkbox');
-    // Find the python-lint checkbox (first in alphabetical order after sort)
     const label = screen.getByText('python-lint.sh').closest('label');
     const checkbox = label?.querySelector('input[type="checkbox"]') as HTMLInputElement;
     expect(checkbox.checked).toBe(true);
