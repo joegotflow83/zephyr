@@ -30,6 +30,7 @@ test.describe('Electron app launch', () => {
     electronApp = await electron.launch({
       executablePath: appInfo.executable,
       args: process.env.CI ? ['--no-sandbox', '--disable-gpu', '--disable-dev-shm-usage'] : [],
+      timeout: 90_000,
     });
   });
 

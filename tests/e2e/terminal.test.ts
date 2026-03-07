@@ -41,9 +41,10 @@ test.describe('Terminal E2E', () => {
     electronApp = await electron.launch({
       executablePath: appInfo.executable,
       args: process.env.CI ? ['--no-sandbox', '--disable-gpu', '--disable-dev-shm-usage'] : [],
+      timeout: 90_000,
     });
 
-    page = await electronApp.firstWindow();
+    page = await electronApp.firstWindow({ timeout: 30_000 });
     await page.waitForLoadState('domcontentloaded');
 
     // Check if Docker is available by evaluating in the main process

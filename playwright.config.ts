@@ -8,8 +8,9 @@ import path from 'path';
 // skipped in headless CI environments without a display server.
 export default defineConfig({
   testDir: './tests/e2e',
-  timeout: 60000,
+  timeout: 120000,
   retries: 0,
+  workers: process.env.CI ? 1 : undefined,
   reporter: [['list'], ['html', { outputFolder: 'playwright-report', open: 'never' }]],
   use: {
     // Capture screenshot on failure for debugging

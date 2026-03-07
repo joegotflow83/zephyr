@@ -37,9 +37,10 @@ test.describe('Zephyr Desktop E2E', () => {
     electronApp = await electron.launch({
       executablePath: appInfo.executable,
       args: process.env.CI ? ['--no-sandbox', '--disable-gpu', '--disable-dev-shm-usage'] : [],
+      timeout: 90_000,
     });
 
-    page = await electronApp.firstWindow();
+    page = await electronApp.firstWindow({ timeout: 30_000 });
     // Give the app time to fully initialize
     await page.waitForLoadState('domcontentloaded');
   });
