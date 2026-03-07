@@ -11,6 +11,7 @@
 
 import { describe, it, expect, beforeEach, vi, type MockedFunction } from 'vitest';
 import { EventEmitter } from 'events';
+import path from 'path';
 
 // Hoist mocks so they are available when vi.mock factory runs
 const { mockSpawn, mockWriteFileSync, mockUnlinkSync } = vi.hoisted(() => ({
@@ -145,9 +146,12 @@ describe('VMManager', () => {
 
       await vm.createVM({ name: 'zephyr-abc12345-x1y2', cpus: 2, memoryGb: 4, diskGb: 20 });
 
+      // Use path.join so the expected path matches on Windows (backslashes) and Unix
+      const expectedTmpFile = path.join('/tmp', 'zephyr-cloud-init-zephyr-abc12345-x1y2.yaml');
+
       // Temp file should have been written with default cloud-init
       expect(mockWriteFileSync).toHaveBeenCalledWith(
-        '/tmp/zephyr-cloud-init-zephyr-abc12345-x1y2.yaml',
+        expectedTmpFile,
         expect.stringContaining('#cloud-config'),
         'utf-8'
       );
@@ -161,13 +165,13 @@ describe('VMManager', () => {
           '--cpus', '2',
           '--memory', '4G',
           '--disk', '20G',
-          '--cloud-init', '/tmp/zephyr-cloud-init-zephyr-abc12345-x1y2.yaml',
+          '--cloud-init', expectedTmpFile,
         ],
         expect.any(Object)
       );
 
       // Temp file should be cleaned up
-      expect(mockUnlinkSync).toHaveBeenCalledWith('/tmp/zephyr-cloud-init-zephyr-abc12345-x1y2.yaml');
+      expect(mockUnlinkSync).toHaveBeenCalledWith(expectedTmpFile);
     });
 
     it('uses custom cloud-init YAML when provided', async () => {
