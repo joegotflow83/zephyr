@@ -67,7 +67,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y \
             libgtk-3-0 libxss1 libasound2t64 libgbm1 \
-            xvfb x11-utils
+            xvfb x11-utils dbus-x11
 
       - name: Install dependencies
         run: npm ci
@@ -78,8 +78,14 @@ jobs:
       - name: Package Electron app
         run: npm run package
 
+      - name: Verify packaged app
+        run: ls -la out/
+
       - name: Run E2E tests
-        run: xvfb-run --auto-servernum npm run test:e2e
+        env:
+          NO_AT_BRIDGE: '1'
+          ELECTRON_ENABLE_LOGGING: 'true'
+        run: dbus-run-session -- xvfb-run --auto-servernum npm run test:e2e
 
       - name: Upload Playwright report
         uses: actions/upload-artifact@v4
