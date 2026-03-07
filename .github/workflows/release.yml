@@ -40,6 +40,7 @@ jobs:
         run: npm install --save-dev appdmg
 
       - name: Import macOS signing certificate
+        if: ${{ secrets.APPLE_CERTIFICATE != '' }}
         uses: apple-actions/import-codesign-certs@v3
         with:
           p12-file-base64: ${{ secrets.APPLE_CERTIFICATE }}
