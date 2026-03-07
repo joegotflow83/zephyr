@@ -15,6 +15,7 @@ export default defineConfig({
       external: (id: string) =>
         id === 'electron' ||
         id.startsWith('node:') ||
+        id.endsWith('.node') ||
         (!id.startsWith('.') && !id.startsWith('/') && !id.startsWith('\0')),
     },
   },
