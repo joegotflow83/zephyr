@@ -8,7 +8,12 @@ export default defineConfig({
   logLevel: 'error',
   build: {
     rollupOptions: {
-      external: ['electron'],
+      external: [
+        'electron',
+        // Treat all native Node addons as external so Rollup never tries to
+        // parse the ELF/PE binary as JavaScript.
+        /\.node$/,
+      ],
     },
   },
 });
