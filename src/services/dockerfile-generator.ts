@@ -49,10 +49,13 @@ export function generateDockerfile(config: ImageBuildConfig): string {
   sections.push('');
 
   // Security tools: trivy (via official apt repo), semgrep + bandit (via pip)
+  // GitHub CLI: gh (via official GitHub apt repo)
   sections.push(
     'RUN wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | gpg --dearmor | tee /usr/share/keyrings/trivy.gpg > /dev/null && \\\n' +
     '    echo "deb [signed-by=/usr/share/keyrings/trivy.gpg] https://aquasecurity.github.io/trivy-repo/deb generic main" | tee /etc/apt/sources.list.d/trivy.list && \\\n' +
-    '    apt-get update && apt-get install -y trivy && \\\n' +
+    '    wget -qO - https://cli.github.com/packages/githubcli-archive-keyring.gpg | tee /usr/share/keyrings/githubcli-archive-keyring.gpg > /dev/null && \\\n' +
+    '    echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | tee /etc/apt/sources.list.d/github-cli.list && \\\n' +
+    '    apt-get update && apt-get install -y trivy gh && \\\n' +
     '    rm -rf /var/lib/apt/lists/* && \\\n' +
     '    pip3 install --break-system-packages semgrep bandit'
   );
