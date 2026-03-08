@@ -81,18 +81,18 @@ export interface ZephyrImage {
  * Predefined roles for a coding factory.
  * Each role maps to a separate container running a dedicated AI agent.
  */
-export type FactoryRole = 'project_manager' | 'coder' | 'security' | 'qa';
+export type FactoryRole = 'pm' | 'coder' | 'security' | 'qa';
 
 /**
  * All available factory roles, in pipeline order.
  */
-export const FACTORY_ROLES: FactoryRole[] = ['project_manager', 'coder', 'security', 'qa'];
+export const FACTORY_ROLES: FactoryRole[] = ['pm', 'coder', 'security', 'qa'];
 
 /**
  * Human-readable labels for factory roles.
  */
 export const FACTORY_ROLE_LABELS: Record<FactoryRole, string> = {
-  project_manager: 'Project Manager',
+  pm: 'Project Manager',
   coder: 'Coder',
   security: 'Security',
   qa: 'QA',
