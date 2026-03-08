@@ -540,6 +540,7 @@ export function registerLoopHandlers(services: LoopServices): void {
     const files: Record<string, string> = {
       '@feature_requests.md': featureRequestsContent?.trim() ? featureRequestsContent : defaultFeatureRequests,
       '@team_plan.md': '# Team Plan\n\nOverall plan and current sprint objectives.\n',
+      '@human_clarification.md': '# Human Clarification\n\nUse this file to provide clarifications, answers, or guidance requested by the AI agents.\n',
       'team/handovers/coder_to_security.md': '# Coder to Security Handover\n\nDocument code changes that need security review.\n',
       'team/handovers/security_to_qa.md': '# Security to QA Handover\n\nDocument security findings and items cleared for QA testing.\n',
       'team/handovers/qa_feedback.md': '# QA Feedback\n\nDocument test results, bugs found, and items that need rework.\n',
