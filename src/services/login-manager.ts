@@ -8,6 +8,7 @@
  * Services supported: Anthropic, GitHub
  */
 
+import crypto from 'crypto';
 import { BrowserWindow } from 'electron';
 import type { CredentialManager, CredentialService } from './credential-manager';
 
@@ -211,26 +212,39 @@ export class LoginManager {
   }
 
   /**
-   * Open a browser login window for claude.ai and capture the session cookies.
+   * Open a browser login window and complete the Claude Code OAuth PKCE flow.
    *
-   * On successful login the captured cookies are stored as a JSON blob under
-   * the 'anthropic_session' credential key so they can be injected into
-   * containers at loop start time.
+   * Uses the same OAuth client as the Claude Code CLI to obtain real access and
+   * refresh tokens. The tokens are stored under 'anthropic_session' in the
+   * credential manager in the same format Claude Code writes to
+   * ~/.claude/.credentials.json, so loop-handlers can inject them directly into
+   * containers.
    *
    * @returns Promise resolving to LoginResult
    */
   async openClaudeCodeLoginSession(): Promise<LoginResult> {
+    // Claude Code CLI OAuth application constants
+    const CLIENT_ID = '9d1c250a-e61b-44d9-88ed-5944d1962f5e';
+    const AUTH_URL = 'https://claude.ai/oauth/authorize';
+    const TOKEN_URL = 'https://claude.ai/v1/oauth/token';
+    const SCOPES = 'user:inference user:mcp_servers user:profile user:sessions:claude_code';
     const timeoutMs = DEFAULT_LOGIN_TIMEOUT_MS;
-    const width = 900;
-    const height = 700;
-    const loginUrl = 'https://claude.ai/login';
+
+    // PKCE parameters
+    const codeVerifier = crypto.randomBytes(32).toString('base64url');
+    const codeChallenge = crypto.createHash('sha256').update(codeVerifier).digest('base64url');
+    const state = crypto.randomBytes(16).toString('hex');
+    // Use a random high port for the redirect URI; we intercept with will-navigate/will-redirect
+    // before Electron actually tries to connect, so no server needs to listen there.
+    const port = Math.floor(Math.random() * 40000) + 10000;
+    const redirectUri = `http://localhost:${port}/callback`;
 
     return new Promise<LoginResult>((resolve) => {
       let resolved = false;
 
       const loginWindow = new BrowserWindow({
-        width,
-        height,
+        width: 900,
+        height: 700,
         show: true,
         webPreferences: {
           nodeIntegration: false,
@@ -252,41 +266,89 @@ export class LoginManager {
         resolveOnce({ success: false, service: 'claude-code', error: `Login timed out after ${timeoutMs}ms` });
       }, timeoutMs);
 
-      loginWindow.webContents.on('did-navigate', async (_, url) => {
-        if (url !== loginUrl && !url.includes('/login')) {
-          try {
-            const allCookies = await loginWindow.webContents.session.cookies.get({});
-            const filteredCookies = allCookies.filter(
-              (c) => c.domain && (c.domain.includes('claude.ai') || c.domain.includes('anthropic.com'))
-            );
-
-            if (filteredCookies.length === 0) {
-              resolveOnce({ success: false, service: 'claude-code', error: 'No cookies captured after login' });
-              return;
-            }
-
-            const sessionData = JSON.stringify({
-              service: 'claude-code',
-              cookies: filteredCookies.map((c) => ({
-                name: c.name,
-                value: c.value,
-                domain: c.domain,
-                path: c.path,
-                secure: c.secure,
-                httpOnly: c.httpOnly,
-                expirationDate: c.expirationDate,
-              })),
-            });
-
-            await this.credentialManager.storeApiKey('anthropic_session', sessionData);
-            resolveOnce({ success: true, service: 'claude-code' });
-          } catch (err) {
-            resolveOnce({
-              success: false,
-              service: 'claude-code',
-              error: `Failed to capture session: ${err instanceof Error ? err.message : String(err)}`,
-            });
+      // Handle the OAuth callback URL after interception
+      const handleCallbackUrl = async (url: string) => {
+        try {
+          const parsed = new URL(url);
+          const error = parsed.searchParams.get('error');
+          if (error) {
+            resolveOnce({ success: false, service: 'claude-code', error: `OAuth error: ${error}` });
+            return;
           }
+
+          const code = parsed.searchParams.get('code');
+          const returnedState = parsed.searchParams.get('state');
+          if (!code || returnedState !== state) {
+            resolveOnce({ success: false, service: 'claude-code', error: 'Invalid OAuth callback: missing code or state mismatch' });
+            return;
+          }
+
+          // Exchange authorization code for tokens
+          const tokenResponse = await fetch(TOKEN_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              grant_type: 'authorization_code',
+              code,
+              redirect_uri: redirectUri,
+              client_id: CLIENT_ID,
+              code_verifier: codeVerifier,
+            }),
+          });
+
+          if (!tokenResponse.ok) {
+            const errText = await tokenResponse.text();
+            resolveOnce({ success: false, service: 'claude-code', error: `Token exchange failed: ${errText}` });
+            return;
+          }
+
+          const tokens = await tokenResponse.json() as {
+            access_token: string;
+            refresh_token?: string;
+            expires_in?: number;
+            scope?: string;
+            subscription_type?: string;
+            rate_limit_tier?: string;
+          };
+
+          // Store in ~/.claude/.credentials.json format so containers can use it directly
+          const credentialsData = JSON.stringify({
+            claudeAiOauth: {
+              accessToken: tokens.access_token,
+              refreshToken: tokens.refresh_token ?? '',
+              expiresAt: tokens.expires_in
+                ? Date.now() + tokens.expires_in * 1000
+                : Date.now() + 24 * 60 * 60 * 1000,
+              scopes: tokens.scope ? tokens.scope.split(' ') : SCOPES.split(' '),
+              subscriptionType: tokens.subscription_type ?? 'pro',
+              rateLimitTier: tokens.rate_limit_tier ?? 'default_claude_ai',
+            },
+          });
+
+          await this.credentialManager.storeApiKey('anthropic_session', credentialsData);
+          resolveOnce({ success: true, service: 'claude-code' });
+        } catch (err) {
+          resolveOnce({
+            success: false,
+            service: 'claude-code',
+            error: `Auth failed: ${err instanceof Error ? err.message : String(err)}`,
+          });
+        }
+      };
+
+      // Intercept client-side navigation to the localhost callback URL
+      loginWindow.webContents.on('will-navigate', (event, url) => {
+        if (url.includes(`localhost:${port}`)) {
+          event.preventDefault();
+          void handleCallbackUrl(url);
+        }
+      });
+
+      // Also intercept server-side (HTTP 3xx) redirects to localhost
+      loginWindow.webContents.on('will-redirect', (event, url) => {
+        if (url.includes(`localhost:${port}`)) {
+          event.preventDefault();
+          void handleCallbackUrl(url);
         }
       });
 
@@ -294,7 +356,17 @@ export class LoginManager {
         resolveOnce({ success: false, service: 'claude-code', error: 'Login window closed by user' });
       });
 
-      loginWindow.loadURL(loginUrl).catch((err) => {
+      const authParams = new URLSearchParams({
+        response_type: 'code',
+        client_id: CLIENT_ID,
+        redirect_uri: redirectUri,
+        scope: SCOPES,
+        code_challenge: codeChallenge,
+        code_challenge_method: 'S256',
+        state,
+      });
+
+      loginWindow.loadURL(`${AUTH_URL}?${authParams.toString()}`).catch((err) => {
         resolveOnce({
           success: false,
           service: 'claude-code',

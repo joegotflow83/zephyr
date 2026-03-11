@@ -136,7 +136,11 @@ export const ProjectsTab: React.FC<ProjectsTabProps> = ({ onRunProject, toast })
         await schedule(project.id, selection.scheduleExpression, baseOpts);
         toast.success(`Loop scheduled for "${project.name}"`);
       } else if (selection.factory) {
-        await factoryStart(project.id, { ...baseOpts, mode: selection.mode });
+        await factoryStart(project.id, {
+          ...baseOpts,
+          mode: selection.mode,
+          envVars: { MAX_ITERATIONS: String(selection.maxIterations ?? 10) },
+        });
         toast.success(`Loop started for "${project.name}"`);
       } else {
         const opts: LoopStartOpts = {

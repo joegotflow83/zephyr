@@ -57,12 +57,13 @@ export const LogViewer: React.FC<LogViewerProps> = ({
     );
   }, [lines, searchTerm]);
 
-  // Virtualizer setup
+  // Virtualizer setup with dynamic sizing for long/wrapped lines
   const rowVirtualizer = useVirtualizer({
     count: filteredLines.length,
     getScrollElement: () => parentRef.current,
-    estimateSize: () => 24, // Estimate line height in pixels
-    overscan: 10, // Render 10 extra items outside viewport
+    estimateSize: () => 24,
+    overscan: 10,
+    measureElement: (el) => el.getBoundingClientRect().height,
   });
 
   // Auto-scroll to bottom when new lines arrive
@@ -262,12 +263,12 @@ export const LogViewer: React.FC<LogViewerProps> = ({
                 <div
                   key={virtualRow.index}
                   data-index={virtualRow.index}
+                  ref={rowVirtualizer.measureElement}
                   style={{
                     position: 'absolute',
                     top: 0,
                     left: 0,
                     width: '100%',
-                    height: `${virtualRow.size}px`,
                     transform: `translateY(${virtualRow.start}px)`,
                   }}
                   className="px-2 py-0.5 whitespace-pre-wrap break-all"

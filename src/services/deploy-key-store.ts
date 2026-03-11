@@ -106,6 +106,16 @@ export class DeployKeyStore {
   }
 
   /**
+   * Return all active or orphaned deploy key records for a given project.
+   * Cleaned keys are excluded since they have already been removed from the service.
+   * Used during project deletion to find keys that still need to be removed.
+   */
+  listActiveByProject(projectId: string): DeployKeyRecord[] {
+    const store = this.loadStore();
+    return store.keys.filter((k) => k.project_id === projectId && k.status !== 'cleaned');
+  }
+
+  /**
    * Build the GitHub URL to the deploy keys management page for a repository.
    *
    * @param repo - Repository in "owner/repo" format

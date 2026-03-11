@@ -154,6 +154,8 @@ const {
   mockLoopScriptsStore,
   mockClaudeSettingsStore,
   mockVmManager,
+  mockSshKeyManager,
+  mockDeployKeyStore,
   MockConfigManager,
   MockProjectStore,
   MockImportExportService,
@@ -173,6 +175,8 @@ const {
   MockLoopScriptsStore,
   MockClaudeSettingsStore,
   MockVMManager,
+  MockSSHKeyManager,
+  MockDeployKeyStore,
 } = vi.hoisted(() => {
   const mockConfigManager = {
     loadJson: vi.fn(),
@@ -305,6 +309,18 @@ const {
   };
   const MockVMManager = vi.fn(function() { return mockVmManager; });
 
+  const mockSshKeyManager = {};
+  const MockSSHKeyManager = vi.fn(function() { return mockSshKeyManager; });
+
+  const mockDeployKeyStore = {
+    detectOrphans: vi.fn(),
+    listOrphaned: vi.fn().mockReturnValue([]),
+    listActiveByProject: vi.fn().mockReturnValue([]),
+    record: vi.fn(),
+    markCleaned: vi.fn(),
+  };
+  const MockDeployKeyStore = vi.fn(function() { return mockDeployKeyStore; });
+
   return {
     mockConfigManager,
     mockProjectStore,
@@ -325,6 +341,8 @@ const {
     mockLoopScriptsStore,
     mockClaudeSettingsStore,
     mockVmManager,
+    mockSshKeyManager,
+    mockDeployKeyStore,
     MockConfigManager,
     MockProjectStore,
     MockImportExportService,
@@ -344,6 +362,8 @@ const {
     MockLoopScriptsStore,
     MockClaudeSettingsStore,
     MockVMManager,
+    MockSSHKeyManager,
+    MockDeployKeyStore,
   };
 });
 
@@ -421,6 +441,14 @@ vi.mock('../../src/services/claude-settings-store', () => ({
 
 vi.mock('../../src/services/vm-manager', () => ({
   VMManager: MockVMManager,
+}));
+
+vi.mock('../../src/services/ssh-key-manager', () => ({
+  SSHKeyManager: MockSSHKeyManager,
+}));
+
+vi.mock('../../src/services/deploy-key-store', () => ({
+  DeployKeyStore: MockDeployKeyStore,
 }));
 
 // ── Mock logging ─────────────────────────────────────────────────────────────
@@ -630,7 +658,7 @@ describe('Main Entry Point', () => {
   });
 
   describe('IPC Handler Registration', () => {
-    it('should register data handlers with ConfigManager, ProjectStore, ImportExport, PreValidationStore, HooksStore, LoopRunner, DockerManager, and CredentialManager', () => {
+    it('should register data handlers with ConfigManager, ProjectStore, ImportExport, PreValidationStore, HooksStore, LoopRunner, DockerManager, CredentialManager, SSHKeyManager, and DeployKeyStore', () => {
       expect(mockRegisterDataHandlers).toHaveBeenCalledWith({
         configManager: mockConfigManager,
         projectStore: mockProjectStore,
@@ -642,6 +670,8 @@ describe('Main Entry Point', () => {
         loopRunner: mockLoopRunner,
         dockerManager: mockDockerManager,
         credentialManager: mockCredentialManager,
+        sshKeyManager: mockSshKeyManager,
+        deployKeyStore: mockDeployKeyStore,
       });
     });
 

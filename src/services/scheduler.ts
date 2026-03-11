@@ -13,7 +13,7 @@ import { LoopMode } from '../shared/loop-types';
  * Parsed schedule configuration.
  */
 export interface ScheduleConfig {
-  /** Interval in milliseconds, or null for daily fixed-time schedules */
+  /** Interval in milliseconds, or null for daily/one-time schedules */
   intervalMs: number | null;
 
   /** For daily schedules: hour (0-23) */
@@ -21,6 +21,9 @@ export interface ScheduleConfig {
 
   /** For daily schedules: minute (0-59) */
   dailyMinute?: number;
+
+  /** For one-time schedules: ISO 8601 datetime to run at */
+  runAt?: string;
 
   /** Original expression string */
   expression: string;
@@ -70,6 +73,7 @@ export class LoopScheduler {
    * - Minute intervals: every N minutes
    * - Hour intervals: every N hours
    * - Daily schedules: daily at fixed time HH:MM
+   * - One-time schedules: once <ISO 8601 datetime>
    *
    * @param expr - Schedule expression string
    * @returns Parsed schedule configuration
@@ -125,9 +129,26 @@ export class LoopScheduler {
       };
     }
 
+    // Pattern 4: "once <ISO 8601 datetime>"
+    const onceMatch = trimmed.match(/^once\s+(.+)$/);
+    if (onceMatch) {
+      const runAt = new Date(onceMatch[1].trim());
+      if (isNaN(runAt.getTime())) {
+        throw new Error(`Invalid datetime in "once" expression: "${onceMatch[1].trim()}"`);
+      }
+      if (runAt.getTime() <= Date.now()) {
+        throw new Error('Scheduled datetime must be in the future');
+      }
+      return {
+        intervalMs: null,
+        runAt: runAt.toISOString(),
+        expression: expr,
+      };
+    }
+
     throw new Error(
       `Invalid schedule expression: "${expr}". ` +
-        'Expected formats: "*/N minutes", "every N hours", or "daily HH:MM"'
+        'Expected formats: "*/N minutes", "every N hours", "daily HH:MM", or "once <ISO datetime>"'
     );
   }
 
@@ -159,7 +180,15 @@ export class LoopScheduler {
       nextRun: null,
     };
 
-    if (config.intervalMs !== null) {
+    if (config.runAt) {
+      // One-time schedule: fire once at the specified datetime, then self-cancel
+      const msUntilRun = new Date(config.runAt).getTime() - Date.now();
+      scheduled.nextRun = config.runAt;
+      scheduled.timerId = setTimeout(async () => {
+        await this.triggerLoop(projectId);
+        this.cancelSchedule(projectId);
+      }, msUntilRun);
+    } else if (config.intervalMs !== null) {
       // Interval-based schedule (minutes or hours)
       scheduled.nextRun = new Date(Date.now() + config.intervalMs).toISOString();
       scheduled.timerId = setInterval(() => {

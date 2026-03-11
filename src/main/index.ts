@@ -94,7 +94,7 @@ const deployKeyStore = new DeployKeyStore(path.join(os.homedir(), '.zephyr'));
 const sshKeyManager = new SSHKeyManager(dockerManager);
 
 // Register all IPC handlers before the window is created.
-registerDataHandlers({ configManager, projectStore, importExport, preValidationStore, hooksStore, loopScriptsStore, claudeSettingsStore, loopRunner, dockerManager, credentialManager });
+registerDataHandlers({ configManager, projectStore, importExport, preValidationStore, hooksStore, loopScriptsStore, claudeSettingsStore, loopRunner, dockerManager, credentialManager, sshKeyManager, deployKeyStore });
 registerDockerHandlers({ dockerManager, dockerHealth });
 registerCredentialHandlers({ credentialManager, loginManager });
 registerLoopHandlers({
@@ -110,6 +110,7 @@ registerLoopHandlers({
   credentialManager,
   sshKeyManager,
   deployKeyStore,
+  loopScriptsStore,
 });
 registerLogHandlers({ logExporter, loopRunner });
 registerTerminalHandlers({ terminalManager, vmManager });

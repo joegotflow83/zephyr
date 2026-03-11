@@ -21,6 +21,7 @@ import type { AuthInjector } from '../../services/auth-injector';
 import type { CredentialManager } from '../../services/credential-manager';
 import type { SSHKeyManager } from '../../services/ssh-key-manager';
 import type { DeployKeyStore } from '../../services/deploy-key-store';
+import type { LoopScriptsStore } from '../../services/loop-scripts-store';
 import { getLogger } from '../../services/logging';
 
 export interface LoopServices {
@@ -36,6 +37,7 @@ export interface LoopServices {
   credentialManager?: CredentialManager;
   sshKeyManager?: SSHKeyManager;
   deployKeyStore?: DeployKeyStore;
+  loopScriptsStore?: LoopScriptsStore;
 }
 
 export function registerLoopHandlers(services: LoopServices): void {
@@ -52,6 +54,7 @@ export function registerLoopHandlers(services: LoopServices): void {
     credentialManager,
     sshKeyManager,
     deployKeyStore,
+    loopScriptsStore,
   } = services;
 
   const logger = getLogger('loop');
@@ -89,6 +92,22 @@ export function registerLoopHandlers(services: LoopServices): void {
         }
       }
 
+      // Write the loop script to the project's local_path root so it appears
+      // at /workspace/<script> in the container via volume mount, executable.
+      if (project && project.local_path && project.loop_script && loopScriptsStore) {
+        try {
+          const content = await loopScriptsStore.getScript(project.loop_script);
+          if (content) {
+            const dest = path.join(project.local_path, project.loop_script);
+            await fs.writeFile(dest, content, { mode: 0o755 });
+          } else {
+            logger.warn(`Loop script "${project.loop_script}" not found in store`);
+          }
+        } catch (err) {
+          logger.warn(`Failed to write loop script ${project.loop_script} to local_path`, { err });
+        }
+      }
+
       // Inject auth credentials into container opts before starting
       let authMethod = 'unknown';
       if (authInjector) {
@@ -118,8 +137,11 @@ export function registerLoopHandlers(services: LoopServices): void {
         const hasHooks = project.hooks.length > 0 && !!hooksStore;
         const hasPrompts = Object.keys(project.custom_prompts).length > 0;
         const hasClaudeSettings = !!project.claude_settings_file && !!claudeSettingsStore;
+        // browser_session credentials must be pre-mounted for VM/SINGLE runs because
+        // docker exec injection would race against (or miss) the agent startup.
+        const hasBrowserSession = authMethod === 'browser_session';
 
-        if (hasHooks || hasClaudeSettings) {
+        if (hasHooks || hasClaudeSettings || hasBrowserSession) {
           const claudeDir = path.join(os.tmpdir(), `zephyr-claude-${opts.projectId}`);
           try {
             await fs.mkdir(path.join(claudeDir, 'hooks'), { recursive: true });
@@ -146,6 +168,21 @@ export function registerLoopHandlers(services: LoopServices): void {
                 }
               } catch (err) {
                 logger.warn(`Failed to write claude settings.json for .claude mount`, { err });
+              }
+            }
+
+            // Pre-write OAuth credentials to .credentials.json so they are available
+            // before the agent CMD starts (exec injection happens too late for SINGLE/VM).
+            if (hasBrowserSession && credentialManager) {
+              try {
+                const sessionJson = await credentialManager.getApiKey('anthropic_session');
+                if (sessionJson) {
+                  await fs.writeFile(path.join(claudeDir, '.credentials.json'), sessionJson, 'utf8');
+                } else {
+                  logger.warn('browser_session auth: no session data stored; container may lack credentials');
+                }
+              } catch (err) {
+                logger.warn('Failed to write browser session credentials for .claude mount', { err });
               }
             }
 
@@ -284,7 +321,8 @@ export function registerLoopHandlers(services: LoopServices): void {
         }
       }
 
-      // For browser_session auth: exec-write captured claude.ai cookies to ~/.claude.json
+      // For browser_session auth: exec-write OAuth credentials to ~/.claude/.credentials.json
+      // This is the file the Claude Code CLI reads for browser-based auth (not ~/.claude.json).
       if (authMethod === 'browser_session' && state.containerId && credentialManager && dockerManager) {
         try {
           const sessionJson = await credentialManager.getApiKey('anthropic_session');
@@ -292,9 +330,9 @@ export function registerLoopHandlers(services: LoopServices): void {
             const encoded = Buffer.from(sessionJson).toString('base64');
             await dockerManager.execCommand(state.containerId, [
               'sh', '-c',
-              `mkdir -p ~/.claude && printf '%s' '${encoded}' | base64 -d > ~/.claude.json`,
+              `mkdir -p ~/.claude && printf '%s' '${encoded}' | base64 -d > ~/.claude/.credentials.json`,
             ]);
-            logger.info('Wrote browser session credentials to ~/.claude.json in container');
+            logger.info('Wrote browser session credentials to ~/.claude/.credentials.json in container');
           } else {
             logger.warn('browser_session auth mode but no session data stored; container may lack credentials');
           }
@@ -393,9 +431,12 @@ export function registerLoopHandlers(services: LoopServices): void {
       ) {
         try {
           const pat = await credentialManager.getGithubPat(opts.projectId);
-          if (pat) {
+          if (!pat) {
+            logger.warn('No GitHub PAT stored for this project — SSH deploy key setup skipped. Add a PAT in the project settings to enable git push over SSH.', { projectId: opts.projectId });
+          } else {
             const { privateKey, publicKey } = sshKeyManager.generateKeyPair();
             const keyTitle = `zephyr-${opts.projectId.slice(0, 8)}-${Date.now()}`;
+            logger.info('Registering GitHub deploy key', { projectId: opts.projectId, repoUrl: project.repo_url });
             const keyId = await sshKeyManager.addDeployKey(pat, project.repo_url, publicKey, keyTitle);
 
             // Record in store before injection so a mid-injection crash leaves a traceable entry
@@ -417,7 +458,7 @@ export function registerLoopHandlers(services: LoopServices): void {
             logger.info('SSH deploy key injected into container', { projectId: opts.projectId, keyId });
           }
         } catch (err) {
-          logger.warn('Failed to set up SSH deploy key; loop continues without GitHub SSH access', { err });
+          logger.warn('Failed to set up GitHub SSH deploy key; loop continues without SSH access', { projectId: opts.projectId, err });
         }
       }
 
@@ -433,9 +474,12 @@ export function registerLoopHandlers(services: LoopServices): void {
       ) {
         try {
           const pat = await credentialManager.getGitlabPat(opts.projectId);
-          if (pat) {
+          if (!pat) {
+            logger.warn('No GitLab PAT stored for this project — SSH deploy key setup skipped. Add a PAT in the project settings to enable git push over SSH.', { projectId: opts.projectId });
+          } else {
             const { privateKey, publicKey } = sshKeyManager.generateKeyPair();
             const keyTitle = `zephyr-${opts.projectId.slice(0, 8)}-${Date.now()}`;
+            logger.info('Registering GitLab deploy key', { projectId: opts.projectId, repoUrl: project.repo_url });
             const keyId = await sshKeyManager.addGitlabDeployKey(pat, project.repo_url, publicKey, keyTitle);
 
             // Record in store before injection so a mid-injection crash leaves a traceable entry
@@ -457,7 +501,7 @@ export function registerLoopHandlers(services: LoopServices): void {
             logger.info('GitLab SSH deploy key injected into container', { projectId: opts.projectId, keyId });
           }
         } catch (err) {
-          logger.warn('Failed to set up SSH deploy key; loop continues without GitLab SSH access', { err });
+          logger.warn('Failed to set up GitLab SSH deploy key; loop continues without SSH access', { projectId: opts.projectId, err });
         }
       }
 
@@ -545,6 +589,17 @@ export function registerLoopHandlers(services: LoopServices): void {
       'team/handovers/security_to_qa.md': '# Security to QA Handover\n\nDocument security findings and items cleared for QA testing.\n',
       'team/handovers/qa_feedback.md': '# QA Feedback\n\nDocument test results, bugs found, and items that need rework.\n',
       'team/handovers/status.log': '',
+      'team/complete.flag': '',
+      '.gitignore': [
+        'team/handovers/',
+        'team/complete.flag',
+        'team/status.log',
+        '@human_clarifications.md',
+        '.*_checked_*',
+        '.last_*',
+        'tasks/pending/*',
+        'team/human_*.md',
+      ].join('\n') + '\n',
     };
 
     for (const [filePath, defaultContent] of Object.entries(files)) {
@@ -582,14 +637,29 @@ export function registerLoopHandlers(services: LoopServices): void {
       }
 
       // Start one loop per configured role.
-      // Each role gets its own prompt if one exists with the naming convention PROMPT_<role>.md
+      // Each role gets its own prompt if one exists with the naming convention PROMPT_<role>.md.
+      // In SINGLE mode, build a per-role CMD that runs the agent against the role's prompt file
+      // with a MAX_ITERATIONS cap passed via --max-turns.
+      const isSingleFactory = baseOpts.mode === LoopMode.SINGLE;
+      const maxIterations = baseOpts.envVars?.MAX_ITERATIONS ?? '10';
+      const loopScript = project.loop_script;
+
       const results: LoopState[] = [];
       for (const role of factoryConfig.roles) {
+        let roleCmd: string[] | undefined;
+        if (isSingleFactory) {
+          const promptFile = `PROMPT_${role}.md`;
+          roleCmd = loopScript
+            ? ['bash', '-c', `./${loopScript} ${promptFile} ${maxIterations}`]
+            : ['bash', '-c', `claude --max-turns ${maxIterations} --print "$(cat /workspace/${promptFile})"`];
+        }
+
         const roleOpts: LoopStartOpts = {
           ...baseOpts,
           projectId,
           projectName: project.name,
           role,
+          ...(roleCmd ? { cmd: roleCmd } : {}),
         };
 
         try {

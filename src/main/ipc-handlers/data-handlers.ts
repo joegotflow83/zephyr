@@ -14,6 +14,8 @@ import type { ClaudeSettingsStore } from '../../services/claude-settings-store';
 import type { LoopRunner } from '../../services/loop-runner';
 import type { DockerManager } from '../../services/docker-manager';
 import type { CredentialManager } from '../../services/credential-manager';
+import type { SSHKeyManager } from '../../services/ssh-key-manager';
+import type { DeployKeyStore } from '../../services/deploy-key-store';
 import type { AppSettings, ProjectConfig } from '../../shared/models';
 import { createDefaultSettings } from '../../shared/models';
 import { setLogLevel, getLogger, type LogLevel } from '../../services/logging';
@@ -40,10 +42,12 @@ export interface DataServices {
   loopRunner: LoopRunner;
   dockerManager: DockerManager;
   credentialManager: CredentialManager;
+  sshKeyManager?: SSHKeyManager;
+  deployKeyStore?: DeployKeyStore;
 }
 
 export function registerDataHandlers(services: DataServices): void {
-  const { configManager, projectStore, importExport, preValidationStore, hooksStore, loopScriptsStore, claudeSettingsStore, loopRunner, dockerManager, credentialManager } =
+  const { configManager, projectStore, importExport, preValidationStore, hooksStore, loopScriptsStore, claudeSettingsStore, loopRunner, dockerManager, credentialManager, sshKeyManager, deployKeyStore } =
     services;
   const logger = getLogger('ipc');
 
@@ -81,6 +85,43 @@ export function registerDataHandlers(services: DataServices): void {
   ipcMain.handle(
     IPC.PROJECTS_REMOVE,
     async (_event, id: string): Promise<boolean> => {
+      const project = projectStore.getProject(id);
+
+      // Remove any registered SSH deploy keys from GitHub/GitLab before deleting the PAT.
+      // This covers both currently-active keys (tracked in deploy-key-store) and orphaned
+      // keys from previous sessions. Must happen before PAT deletion while credentials
+      // are still available. The loop's own onStateChange cleanup may also fire, but
+      // removeDeployKey / removeGitlabDeployKey are idempotent (404 treated as success).
+      if (sshKeyManager && deployKeyStore && project?.repo_url) {
+        const pendingKeys = deployKeyStore.listActiveByProject(id);
+        for (const record of pendingKeys) {
+          try {
+            const service = record.service ?? 'github';
+            const repoUrl = service === 'gitlab'
+              ? `https://gitlab.com/${record.repo}`
+              : `https://github.com/${record.repo}`;
+            const pat = service === 'gitlab'
+              ? await credentialManager.getGitlabPat(id)
+              : await credentialManager.getGithubPat(id);
+            if (pat) {
+              if (service === 'gitlab') {
+                await sshKeyManager.removeGitlabDeployKey(pat, repoUrl, record.key_id);
+              } else {
+                await sshKeyManager.removeDeployKey(pat, repoUrl, record.key_id);
+              }
+              deployKeyStore.markCleaned(record.key_id);
+              logger.info('Removed deploy key during project deletion', { projectId: id, keyId: record.key_id, service });
+            }
+          } catch (err) {
+            logger.warn('Failed to remove deploy key during project deletion (key may need manual cleanup)', {
+              projectId: id,
+              keyId: record.key_id,
+              err,
+            });
+          }
+        }
+      }
+
       // Stop any running loop for this project before removing it
       try {
         const running = loopRunner.listRunning();
@@ -106,11 +147,16 @@ export function registerDataHandlers(services: DataServices): void {
         logger.warn('Failed to list containers for deleted project', { projectId: id, err });
       }
 
-      // Clean up any stored GitHub PAT for this project
+      // Clean up stored credentials for this project
       try {
         await credentialManager.deleteGithubPat(id);
       } catch (err) {
         logger.warn('Failed to delete GitHub PAT for deleted project', { projectId: id, err });
+      }
+      try {
+        await credentialManager.deleteGitlabPat(id);
+      } catch (err) {
+        logger.warn('Failed to delete GitLab PAT for deleted project', { projectId: id, err });
       }
 
       return projectStore.removeProject(id);

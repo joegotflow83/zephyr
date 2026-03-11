@@ -38,10 +38,10 @@ describe('SSHKeyManager.generateKeyPair', () => {
     manager = new SSHKeyManager(docker);
   });
 
-  it('returns a privateKey in PKCS#8 PEM format', () => {
+  it('returns a privateKey in OpenSSH native PEM format', () => {
     const { privateKey } = manager.generateKeyPair();
-    expect(privateKey).toMatch(/^-----BEGIN PRIVATE KEY-----/);
-    expect(privateKey).toMatch(/-----END PRIVATE KEY-----/);
+    expect(privateKey).toMatch(/^-----BEGIN OPENSSH PRIVATE KEY-----/);
+    expect(privateKey).toMatch(/-----END OPENSSH PRIVATE KEY-----/);
   });
 
   it('returns a publicKey in ssh-ed25519 authorized_keys format', () => {
@@ -167,10 +167,10 @@ describe('SSHKeyManager.injectIntoContainer', () => {
     manager = new SSHKeyManager(mock.manager);
   });
 
-  it('calls execCommand exactly 4 times (mkdir, key, known_hosts, config)', async () => {
+  it('calls execCommand exactly 5 times (mkdir, key, ssh-keyscan, chmod, config)', async () => {
     const { privateKey } = manager.generateKeyPair();
     await manager.injectIntoContainer('container-abc', privateKey);
-    expect(execCommand).toHaveBeenCalledTimes(4);
+    expect(execCommand).toHaveBeenCalledTimes(5);
   });
 
   it('first call creates ~/.ssh with chmod 700', async () => {
@@ -196,11 +196,11 @@ describe('SSHKeyManager.injectIntoContainer', () => {
     expect(thirdCall[2]).toContain('~/.ssh/known_hosts');
   });
 
-  it('fourth call writes ~/.ssh/config', async () => {
+  it('fifth call writes ~/.ssh/config', async () => {
     const { privateKey } = manager.generateKeyPair();
     await manager.injectIntoContainer('container-abc', privateKey);
-    const fourthCall = execCommand.mock.calls[3][1] as string[];
-    expect(fourthCall[2]).toContain('~/.ssh/config');
+    const fifthCall = execCommand.mock.calls[4][1] as string[];
+    expect(fifthCall[2]).toContain('~/.ssh/config');
   });
 
   it('passes the correct containerId to all exec calls', async () => {
@@ -229,11 +229,12 @@ describe('SSHKeyManager.injectIntoContainer', () => {
     );
   });
 
-  it('throws if writing known_hosts fails', async () => {
+  it('throws if writing known_hosts fails (keyscan fails and fallback also fails)', async () => {
     execCommand
       .mockResolvedValueOnce({ exitCode: 0, stdout: '', stderr: '' }) // mkdir
       .mockResolvedValueOnce({ exitCode: 0, stdout: '', stderr: '' }) // key write
-      .mockResolvedValueOnce({ exitCode: 1, stdout: '', stderr: 'err' }); // known_hosts fails
+      .mockResolvedValueOnce({ exitCode: 1, stdout: '', stderr: '' }) // ssh-keyscan fails → triggers fallback
+      .mockResolvedValueOnce({ exitCode: 1, stdout: '', stderr: 'err' }); // fallback write fails
     const { privateKey } = manager.generateKeyPair();
     await expect(manager.injectIntoContainer('c1', privateKey)).rejects.toThrow(
       'Failed to write SSH known_hosts to container'
@@ -244,7 +245,8 @@ describe('SSHKeyManager.injectIntoContainer', () => {
     execCommand
       .mockResolvedValueOnce({ exitCode: 0, stdout: '', stderr: '' }) // mkdir
       .mockResolvedValueOnce({ exitCode: 0, stdout: '', stderr: '' }) // key
-      .mockResolvedValueOnce({ exitCode: 0, stdout: '', stderr: '' }) // known_hosts
+      .mockResolvedValueOnce({ exitCode: 0, stdout: '', stderr: '' }) // ssh-keyscan succeeds
+      .mockResolvedValueOnce({ exitCode: 0, stdout: '', stderr: '' }) // chmod known_hosts
       .mockResolvedValueOnce({ exitCode: 1, stdout: '', stderr: 'err' }); // config fails
     const { privateKey } = manager.generateKeyPair();
     await expect(manager.injectIntoContainer('c1', privateKey)).rejects.toThrow(

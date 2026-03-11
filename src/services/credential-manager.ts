@@ -16,7 +16,7 @@ import { safeStorage } from 'electron';
 import fs from 'fs';
 import path from 'path';
 
-export type CredentialService = 'anthropic' | 'github' | 'gitlab' | 'anthropic_bedrock' | 'anthropic_session';
+export type CredentialService = 'anthropic' | 'github' | 'gitlab' | 'anthropic_bedrock' | 'anthropic_session' | 'aws_q_developer' | 'aws_kiro';
 
 interface CredentialStorage {
   [service: string]: string; // encrypted base64

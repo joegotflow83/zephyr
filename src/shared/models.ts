@@ -48,8 +48,8 @@ export const AVAILABLE_LANGUAGES: LanguageOption[] = [
   {
     id: 'go',
     name: 'Go',
-    versions: ['1.23', '1.22', '1.21'],
-    defaultVersion: '1.23',
+    versions: ['1.23.0', '1.22.0', '1.21.0'],
+    defaultVersion: '1.23.0',
   },
 ];
 

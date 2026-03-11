@@ -7,8 +7,10 @@ export interface RunModeSelection {
   cmd?: string[];
   /** When true, start as a factory (multiple role containers) */
   factory?: boolean;
-  /** Schedule expression for SCHEDULED mode (e.g. "every 30 minutes", "every 2 hours", "daily 09:00") */
+  /** Schedule expression for SCHEDULED mode (e.g. "every 30 minutes", "every 2 hours", "daily 09:00", "once <ISO>") */
   scheduleExpression?: string;
+  /** Max iterations for factory single-run mode */
+  maxIterations?: number;
 }
 
 const SCHEDULE_PRESETS = [
@@ -51,9 +53,16 @@ export const RunModeDialog: React.FC<RunModeDialogProps> = ({
   onCancel,
 }) => {
   const [selected, setSelected] = useState<string>(factoryEnabled ? 'factory' : 'continuous');
+  const [maxIterations, setMaxIterations] = useState<number>(10);
   const [schedulePreset, setSchedulePreset] = useState<string>('*/30 minutes');
   const [dailyTime, setDailyTime] = useState<string>('09:00');
   const [customSchedule, setCustomSchedule] = useState<string>('');
+  const [runOnceAt, setRunOnceAt] = useState<string>(() => {
+    // Default to 1 hour from now in local time, formatted for datetime-local input
+    const d = new Date(Date.now() + 60 * 60 * 1000);
+    const pad = (n: number) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  });
 
   const getScheduleExpression = (): string => {
     if (schedulePreset === 'daily') return `daily ${dailyTime}`;
@@ -63,13 +72,16 @@ export const RunModeDialog: React.FC<RunModeDialogProps> = ({
 
   const buildSelection = (): RunModeSelection => {
     if (selected === 'factory') {
-      return { mode: LoopMode.CONTINUOUS, factory: true };
+      return { mode: LoopMode.SINGLE, factory: true, maxIterations };
     }
     if (selected === 'continuous') {
       return { mode: LoopMode.CONTINUOUS };
     }
     if (selected === 'scheduled') {
       return { mode: LoopMode.SCHEDULED, scheduleExpression: getScheduleExpression() };
+    }
+    if (selected === 'run-once') {
+      return { mode: LoopMode.SCHEDULED, scheduleExpression: `once ${new Date(runOnceAt).toISOString()}` };
     }
     // selected is a prompt filename
     const cmd = [
@@ -120,13 +132,28 @@ export const RunModeDialog: React.FC<RunModeDialogProps> = ({
                 onChange={() => setSelected('factory')}
                 className="mt-0.5 accent-blue-600"
               />
-              <div>
+              <div className="flex-1 min-w-0">
                 <div className="text-sm font-medium text-gray-900 dark:text-white">
                   Coding Factory
                 </div>
                 <div className="text-xs text-gray-500 dark:text-gray-400">
-                  Start all configured roles in parallel
+                  Run all configured roles in parallel as a single task
                 </div>
+                {selected === 'factory' && (
+                  <div className="mt-2 flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                    <label className="text-xs text-gray-600 dark:text-gray-300 whitespace-nowrap">
+                      Max iterations
+                    </label>
+                    <input
+                      type="number"
+                      min={1}
+                      max={200}
+                      value={maxIterations}
+                      onChange={(e) => setMaxIterations(Math.max(1, parseInt(e.target.value) || 1))}
+                      className="w-20 text-xs rounded border border-gray-300 dark:border-gray-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    />
+                  </div>
+                )}
               </div>
             </label>
           )}
@@ -201,6 +228,41 @@ export const RunModeDialog: React.FC<RunModeDialogProps> = ({
             </div>
           </label>
 
+          {/* Run once at a specific datetime */}
+          <label className="flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 has-[:checked]:border-blue-500 has-[:checked]:bg-blue-50 dark:has-[:checked]:bg-blue-900/20">
+            <input
+              type="radio"
+              name="run-mode"
+              value="run-once"
+              checked={selected === 'run-once'}
+              onChange={() => setSelected('run-once')}
+              className="mt-0.5 accent-blue-600"
+            />
+            <div className="flex-1 min-w-0">
+              <div className="text-sm font-medium text-gray-900 dark:text-white">
+                Run once at...
+              </div>
+              <div className="text-xs text-gray-500 dark:text-gray-400">
+                Schedule a single run at a specific date and time
+              </div>
+              {selected === 'run-once' && (
+                <div className="mt-2" onClick={(e) => e.stopPropagation()}>
+                  <input
+                    type="datetime-local"
+                    value={runOnceAt}
+                    min={(() => {
+                      const now = new Date(Date.now() + 60 * 1000);
+                      const pad = (n: number) => String(n).padStart(2, '0');
+                      return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}`;
+                    })()}
+                    onChange={(e) => setRunOnceAt(e.target.value)}
+                    className="w-full text-xs rounded border border-gray-300 dark:border-gray-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  />
+                </div>
+              )}
+            </div>
+          </label>
+
           {/* Single-run option per prompt file */}
           {promptFiles.map((filename) => (
             <label
@@ -243,9 +305,10 @@ export const RunModeDialog: React.FC<RunModeDialogProps> = ({
           </button>
           <button
             onClick={handleConfirm}
-            className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
+            disabled={selected === 'run-once' && (!runOnceAt || new Date(runOnceAt).getTime() <= Date.now())}
+            className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            Run
+            {selected === 'run-once' ? 'Schedule' : 'Run'}
           </button>
         </div>
       </div>

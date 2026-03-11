@@ -870,7 +870,10 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({ mode, project, onS
                         autoComplete="off"
                       />
                       <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                        Fine-grained PAT with read/write access to repository deploy keys. Scoped to this repo only.{' '}
+                        Fine-grained PAT scoped to this repo with:{' '}
+                        <strong className="text-gray-700 dark:text-gray-300">Administration</strong> (read/write) for deploy keys,{' '}
+                        <strong className="text-gray-700 dark:text-gray-300">Contents</strong> (read/write) to push commits,{' '}
+                        <strong className="text-gray-700 dark:text-gray-300">Actions</strong> (read) to check workflow runs.{' '}
                         <a
                           href="https://github.com/settings/personal-access-tokens/new"
                           target="_blank"

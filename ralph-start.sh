@@ -1,4 +1,4 @@
-docker run -d \
+podman run -d \
   --name "ralph-zephyr" \
   -v "./":/home/ralph/workspace \
   ralph

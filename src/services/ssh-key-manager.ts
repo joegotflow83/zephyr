@@ -17,6 +17,72 @@
 import crypto from 'crypto';
 import https from 'https';
 
+/**
+ * Build an OpenSSH private key file (-----BEGIN OPENSSH PRIVATE KEY-----) from
+ * raw ED25519 key material. Node.js exports ED25519 private keys in PKCS#8 format
+ * which older OpenSSH clients reject with "invalid format". OpenSSH native format
+ * is universally supported across all versions.
+ *
+ * Format spec: https://github.com/openssh/openssh-portable/blob/master/PROTOCOL.key
+ *
+ * @param privateScalar - 32-byte raw ED25519 private scalar (seed)
+ * @param publicKey     - 32-byte raw ED25519 public key
+ */
+function buildOpenSSHPrivateKey(privateScalar: Buffer, publicKey: Buffer): string {
+  const u32 = (n: number): Buffer => {
+    const b = Buffer.allocUnsafe(4);
+    b.writeUInt32BE(n);
+    return b;
+  };
+  const str = (s: string): Buffer => Buffer.from(s, 'utf8');
+
+  const keyType = str('ssh-ed25519');
+  const comment = str('zephyr-deploy-key');
+  // Two identical random uint32s used by OpenSSH to detect decryption errors
+  const checkInt = crypto.randomBytes(4);
+
+  // Public key blob: [type_len][type][key_len][key]
+  const pubKeyBlob = Buffer.concat([
+    u32(keyType.length), keyType,
+    u32(publicKey.length), publicKey,
+  ]);
+
+  // OpenSSH ED25519 private key data is seed (32 bytes) || public key (32 bytes) = 64 bytes
+  const privKeyData = Buffer.concat([privateScalar, publicKey]);
+
+  // Private section before padding
+  const privateSection = Buffer.concat([
+    checkInt, checkInt,                      // decryption check
+    u32(keyType.length), keyType,            // key type
+    u32(publicKey.length), publicKey,        // public key
+    u32(privKeyData.length), privKeyData,    // private key (seed + pub)
+    u32(comment.length), comment,            // comment
+  ]);
+
+  // Pad to multiple of 8 bytes (block size for unencrypted "none" cipher)
+  const padLen = (8 - (privateSection.length % 8)) % 8;
+  const padding = Buffer.from(Array.from({ length: padLen }, (_, i) => (i + 1) & 0xff));
+  const privateSectionPadded = Buffer.concat([privateSection, padding]);
+
+  // Full key structure
+  const magic = Buffer.concat([str('openssh-key-v1'), Buffer.from([0x00])]);
+  const none = str('none');
+  const fullKey = Buffer.concat([
+    magic,
+    u32(none.length), none,                            // cipher: none
+    u32(none.length), none,                            // kdf: none
+    u32(0),                                            // kdf options: empty
+    u32(1),                                            // number of keys
+    u32(pubKeyBlob.length), pubKeyBlob,                // public key
+    u32(privateSectionPadded.length), privateSectionPadded, // private section
+  ]);
+
+  // Wrap in PEM with standard 70-character line width
+  const b64 = fullKey.toString('base64');
+  const lines = (b64.match(/.{1,70}/g) ?? []).join('\n');
+  return `-----BEGIN OPENSSH PRIVATE KEY-----\n${lines}\n-----END OPENSSH PRIVATE KEY-----\n`;
+}
+
 /** DockerManager interface required by SSHKeyManager (narrow pick for testability). */
 export interface Execable {
   execCommand(
@@ -39,19 +105,26 @@ export interface GitlabRepo {
 }
 
 /**
- * GitHub's hardcoded ED25519 host fingerprint.
- * Pinning this prevents MITM on the very first `git push` inside the container.
- * Source: https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/githubs-ssh-key-fingerprints
+ * GitHub's hardcoded host fingerprints (all key types) used as a fallback when
+ * ssh-keyscan is unavailable. Including RSA, ECDSA, and ED25519 ensures the
+ * SSH client can verify the host regardless of which key type it negotiates.
+ * Sources: https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/githubs-ssh-key-fingerprints
  */
-const GITHUB_KNOWN_HOST =
-  'github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl';
+const GITHUB_KNOWN_HOSTS = [
+  'github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl',
+  'github.com ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBEmKSENjQEezOmxkZMy7opKgwFB9nkt5YRrYMjNuG5N87uRgg6CLrbo5wAdT/y6v0mKV0U2w0WZ2YB/++Tpockg=',
+  'github.com ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCj7ndNxQowgcQnjshcLrqPEiiphnt+VTTvDP6mHBL9j1aNUkY4Ue1gvwnGLVlOhGeYrnZaMgRK6+PKCUXaDbC7qtbW8gIkhL7aGCsOr/C56SJMy/BCZfxd1nWzAOxSDPgVsmerOBYfNqltV9/hWCqBywINIR+5dIg6JTJ72pcEpEjcYgXkE2YEFBK8NOQBI+3i29sfeQH7Nd2HEXSTGxaVAiZ1Fx+Xk0ZQVZ3gJ+T6C2I3Z5E9ZQ3qnQ9W+9Y5r+DK6C0u+C6JB5oQJdx7Qe1DcO0xDOVYcpT3v/L3T7vVHU0H6d9W6B5XxdGOgIQ8y5M8e7PdS2D+oT6c8YC6R5/Z0bXA/H6YJb/VQy/S1Q1R5YFyOt9YkdS3d1AvdZWO6HzMcGcj+T7bGVFNcTq+Qv7w2o7v+OJqfZkrW6G8aXgT/f6oQqH8wF2E9bv8XF5qY/A8kU+UB8+mPXnGNwmAU9OxWO/C+vJFYzfRzYMzD6T+gPbVkLkh7ZRQXq5Ix3QGn5kMV+T3GXXlY0T9QJR2Fuz78v7jXCn7lY7pXgO2OjJ5bh7Y9O+pf3+/XH8==',
+].join('\n');
 
 /**
- * GitLab's hardcoded ED25519 host fingerprint.
+ * GitLab's hardcoded host fingerprints (all key types) used as a fallback.
  * Source: https://docs.gitlab.com/ee/user/gitlab_com/index.html#ssh-known_hosts-entries
  */
-const GITLAB_KNOWN_HOST =
-  'gitlab.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAfuCHKVTjquxvt6CM6tdG4SLp1Btn/nOeHHE5UOzRdf';
+const GITLAB_KNOWN_HOSTS = [
+  'gitlab.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAfuCHKVTjquxvt6CM6tdG4SLp1Btn/nOeHHE5UOzRdf',
+  'gitlab.com ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBFSMqzJeV9rUzU4kWitGjeR4PWSa29SPqJ1fVkhtj3Hw9xjLVXVYrU9QlYWrOLXBpQ6KWjbjTDTdDkoohFzgbEY=',
+  'gitlab.com ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCsj2bNKTBSpIYDEGk9KxsGh3mySTRgMtXL583qmBpzeQ+jqCMRgBqB98u3z++J1sKlXHWfM9dyhSevkMwSbhoR8XIq/U0tCNyokEi/ueaBMCvbcTHhO7FcwzY92WK4Yt0aGROY5qX2UqMotz/N9gcCbst48jrnUrY3jyioLTivKe1yk3RPkFhjSIKFZpQXX2pkJFbHbFyoE2JKqAGTT8+sqPLaXXEjRRRlqNfaACTTxDVJwc9ek+ihe53Xb4A8VBVbPGFNOWBMF8c6gC1E1QKGE6XFkVxbmNkBnkFtRMF3MZr8yHCVANGbX4oOQGr5iQQ3KCxc/5/1T5XjkrE6kJVH',
+].join('\n');
 
 /**
  * SSH config written to ~/.ssh/config inside the container.
@@ -86,29 +159,30 @@ export class SSHKeyManager {
   generateKeyPair(): { privateKey: string; publicKey: string } {
     const keyPair = crypto.generateKeyPairSync('ed25519');
 
-    const privateKey = keyPair.privateKey.export({
-      type: 'pkcs8',
-      format: 'pem',
-    }) as string;
-
-    // Extract the raw 32-byte public key from the SPKI DER encoding.
+    // Extract raw 32-byte public key from SPKI DER.
     // ED25519 SPKI DER is always: 30 2a 30 05 06 03 2b 65 70 03 21 00 <32 bytes>
     // The last 32 bytes are invariably the raw key material.
-    const spkiDer = keyPair.publicKey.export({
-      type: 'spki',
-      format: 'der',
-    }) as Buffer;
+    const spkiDer = keyPair.publicKey.export({ type: 'spki', format: 'der' }) as Buffer;
+    const rawPubKey = spkiDer.slice(-32);
 
-    const rawKey = spkiDer.slice(-32);
+    // Extract raw 32-byte private scalar from PKCS#8 DER.
+    // ED25519 PKCS#8 DER structure is fixed-length: the seed starts at byte 16.
+    // Layout: 30 2e 02 01 00 30 05 06 03 2b 65 70 04 22 04 20 <32 bytes seed>
+    const pkcs8Der = keyPair.privateKey.export({ type: 'pkcs8', format: 'der' }) as Buffer;
+    const privateScalar = pkcs8Der.slice(16, 48);
+
+    // Build the private key in OpenSSH native format (-----BEGIN OPENSSH PRIVATE KEY-----)
+    // rather than PKCS#8 (-----BEGIN PRIVATE KEY-----). OpenSSH native format is
+    // universally supported; PKCS#8 causes "invalid format" errors in some container images.
+    const privateKey = buildOpenSSHPrivateKey(privateScalar, rawPubKey);
 
     // SSH public key wire format: [uint32 type-len][type][uint32 key-len][key-bytes]
     const typeBuf = Buffer.from('ssh-ed25519');
     const typeLen = Buffer.allocUnsafe(4);
     typeLen.writeUInt32BE(typeBuf.length);
     const keyLen = Buffer.allocUnsafe(4);
-    keyLen.writeUInt32BE(rawKey.length);
-
-    const blob = Buffer.concat([typeLen, typeBuf, keyLen, rawKey]);
+    keyLen.writeUInt32BE(rawPubKey.length);
+    const blob = Buffer.concat([typeLen, typeBuf, keyLen, rawPubKey]);
     const publicKey = `ssh-ed25519 ${blob.toString('base64')} zephyr-deploy-key`;
 
     return { privateKey, publicKey };
@@ -334,6 +408,12 @@ export class SSHKeyManager {
 
   /**
    * Shared implementation for injecting an SSH key into a container for a given host.
+   *
+   * Uses ssh-keyscan to populate known_hosts with all current host key types
+   * (RSA, ECDSA, ED25519) from the live server. This avoids "Host key verification
+   * failed" errors that occur when the SSH client negotiates a key type that isn't
+   * present in a hardcoded known_hosts. Falls back to hardcoded fingerprints if
+   * ssh-keyscan is unavailable or fails.
    */
   private async injectIntoContainerForHost(
     containerId: string,
@@ -343,7 +423,8 @@ export class SSHKeyManager {
     const exec = (cmd: string) =>
       this.dockerManager.execCommand(containerId, ['sh', '-c', cmd]);
 
-    const knownHost = provider === 'github' ? GITHUB_KNOWN_HOST : GITLAB_KNOWN_HOST;
+    const hostname = provider === 'github' ? 'github.com' : 'gitlab.com';
+    const fallbackKnownHosts = provider === 'github' ? GITHUB_KNOWN_HOSTS : GITLAB_KNOWN_HOSTS;
     const sshConfig = provider === 'github' ? SSH_CONFIG : GITLAB_SSH_CONFIG;
 
     // Create SSH directory with restrictive permissions
@@ -361,13 +442,24 @@ export class SSHKeyManager {
       throw new Error(`Failed to write SSH private key to container: ${writeKeyResult.stderr}`);
     }
 
-    // Write hardcoded known_hosts fingerprint to prevent MITM on first connection
-    const knownHostsB64 = Buffer.from(knownHost + '\n').toString('base64');
-    const writeKnownHostsResult = await exec(
-      `printf '%s' '${knownHostsB64}' | base64 -d > ~/.ssh/known_hosts && chmod 644 ~/.ssh/known_hosts`
+    // Populate known_hosts using ssh-keyscan so all host key types (RSA, ECDSA, ED25519)
+    // are included. This prevents "Host key verification failed" when the SSH client
+    // negotiates a key type that differs from any single hardcoded entry. Falls back
+    // to hardcoded fingerprints if ssh-keyscan is unavailable.
+    const keyscanResult = await exec(
+      `ssh-keyscan -T 10 ${hostname} > ~/.ssh/known_hosts 2>/dev/null && [ -s ~/.ssh/known_hosts ]`
     );
-    if (writeKnownHostsResult.exitCode !== 0) {
-      throw new Error(`Failed to write SSH known_hosts to container: ${writeKnownHostsResult.stderr}`);
+    if (keyscanResult.exitCode !== 0) {
+      // keyscan failed or returned empty — fall back to hardcoded fingerprints
+      const fallbackB64 = Buffer.from(fallbackKnownHosts + '\n').toString('base64');
+      const writeKnownHostsResult = await exec(
+        `printf '%s' '${fallbackB64}' | base64 -d > ~/.ssh/known_hosts && chmod 644 ~/.ssh/known_hosts`
+      );
+      if (writeKnownHostsResult.exitCode !== 0) {
+        throw new Error(`Failed to write SSH known_hosts to container: ${writeKnownHostsResult.stderr}`);
+      }
+    } else {
+      await exec('chmod 644 ~/.ssh/known_hosts');
     }
 
     // Write SSH config to bind the key to the host
