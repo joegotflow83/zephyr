@@ -3,7 +3,7 @@ import {
   Terminal,
   TerminalHandle,
 } from '../../components/Terminal/Terminal';
-import type { ContainerInfo } from '../../../services/docker-manager';
+import type { ContainerSummary } from '../../../services/container-runtime';
 import type { TerminalSession } from '../../../services/terminal-manager';
 import type { LoopState } from '../../../shared/loop-types';
 import { LoopStatus } from '../../../shared/loop-types';
@@ -34,7 +34,7 @@ interface TerminalTabProps {
 
 export const TerminalTab: React.FC<TerminalTabProps> = ({ isActive }) => {
   const { settings } = useAppStore();
-  const [containers, setContainers] = useState<ContainerInfo[]>([]);
+  const [containers, setContainers] = useState<ContainerSummary[]>([]);
   const [vmLoops, setVmLoops] = useState<LoopState[]>([]);
   // Encoded as "docker:{containerId}" or "vm:{vmName}:{containerName}"
   const [selectedTarget, setSelectedTarget] = useState<string>('');

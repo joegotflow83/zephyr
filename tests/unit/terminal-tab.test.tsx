@@ -5,7 +5,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import React from 'react';
 import { TerminalTab } from '../../src/renderer/pages/TerminalTab/TerminalTab';
-import type { ContainerInfo } from '../../src/services/docker-manager';
+import type { ContainerSummary } from '../../src/services/container-runtime';
 import type { TerminalSession } from '../../src/services/terminal-manager';
 
 // Hoisted state for capturing Terminal component props across the mock boundary.
@@ -68,7 +68,7 @@ const mockOnError = vi.fn((callback) => {
 });
 
 describe('TerminalTab', () => {
-  const mockContainers: ContainerInfo[] = [
+  const mockContainers: ContainerSummary[] = [
     {
       id: 'container1',
       name: 'test-container-1',

@@ -14,16 +14,22 @@ import { LoopScheduler } from '../../src/services/scheduler';
 import { ConfigManager } from '../../src/services/config-manager';
 import { ProjectStore } from '../../src/services/project-store';
 import { LoopMode, LoopStatus, isLoopActive } from '../../src/shared/loop-types';
-import type { DockerManager, ContainerStatus, ContainerInfo } from '../../src/services/docker-manager';
+import type { ContainerRuntime, ContainerStatus, ContainerSummary } from '../../src/services/container-runtime';
 import type { StateChangeCallback, LogLineCallback } from '../../src/services/loop-runner';
 
-// -- Mock DockerManager -------------------------------------------------------
+// -- Mock ContainerRuntime ----------------------------------------------------
 
-function createMockDockerManager(): DockerManager {
+function createMockContainerRuntime(): ContainerRuntime {
   const containerStates = new Map<string, 'running' | 'exited' | 'dead'>();
 
   return {
-    isDockerAvailable: vi.fn().mockResolvedValue(true),
+    runtimeType: 'docker',
+    isAvailable: vi.fn().mockResolvedValue(true),
+    getInfo: vi.fn().mockResolvedValue({ version: '27.0.0', containers: 0, images: 0 }),
+    isImageAvailable: vi.fn().mockResolvedValue(true),
+    pullImage: vi.fn().mockResolvedValue(undefined),
+    saveImage: vi.fn().mockResolvedValue(undefined),
+    buildImage: vi.fn().mockResolvedValue(undefined),
     createContainer: vi.fn(async (opts) => {
       const containerId = `container-${Math.random().toString(36).substring(7)}`;
       containerStates.set(containerId, 'running');
@@ -44,6 +50,11 @@ function createMockDockerManager(): DockerManager {
         status: state === 'running' ? 'Up 1 minute' : 'Exited (0) 1 second ago',
       } as ContainerStatus;
     }),
+    getContainerCreated: vi.fn().mockResolvedValue(null),
+    listContainers: vi.fn().mockResolvedValue([]),
+    execCommand: vi.fn().mockResolvedValue({ exitCode: 0, stdout: '', stderr: '' }),
+    createExecSession: vi.fn().mockResolvedValue({ id: 'exec-1', stream: null }),
+    resizeExec: vi.fn().mockResolvedValue(undefined),
     streamLogs: vi.fn(async (containerId: string, onLine: (line: string) => void) => {
       // Simulate a few log lines immediately
       setTimeout(() => {
@@ -54,11 +65,9 @@ function createMockDockerManager(): DockerManager {
         }
       }, 10);
 
-      const abortController = new AbortController();
-      return abortController;
+      return { stop: vi.fn() };
     }),
-    listRunningContainers: vi.fn().mockResolvedValue([]),
-  } as unknown as DockerManager;
+  } as unknown as ContainerRuntime;
 }
 
 // -- Tests --------------------------------------------------------------------
@@ -67,7 +76,7 @@ describe('Loop Workflow Integration', () => {
   let testDir: string;
   let configManager: ConfigManager;
   let projectStore: ProjectStore;
-  let docker: DockerManager;
+  let docker: ContainerRuntime;
   let parser: LogParser;
   let loopRunner: LoopRunner;
   let scheduler: LoopScheduler;
@@ -78,8 +87,8 @@ describe('Loop Workflow Integration', () => {
     configManager = new ConfigManager(testDir);
     projectStore = new ProjectStore(configManager);
 
-    // Create mocked Docker and real parser/runner
-    docker = createMockDockerManager();
+    // Create mocked ContainerRuntime and real parser/runner
+    docker = createMockContainerRuntime();
     parser = new LogParser(); // Real parser, no mocking needed
     loopRunner = new LoopRunner(docker, parser, 2); // Max 2 concurrent
     scheduler = new LoopScheduler(loopRunner);
@@ -211,7 +220,7 @@ describe('Loop Workflow Integration', () => {
     });
 
     // Create a new mock docker manager with custom log lines
-    const customDocker = createMockDockerManager();
+    const customDocker = createMockContainerRuntime();
     const customParser = new LogParser();
     const customRunner = new LoopRunner(customDocker, customParser, 2);
 
@@ -226,7 +235,7 @@ describe('Loop Workflow Integration', () => {
         onLine('[2026-02-19 10:00:04] [main def5678] Fix bug');
       }, 10);
 
-      return new AbortController();
+      return { stop: vi.fn() };
     });
 
     // Wait for log lines via callback
@@ -372,7 +381,7 @@ describe('Loop Workflow Integration', () => {
     });
 
     // Simulate existing running container
-    const mockContainers: ContainerInfo[] = [
+    const mockContainers: ContainerSummary[] = [
       {
         id: 'existing-container-123',
         name: 'zephyr-existing',
@@ -390,7 +399,7 @@ describe('Loop Workflow Integration', () => {
       setTimeout(() => {
         onLine('[2026-02-19 10:00:00] Recovered log line');
       }, 10);
-      return new AbortController();
+      return { stop: vi.fn() };
     });
 
     // Recover loops
@@ -426,7 +435,7 @@ describe('Loop Workflow Integration', () => {
     projectStore.removeProject(deletedProjectId);
 
     // Simulate container for deleted project
-    const mockContainers: ContainerInfo[] = [
+    const mockContainers: ContainerSummary[] = [
       {
         id: 'orphaned-container',
         name: 'zephyr-orphaned',
@@ -453,7 +462,7 @@ describe('Loop Workflow Integration', () => {
     const p3 = await projectStore.addProject({ name: 'P3', docker_image: 'ubuntu:22.04' });
 
     // Simulate 3 running containers (but limit is 2)
-    const mockContainers: ContainerInfo[] = [
+    const mockContainers: ContainerSummary[] = [
       { id: 'c1', name: 'zephyr-c1', image: 'ubuntu:22.04', state: 'running', status: 'Up', projectId: p1.id, created: new Date().toISOString() },
       { id: 'c2', name: 'zephyr-c2', image: 'ubuntu:22.04', state: 'running', status: 'Up', projectId: p2.id, created: new Date().toISOString() },
       { id: 'c3', name: 'zephyr-c3', image: 'ubuntu:22.04', state: 'running', status: 'Up', projectId: p3.id, created: new Date().toISOString() },

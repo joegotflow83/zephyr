@@ -16,7 +16,7 @@ const mockSchedulerInstance = {
   cancelSchedule: vi.fn(),
 };
 
-const mockDockerHealthInstance = {
+const mockRuntimeHealthInstance = {
   start: vi.fn(),
   stop: vi.fn(),
 };
@@ -89,14 +89,18 @@ vi.mock('../../src/services/import-export', () => ({
   ImportExportService: class ImportExportService {},
 }));
 
-vi.mock('../../src/services/docker-manager', () => ({
-  DockerManager: class DockerManager {},
+vi.mock('../../src/services/docker-runtime', () => ({
+  DockerRuntime: class DockerRuntime {},
 }));
 
-vi.mock('../../src/services/docker-health', () => ({
-  DockerHealthMonitor: class DockerHealthMonitor {
+vi.mock('../../src/services/podman-runtime', () => ({
+  PodmanRuntime: class PodmanRuntime {},
+}));
+
+vi.mock('../../src/services/runtime-health', () => ({
+  RuntimeHealthMonitor: class RuntimeHealthMonitor {
     constructor() {
-      return mockDockerHealthInstance;
+      return mockRuntimeHealthInstance;
     }
   },
 }));
@@ -173,8 +177,8 @@ vi.mock('../../src/main/ipc-handlers/data-handlers', () => ({
   registerDataHandlers: vi.fn(),
 }));
 
-vi.mock('../../src/main/ipc-handlers/docker-handlers', () => ({
-  registerDockerHandlers: vi.fn(),
+vi.mock('../../src/main/ipc-handlers/runtime-handlers', () => ({
+  registerRuntimeHandlers: vi.fn(),
 }));
 
 vi.mock('../../src/main/ipc-handlers/credential-handlers', () => ({
@@ -230,7 +234,7 @@ describe('Graceful Shutdown', () => {
     mockLoopRunnerInstance.listAll.mockReturnValue([]);
     mockLoopRunnerInstance.stopLoop.mockResolvedValue(undefined);
     mockSchedulerInstance.listScheduled.mockReturnValue([]);
-    mockDockerHealthInstance.stop.mockReset();
+    mockRuntimeHealthInstance.stop.mockReset();
     mockTerminalManagerInstance.closeAllSessions.mockResolvedValue(undefined);
     mockCleanupManagerInstance.cleanupAll.mockResolvedValue(undefined);
 
@@ -285,7 +289,7 @@ describe('Graceful Shutdown', () => {
       await beforeQuitHandler!(mockEvent);
 
       // Should stop health monitor
-      expect(mockDockerHealthInstance.stop).toHaveBeenCalled();
+      expect(mockRuntimeHealthInstance.stop).toHaveBeenCalled();
 
       // Should close all terminal sessions
       expect(mockTerminalManagerInstance.closeAllSessions).toHaveBeenCalled();

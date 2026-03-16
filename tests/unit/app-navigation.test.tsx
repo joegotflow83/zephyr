@@ -100,7 +100,7 @@ describe('App Navigation', () => {
     fireEvent.click(settingsTabButton!);
 
     await waitFor(() => {
-      expect(screen.getByText('Configure credentials, Docker, application preferences, and updates')).toBeInTheDocument();
+      expect(screen.getByText('Configure credentials, container runtime, application preferences, and updates')).toBeInTheDocument();
     });
 
     const activeSettingsButton = settingsButtons.find(btn => btn.getAttribute('aria-current') === 'page');
@@ -171,7 +171,7 @@ describe('App Navigation', () => {
     });
 
     await waitFor(() => {
-      expect(screen.getByText('Configure credentials, Docker, application preferences, and updates')).toBeInTheDocument();
+      expect(screen.getByText('Configure credentials, container runtime, application preferences, and updates')).toBeInTheDocument();
     });
     // Get the tab button specifically (the one with aria-current='page')
     const settingsButtons = screen.getAllByRole('button', { name: /settings/i });

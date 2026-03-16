@@ -1,7 +1,7 @@
 import { randomUUID } from 'crypto';
 import { Duplex } from 'stream';
 
-import { DockerManager } from './docker-manager';
+import type { ContainerRuntime } from './container-runtime';
 import type { VMManager } from './vm-manager';
 import type { WebContents } from 'electron';
 
@@ -50,11 +50,11 @@ interface SessionState {
  */
 export class TerminalManager {
   private sessions = new Map<string, SessionState>();
-  private dockerManager: DockerManager;
+  private runtime: ContainerRuntime;
   private webContents?: WebContents;
 
-  constructor(dockerManager: DockerManager, webContents?: WebContents) {
-    this.dockerManager = dockerManager;
+  constructor(runtime: ContainerRuntime, webContents?: WebContents) {
+    this.runtime = runtime;
     this.webContents = webContents;
   }
 
@@ -75,7 +75,7 @@ export class TerminalManager {
    */
   async openSession(containerId: string, opts?: TerminalSessionOpts): Promise<TerminalSession> {
     // Create Docker exec session with PTY
-    const execSession = await this.dockerManager.createExecSession(containerId, {
+    const execSession = await this.runtime.createExecSession(containerId, {
       shell: opts?.shell,
       user: opts?.user,
       workingDir: opts?.workingDir,
@@ -178,7 +178,7 @@ export class TerminalManager {
     if (!state.execId) return;
 
     // Resize the Docker exec PTY
-    await this.dockerManager.resizeExec(state.execId, rows, cols);
+    await this.runtime.resizeExec(state.execId, rows, cols);
   }
 
   /**

@@ -1,0 +1,303 @@
+/**
+ * KiroHooksSection — checkbox list of Kiro hook files for the ProjectDialog.
+ *
+ * Displays all hook files from ~/.zephyr/kiro_hooks/ with checkboxes.
+ * Selected hook filenames are stored in ProjectConfig.kiro_hooks.
+ * Also provides an "Add Hook File" inline editor for user-authored hooks,
+ * and Edit/Delete actions for existing hook files.
+ *
+ * Hook files are injected into containers at ~/.kiro/hooks/ so the
+ * Kiro agent can invoke them during execution.
+ */
+
+import React, { useState, useEffect } from 'react';
+
+interface KiroHookFile {
+  filename: string;
+  name: string;
+  description: string;
+}
+
+interface KiroHooksSectionProps {
+  /** Currently selected hook filenames */
+  selected: string[];
+  /** Callback when selection changes */
+  onChange: (selected: string[]) => void;
+}
+
+export const KiroHooksSection: React.FC<KiroHooksSectionProps> = ({ selected, onChange }) => {
+  const [hooks, setHooks] = useState<KiroHookFile[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showAddEditor, setShowAddEditor] = useState(false);
+  const [newFilename, setNewFilename] = useState('');
+  const [newContent, setNewContent] = useState('');
+  const [addError, setAddError] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  const [editingFilename, setEditingFilename] = useState<string | null>(null);
+  const [editingContent, setEditingContent] = useState('');
+  const [editError, setEditError] = useState('');
+  const [editSaving, setEditSaving] = useState(false);
+
+  const loadHooks = async () => {
+    try {
+      const list = await window.api.kiroHooks.list();
+      setHooks(list);
+    } catch {
+      setHooks([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadHooks();
+  }, []);
+
+  const handleToggle = (filename: string) => {
+    if (selected.includes(filename)) {
+      onChange(selected.filter((f) => f !== filename));
+    } else {
+      onChange([...selected, filename]);
+    }
+  };
+
+  const handleEdit = async (filename: string) => {
+    setShowAddEditor(false);
+    setEditError('');
+    try {
+      const content = await window.api.kiroHooks.get(filename);
+      setEditingFilename(filename);
+      setEditingContent(content ?? '');
+    } catch {
+      setEditError('Failed to load hook file content');
+    }
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editingFilename) return;
+    setEditError('');
+    setEditSaving(true);
+    try {
+      await window.api.kiroHooks.add(editingFilename, editingContent);
+      setEditingFilename(null);
+      setEditingContent('');
+      await loadHooks();
+    } catch (err) {
+      setEditError(err instanceof Error ? err.message : 'Failed to save hook file');
+    } finally {
+      setEditSaving(false);
+    }
+  };
+
+  const handleCancelEdit = () => {
+    setEditingFilename(null);
+    setEditingContent('');
+    setEditError('');
+  };
+
+  const handleDelete = async (filename: string) => {
+    if (!confirm(`Delete Kiro hook file "${filename}"?`)) return;
+    try {
+      await window.api.kiroHooks.remove(filename);
+      if (selected.includes(filename)) {
+        onChange(selected.filter((f) => f !== filename));
+      }
+      if (editingFilename === filename) {
+        setEditingFilename(null);
+        setEditingContent('');
+      }
+      await loadHooks();
+    } catch {
+      // Non-fatal
+    }
+  };
+
+  const handleAddHook = async () => {
+    setAddError('');
+    const trimmedFilename = newFilename.trim();
+    if (!trimmedFilename) {
+      setAddError('Filename is required');
+      return;
+    }
+    if (!trimmedFilename.includes('.')) {
+      setAddError('Filename must include an extension (e.g. pre-tool-use.sh)');
+      return;
+    }
+    if (!newContent.trim()) {
+      setAddError('File content is required');
+      return;
+    }
+
+    setSaving(true);
+    try {
+      await window.api.kiroHooks.add(trimmedFilename, newContent);
+      setNewFilename('');
+      setNewContent('');
+      setShowAddEditor(false);
+      await loadHooks();
+    } catch (err) {
+      setAddError(err instanceof Error ? err.message : 'Failed to save hook file');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="mb-4">
+      <div className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Kiro Hooks</div>
+      <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
+        Select hook files to inject into the container at{' '}
+        <code className="bg-gray-100 dark:bg-gray-700 px-1 rounded">~/.kiro/hooks</code>.
+      </p>
+
+      {loading ? (
+        <p className="text-xs text-gray-500">Loading hooks…</p>
+      ) : hooks.length === 0 && !showAddEditor ? (
+        <p className="text-xs text-gray-500">
+          No hook files available. Use &quot;+ Add Hook File&quot; to create one.
+        </p>
+      ) : (
+        <div className="space-y-2 mb-3">
+          {hooks.map((hook) => (
+            <div key={hook.filename} className="group">
+              {editingFilename === hook.filename ? (
+                <div className="p-3 bg-gray-100 dark:bg-gray-800 border border-blue-400 dark:border-blue-500 rounded space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium text-gray-900 dark:text-white">
+                      {hook.filename}
+                    </span>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={handleSaveEdit}
+                        disabled={editSaving}
+                        className="text-xs px-2 py-1 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50 transition-colors"
+                      >
+                        {editSaving ? 'Saving…' : 'Save'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleCancelEdit}
+                        className="text-xs px-2 py-1 bg-gray-200 dark:bg-gray-600 text-gray-900 dark:text-white rounded hover:bg-gray-300 dark:hover:bg-gray-700 transition-colors"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                  <textarea
+                    value={editingContent}
+                    onChange={(e) => setEditingContent(e.target.value)}
+                    rows={8}
+                    className="w-full px-2 py-1 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-600 rounded text-gray-900 dark:text-white text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                  />
+                  {editError && <p className="text-xs text-red-400">{editError}</p>}
+                </div>
+              ) : (
+                <div className="flex items-start gap-2">
+                  <label className="flex items-start gap-2 cursor-pointer flex-1 min-w-0">
+                    <input
+                      type="checkbox"
+                      checked={selected.includes(hook.filename)}
+                      onChange={() => handleToggle(hook.filename)}
+                      className="mt-0.5 flex-shrink-0"
+                    />
+                    <div className="min-w-0">
+                      <span className="text-sm text-gray-800 dark:text-gray-200">
+                        {hook.filename}
+                      </span>
+                      {hook.description && (
+                        <span className="ml-2 text-xs text-gray-500 dark:text-gray-400">
+                          — {hook.description}
+                        </span>
+                      )}
+                    </div>
+                  </label>
+                  <div className="flex gap-2 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button
+                      type="button"
+                      onClick={() => handleEdit(hook.filename)}
+                      className="text-xs text-blue-400 hover:text-blue-300 transition-colors"
+                    >
+                      Edit
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDelete(hook.filename)}
+                      className="text-xs text-red-400 hover:text-red-300 transition-colors"
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {showAddEditor ? (
+        <div className="mt-2 p-3 bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded space-y-2">
+          <div>
+            <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">Filename (with extension)</label>
+            <input
+              type="text"
+              value={newFilename}
+              onChange={(e) => setNewFilename(e.target.value)}
+              placeholder="pre-tool-use.sh"
+              className="w-full px-2 py-1 text-sm bg-gray-100 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+            />
+          </div>
+          <div>
+            <label htmlFor="kiro-hook-file-content" className="block text-xs text-gray-400 mb-1">
+              File Content
+            </label>
+            <textarea
+              id="kiro-hook-file-content"
+              value={newContent}
+              onChange={(e) => setNewContent(e.target.value)}
+              placeholder={'#!/bin/bash\n# Description: My Kiro hook\necho "Hook triggered"'}
+              rows={6}
+              className="w-full px-2 py-1 text-sm bg-gray-100 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded text-gray-900 dark:text-white font-mono focus:outline-none focus:ring-1 focus:ring-blue-500"
+            />
+          </div>
+          {addError && <p className="text-xs text-red-400">{addError}</p>}
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={handleAddHook}
+              disabled={saving}
+              className="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 transition-colors"
+            >
+              {saving ? 'Saving…' : 'Save Hook'}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setShowAddEditor(false);
+                setNewFilename('');
+                setNewContent('');
+                setAddError('');
+              }}
+              className="px-3 py-1 text-sm text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={() => {
+            setEditingFilename(null);
+            setEditingContent('');
+            setShowAddEditor(true);
+          }}
+          className="text-sm text-blue-400 hover:text-blue-300 transition-colors"
+        >
+          + Add Hook File
+        </button>
+      )}
+    </div>
+  );
+};

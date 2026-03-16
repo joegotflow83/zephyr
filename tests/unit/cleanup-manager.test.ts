@@ -1,18 +1,18 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { CleanupManager } from '../../src/services/cleanup-manager';
-import type { DockerManager } from '../../src/services/docker-manager';
+import type { ContainerRuntime } from '../../src/services/container-runtime';
 
 describe('CleanupManager', () => {
   let cleanupManager: CleanupManager;
-  let mockDockerManager: DockerManager;
+  let mockRuntime: Pick<ContainerRuntime, 'stopContainer' | 'removeContainer'>;
 
   beforeEach(() => {
-    mockDockerManager = {
+    mockRuntime = {
       stopContainer: vi.fn(),
       removeContainer: vi.fn(),
-    } as unknown as DockerManager;
+    } as unknown as Pick<ContainerRuntime, 'stopContainer' | 'removeContainer'>;
 
-    cleanupManager = new CleanupManager(mockDockerManager);
+    cleanupManager = new CleanupManager(mockRuntime as ContainerRuntime);
   });
 
   afterEach(() => {
@@ -136,8 +136,8 @@ describe('CleanupManager', () => {
   describe('cleanupAll', () => {
     it('should not throw when no containers are registered', async () => {
       await expect(cleanupManager.cleanupAll()).resolves.toBeUndefined();
-      expect(mockDockerManager.stopContainer).not.toHaveBeenCalled();
-      expect(mockDockerManager.removeContainer).not.toHaveBeenCalled();
+      expect(mockRuntime.stopContainer).not.toHaveBeenCalled();
+      expect(mockRuntime.removeContainer).not.toHaveBeenCalled();
     });
 
     it('should stop and remove a single tracked container', async () => {
@@ -145,8 +145,8 @@ describe('CleanupManager', () => {
 
       await cleanupManager.cleanupAll();
 
-      expect(mockDockerManager.stopContainer).toHaveBeenCalledWith('container-123');
-      expect(mockDockerManager.removeContainer).toHaveBeenCalledWith('container-123');
+      expect(mockRuntime.stopContainer).toHaveBeenCalledWith('container-123');
+      expect(mockRuntime.removeContainer).toHaveBeenCalledWith('container-123');
       expect(cleanupManager.getTrackedContainers()).toEqual([]);
     });
 
@@ -157,11 +157,11 @@ describe('CleanupManager', () => {
 
       await cleanupManager.cleanupAll();
 
-      expect(mockDockerManager.stopContainer).toHaveBeenCalledTimes(3);
-      expect(mockDockerManager.removeContainer).toHaveBeenCalledTimes(3);
-      expect(mockDockerManager.stopContainer).toHaveBeenCalledWith('container-1');
-      expect(mockDockerManager.stopContainer).toHaveBeenCalledWith('container-2');
-      expect(mockDockerManager.stopContainer).toHaveBeenCalledWith('container-3');
+      expect(mockRuntime.stopContainer).toHaveBeenCalledTimes(3);
+      expect(mockRuntime.removeContainer).toHaveBeenCalledTimes(3);
+      expect(mockRuntime.stopContainer).toHaveBeenCalledWith('container-1');
+      expect(mockRuntime.stopContainer).toHaveBeenCalledWith('container-2');
+      expect(mockRuntime.stopContainer).toHaveBeenCalledWith('container-3');
       expect(cleanupManager.getTrackedContainers()).toEqual([]);
     });
 
@@ -175,7 +175,7 @@ describe('CleanupManager', () => {
     });
 
     it('should continue cleanup even if stop fails', async () => {
-      vi.mocked(mockDockerManager.stopContainer).mockRejectedValueOnce(
+      vi.mocked(mockRuntime.stopContainer).mockRejectedValueOnce(
         new Error('Stop failed')
       );
 
@@ -185,11 +185,11 @@ describe('CleanupManager', () => {
       await cleanupManager.cleanupAll();
 
       // Should still attempt to stop both containers
-      expect(mockDockerManager.stopContainer).toHaveBeenCalledTimes(2);
+      expect(mockRuntime.stopContainer).toHaveBeenCalledTimes(2);
     });
 
     it('should continue cleanup even if remove fails', async () => {
-      vi.mocked(mockDockerManager.removeContainer).mockRejectedValueOnce(
+      vi.mocked(mockRuntime.removeContainer).mockRejectedValueOnce(
         new Error('Remove failed')
       );
 
@@ -199,16 +199,16 @@ describe('CleanupManager', () => {
       await cleanupManager.cleanupAll();
 
       // Should still attempt to remove both containers
-      expect(mockDockerManager.removeContainer).toHaveBeenCalledTimes(2);
+      expect(mockRuntime.removeContainer).toHaveBeenCalledTimes(2);
     });
 
     it('should handle multiple failures and continue cleanup', async () => {
-      vi.mocked(mockDockerManager.stopContainer)
+      vi.mocked(mockRuntime.stopContainer)
         .mockRejectedValueOnce(new Error('Stop failed 1'))
         .mockResolvedValueOnce(undefined)
         .mockRejectedValueOnce(new Error('Stop failed 3'));
 
-      vi.mocked(mockDockerManager.removeContainer)
+      vi.mocked(mockRuntime.removeContainer)
         .mockRejectedValueOnce(new Error('Remove failed 2'))
         .mockResolvedValueOnce(undefined);
 
@@ -219,17 +219,17 @@ describe('CleanupManager', () => {
       await cleanupManager.cleanupAll();
 
       // All stop attempts should be made despite failures
-      expect(mockDockerManager.stopContainer).toHaveBeenCalledTimes(3);
+      expect(mockRuntime.stopContainer).toHaveBeenCalledTimes(3);
       // Only container-2 reaches remove (container-1 and container-3 failed at stop)
-      expect(mockDockerManager.removeContainer).toHaveBeenCalledTimes(1);
-      expect(mockDockerManager.removeContainer).toHaveBeenCalledWith('container-2');
+      expect(mockRuntime.removeContainer).toHaveBeenCalledTimes(1);
+      expect(mockRuntime.removeContainer).toHaveBeenCalledWith('container-2');
     });
 
     it('should complete successfully and not throw errors', async () => {
-      vi.mocked(mockDockerManager.stopContainer).mockRejectedValue(
+      vi.mocked(mockRuntime.stopContainer).mockRejectedValue(
         new Error('All stops fail')
       );
-      vi.mocked(mockDockerManager.removeContainer).mockRejectedValue(
+      vi.mocked(mockRuntime.removeContainer).mockRejectedValue(
         new Error('All removes fail')
       );
 
@@ -243,11 +243,11 @@ describe('CleanupManager', () => {
     it('should call stop before remove for each container', async () => {
       const callOrder: string[] = [];
 
-      vi.mocked(mockDockerManager.stopContainer).mockImplementation(async (id) => {
+      vi.mocked(mockRuntime.stopContainer).mockImplementation(async (id) => {
         callOrder.push(`stop-${id}`);
       });
 
-      vi.mocked(mockDockerManager.removeContainer).mockImplementation(async (id) => {
+      vi.mocked(mockRuntime.removeContainer).mockImplementation(async (id) => {
         callOrder.push(`remove-${id}`);
       });
 
@@ -262,14 +262,14 @@ describe('CleanupManager', () => {
       let activeOperations = 0;
       let maxConcurrent = 0;
 
-      vi.mocked(mockDockerManager.stopContainer).mockImplementation(async () => {
+      vi.mocked(mockRuntime.stopContainer).mockImplementation(async () => {
         activeOperations++;
         maxConcurrent = Math.max(maxConcurrent, activeOperations);
         await new Promise(resolve => setTimeout(resolve, 10));
         activeOperations--;
       });
 
-      vi.mocked(mockDockerManager.removeContainer).mockResolvedValue(undefined);
+      vi.mocked(mockRuntime.removeContainer).mockResolvedValue(undefined);
 
       cleanupManager.registerContainer('container-1');
       cleanupManager.registerContainer('container-2');
@@ -302,8 +302,8 @@ describe('CleanupManager', () => {
       // Cleanup remaining 3
       await cleanupManager.cleanupAll();
 
-      expect(mockDockerManager.stopContainer).toHaveBeenCalledTimes(3);
-      expect(mockDockerManager.removeContainer).toHaveBeenCalledTimes(3);
+      expect(mockRuntime.stopContainer).toHaveBeenCalledTimes(3);
+      expect(mockRuntime.removeContainer).toHaveBeenCalledTimes(3);
       expect(cleanupManager.getTrackedContainers()).toHaveLength(0);
     });
 
@@ -321,8 +321,8 @@ describe('CleanupManager', () => {
       await cleanupManager.cleanupAll();
 
       expect(cleanupManager.getTrackedContainers()).toHaveLength(0);
-      expect(mockDockerManager.stopContainer).toHaveBeenCalledTimes(4);
-      expect(mockDockerManager.removeContainer).toHaveBeenCalledTimes(4);
+      expect(mockRuntime.stopContainer).toHaveBeenCalledTimes(4);
+      expect(mockRuntime.removeContainer).toHaveBeenCalledTimes(4);
     });
   });
 });

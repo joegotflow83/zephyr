@@ -13,7 +13,7 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 
-import type { DockerManager, ContainerInfo } from './docker-manager';
+import type { ContainerRuntime, ContainerSummary, LogStream } from './container-runtime';
 import type { LogParser, ParsedLogLine } from './log-parser';
 import type { VMManager, VMInfo } from './vm-manager';
 import type { VMConfig } from '../shared/models';
@@ -49,14 +49,17 @@ export type LogLineCallback = (projectId: string, line: ParsedLogLine) => void;
  * - Notifying registered callbacks on state changes and log lines
  */
 export class LoopRunner {
-  private docker: DockerManager;
+  private docker: ContainerRuntime;
   private parser: LogParser;
   private vm?: VMManager;
   private states: Map<string, LoopState> = new Map();
   private maxConcurrent: number;
   private stateCallbacks: Set<StateChangeCallback> = new Set();
   private logCallbacks: Set<LogLineCallback> = new Set();
-  private logAbortControllers: Map<string, AbortController> = new Map();
+  /** Log streams for direct container execution (non-VM path) */
+  private logStreams: Map<string, LogStream> = new Map();
+  /** Abort controllers for VM-backed execution (from streamExecInVM) */
+  private vmLogAbortControllers: Map<string, AbortController> = new Map();
   /** Throttle timers for batching log-driven state broadcasts */
   private logBroadcastTimers: Map<string, NodeJS.Timeout> = new Map();
   /** Stores the VM name for each persistent-VM project across loop runs */
@@ -65,12 +68,12 @@ export class LoopRunner {
   /**
    * Create a new LoopRunner.
    *
-   * @param docker - DockerManager instance for container operations
+   * @param docker - ContainerRuntime instance for container operations
    * @param parser - LogParser instance for log classification
    * @param maxConcurrent - Maximum number of concurrent loops (default: 3)
    * @param vm - Optional VMManager for VM-backed loop execution
    */
-  constructor(docker: DockerManager, parser: LogParser, maxConcurrent = 3, vm?: VMManager) {
+  constructor(docker: ContainerRuntime, parser: LogParser, maxConcurrent = 3, vm?: VMManager) {
     this.docker = docker;
     this.parser = parser;
     this.maxConcurrent = maxConcurrent;
@@ -165,10 +168,10 @@ export class LoopRunner {
         image: opts.dockerImage,
         projectId: opts.projectId,
         name: containerName,
-        cmd: opts.cmd,
+        command: opts.cmd,
         env: opts.envVars,
         workingDir: opts.workDir,
-        volumes: this.parseVolumeMounts(opts.volumeMounts),
+        binds: opts.volumeMounts,
         autoRemove: false, // We manage cleanup
       });
 
@@ -234,11 +237,11 @@ export class LoopRunner {
       // Transition to STOPPING
       this.updateState(key, { status: LoopStatus.STOPPING });
 
-      // Abort log streaming and pending broadcast
-      const abortController = this.logAbortControllers.get(key);
-      if (abortController) {
-        abortController.abort();
-        this.logAbortControllers.delete(key);
+      // Stop log streaming and pending broadcast
+      const logStream = this.logStreams.get(key);
+      if (logStream) {
+        logStream.stop();
+        this.logStreams.delete(key);
       }
       this.clearLogBroadcastTimer(key);
 
@@ -331,7 +334,7 @@ export class LoopRunner {
    * @returns Array of project IDs that were successfully recovered
    */
   async recoverLoops(
-    containers: ContainerInfo[],
+    containers: ContainerSummary[],
     projectStore: { getProject: (id: string) => { id: string } | null },
   ): Promise<string[]> {
     const recovered: string[] = [];
@@ -464,6 +467,7 @@ export class LoopRunner {
           memoryGb: vmConfig.memory_gb ?? 4,
           diskGb: vmConfig.disk_gb ?? 20,
           cloudInit: vmConfig.cloud_init,
+          runtime: this.docker.runtimeType,
         });
         await this.vm.waitForCloudInit(vmName);
         const created = await this.vm.getVMInfo(vmName);
@@ -579,12 +583,12 @@ export class LoopRunner {
     mode: LoopMode,
   ): Promise<void> {
     try {
-      const abortController = await this.docker.streamLogs(
+      const logStream = await this.docker.streamLogs(
         containerId,
         (line) => this.handleLogLine(loopKey, line),
       );
 
-      this.logAbortControllers.set(loopKey, abortController);
+      this.logStreams.set(loopKey, logStream);
 
       // When container exits, update state accordingly
       this.monitorContainerExit(loopKey, containerId, mode);
@@ -613,13 +617,13 @@ export class LoopRunner {
     // Convert ISO timestamp to Unix timestamp (seconds since epoch)
     const since = Math.floor(new Date(sinceTimestamp).getTime() / 1000);
 
-    const abortController = await this.docker.streamLogs(
+    const logStream = await this.docker.streamLogs(
       containerId,
       (line) => this.handleLogLine(loopKey, line),
       since,
     );
 
-    this.logAbortControllers.set(loopKey, abortController);
+    this.logStreams.set(loopKey, logStream);
 
     // Monitor container exit (assuming CONTINUOUS mode for recovered loops)
     this.monitorContainerExit(loopKey, containerId, LoopMode.CONTINUOUS);
@@ -749,7 +753,7 @@ export class LoopRunner {
             }
 
             // Clean up
-            this.logAbortControllers.delete(loopKey);
+            this.logStreams.delete(loopKey);
             this.clearLogBroadcastTimer(loopKey);
             return;
           }
@@ -761,7 +765,7 @@ export class LoopRunner {
             error: `Container lost: ${errorMessage}`,
             stoppedAt: new Date().toISOString(),
           });
-          this.logAbortControllers.delete(loopKey);
+          this.logStreams.delete(loopKey);
           this.clearLogBroadcastTimer(loopKey);
           return;
         }
@@ -777,9 +781,10 @@ export class LoopRunner {
    */
   private async removeStaleContainer(name: string): Promise<void> {
     try {
-      const containers = await this.docker.listRunningContainers();
+      const containers = await this.docker.listContainers();
       const stale = containers.find(
-        (c) => c.name === name && (c.state === 'exited' || c.state === 'created' || c.state === 'dead'),
+        // 'stopped' is Podman's state string for stopped containers; Docker uses 'exited'.
+        (c) => c.name === name && (c.state === 'exited' || c.state === 'stopped' || c.state === 'created' || c.state === 'dead'),
       );
       if (stale) {
         await this.docker.removeContainer(stale.id);
@@ -787,28 +792,6 @@ export class LoopRunner {
     } catch {
       // Best-effort — don't block the new container creation
     }
-  }
-
-  /**
-   * Parse volume mount strings into Docker format.
-   *
-   * Converts ["host:container", ...] to { host: "container", ... }
-   */
-  private parseVolumeMounts(
-    volumeMounts?: string[],
-  ): Record<string, string> | undefined {
-    if (!volumeMounts || volumeMounts.length === 0) {
-      return undefined;
-    }
-
-    const result: Record<string, string> = {};
-    for (const mount of volumeMounts) {
-      const [hostPath, containerPath] = mount.split(':');
-      if (hostPath && containerPath) {
-        result[hostPath] = containerPath;
-      }
-    }
-    return result;
   }
 
   /**
@@ -910,6 +893,7 @@ export class LoopRunner {
             memoryGb: opts.vmConfig?.memory_gb ?? 4,
             diskGb: opts.vmConfig?.disk_gb ?? 20,
             cloudInit: opts.vmConfig?.cloud_init,
+            runtime: this.docker.runtimeType,
           });
           await this.vm.waitForCloudInit(vmName);
         } else if (vmInfo.state === 'Stopped') {
@@ -925,6 +909,7 @@ export class LoopRunner {
           memoryGb: opts.vmConfig?.memory_gb ?? 4,
           diskGb: opts.vmConfig?.disk_gb ?? 20,
           cloudInit: opts.vmConfig?.cloud_init,
+          runtime: this.docker.runtimeType,
         });
         await this.vm.waitForCloudInit(vmName);
       }
@@ -938,9 +923,9 @@ export class LoopRunner {
       if (isLocalImage) {
         await this.transferImageToVM(vmName, opts.dockerImage);
       } else {
-        const pullResult = await this.vm.execInVM(vmName, ['docker', 'pull', opts.dockerImage]);
+        const pullResult = await this.vm.execInVM(vmName, [this.docker.runtimeType, 'pull', opts.dockerImage]);
         if (pullResult.exitCode !== 0) {
-          throw new Error(`docker pull failed inside VM: ${pullResult.stderr || pullResult.stdout}`);
+          throw new Error(`${this.docker.runtimeType} pull failed inside VM: ${pullResult.stderr || pullResult.stdout}`);
         }
       }
 
@@ -967,18 +952,20 @@ export class LoopRunner {
       // happen when the docker run client process is killed (e.g. on manual
       // stop) before Docker's --rm cleanup fires, leaving the named container
       // behind. Best-effort: ignore errors (container may not exist).
-      await this.vm!.execInVM(vmName, ['docker', 'rm', '-f', containerName]).catch(() => undefined);
+      await this.vm!.execInVM(vmName, [this.docker.runtimeType, 'rm', '-f', containerName]).catch(() => undefined);
 
       // Build docker run args
       const dockerRunArgs = this.buildDockerRunArgs(opts);
+      // Podman rootless requires --userns=keep-id for bind mounts to have correct ownership
+      const runtimeRunFlags = this.docker.runtimeType === 'podman' ? ['--userns=keep-id'] : [];
 
       // Transition to RUNNING before starting the stream
       this.updateState(key, { status: LoopStatus.RUNNING });
 
-      // Stream docker run output from inside the VM
+      // Stream container run output from inside the VM
       const abortController = await this.vm.streamExecInVM(
         vmName,
-        ['docker', 'run', '--rm', '--name', containerName, ...dockerRunArgs, opts.dockerImage],
+        [this.docker.runtimeType, 'run', '--rm', ...runtimeRunFlags, '--name', containerName, ...dockerRunArgs, opts.dockerImage],
         (line) => this.handleLogLine(key, line),
         {
           onExit: (exitCode) => {
@@ -987,7 +974,7 @@ export class LoopRunner {
         },
       );
 
-      this.logAbortControllers.set(key, abortController);
+      this.vmLogAbortControllers.set(key, abortController);
 
       return this.states.get(key)!;
     } catch (error) {
@@ -1013,9 +1000,9 @@ export class LoopRunner {
     try {
       await this.docker.saveImage(imageTag, tmpFile);
       await this.vm!.transfer(vmName, tmpFile, '/tmp/zephyr-image.tar');
-      const loadResult = await this.vm!.execInVM(vmName, ['docker', 'load', '-i', '/tmp/zephyr-image.tar']);
+      const loadResult = await this.vm!.execInVM(vmName, [this.docker.runtimeType, 'load', '-i', '/tmp/zephyr-image.tar']);
       if (loadResult.exitCode !== 0) {
-        throw new Error(`docker load failed inside VM: ${loadResult.stderr || loadResult.stdout}`);
+        throw new Error(`${this.docker.runtimeType} load failed inside VM: ${loadResult.stderr || loadResult.stdout}`);
       }
     } finally {
       try { fs.unlinkSync(tmpFile); } catch { /* ignore cleanup errors */ }
@@ -1037,15 +1024,15 @@ export class LoopRunner {
       this.updateState(loopKey, { status: LoopStatus.STOPPING });
 
       // Abort log streaming
-      const abortController = this.logAbortControllers.get(loopKey);
+      const abortController = this.vmLogAbortControllers.get(loopKey);
       if (abortController) {
         abortController.abort();
-        this.logAbortControllers.delete(loopKey);
+        this.vmLogAbortControllers.delete(loopKey);
       }
 
       // Stop the docker container running inside the VM
       const containerName = this.deriveContainerName(state.projectName, state.projectId);
-      await this.vm!.execInVM(vmName, ['docker', 'stop', containerName]);
+      await this.vm!.execInVM(vmName, [this.docker.runtimeType, 'stop', containerName]);
 
       // For ephemeral VMs, delete the VM on stop; for persistent VMs, unmount
       // host directories that were mounted for this loop run.
@@ -1112,7 +1099,7 @@ export class LoopRunner {
       });
     }
 
-    this.logAbortControllers.delete(loopKey);
+    this.vmLogAbortControllers.delete(loopKey);
     this.clearLogBroadcastTimer(loopKey);
 
     // Clean up after the loop ends: delete ephemeral VMs; unmount host

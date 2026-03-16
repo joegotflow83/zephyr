@@ -13,26 +13,34 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { LoopRunner } from '../../src/services/loop-runner';
 import { LogParser } from '../../src/services/log-parser';
 import { LoopMode, LoopStatus } from '../../src/shared/loop-types';
-import type { DockerManager } from '../../src/services/docker-manager';
+import type { ContainerRuntime } from '../../src/services/container-runtime';
 import type { VMManager, VMInfo, VMExecOpts } from '../../src/services/vm-manager';
 
 // ---------------------------------------------------------------------------
 // Mock factories
 // ---------------------------------------------------------------------------
 
-function createMockDockerManager(): DockerManager {
+function createMockDockerManager(): ContainerRuntime {
   return {
+    runtimeType: 'docker',
+    isAvailable: vi.fn().mockResolvedValue(true),
+    getInfo: vi.fn().mockResolvedValue({ version: '27.0', containers: 0, images: 0 }),
+    isImageAvailable: vi.fn().mockResolvedValue(false),
+    pullImage: vi.fn().mockResolvedValue(undefined),
+    saveImage: vi.fn().mockResolvedValue(undefined),
+    buildImage: vi.fn().mockResolvedValue(undefined),
     createContainer: vi.fn().mockResolvedValue('container-123'),
     startContainer: vi.fn().mockResolvedValue(undefined),
     stopContainer: vi.fn().mockResolvedValue(undefined),
     removeContainer: vi.fn().mockResolvedValue(undefined),
-    listRunningContainers: vi.fn().mockResolvedValue([]),
+    listContainers: vi.fn().mockResolvedValue([]),
     getContainerStatus: vi.fn().mockResolvedValue({ id: 'c', state: 'running', status: 'Up' }),
-    streamLogs: vi.fn().mockResolvedValue({ abort: vi.fn() }),
-    // Default: image not found locally → falls through to docker pull inside VM
-    isImageAvailable: vi.fn().mockResolvedValue(false),
-    saveImage: vi.fn().mockResolvedValue(undefined),
-  } as unknown as DockerManager;
+    getContainerCreated: vi.fn().mockResolvedValue(null),
+    execCommand: vi.fn().mockResolvedValue({ exitCode: 0, stdout: '', stderr: '' }),
+    createExecSession: vi.fn().mockResolvedValue({ id: 'exec-1', stream: {} }),
+    resizeExec: vi.fn().mockResolvedValue(undefined),
+    streamLogs: vi.fn().mockResolvedValue({ stop: vi.fn() }),
+  } as unknown as ContainerRuntime;
 }
 
 function createMockLogParser(): LogParser {
@@ -84,7 +92,7 @@ function createMockVMManager(): VMManager {
 
 describe('LoopRunner — VM execution branch', () => {
   let runner: LoopRunner;
-  let docker: DockerManager;
+  let docker: ContainerRuntime;
   let parser: LogParser;
   let vm: VMManager;
 

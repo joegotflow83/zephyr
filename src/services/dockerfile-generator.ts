@@ -10,6 +10,7 @@ const COMMON_TOOLS = [
   'wget',
   'vim',
   'jq',
+  'unzip',
   'ca-certificates',
   'bc',
   'python-is-python3',
@@ -89,6 +90,7 @@ export function generateDockerfile(config: ImageBuildConfig): string {
   sections.push('');
   sections.push('WORKDIR /home/ralph/workspace');
   sections.push('USER ralph');
+  sections.push('ENV PATH="/home/ralph/.local/bin:${PATH}"');
   sections.push('');
 
   // Pre-configure Claude Code settings as the ralph user (cached layer).
@@ -96,6 +98,10 @@ export function generateDockerfile(config: ImageBuildConfig): string {
     sections.push(generateClaudeCodeConfigBlock());
     sections.push('');
   }
+
+  // Amazon Q Developer CLI and Kiro CLI (installed as ralph user to ~/.local/bin)
+  sections.push(generateAIToolsInstallBlock());
+  sections.push('');
 
   // Unique label per build to bust Docker's BuildKit cache at this point.
   // Without it, BuildKit can return a fully-cached image whose CMD is still
@@ -143,6 +149,27 @@ export function generateClaudeCodeConfigBlock(): string {
     'RUN mkdir -p /home/ralph/.claude && \\',
     `    printf '{"autoUpdaterStatus":"disabled"}\\n' > /home/ralph/.claude/settings.json`,
   ].join('\n');
+}
+
+/**
+ * Generates the Dockerfile RUN block that installs Amazon Q Developer CLI
+ * and Kiro CLI as the ralph user into ~/.local/bin.
+ */
+export function generateAIToolsInstallBlock(): string {
+  return (
+    'RUN curl --proto \'=https\' --tlsv1.2 -sSf \\\n' +
+    '    "https://desktop-release.q.us-east-1.amazonaws.com/latest/q-x86_64-linux.zip" \\\n' +
+    '    -o /tmp/q.zip && \\\n' +
+    '    unzip /tmp/q.zip -d /tmp/q-install && \\\n' +
+    '    /tmp/q-install/q/install.sh --no-confirm && \\\n' +
+    '    rm -rf /tmp/q.zip /tmp/q-install && \\\n' +
+    '    curl --proto \'=https\' --tlsv1.2 -sSf \\\n' +
+    '    "https://desktop-release.q.us-east-1.amazonaws.com/latest/kirocli-x86_64-linux.zip" \\\n' +
+    '    -o /tmp/kirocli.zip && \\\n' +
+    '    unzip /tmp/kirocli.zip -d /tmp/kirocli-install && \\\n' +
+    '    /tmp/kirocli-install/kirocli/install.sh --no-confirm && \\\n' +
+    '    rm -rf /tmp/kirocli.zip /tmp/kirocli-install'
+  );
 }
 
 export function getLanguageInstallBlock(lang: LanguageSelection): string {

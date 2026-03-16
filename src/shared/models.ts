@@ -75,6 +75,8 @@ export interface ZephyrImage {
   buildConfig: ImageBuildConfig;
   builtAt: string;
   size?: number;
+  /** Which container runtime was used to build this image. Defaults to 'docker' for legacy images. */
+  runtime?: 'docker' | 'podman';
 }
 
 /**
@@ -146,6 +148,8 @@ export interface ProjectConfig {
   pre_validation_scripts: string[];
   /** Filenames of hook files to inject into ~/.claude/hooks in the container */
   hooks: string[];
+  /** Filenames of Kiro hook files to inject into ~/.kiro/hooks in the container */
+  kiro_hooks: string[];
   /** Filename of the loop script to use as the container command (optional, single selection) */
   loop_script?: string;
   /** Filename of the Claude settings file to inject into ~/.claude/settings.json (optional, single selection) */
@@ -197,6 +201,11 @@ export interface ProjectConfig {
    * The file is never overwritten if it already exists on disk.
    */
   feature_requests_content?: string;
+  /**
+   * Raw JSON content to inject into the container at ~/.kiro/config.json.
+   * Used to configure the Kiro (Amazon) AI agent when it is the active agent.
+   */
+  kiro_config?: string;
 }
 
 /**
@@ -206,6 +215,12 @@ export interface ProjectConfig {
  * - aws_bedrock: AWS Bedrock env vars injected at container start
  */
 export type AnthropicAuthMethod = 'api_key' | 'browser_session' | 'aws_bedrock';
+
+/**
+ * Podman-specific settings stub for future configuration.
+ * Currently a placeholder; extended as Podman features are added.
+ */
+export type PodmanSettings = Record<string, never>;
 
 /**
  * Global application settings persisted to ~/.zephyr/settings.json
@@ -229,6 +244,13 @@ export interface AppSettings {
   bedrock_small_fast_model?: string;
   /** Anthropic log level for Bedrock */
   bedrock_log?: string;
+  /**
+   * Active container runtime. Defaults to 'docker'.
+   * Changing this setting requires an app restart and images must be rebuilt.
+   */
+  container_runtime: 'docker' | 'podman';
+  /** Podman-specific settings stub for future configuration */
+  podman_settings?: PodmanSettings;
 }
 
 /**
@@ -241,6 +263,7 @@ export function createDefaultSettings(): AppSettings {
     theme: 'system',
     log_level: 'INFO',
     anthropic_auth_method: 'api_key',
+    container_runtime: 'docker',
   };
 }
 
@@ -282,6 +305,7 @@ export function createProjectConfig(partial: Partial<ProjectConfig> = {}): Proje
     image_id: partial.image_id,
     pre_validation_scripts: partial.pre_validation_scripts ?? [],
     hooks: partial.hooks ?? [],
+    kiro_hooks: partial.kiro_hooks ?? [],
     loop_script: partial.loop_script,
     claude_settings_file: partial.claude_settings_file,
     custom_prompts: partial.custom_prompts ?? {},
@@ -294,5 +318,6 @@ export function createProjectConfig(partial: Partial<ProjectConfig> = {}): Proje
     vm_config: partial.vm_config,
     factory_config: partial.factory_config,
     feature_requests_content: partial.feature_requests_content,
+    kiro_config: partial.kiro_config,
   };
 }

@@ -4,8 +4,9 @@
  * Build flow:
  *   1. Generate Dockerfile from ImageBuildConfig via generateDockerfile()
  *   2. Write Dockerfile to a temporary directory via writeDockerfile()
- *   3. Call DockerManager.buildImage() with host UID/GID as build args
- *   4. On success: persist the new ZephyrImage record in ImageStore
+ *   3. Call ContainerRuntime.buildImage() with host UID/GID as build args
+ *   4. On success: persist the new ZephyrImage record in ImageStore,
+ *      stamped with the active runtime type
  *   5. Clean up the temporary directory (success and failure)
  *
  * Why host UID/GID as build args: the generated Dockerfile creates a `ralph`
@@ -22,32 +23,40 @@ import * as path from 'path';
 
 import { ImageBuildConfig, ZephyrImage } from '../shared/models';
 import { generateDockerfile, writeDockerfile } from './dockerfile-generator';
-import { type BuildProgressEvent, DockerManager } from './docker-manager';
+import { type ContainerRuntime, type ProgressEvent } from './container-runtime';
 import { ImageStore } from './image-store';
 
-export type { BuildProgressEvent };
+export type BuildProgressEvent = ProgressEvent;
 
 /**
- * Derives a Docker tag from a human-readable image name.
+ * Derives a container image tag from a human-readable image name.
  * Lowercases, replaces spaces with hyphens, strips invalid chars.
  * Example: "Python Node Dev" → "zephyr-python-node-dev:latest"
+ *
+ * For Podman builds the tag is prefixed with `localhost/` to avoid
+ * short-name resolution which, in non-interactive mode (Electron),
+ * falls back to docker.io and fails for locally-built images.
  */
-function deriveDockerTag(name: string): string {
+function deriveDockerTag(name: string, runtimeType?: string): string {
   const slug = name
     .toLowerCase()
     .replace(/\s+/g, '-')
     .replace(/[^a-z0-9-]/g, '');
   // Avoid double prefix if the user named their image "Zephyr ..."
   const prefixed = slug.startsWith('zephyr-') ? slug : `zephyr-${slug}`;
-  return `${prefixed}:latest`;
+  const tag = `${prefixed}:latest`;
+  // Podman stores locally-built images under the `localhost/` registry.
+  // Explicit prefix prevents ambiguous short-name resolution at container
+  // creation time.
+  return runtimeType === 'podman' ? `localhost/${tag}` : tag;
 }
 
 export class ImageBuilder {
-  private readonly dockerManager: DockerManager;
+  private readonly runtime: ContainerRuntime;
   private readonly imageStore: ImageStore;
 
-  constructor(dockerManager: DockerManager, imageStore: ImageStore) {
-    this.dockerManager = dockerManager;
+  constructor(runtime: ContainerRuntime, imageStore: ImageStore) {
+    this.runtime = runtime;
     this.imageStore = imageStore;
   }
 
@@ -73,11 +82,11 @@ export class ImageBuilder {
       const dockerfileContent = generateDockerfile(config);
       await writeDockerfile(tmpDir, dockerfileContent);
 
-      const tag = deriveDockerTag(config.name);
+      const tag = deriveDockerTag(config.name, this.runtime.runtimeType);
       const uid = (process.getuid ? process.getuid() : 1000).toString();
       const gid = (process.getgid ? process.getgid() : 1000).toString();
 
-      await this.dockerManager.buildImage(
+      await this.runtime.buildImage(
         tmpDir,
         tag,
         { HOST_UID: uid, HOST_GID: gid },
@@ -89,6 +98,7 @@ export class ImageBuilder {
         dockerTag: tag,
         languages: config.languages,
         buildConfig: config,
+        runtime: this.runtime.runtimeType,
       });
 
       return image;
@@ -126,15 +136,22 @@ export class ImageBuilder {
       const uid = (process.getuid ? process.getuid() : 1000).toString();
       const gid = (process.getgid ? process.getgid() : 1000).toString();
 
-      await this.dockerManager.buildImage(
+      // Re-derive the tag for the current runtime. This handles the case where
+      // the image was originally built with a different runtime (e.g., Docker)
+      // and is now being rebuilt with Podman, which needs the localhost/ prefix.
+      const newTag = deriveDockerTag(existingImage.buildConfig.name, this.runtime.runtimeType);
+
+      await this.runtime.buildImage(
         tmpDir,
-        existingImage.dockerTag,
+        newTag,
         { HOST_UID: uid, HOST_GID: gid },
         onProgress
       );
 
       return this.imageStore.updateImage(imageId, {
         builtAt: new Date().toISOString(),
+        dockerTag: newTag,
+        runtime: this.runtime.runtimeType,
       });
     } finally {
       await fs.rm(tmpDir, { recursive: true, force: true });

@@ -19,6 +19,7 @@ import { PreValidationSection } from './PreValidationSection';
 import { HooksSection } from './HooksSection';
 import { LoopScriptsSection } from './LoopScriptsSection';
 import { ClaudeSettingsSection } from './ClaudeSettingsSection';
+import { KiroHooksSection } from './KiroHooksSection';
 import { useImages } from '../../hooks/useImages';
 import { ImageBuilderDialog } from '../ImageBuilderDialog/ImageBuilderDialog';
 import { useAppStore } from '../../stores/app-store';
@@ -50,6 +51,8 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({ mode, project, onS
   const [hooks, setHooks] = useState<string[]>([]);
   const [loopScript, setLoopScript] = useState<string | undefined>(undefined);
   const [claudeSettingsFile, setClaudeSettingsFile] = useState<string | undefined>(undefined);
+  const [kiroConfig, setKiroConfig] = useState('');
+  const [kiroHooks, setKiroHooks] = useState<string[]>([]);
 
   // Image picker state: library = pick from ZephyrImage library, custom = free-text
   const [imageMode, setImageMode] = useState<ImageMode>('custom');
@@ -79,6 +82,8 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({ mode, project, onS
   const [vmDiskGb, setVmDiskGb] = useState(20);
   const [vmCloudInit, setVmCloudInit] = useState('');
   const [showVmAdvanced, setShowVmAdvanced] = useState(false);
+  const [showClaudeConfig, setShowClaudeConfig] = useState(false);
+  const [showKiroConfig, setShowKiroConfig] = useState(false);
 
   // Factory state
   const [factoryEnabled, setFactoryEnabled] = useState(false);
@@ -107,6 +112,8 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({ mode, project, onS
       setHooks(project.hooks ?? []);
       setLoopScript(project.loop_script);
       setClaudeSettingsFile(project.claude_settings_file);
+      setKiroConfig(project.kiro_config ?? '');
+      setKiroHooks(project.kiro_hooks ?? []);
       setAdditionalMounts(project.additional_mounts ?? []);
       setImageId(project.image_id);
       setImageMode(project.image_id ? 'library' : images.length > 0 ? 'library' : 'custom');
@@ -262,6 +269,8 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({ mode, project, onS
             vm_config: effectiveVmConfig,
             factory_config: effectiveFactoryConfig,
             feature_requests_content: effectiveFeatureRequestsContent,
+            kiro_config: kiroConfig.trim() || undefined,
+            kiro_hooks: kiroHooks,
           }
         : createProjectConfig({
             name: name.trim(),
@@ -279,6 +288,8 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({ mode, project, onS
             vm_config: effectiveVmConfig,
             factory_config: effectiveFactoryConfig,
             feature_requests_content: effectiveFeatureRequestsContent,
+            kiro_config: kiroConfig.trim() || undefined,
+            kiro_hooks: kiroHooks,
           });
 
     // Store GitHub PAT if the user entered one (uses config.id so it works in both add and edit mode)
@@ -828,14 +839,74 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({ mode, project, onS
               onChange={setPreValidationScripts}
             />
 
-            {/* Claude Hooks section */}
-            <HooksSection selected={hooks} onChange={setHooks} />
+            {/* LLM Configs section */}
+            <div className="mb-4">
+              <div className="text-sm font-semibold text-gray-800 dark:text-gray-200 pb-1 border-b border-gray-200 dark:border-gray-700 mb-3">
+                LLM Configs
+              </div>
+              <div className="space-y-2">
+                {/* Claude subsection */}
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <div className="text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wide">
+                      Claude
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setShowClaudeConfig(!showClaudeConfig)}
+                      className="text-xs text-blue-400 hover:text-blue-300 transition-colors"
+                    >
+                      {showClaudeConfig ? '▲ Hide' : '▼ Show'}
+                    </button>
+                  </div>
+                  {showClaudeConfig && (
+                    <div className="pl-1 mt-2">
+                      <HooksSection selected={hooks} onChange={setHooks} />
+                      <ClaudeSettingsSection selected={claudeSettingsFile} onChange={setClaudeSettingsFile} />
+                    </div>
+                  )}
+                </div>
+
+                {/* Kiro subsection */}
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <div className="text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wide">
+                      Kiro
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setShowKiroConfig(!showKiroConfig)}
+                      className="text-xs text-blue-400 hover:text-blue-300 transition-colors"
+                    >
+                      {showKiroConfig ? '▲ Hide' : '▼ Show'}
+                    </button>
+                  </div>
+                  {showKiroConfig && (
+                    <div className="pl-1 mt-2">
+                      <KiroHooksSection selected={kiroHooks} onChange={setKiroHooks} />
+                      <div className="mb-4">
+                        <div className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Kiro Config</div>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+                          Paste a JSON config to inject into the container at{' '}
+                          <code className="bg-gray-100 dark:bg-gray-700 px-1 rounded">~/.kiro/config.json</code>.
+                          Leave blank to skip.
+                        </p>
+                        <textarea
+                          value={kiroConfig}
+                          onChange={(e) => setKiroConfig(e.target.value)}
+                          placeholder={'{\n  "model": "...",\n  "apiKey": "..."\n}'}
+                          rows={6}
+                          className="w-full px-2 py-1 text-sm bg-gray-100 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded text-gray-900 dark:text-white font-mono focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
 
             {/* Loop Scripts section */}
             <LoopScriptsSection selected={loopScript} onChange={setLoopScript} />
-
-            {/* Claude Settings section */}
-            <ClaudeSettingsSection selected={claudeSettingsFile} onChange={setClaudeSettingsFile} />
 
             {/* GitHub SSH Access section — only shown when repo URL is a GitHub URL */}
             {isGithubRepo && (

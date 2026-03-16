@@ -445,7 +445,13 @@ export const LoopsTab: React.FC = () => {
         </div>
         <div className="flex-1 overflow-hidden">
           {selectedLoop ? (
-            <LogViewer lines={parsedLogs} autoScroll={true} onExport={handleExport} />
+            parsedLogs.length === 0 && selectedLoop.status === LoopStatus.FAILED && selectedLoop.error ? (
+              <div className="p-4 text-red-400 font-mono text-sm whitespace-pre-wrap">
+                {selectedLoop.error}
+              </div>
+            ) : (
+              <LogViewer lines={parsedLogs} autoScroll={true} onExport={handleExport} />
+            )
           ) : (
             <div className="flex items-center justify-center h-full text-gray-500 dark:text-gray-500">
               Select a loop to view logs

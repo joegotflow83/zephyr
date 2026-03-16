@@ -89,8 +89,8 @@ const mockLoopRunner = {
   setMaxConcurrent: vi.fn(),
 };
 
-const mockDockerManager = {
-  listRunningContainers: vi.fn(),
+const mockRuntime = {
+  listContainers: vi.fn(),
   removeContainer: vi.fn(),
 };
 
@@ -108,7 +108,7 @@ describe('registerDataHandlers', () => {
       delete handlerRegistry[key];
     }
     mockLoopRunner.listRunning.mockReturnValue([]);
-    mockDockerManager.listRunningContainers.mockResolvedValue([]);
+    mockRuntime.listContainers.mockResolvedValue([]);
     mockCredentialManager.deleteGithubPat.mockResolvedValue(undefined);
     registerDataHandlers({
       configManager: mockConfigManager as never,
@@ -116,7 +116,7 @@ describe('registerDataHandlers', () => {
       importExport: mockImportExport as never,
       preValidationStore: mockPreValidationStore as never,
       loopRunner: mockLoopRunner as never,
-      dockerManager: mockDockerManager as never,
+      runtime: mockRuntime as never,
       credentialManager: mockCredentialManager as never,
     });
   });
@@ -202,21 +202,21 @@ describe('registerDataHandlers', () => {
 
     it('removes all containers associated with the project', async () => {
       const id = 'proj-with-containers';
-      mockDockerManager.listRunningContainers.mockResolvedValue([
+      mockRuntime.listContainers.mockResolvedValue([
         { id: 'c1', projectId: id, state: 'running' },
         { id: 'c2', projectId: id, state: 'exited' },
         { id: 'c3', projectId: 'other-project', state: 'running' },
       ]);
       mockProjectStore.removeProject.mockResolvedValue(true);
       await invoke(IPC.PROJECTS_REMOVE, id);
-      expect(mockDockerManager.removeContainer).toHaveBeenCalledWith('c1', true);
-      expect(mockDockerManager.removeContainer).toHaveBeenCalledWith('c2', true);
-      expect(mockDockerManager.removeContainer).not.toHaveBeenCalledWith('c3', true);
+      expect(mockRuntime.removeContainer).toHaveBeenCalledWith('c1', true);
+      expect(mockRuntime.removeContainer).toHaveBeenCalledWith('c2', true);
+      expect(mockRuntime.removeContainer).not.toHaveBeenCalledWith('c3', true);
     });
 
     it('still removes the project even if container cleanup fails', async () => {
       const id = 'proj-cleanup-fail';
-      mockDockerManager.listRunningContainers.mockRejectedValue(new Error('Docker unavailable'));
+      mockRuntime.listContainers.mockRejectedValue(new Error('Docker unavailable'));
       mockProjectStore.removeProject.mockResolvedValue(true);
       const result = await invoke(IPC.PROJECTS_REMOVE, id);
       expect(mockProjectStore.removeProject).toHaveBeenCalledWith(id);

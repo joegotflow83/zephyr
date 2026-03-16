@@ -9,10 +9,11 @@ import type { ProjectStore } from '../../services/project-store';
 import type { ImportExportService } from '../../services/import-export';
 import type { PreValidationStore } from '../../services/pre-validation-store';
 import type { HooksStore } from '../../services/hooks-store';
+import type { KiroHooksStore } from '../../services/kiro-hooks-store';
 import type { LoopScriptsStore } from '../../services/loop-scripts-store';
 import type { ClaudeSettingsStore } from '../../services/claude-settings-store';
 import type { LoopRunner } from '../../services/loop-runner';
-import type { DockerManager } from '../../services/docker-manager';
+import type { ContainerRuntime } from '../../services/container-runtime';
 import type { CredentialManager } from '../../services/credential-manager';
 import type { SSHKeyManager } from '../../services/ssh-key-manager';
 import type { DeployKeyStore } from '../../services/deploy-key-store';
@@ -37,17 +38,18 @@ export interface DataServices {
   importExport: ImportExportService;
   preValidationStore: PreValidationStore;
   hooksStore: HooksStore;
+  kiroHooksStore: KiroHooksStore;
   loopScriptsStore: LoopScriptsStore;
   claudeSettingsStore: ClaudeSettingsStore;
   loopRunner: LoopRunner;
-  dockerManager: DockerManager;
+  runtime: ContainerRuntime;
   credentialManager: CredentialManager;
   sshKeyManager?: SSHKeyManager;
   deployKeyStore?: DeployKeyStore;
 }
 
 export function registerDataHandlers(services: DataServices): void {
-  const { configManager, projectStore, importExport, preValidationStore, hooksStore, loopScriptsStore, claudeSettingsStore, loopRunner, dockerManager, credentialManager, sshKeyManager, deployKeyStore } =
+  const { configManager, projectStore, importExport, preValidationStore, hooksStore, kiroHooksStore, loopScriptsStore, claudeSettingsStore, loopRunner, runtime, credentialManager, sshKeyManager, deployKeyStore } =
     services;
   const logger = getLogger('ipc');
 
@@ -134,11 +136,11 @@ export function registerDataHandlers(services: DataServices): void {
 
       // Remove all Docker containers associated with this project
       try {
-        const containers = await dockerManager.listRunningContainers();
-        const projectContainers = containers.filter((c) => c.projectId === id);
+        const allContainers = await runtime.listContainers();
+        const projectContainers = allContainers.filter((c) => c.projectId === id);
         for (const container of projectContainers) {
           try {
-            await dockerManager.removeContainer(container.id, true);
+            await runtime.removeContainer(container.id, true);
           } catch (err) {
             logger.warn('Failed to remove container for deleted project', { containerId: container.id, err });
           }
@@ -254,6 +256,27 @@ export function registerDataHandlers(services: DataServices): void {
 
   ipcMain.handle(IPC.HOOKS_REMOVE, async (_event, filename: string): Promise<boolean> => {
     return hooksStore.removeHook(filename);
+  });
+
+  // ── Kiro hooks ─────────────────────────────────────────────────────────────
+
+  ipcMain.handle(IPC.KIRO_HOOKS_LIST, async () => {
+    return kiroHooksStore.listHooks();
+  });
+
+  ipcMain.handle(IPC.KIRO_HOOKS_GET, async (_event, filename: string) => {
+    return kiroHooksStore.getHook(filename);
+  });
+
+  ipcMain.handle(
+    IPC.KIRO_HOOKS_ADD,
+    async (_event, filename: string, content: string): Promise<void> => {
+      await kiroHooksStore.addHook(filename, content);
+    },
+  );
+
+  ipcMain.handle(IPC.KIRO_HOOKS_REMOVE, async (_event, filename: string): Promise<boolean> => {
+    return kiroHooksStore.removeHook(filename);
   });
 
   // ── Loop scripts ───────────────────────────────────────────────────────────

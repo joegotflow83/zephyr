@@ -83,7 +83,7 @@ function buildOpenSSHPrivateKey(privateScalar: Buffer, publicKey: Buffer): strin
   return `-----BEGIN OPENSSH PRIVATE KEY-----\n${lines}\n-----END OPENSSH PRIVATE KEY-----\n`;
 }
 
-/** DockerManager interface required by SSHKeyManager (narrow pick for testability). */
+/** ContainerRuntime interface required by SSHKeyManager (narrow pick for testability). */
 export interface Execable {
   execCommand(
     containerId: string,

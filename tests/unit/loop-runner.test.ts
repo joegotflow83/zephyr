@@ -6,26 +6,35 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { LoopRunner } from '../../src/services/loop-runner';
 import { LogParser } from '../../src/services/log-parser';
 import { LoopMode, LoopStatus } from '../../src/shared/loop-types';
-import type { DockerManager, ContainerStatus } from '../../src/services/docker-manager';
+import type { ContainerRuntime, ContainerStatus } from '../../src/services/container-runtime';
 
 // -- Mocks --------------------------------------------------------------------
 
-function createMockDockerManager(): DockerManager {
+function createMockDockerManager(): ContainerRuntime {
   return {
+    runtimeType: 'docker',
+    isAvailable: vi.fn().mockResolvedValue(true),
+    getInfo: vi.fn().mockResolvedValue({ version: '27.0', containers: 0, images: 0 }),
+    isImageAvailable: vi.fn().mockResolvedValue(true),
+    pullImage: vi.fn().mockResolvedValue(undefined),
+    saveImage: vi.fn().mockResolvedValue(undefined),
+    buildImage: vi.fn().mockResolvedValue(undefined),
     createContainer: vi.fn().mockResolvedValue('container-123'),
     startContainer: vi.fn().mockResolvedValue(undefined),
     stopContainer: vi.fn().mockResolvedValue(undefined),
     removeContainer: vi.fn().mockResolvedValue(undefined),
-    listRunningContainers: vi.fn().mockResolvedValue([]),
+    listContainers: vi.fn().mockResolvedValue([]),
     getContainerStatus: vi.fn().mockResolvedValue({
       id: 'container-123',
       state: 'running',
       status: 'Up 1 minute',
     } as ContainerStatus),
-    streamLogs: vi.fn().mockResolvedValue({
-      abort: vi.fn(),
-    }),
-  } as unknown as DockerManager;
+    getContainerCreated: vi.fn().mockResolvedValue(null),
+    execCommand: vi.fn().mockResolvedValue({ exitCode: 0, stdout: '', stderr: '' }),
+    createExecSession: vi.fn().mockResolvedValue({ id: 'exec-1', stream: {} }),
+    resizeExec: vi.fn().mockResolvedValue(undefined),
+    streamLogs: vi.fn().mockResolvedValue({ stop: vi.fn() }),
+  } as unknown as ContainerRuntime;
 }
 
 function createMockLogParser(): LogParser {
@@ -43,7 +52,7 @@ function createMockLogParser(): LogParser {
 
 describe('LoopRunner', () => {
   let runner: LoopRunner;
-  let docker: DockerManager;
+  let docker: ContainerRuntime;
   let parser: LogParser;
 
   beforeEach(() => {
@@ -115,7 +124,7 @@ describe('LoopRunner', () => {
       expect(docker.createContainer).toHaveBeenCalledWith(
         expect.objectContaining({
           env: { FOO: 'bar', BAZ: 'qux' },
-          volumes: { '/host/path': '/container/path', '/tmp': '/data' },
+          binds: ['/host/path:/container/path', '/tmp:/data'],
         }),
       );
     });
@@ -248,9 +257,9 @@ describe('LoopRunner', () => {
       expect(docker.stopContainer).toHaveBeenCalledWith('container-123', 10);
     });
 
-    it('aborts log streaming when stopping', async () => {
-      const abortController = { abort: vi.fn() };
-      vi.mocked(docker.streamLogs).mockResolvedValueOnce(abortController as any);
+    it('stops log streaming when stopping', async () => {
+      const logStream = { stop: vi.fn() };
+      vi.mocked(docker.streamLogs).mockResolvedValueOnce(logStream as any);
 
       await runner.startLoop({
         projectId: 'proj-123',
@@ -260,7 +269,7 @@ describe('LoopRunner', () => {
 
       await runner.stopLoop('proj-123');
 
-      expect(abortController.abort).toHaveBeenCalled();
+      expect(logStream.stop).toHaveBeenCalled();
     });
 
     it('throws if loop does not exist', async () => {
@@ -498,7 +507,7 @@ describe('LoopRunner', () => {
         onLine('[main abc1234] Commit message');
         onLine('ERROR: Something went wrong');
         onLine('INFO: Normal log line');
-        return { abort: vi.fn() } as any;
+        return { stop: vi.fn() } as any;
       });
 
       vi.mocked(parser.parseLine).mockImplementation((line) => {
@@ -538,7 +547,7 @@ describe('LoopRunner', () => {
 
       vi.mocked(docker.streamLogs).mockImplementationOnce(async (containerId, onLine) => {
         onLine('Test log line');
-        return { abort: vi.fn() } as any;
+        return { stop: vi.fn() } as any;
       });
 
       await runner.startLoop({
@@ -560,7 +569,7 @@ describe('LoopRunner', () => {
       vi.mocked(docker.streamLogs).mockImplementationOnce(async (containerId, onLine) => {
         onLine('[main abc1234] First commit');
         onLine('[main def5678] Second commit');
-        return { abort: vi.fn() } as any;
+        return { stop: vi.fn() } as any;
       });
 
       vi.mocked(parser.parseLine).mockImplementation((line) => {
@@ -593,7 +602,7 @@ describe('LoopRunner', () => {
         onLine('ERROR: First error');
         onLine('ERROR: Second error');
         onLine('INFO: Normal line');
-        return { abort: vi.fn() } as any;
+        return { stop: vi.fn() } as any;
       });
 
       vi.mocked(parser.parseLine).mockImplementation((line) => {
@@ -620,7 +629,7 @@ describe('LoopRunner', () => {
         onLine('======================== LOOP 1 ========================');
         onLine('Some work...');
         onLine('======================== LOOP 2 ========================');
-        return { abort: vi.fn() } as any;
+        return { stop: vi.fn() } as any;
       });
 
       vi.mocked(parser.parseIterationBoundary).mockImplementation((line) => {
@@ -648,7 +657,7 @@ describe('LoopRunner', () => {
 
       vi.mocked(docker.streamLogs).mockImplementationOnce(async (containerId, onLine) => {
         lines.forEach((line) => onLine(line));
-        return { abort: vi.fn() } as any;
+        return { stop: vi.fn() } as any;
       });
 
       await runner.startLoop({

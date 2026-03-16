@@ -6,26 +6,37 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { LoopRunner } from '../../src/services/loop-runner';
 import { LogParser } from '../../src/services/log-parser';
 import { LoopMode, LoopStatus } from '../../src/shared/loop-types';
-import type { DockerManager, ContainerInfo } from '../../src/services/docker-manager';
+import type { ContainerRuntime, ContainerSummary } from '../../src/services/container-runtime';
 
 // -- Mocks --------------------------------------------------------------------
 
-function createMockDockerManager(): DockerManager {
+function createMockDockerManager(): ContainerRuntime {
   return {
+    runtimeType: 'docker',
+    isAvailable: vi.fn().mockResolvedValue(true),
+    getInfo: vi.fn().mockResolvedValue({ version: '27.0', containers: 0, images: 0 }),
+    isImageAvailable: vi.fn().mockResolvedValue(true),
+    pullImage: vi.fn().mockResolvedValue(undefined),
+    saveImage: vi.fn().mockResolvedValue(undefined),
+    buildImage: vi.fn().mockResolvedValue(undefined),
     createContainer: vi.fn().mockResolvedValue('container-123'),
     startContainer: vi.fn().mockResolvedValue(undefined),
     stopContainer: vi.fn().mockResolvedValue(undefined),
     removeContainer: vi.fn().mockResolvedValue(undefined),
-    listRunningContainers: vi.fn().mockResolvedValue([]),
-    streamLogs: vi.fn().mockResolvedValue({
-      abort: vi.fn(),
-    }),
     getContainerStatus: vi.fn().mockResolvedValue({
       id: 'container-123',
       state: 'running',
       status: 'Up 10 minutes',
     }),
-  } as unknown as DockerManager;
+    getContainerCreated: vi.fn().mockResolvedValue(null),
+    listContainers: vi.fn().mockResolvedValue([]),
+    execCommand: vi.fn().mockResolvedValue({ exitCode: 0, stdout: '', stderr: '' }),
+    createExecSession: vi.fn().mockResolvedValue({ id: 'exec-1', stream: {} }),
+    resizeExec: vi.fn().mockResolvedValue(undefined),
+    streamLogs: vi.fn().mockResolvedValue({
+      stop: vi.fn(),
+    }),
+  } as unknown as ContainerRuntime;
 }
 
 function createMockLogParser(): LogParser {
@@ -48,7 +59,7 @@ function createMockProjectStore() {
   };
 }
 
-function createMockContainer(projectId: string, id: string = 'container-123'): ContainerInfo {
+function createMockContainer(projectId: string, id: string = 'container-123'): ContainerSummary {
   return {
     id,
     name: `zephyr-${projectId.substring(0, 8)}`,
@@ -64,7 +75,7 @@ function createMockContainer(projectId: string, id: string = 'container-123'): C
 
 describe('LoopRunner - recoverLoops', () => {
   let runner: LoopRunner;
-  let docker: DockerManager;
+  let docker: ContainerRuntime;
   let parser: LogParser;
   let projectStore: ReturnType<typeof createMockProjectStore>;
 
@@ -262,9 +273,9 @@ describe('LoopRunner - recoverLoops', () => {
   describe('error handling', () => {
     it('continues recovery if one container fails', async () => {
       vi.spyOn(docker, 'streamLogs')
-        .mockResolvedValueOnce({ abort: vi.fn() }) // First succeeds
+        .mockResolvedValueOnce({ stop: vi.fn() }) // First succeeds
         .mockRejectedValueOnce(new Error('Stream failed')) // Second fails
-        .mockResolvedValueOnce({ abort: vi.fn() }); // Third succeeds
+        .mockResolvedValueOnce({ stop: vi.fn() }); // Third succeeds
 
       const containers = [
         createMockContainer('proj-1', 'container-1'),

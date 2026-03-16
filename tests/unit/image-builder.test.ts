@@ -18,7 +18,7 @@
 
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { ImageBuilder, BuildProgressEvent } from '../../src/services/image-builder';
-import { DockerManager } from '../../src/services/docker-manager';
+import type { ContainerRuntime } from '../../src/services/container-runtime';
 import { ImageStore } from '../../src/services/image-store';
 import { ImageBuildConfig, ZephyrImage } from '../../src/shared/models';
 
@@ -118,7 +118,7 @@ describe('ImageBuilder', () => {
     dockerManager = makeMockDockerManager();
     imageStore = makeMockImageStore();
     builder = new ImageBuilder(
-      dockerManager as unknown as DockerManager,
+      dockerManager as unknown as ContainerRuntime,
       imageStore as unknown as ImageStore
     );
 
@@ -160,7 +160,7 @@ describe('ImageBuilder', () => {
       );
     });
 
-    it('calls DockerManager.buildImage with the derived tag', async () => {
+    it('calls ContainerRuntime.buildImage with the derived tag', async () => {
       await builder.buildImage(SAMPLE_CONFIG);
       const [contextDir, tag] = dockerManager.buildImage.mock.calls[0] as [
         string,
@@ -255,7 +255,7 @@ describe('ImageBuilder', () => {
       });
     });
 
-    it('propagates errors from DockerManager.buildImage', async () => {
+    it('propagates errors from ContainerRuntime.buildImage', async () => {
       dockerManager.buildImage.mockRejectedValue(new Error('build failed'));
       await expect(builder.buildImage(SAMPLE_CONFIG)).rejects.toThrow('build failed');
     });
@@ -296,7 +296,7 @@ describe('ImageBuilder', () => {
     beforeEach(() => {
       imageStore = makeMockImageStore([SAMPLE_IMAGE]);
       builder = new ImageBuilder(
-        dockerManager as unknown as DockerManager,
+        dockerManager as unknown as ContainerRuntime,
         imageStore as unknown as ImageStore
       );
     });

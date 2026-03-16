@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { TerminalManager } from '../../src/services/terminal-manager';
-import { DockerManager } from '../../src/services/docker-manager';
+import type { ContainerRuntime } from '../../src/services/container-runtime';
 import { EventEmitter } from 'events';
 
 // Mock stream class
@@ -13,7 +13,7 @@ class MockStream extends EventEmitter {
 
 describe('TerminalManager', () => {
   let terminalManager: TerminalManager;
-  let mockDockerManager: DockerManager;
+  let mockRuntime: Pick<ContainerRuntime, 'createExecSession' | 'resizeExec'>;
   let mockWebContents: any;
   let mockStream: MockStream;
 
@@ -21,8 +21,8 @@ describe('TerminalManager', () => {
     // Create mock stream
     mockStream = new MockStream();
 
-    // Create mock DockerManager
-    mockDockerManager = {
+    // Create mock ContainerRuntime
+    mockRuntime = {
       createExecSession: vi.fn(),
       resizeExec: vi.fn(),
     } as any;
@@ -34,7 +34,7 @@ describe('TerminalManager', () => {
     };
 
     // Create TerminalManager instance
-    terminalManager = new TerminalManager(mockDockerManager, mockWebContents);
+    terminalManager = new TerminalManager(mockRuntime as ContainerRuntime, mockWebContents);
   });
 
   afterEach(() => {
@@ -43,7 +43,7 @@ describe('TerminalManager', () => {
 
   describe('openSession', () => {
     it('should open a terminal session successfully', async () => {
-      vi.mocked(mockDockerManager.createExecSession).mockResolvedValue({
+      vi.mocked(mockRuntime.createExecSession).mockResolvedValue({
         id: 'exec-123',
         stream: mockStream as any,
       });
@@ -56,11 +56,11 @@ describe('TerminalManager', () => {
       });
       expect(session.id).toMatch(/^[0-9a-f-]{36}$/); // UUID format
       expect(session.createdAt).toBeInstanceOf(Date);
-      expect(mockDockerManager.createExecSession).toHaveBeenCalledWith('container-123', {});
+      expect(mockRuntime.createExecSession).toHaveBeenCalledWith('container-123', {});
     });
 
     it('should pass options to Docker exec', async () => {
-      vi.mocked(mockDockerManager.createExecSession).mockResolvedValue({
+      vi.mocked(mockRuntime.createExecSession).mockResolvedValue({
         id: 'exec-123',
         stream: mockStream as any,
       });
@@ -74,7 +74,7 @@ describe('TerminalManager', () => {
         cols: 80,
       });
 
-      expect(mockDockerManager.createExecSession).toHaveBeenCalledWith('container-123', {
+      expect(mockRuntime.createExecSession).toHaveBeenCalledWith('container-123', {
         shell: 'zsh',
         user: 'root',
         workingDir: '/app',
@@ -85,7 +85,7 @@ describe('TerminalManager', () => {
     });
 
     it('should store user in session metadata', async () => {
-      vi.mocked(mockDockerManager.createExecSession).mockResolvedValue({
+      vi.mocked(mockRuntime.createExecSession).mockResolvedValue({
         id: 'exec-123',
         stream: mockStream as any,
       });
@@ -96,7 +96,7 @@ describe('TerminalManager', () => {
     });
 
     it('should forward stdout data to renderer via IPC', async () => {
-      vi.mocked(mockDockerManager.createExecSession).mockResolvedValue({
+      vi.mocked(mockRuntime.createExecSession).mockResolvedValue({
         id: 'exec-123',
         stream: mockStream as any,
       });
@@ -110,7 +110,7 @@ describe('TerminalManager', () => {
     });
 
     it('should not send data if webContents is destroyed', async () => {
-      vi.mocked(mockDockerManager.createExecSession).mockResolvedValue({
+      vi.mocked(mockRuntime.createExecSession).mockResolvedValue({
         id: 'exec-123',
         stream: mockStream as any,
       });
@@ -125,7 +125,7 @@ describe('TerminalManager', () => {
     });
 
     it('should send terminal:closed event when stream ends', async () => {
-      vi.mocked(mockDockerManager.createExecSession).mockResolvedValue({
+      vi.mocked(mockRuntime.createExecSession).mockResolvedValue({
         id: 'exec-123',
         stream: mockStream as any,
       });
@@ -139,7 +139,7 @@ describe('TerminalManager', () => {
     });
 
     it('should send terminal:error event on stream error', async () => {
-      vi.mocked(mockDockerManager.createExecSession).mockResolvedValue({
+      vi.mocked(mockRuntime.createExecSession).mockResolvedValue({
         id: 'exec-123',
         stream: mockStream as any,
       });
@@ -154,7 +154,7 @@ describe('TerminalManager', () => {
     });
 
     it('should remove session from map on stream end', async () => {
-      vi.mocked(mockDockerManager.createExecSession).mockResolvedValue({
+      vi.mocked(mockRuntime.createExecSession).mockResolvedValue({
         id: 'exec-123',
         stream: mockStream as any,
       });
@@ -169,7 +169,7 @@ describe('TerminalManager', () => {
     });
 
     it('should throw error if createExecSession fails', async () => {
-      vi.mocked(mockDockerManager.createExecSession).mockRejectedValue(new Error('Container not found'));
+      vi.mocked(mockRuntime.createExecSession).mockRejectedValue(new Error('Container not found'));
 
       await expect(terminalManager.openSession('invalid-container')).rejects.toThrow('Container not found');
     });
@@ -177,7 +177,7 @@ describe('TerminalManager', () => {
 
   describe('closeSession', () => {
     it('should close an open session', async () => {
-      vi.mocked(mockDockerManager.createExecSession).mockResolvedValue({
+      vi.mocked(mockRuntime.createExecSession).mockResolvedValue({
         id: 'exec-123',
         stream: mockStream as any,
       });
@@ -196,7 +196,7 @@ describe('TerminalManager', () => {
     });
 
     it('should remove session even if end() throws', async () => {
-      vi.mocked(mockDockerManager.createExecSession).mockResolvedValue({
+      vi.mocked(mockRuntime.createExecSession).mockResolvedValue({
         id: 'exec-123',
         stream: mockStream as any,
       });
@@ -216,7 +216,7 @@ describe('TerminalManager', () => {
 
   describe('writeToSession', () => {
     it('should write data to session stream', async () => {
-      vi.mocked(mockDockerManager.createExecSession).mockResolvedValue({
+      vi.mocked(mockRuntime.createExecSession).mockResolvedValue({
         id: 'exec-123',
         stream: mockStream as any,
       });
@@ -234,7 +234,7 @@ describe('TerminalManager', () => {
     });
 
     it('should write multiple times to same session', async () => {
-      vi.mocked(mockDockerManager.createExecSession).mockResolvedValue({
+      vi.mocked(mockRuntime.createExecSession).mockResolvedValue({
         id: 'exec-123',
         stream: mockStream as any,
       });
@@ -251,16 +251,16 @@ describe('TerminalManager', () => {
 
   describe('resizeSession', () => {
     it('should resize session PTY', async () => {
-      vi.mocked(mockDockerManager.createExecSession).mockResolvedValue({
+      vi.mocked(mockRuntime.createExecSession).mockResolvedValue({
         id: 'exec-123',
         stream: mockStream as any,
       });
-      vi.mocked(mockDockerManager.resizeExec).mockResolvedValue();
+      vi.mocked(mockRuntime.resizeExec).mockResolvedValue();
 
       const session = await terminalManager.openSession('container-123');
       await terminalManager.resizeSession(session.id, 120, 40);
 
-      expect(mockDockerManager.resizeExec).toHaveBeenCalledWith('exec-123', 40, 120);
+      expect(mockRuntime.resizeExec).toHaveBeenCalledWith('exec-123', 40, 120);
     });
 
     it('should throw error if session not found', async () => {
@@ -270,11 +270,11 @@ describe('TerminalManager', () => {
     });
 
     it('should propagate resize errors', async () => {
-      vi.mocked(mockDockerManager.createExecSession).mockResolvedValue({
+      vi.mocked(mockRuntime.createExecSession).mockResolvedValue({
         id: 'exec-123',
         stream: mockStream as any,
       });
-      vi.mocked(mockDockerManager.resizeExec).mockRejectedValue(new Error('Resize failed'));
+      vi.mocked(mockRuntime.resizeExec).mockRejectedValue(new Error('Resize failed'));
 
       const session = await terminalManager.openSession('container-123');
 
@@ -288,7 +288,7 @@ describe('TerminalManager', () => {
     });
 
     it('should return all active sessions', async () => {
-      vi.mocked(mockDockerManager.createExecSession).mockResolvedValue({
+      vi.mocked(mockRuntime.createExecSession).mockResolvedValue({
         id: 'exec-123',
         stream: mockStream as any,
       });
@@ -306,7 +306,7 @@ describe('TerminalManager', () => {
       const stream1 = new MockStream();
       const stream2 = new MockStream();
 
-      vi.mocked(mockDockerManager.createExecSession)
+      vi.mocked(mockRuntime.createExecSession)
         .mockResolvedValueOnce({ id: 'exec-1', stream: stream1 as any })
         .mockResolvedValueOnce({ id: 'exec-2', stream: stream2 as any });
 
@@ -323,7 +323,7 @@ describe('TerminalManager', () => {
 
   describe('getSession', () => {
     it('should return session metadata by ID', async () => {
-      vi.mocked(mockDockerManager.createExecSession).mockResolvedValue({
+      vi.mocked(mockRuntime.createExecSession).mockResolvedValue({
         id: 'exec-123',
         stream: mockStream as any,
       });
@@ -346,7 +346,7 @@ describe('TerminalManager', () => {
       const stream2 = new MockStream();
       const stream3 = new MockStream();
 
-      vi.mocked(mockDockerManager.createExecSession)
+      vi.mocked(mockRuntime.createExecSession)
         .mockResolvedValueOnce({ id: 'exec-1', stream: stream1 as any })
         .mockResolvedValueOnce({ id: 'exec-2', stream: stream2 as any })
         .mockResolvedValueOnce({ id: 'exec-3', stream: stream3 as any });
@@ -376,7 +376,7 @@ describe('TerminalManager', () => {
 
       terminalManager.setWebContents(newWebContents as any);
 
-      vi.mocked(mockDockerManager.createExecSession).mockResolvedValue({
+      vi.mocked(mockRuntime.createExecSession).mockResolvedValue({
         id: 'exec-123',
         stream: mockStream as any,
       });
@@ -391,11 +391,11 @@ describe('TerminalManager', () => {
 
   describe('session lifecycle', () => {
     it('should handle full lifecycle: open -> write -> resize -> close', async () => {
-      vi.mocked(mockDockerManager.createExecSession).mockResolvedValue({
+      vi.mocked(mockRuntime.createExecSession).mockResolvedValue({
         id: 'exec-123',
         stream: mockStream as any,
       });
-      vi.mocked(mockDockerManager.resizeExec).mockResolvedValue();
+      vi.mocked(mockRuntime.resizeExec).mockResolvedValue();
 
       // Open session
       const session = await terminalManager.openSession('container-123', {
@@ -416,7 +416,7 @@ describe('TerminalManager', () => {
 
       // Resize
       await terminalManager.resizeSession(session.id, 120, 40);
-      expect(mockDockerManager.resizeExec).toHaveBeenCalledWith('exec-123', 40, 120);
+      expect(mockRuntime.resizeExec).toHaveBeenCalledWith('exec-123', 40, 120);
 
       // Close
       await terminalManager.closeSession(session.id);
@@ -427,7 +427,7 @@ describe('TerminalManager', () => {
       const stream1 = new MockStream();
       const stream2 = new MockStream();
 
-      vi.mocked(mockDockerManager.createExecSession)
+      vi.mocked(mockRuntime.createExecSession)
         .mockResolvedValueOnce({ id: 'exec-1', stream: stream1 as any })
         .mockResolvedValueOnce({ id: 'exec-2', stream: stream2 as any });
 

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useSettings } from '../../hooks/useSettings';
 import { CredentialsSection } from './CredentialsSection';
-import { DockerSection } from './DockerSection';
+import { ContainerRuntimeSection } from './ContainerRuntimeSection';
 import { GeneralSection } from './GeneralSection';
 import { UpdatesSection } from './UpdatesSection';
 import { OrphanedKeysSection } from './OrphanedKeysSection';
@@ -103,7 +103,7 @@ export const SettingsTab: React.FC = () => {
         <div className="mb-6">
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">Settings</h1>
           <p className="text-gray-500 dark:text-gray-400">
-            Configure credentials, Docker, application preferences, and updates
+            Configure credentials, container runtime, application preferences, and updates
           </p>
         </div>
 
@@ -116,12 +116,12 @@ export const SettingsTab: React.FC = () => {
           <CredentialsSection />
         </SettingsSection>
 
-        {/* Docker Section */}
+        {/* Container Runtime Section */}
         <SettingsSection
-          title="Docker"
-          description="Configure Docker connection and container settings"
+          title="Container Runtime"
+          description="Select and configure the container runtime (Docker or Podman)"
         >
-          <DockerSection />
+          <ContainerRuntimeSection />
         </SettingsSection>
 
         {/* General Section */}

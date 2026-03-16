@@ -138,7 +138,8 @@ const {
   mockConfigManager,
   mockProjectStore,
   mockImportExport,
-  mockDockerManager,
+  mockDockerRuntime,
+  mockRuntimeHealth,
   mockDockerHealth,
   mockCredentialManager,
   mockLoginManager,
@@ -156,10 +157,13 @@ const {
   mockVmManager,
   mockSshKeyManager,
   mockDeployKeyStore,
+  mockKiroHooksStore,
   MockConfigManager,
   MockProjectStore,
   MockImportExportService,
-  MockDockerManager,
+  MockDockerRuntime,
+  MockPodmanRuntime,
+  MockRuntimeHealthMonitor,
   MockDockerHealthMonitor,
   MockCredentialManager,
   MockLoginManager,
@@ -177,6 +181,7 @@ const {
   MockVMManager,
   MockSSHKeyManager,
   MockDeployKeyStore,
+  MockKiroHooksStore,
 } = vi.hoisted(() => {
   const mockConfigManager = {
     loadJson: vi.fn(),
@@ -198,23 +203,20 @@ const {
     importConfig: vi.fn(),
   };
 
-  const mockDockerManager = {
-    getStatus: vi.fn(),
-    pullImage: vi.fn(),
-    createContainer: vi.fn(),
-    startContainer: vi.fn(),
-    stopContainer: vi.fn(),
-    removeContainer: vi.fn(),
-    listContainers: vi.fn(),
-    exec: vi.fn(),
-    getContainerStatus: vi.fn(),
+  const mockDockerRuntime = {
+    runtimeType: 'docker' as const,
+    isAvailable: vi.fn().mockResolvedValue(true),
+    listContainers: vi.fn().mockResolvedValue([]),
   };
 
-  const mockDockerHealth = {
+  const mockRuntimeHealth = {
     start: vi.fn(),
     stop: vi.fn(),
     getStatus: vi.fn(),
   };
+
+  // Keep for legacy compat in tests that still reference it
+  const mockDockerHealth = mockRuntimeHealth;
 
   const mockCredentialManager = {
     store: vi.fn(),
@@ -278,8 +280,11 @@ const {
   const MockConfigManager = vi.fn(function() { return mockConfigManager; });
   const MockProjectStore = vi.fn(function() { return mockProjectStore; });
   const MockImportExportService = vi.fn(function() { return mockImportExport; });
-  const MockDockerManager = vi.fn(function() { return mockDockerManager; });
-  const MockDockerHealthMonitor = vi.fn(function() { return mockDockerHealth; });
+  const MockDockerRuntime = vi.fn(function() { return mockDockerRuntime; });
+  const MockPodmanRuntime = vi.fn(function() { return ({}); });
+  const MockRuntimeHealthMonitor = vi.fn(function() { return mockRuntimeHealth; });
+  // Alias kept for tests that reference the old name
+  const MockDockerHealthMonitor = MockRuntimeHealthMonitor;
   const MockCredentialManager = vi.fn(function() { return mockCredentialManager; });
   const MockLoginManager = vi.fn(function() { return mockLoginManager; });
   const MockLogParser = vi.fn(function() { return mockLogParser; });
@@ -321,11 +326,15 @@ const {
   };
   const MockDeployKeyStore = vi.fn(function() { return mockDeployKeyStore; });
 
+  const mockKiroHooksStore = {};
+  const MockKiroHooksStore = vi.fn(function() { return mockKiroHooksStore; });
+
   return {
     mockConfigManager,
     mockProjectStore,
     mockImportExport,
-    mockDockerManager,
+    mockDockerRuntime,
+    mockRuntimeHealth,
     mockDockerHealth,
     mockCredentialManager,
     mockLoginManager,
@@ -343,10 +352,13 @@ const {
     mockVmManager,
     mockSshKeyManager,
     mockDeployKeyStore,
+    mockKiroHooksStore,
     MockConfigManager,
     MockProjectStore,
     MockImportExportService,
-    MockDockerManager,
+    MockDockerRuntime,
+    MockPodmanRuntime,
+    MockRuntimeHealthMonitor,
     MockDockerHealthMonitor,
     MockCredentialManager,
     MockLoginManager,
@@ -364,6 +376,7 @@ const {
     MockVMManager,
     MockSSHKeyManager,
     MockDeployKeyStore,
+    MockKiroHooksStore,
   };
 });
 
@@ -379,12 +392,16 @@ vi.mock('../../src/services/import-export', () => ({
   ImportExportService: MockImportExportService,
 }));
 
-vi.mock('../../src/services/docker-manager', () => ({
-  DockerManager: MockDockerManager,
+vi.mock('../../src/services/docker-runtime', () => ({
+  DockerRuntime: MockDockerRuntime,
 }));
 
-vi.mock('../../src/services/docker-health', () => ({
-  DockerHealthMonitor: MockDockerHealthMonitor,
+vi.mock('../../src/services/podman-runtime', () => ({
+  PodmanRuntime: MockPodmanRuntime,
+}));
+
+vi.mock('../../src/services/runtime-health', () => ({
+  RuntimeHealthMonitor: MockRuntimeHealthMonitor,
 }));
 
 vi.mock('../../src/services/credential-manager', () => ({
@@ -449,6 +466,10 @@ vi.mock('../../src/services/ssh-key-manager', () => ({
 
 vi.mock('../../src/services/deploy-key-store', () => ({
   DeployKeyStore: MockDeployKeyStore,
+}));
+
+vi.mock('../../src/services/kiro-hooks-store', () => ({
+  KiroHooksStore: MockKiroHooksStore,
 }));
 
 // ── Mock logging ─────────────────────────────────────────────────────────────
@@ -523,8 +544,8 @@ vi.mock('../../src/main/ipc-handlers/data-handlers', () => ({
   registerDataHandlers: mockRegisterDataHandlers,
 }));
 
-vi.mock('../../src/main/ipc-handlers/docker-handlers', () => ({
-  registerDockerHandlers: mockRegisterDockerHandlers,
+vi.mock('../../src/main/ipc-handlers/runtime-handlers', () => ({
+  registerRuntimeHandlers: mockRegisterDockerHandlers,
 }));
 
 vi.mock('../../src/main/ipc-handlers/credential-handlers', () => ({
@@ -612,12 +633,8 @@ describe('Main Entry Point', () => {
       expect(MockImportExportService).toHaveBeenCalledWith(mockConfigManager);
     });
 
-    it('should instantiate DockerManager', () => {
-      expect(MockDockerManager).toHaveBeenCalled();
-    });
-
-    it('should instantiate DockerHealthMonitor with DockerManager', () => {
-      expect(MockDockerHealthMonitor).toHaveBeenCalledWith(mockDockerManager);
+    it('should instantiate RuntimeHealthMonitor with a ContainerRuntime', () => {
+      expect(MockRuntimeHealthMonitor).toHaveBeenCalledWith(mockDockerRuntime);
     });
 
     it('should instantiate CredentialManager with zephyr config dir', () => {
@@ -632,8 +649,8 @@ describe('Main Entry Point', () => {
       expect(MockLogParser).toHaveBeenCalled();
     });
 
-    it('should instantiate LoopRunner with DockerManager, LogParser, max concurrent 3, and VMManager', () => {
-      expect(MockLoopRunner).toHaveBeenCalledWith(mockDockerManager, mockLogParser, 3, mockVmManager);
+    it('should instantiate LoopRunner with ContainerRuntime, LogParser, max concurrent 3, and VMManager', () => {
+      expect(MockLoopRunner).toHaveBeenCalledWith(mockDockerRuntime, mockLogParser, 3, mockVmManager);
     });
 
     it('should instantiate LoopScheduler with LoopRunner', () => {
@@ -644,41 +661,42 @@ describe('Main Entry Point', () => {
       expect(MockLogExporter).toHaveBeenCalled();
     });
 
-    it('should instantiate TerminalManager with DockerManager', () => {
-      expect(MockTerminalManager).toHaveBeenCalledWith(mockDockerManager);
+    it('should instantiate TerminalManager with ContainerRuntime', () => {
+      expect(MockTerminalManager).toHaveBeenCalledWith(mockDockerRuntime);
     });
 
     it('should instantiate SelfUpdater with app path and LoopRunner', () => {
       expect(MockSelfUpdater).toHaveBeenCalledWith('/mock/app/path', mockLoopRunner);
     });
 
-    it('should instantiate CleanupManager with DockerManager', () => {
-      expect(MockCleanupManager).toHaveBeenCalledWith(mockDockerManager);
+    it('should instantiate CleanupManager with ContainerRuntime', () => {
+      expect(MockCleanupManager).toHaveBeenCalledWith(mockDockerRuntime);
     });
   });
 
   describe('IPC Handler Registration', () => {
-    it('should register data handlers with ConfigManager, ProjectStore, ImportExport, PreValidationStore, HooksStore, LoopRunner, DockerManager, CredentialManager, SSHKeyManager, and DeployKeyStore', () => {
+    it('should register data handlers with ConfigManager, ProjectStore, ImportExport, PreValidationStore, HooksStore, LoopRunner, ContainerRuntime, CredentialManager, SSHKeyManager, and DeployKeyStore', () => {
       expect(mockRegisterDataHandlers).toHaveBeenCalledWith({
         configManager: mockConfigManager,
         projectStore: mockProjectStore,
         importExport: mockImportExport,
         preValidationStore: mockPreValidationStore,
         hooksStore: mockHooksStore,
+        kiroHooksStore: mockKiroHooksStore,
         loopScriptsStore: mockLoopScriptsStore,
         claudeSettingsStore: mockClaudeSettingsStore,
         loopRunner: mockLoopRunner,
-        dockerManager: mockDockerManager,
+        runtime: mockDockerRuntime,
         credentialManager: mockCredentialManager,
         sshKeyManager: mockSshKeyManager,
         deployKeyStore: mockDeployKeyStore,
       });
     });
 
-    it('should register docker handlers with DockerManager and DockerHealthMonitor', () => {
+    it('should register runtime handlers with runtime and runtimeHealth', () => {
       expect(mockRegisterDockerHandlers).toHaveBeenCalledWith({
-        dockerManager: mockDockerManager,
-        dockerHealth: mockDockerHealth,
+        runtime: mockDockerRuntime,
+        runtimeHealth: mockRuntimeHealth,
       });
     });
 
@@ -698,7 +716,7 @@ describe('Main Entry Point', () => {
           projectStore: mockProjectStore,
           preValidationStore: mockPreValidationStore,
           hooksStore: mockHooksStore,
-          dockerManager: mockDockerManager,
+          runtime: mockDockerRuntime,
         })
       );
     });
@@ -824,12 +842,12 @@ describe('Main Entry Point', () => {
       expect(mockBuildApplicationMenu).toHaveBeenCalled();
     });
 
-    it('should start Docker health monitoring', async () => {
+    it('should start runtime health monitoring', async () => {
       mockConfigManager.loadJson.mockResolvedValue({});
       vi.clearAllMocks();
       await triggerAppReady();
 
-      expect(mockDockerHealth.start).toHaveBeenCalled();
+      expect(mockRuntimeHealth.start).toHaveBeenCalled();
     });
 
     it('should log successful startup', async () => {
@@ -842,12 +860,12 @@ describe('Main Entry Point', () => {
   });
 
   describe('App Lifecycle - window-all-closed', () => {
-    it('should not stop Docker health monitoring (moved to before-quit)', () => {
+    it('should not stop runtime health monitoring on window-all-closed (moved to before-quit)', () => {
       vi.clearAllMocks();
       triggerWindowAllClosed();
 
-      // Docker health monitoring is now stopped in before-quit, not window-all-closed
-      expect(mockDockerHealth.stop).not.toHaveBeenCalled();
+      // Runtime health monitoring is now stopped in before-quit, not window-all-closed
+      expect(mockRuntimeHealth.stop).not.toHaveBeenCalled();
     });
 
     it('should quit app on non-macOS platforms', () => {

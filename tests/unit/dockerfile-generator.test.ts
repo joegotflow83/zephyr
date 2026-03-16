@@ -6,6 +6,7 @@ import {
   generateDockerfile,
   generateClaudeCodeInstallBlock,
   generateClaudeCodeConfigBlock,
+  generateAIToolsInstallBlock,
   getLanguageInstallBlock,
   writeDockerfile,
 } from '../../src/services/dockerfile-generator';
@@ -308,6 +309,59 @@ describe('generateClaudeCodeInstallBlock', () => {
     expect(result).toContain('nodesource');
     expect(result).toContain('setup_22.x');
     expect(result).toContain('@anthropic-ai/claude-code');
+  });
+});
+
+describe('generateAIToolsInstallBlock', () => {
+  it('downloads and installs Amazon Q Developer CLI', () => {
+    const result = generateAIToolsInstallBlock();
+    expect(result).toContain('q-x86_64-linux.zip');
+    expect(result).toContain('q/install.sh');
+  });
+
+  it('downloads and installs Kiro CLI', () => {
+    const result = generateAIToolsInstallBlock();
+    expect(result).toContain('kirocli-x86_64-linux.zip');
+    expect(result).toContain('kirocli/install.sh');
+  });
+
+  it('cleans up temp files after install', () => {
+    const result = generateAIToolsInstallBlock();
+    expect(result).toContain('rm -rf');
+  });
+});
+
+describe('generateDockerfile AI tools', () => {
+  it('includes Q Developer CLI install', () => {
+    const config: ImageBuildConfig = { name: 'test', languages: [] };
+    const result = generateDockerfile(config);
+    expect(result).toContain('q-x86_64-linux.zip');
+  });
+
+  it('includes Kiro CLI install', () => {
+    const config: ImageBuildConfig = { name: 'test', languages: [] };
+    const result = generateDockerfile(config);
+    expect(result).toContain('kirocli-x86_64-linux.zip');
+  });
+
+  it('AI tools install appears after USER ralph', () => {
+    const config: ImageBuildConfig = { name: 'test', languages: [] };
+    const result = generateDockerfile(config);
+    const userRalphIdx = result.indexOf('USER ralph');
+    const qIdx = result.indexOf('q-x86_64-linux.zip');
+    expect(qIdx).toBeGreaterThan(userRalphIdx);
+  });
+
+  it('includes unzip in common tools', () => {
+    const config: ImageBuildConfig = { name: 'test', languages: [] };
+    const result = generateDockerfile(config);
+    expect(result).toContain('unzip');
+  });
+
+  it('sets ~/.local/bin in PATH', () => {
+    const config: ImageBuildConfig = { name: 'test', languages: [] };
+    const result = generateDockerfile(config);
+    expect(result).toContain('/home/ralph/.local/bin');
   });
 });
 

@@ -5,16 +5,17 @@ import type { AppSettings, ProjectConfig, VMConfig, ZephyrImage, ImageBuildConfi
 import type { DeployKeyRecord } from '../../services/deploy-key-store';
 import type { PreValidationScript } from '../../services/pre-validation-store';
 import type { HookFile } from '../../services/hooks-store';
+import type { KiroHookFile } from '../../services/kiro-hooks-store';
 import type { LoopScript } from '../../services/loop-scripts-store';
 import type { ClaudeSettingsFile } from '../../services/claude-settings-store';
 import type {
-  DockerInfo,
+  RuntimeInfo,
   ContainerCreateOpts,
   ContainerStatus,
-  ContainerInfo,
+  ContainerSummary,
   ExecResult,
-  ExecCommandOpts,
-} from '../../services/docker-manager';
+  ExecOpts,
+} from '../../services/container-runtime';
 import type { CredentialService } from '../../services/credential-manager';
 import type { LoginResult } from '../../services/login-manager';
 import type { LoopState, LoopStartOpts } from '../../shared/loop-types';
@@ -60,7 +61,7 @@ declare global {
         /** Check Docker availability and get daemon info */
         status: () => Promise<
           | { available: false }
-          | { available: true; info: DockerInfo }
+          | { available: true; info: RuntimeInfo }
         >;
         /** Pull a Docker image with progress updates via onPullProgress */
         pullImage: (image: string) => Promise<{ success: boolean }>;
@@ -73,19 +74,19 @@ declare global {
         /** Remove a container by ID */
         remove: (containerId: string, force?: boolean) => Promise<void>;
         /** List all Zephyr-managed running containers */
-        listContainers: () => Promise<ContainerInfo[]>;
+        listContainers: () => Promise<ContainerSummary[]>;
         /** Get container status by ID */
         getContainerStatus: (containerId: string) => Promise<ContainerStatus>;
         /** Execute a command in a container (non-interactive) */
         exec: (
           containerId: string,
           cmd: string[],
-          opts?: ExecCommandOpts,
+          opts?: ExecOpts,
         ) => Promise<ExecResult>;
 
         // Event listeners
         /** Listen for Docker availability changes. Returns cleanup function. */
-        onStatusChanged: (callback: (isAvailable: boolean, info?: DockerInfo) => void) => () => void;
+        onStatusChanged: (callback: (isAvailable: boolean, info?: RuntimeInfo) => void) => () => void;
         /** Listen for image pull progress. Returns cleanup function. */
         onPullProgress: (
           callback: (data: { image: string; progress: unknown }) => void,
@@ -241,6 +242,17 @@ declare global {
         /** Add or overwrite a loop script */
         add: (filename: string, content: string) => Promise<void>;
         /** Remove a loop script. Returns true if deleted, false if not found. */
+        remove: (filename: string) => Promise<boolean>;
+      };
+
+      kiroHooks: {
+        /** List all Kiro hook files in ~/.zephyr/kiro_hooks/ */
+        list: () => Promise<KiroHookFile[]>;
+        /** Get the content of a specific Kiro hook file */
+        get: (filename: string) => Promise<string | null>;
+        /** Add or overwrite a Kiro hook file */
+        add: (filename: string, content: string) => Promise<void>;
+        /** Remove a Kiro hook file. Returns true if deleted, false if not found. */
         remove: (filename: string) => Promise<boolean>;
       };
 

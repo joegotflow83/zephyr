@@ -5,7 +5,7 @@
  * - Projects list (from ProjectStore)
  * - Loop states (from LoopRunner)
  * - App settings (from ConfigManager)
- * - Docker connection status (from DockerHealthMonitor)
+ * - Container runtime connection status (from RuntimeHealthMonitor)
  *
  * The store is automatically updated by IPC event listeners set up
  * during app initialization.
@@ -15,7 +15,7 @@ import { create } from 'zustand';
 import type { ProjectConfig, AppSettings, ZephyrImage, ImageBuildConfig } from '../../shared/models';
 import type { LoopState } from '../../shared/loop-types';
 import { getLoopKey } from '../../shared/loop-types';
-import type { DockerInfo } from '../../services/docker-manager';
+import type { RuntimeInfo } from '../../services/container-runtime';
 import type { VMInfo } from '../../services/vm-manager';
 
 /**
@@ -46,7 +46,7 @@ export interface AppState {
 
   // Docker status
   dockerConnected: boolean;
-  dockerInfo: DockerInfo | undefined;
+  dockerInfo: RuntimeInfo | undefined;
 
   // VM status
   vmInfos: VMInfo[];
@@ -84,7 +84,7 @@ export interface AppState {
   deleteImage: (id: string) => Promise<void>;
   rebuildImage: (id: string) => Promise<void>;
 
-  setDockerStatus: (connected: boolean, info?: DockerInfo) => void;
+  setDockerStatus: (connected: boolean, info?: RuntimeInfo) => void;
 
   setVMInfos: (vmInfos: VMInfo[]) => void;
   setMultipassAvailable: (available: boolean) => void;

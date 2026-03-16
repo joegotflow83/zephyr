@@ -28,8 +28,10 @@ export interface VMCreateOpts {
   cpus: number;
   memoryGb: number;
   diskGb: number;
-  /** YAML string; defaults to DEFAULT_CLOUD_INIT when omitted */
+  /** YAML string; when omitted, a runtime-appropriate default is generated */
   cloudInit?: string;
+  /** Container runtime to install in the VM. Defaults to 'docker'. */
+  runtime?: 'docker' | 'podman';
 }
 
 /** VM details returned by inspection commands */
@@ -58,12 +60,27 @@ export interface ExecResult {
   stderr: string;
 }
 
-const DEFAULT_CLOUD_INIT = `#cloud-config
+/**
+ * Generates cloud-init YAML for the given container runtime.
+ *
+ * Docker: installs docker.io, adds ubuntu user to the docker group, enables daemon.
+ * Podman: installs podman, enables podman.socket for API-compatible access.
+ */
+export function generateCloudInit(runtime: 'docker' | 'podman'): string {
+  if (runtime === 'podman') {
+    return `#cloud-config
+packages: [podman, git, curl, build-essential]
+runcmd:
+  - systemctl enable --now podman.socket
+`;
+  }
+  return `#cloud-config
 packages: [docker.io, git, curl, build-essential]
 runcmd:
   - usermod -aG docker ubuntu
   - systemctl enable --now docker
 `;
+}
 
 /**
  * Manages Multipass VM lifecycle and execution for Zephyr Desktop.
@@ -153,7 +170,7 @@ export class VMManager {
    * @throws if multipass launch fails
    */
   async createVM(opts: VMCreateOpts): Promise<void> {
-    const cloudInitYaml = opts.cloudInit ?? DEFAULT_CLOUD_INIT;
+    const cloudInitYaml = opts.cloudInit ?? generateCloudInit(opts.runtime ?? 'docker');
     const tmpFile = path.join(os.tmpdir(), `zephyr-cloud-init-${opts.name}.yaml`);
 
     try {

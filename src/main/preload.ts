@@ -28,32 +28,32 @@ contextBridge.exposeInMainWorld('api', {
   },
 
   docker: {
-    status: () => ipcRenderer.invoke(IPC.DOCKER_STATUS),
-    pullImage: (image: string) => ipcRenderer.invoke(IPC.DOCKER_PULL_IMAGE, image),
-    createContainer: (opts: unknown) => ipcRenderer.invoke(IPC.DOCKER_CREATE_CONTAINER, opts),
-    start: (containerId: string) => ipcRenderer.invoke(IPC.DOCKER_START, containerId),
+    status: () => ipcRenderer.invoke(IPC.RUNTIME_STATUS),
+    pullImage: (image: string) => ipcRenderer.invoke(IPC.RUNTIME_PULL_IMAGE, image),
+    createContainer: (opts: unknown) => ipcRenderer.invoke(IPC.RUNTIME_CREATE_CONTAINER, opts),
+    start: (containerId: string) => ipcRenderer.invoke(IPC.RUNTIME_START, containerId),
     stop: (containerId: string, timeout?: number) =>
-      ipcRenderer.invoke(IPC.DOCKER_STOP, containerId, timeout),
+      ipcRenderer.invoke(IPC.RUNTIME_STOP, containerId, timeout),
     remove: (containerId: string, force?: boolean) =>
-      ipcRenderer.invoke(IPC.DOCKER_REMOVE, containerId, force),
-    listContainers: () => ipcRenderer.invoke(IPC.DOCKER_LIST_CONTAINERS),
+      ipcRenderer.invoke(IPC.RUNTIME_REMOVE, containerId, force),
+    listContainers: () => ipcRenderer.invoke(IPC.RUNTIME_LIST_CONTAINERS),
     getContainerStatus: (containerId: string) =>
-      ipcRenderer.invoke(IPC.DOCKER_CONTAINER_STATUS, containerId),
+      ipcRenderer.invoke(IPC.RUNTIME_CONTAINER_STATUS, containerId),
     exec: (containerId: string, cmd: string[], opts?: unknown) =>
-      ipcRenderer.invoke(IPC.DOCKER_EXEC, containerId, cmd, opts),
+      ipcRenderer.invoke(IPC.RUNTIME_EXEC, containerId, cmd, opts),
 
     // Event listeners
     onStatusChanged: (callback: (isAvailable: boolean, info?: unknown) => void) => {
       const listener = (_event: unknown, isAvailable: boolean, info?: unknown) => callback(isAvailable, info);
-      ipcRenderer.on(IPC.DOCKER_STATUS_CHANGED, listener);
+      ipcRenderer.on(IPC.RUNTIME_STATUS_CHANGED, listener);
       // Return cleanup function
-      return () => ipcRenderer.removeListener(IPC.DOCKER_STATUS_CHANGED, listener);
+      return () => ipcRenderer.removeListener(IPC.RUNTIME_STATUS_CHANGED, listener);
     },
     onPullProgress: (callback: (data: { image: string; progress: unknown }) => void) => {
       const listener = (_event: unknown, data: { image: string; progress: unknown }) => callback(data);
-      ipcRenderer.on(IPC.DOCKER_PULL_PROGRESS, listener);
+      ipcRenderer.on(IPC.RUNTIME_PULL_PROGRESS, listener);
       // Return cleanup function
-      return () => ipcRenderer.removeListener(IPC.DOCKER_PULL_PROGRESS, listener);
+      return () => ipcRenderer.removeListener(IPC.RUNTIME_PULL_PROGRESS, listener);
     },
   },
 
@@ -186,6 +186,14 @@ contextBridge.exposeInMainWorld('api', {
     add: (filename: string, content: string) =>
       ipcRenderer.invoke(IPC.LOOP_SCRIPTS_ADD, filename, content),
     remove: (filename: string) => ipcRenderer.invoke(IPC.LOOP_SCRIPTS_REMOVE, filename),
+  },
+
+  kiroHooks: {
+    list: () => ipcRenderer.invoke(IPC.KIRO_HOOKS_LIST),
+    get: (filename: string) => ipcRenderer.invoke(IPC.KIRO_HOOKS_GET, filename),
+    add: (filename: string, content: string) =>
+      ipcRenderer.invoke(IPC.KIRO_HOOKS_ADD, filename, content),
+    remove: (filename: string) => ipcRenderer.invoke(IPC.KIRO_HOOKS_REMOVE, filename),
   },
 
   claudeSettings: {

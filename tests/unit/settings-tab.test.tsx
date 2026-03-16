@@ -3,14 +3,14 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { SettingsTab } from '../../src/renderer/pages/SettingsTab/SettingsTab';
 import * as useSettingsModule from '../../src/renderer/hooks/useSettings';
-import * as useDockerStatusModule from '../../src/renderer/hooks/useDockerStatus';
+import * as useRuntimeStatusModule from '../../src/renderer/hooks/useRuntimeStatus';
 import type { AppSettings } from '../../src/shared/models';
 
 // Mock the useSettings hook
 vi.mock('../../src/renderer/hooks/useSettings');
 
-// Mock the useDockerStatus hook
-vi.mock('../../src/renderer/hooks/useDockerStatus');
+// Mock the useRuntimeStatus hook (used by ContainerRuntimeSection and StatusBar)
+vi.mock('../../src/renderer/hooks/useRuntimeStatus');
 
 // Mock window.api.credentials for CredentialsSection
 const mockCredentials = {
@@ -22,9 +22,9 @@ const mockCredentials = {
   checkAuth: vi.fn().mockResolvedValue({ api_key: false, browser_session: false, aws_bedrock: false }),
 };
 
-// Mock window.api.docker for DockerSection
+// Mock window.api.docker for ContainerRuntimeSection (useRuntimeStatus calls it directly)
 const mockDocker = {
-  status: vi.fn().mockResolvedValue({ available: false, info: undefined }),
+  status: vi.fn().mockResolvedValue({ available: false }),
   onStatusChanged: vi.fn().mockReturnValue(() => {}),
 };
 
@@ -35,6 +35,7 @@ const mockSettingsApi = {
     theme: 'dark',
     log_level: 'INFO',
     anthropic_auth_method: 'api_key',
+    container_runtime: 'docker',
   }),
   save: vi.fn().mockResolvedValue(undefined),
 };
@@ -70,6 +71,7 @@ describe('SettingsTab', () => {
     theme: 'dark',
     log_level: 'INFO',
     anthropic_auth_method: 'api_key',
+    container_runtime: 'docker',
   };
 
   const defaultUseSettingsReturn = {
@@ -81,26 +83,27 @@ describe('SettingsTab', () => {
   };
 
   beforeEach(() => {
-    // Reset credential mocks
     vi.clearAllMocks();
     mockCredentials.list.mockResolvedValue([]);
     mockCredentials.get.mockResolvedValue(null);
     mockCredentials.checkAuth.mockResolvedValue({ api_key: false, browser_session: false, aws_bedrock: false });
     mockSettingsApi.load.mockResolvedValue({ ...mockSettings });
     mockSettingsApi.save.mockResolvedValue(undefined);
-    mockDocker.status.mockResolvedValue({ available: false, info: undefined });
+    mockDocker.status.mockResolvedValue({ available: false });
     mockDocker.onStatusChanged.mockReturnValue(() => {});
     mockDeployKeys.listOrphaned.mockResolvedValue([]);
     mockDeployKeys.getUrl.mockResolvedValue('https://github.com/owner/repo/settings/keys');
     mockShell.openExternal.mockResolvedValue(undefined);
-    vi.clearAllMocks();
-    vi.spyOn(useSettingsModule, 'useSettings').mockReturnValue(
-      defaultUseSettingsReturn
-    );
-    vi.spyOn(useDockerStatusModule, 'useDockerStatus').mockReturnValue({
-      isConnected: false,
-      dockerInfo: undefined,
+
+    vi.spyOn(useSettingsModule, 'useSettings').mockReturnValue(defaultUseSettingsReturn);
+    vi.spyOn(useRuntimeStatusModule, 'useRuntimeStatus').mockReturnValue({
+      available: false,
+      info: undefined,
+      runtimeType: 'docker',
     });
+
+    mockUpdate.mockResolvedValue(undefined);
+    mockRefresh.mockResolvedValue(undefined);
   });
 
   describe('Basic Rendering', () => {
@@ -109,7 +112,7 @@ describe('SettingsTab', () => {
       expect(screen.getByText('Settings')).toBeInTheDocument();
       expect(
         screen.getByText(
-          /Configure credentials, Docker, application preferences, and updates/i
+          /Configure credentials, container runtime, application preferences, and updates/i
         )
       ).toBeInTheDocument();
     });
@@ -122,7 +125,7 @@ describe('SettingsTab', () => {
     it('should render all five section headers', () => {
       render(<SettingsTab />);
       expect(screen.getByText('Credentials')).toBeInTheDocument();
-      expect(screen.getByText('Docker')).toBeInTheDocument();
+      expect(screen.getByText('Container Runtime')).toBeInTheDocument();
       expect(screen.getByText('General')).toBeInTheDocument();
       expect(screen.getByText('Updates')).toBeInTheDocument();
       expect(screen.getByText('Orphaned Deploy Keys')).toBeInTheDocument();
@@ -134,7 +137,7 @@ describe('SettingsTab', () => {
         screen.getByText('Manage API keys and login sessions for AI services')
       ).toBeInTheDocument();
       expect(
-        screen.getByText('Configure Docker connection and container settings')
+        screen.getByText('Select and configure the container runtime (Docker or Podman)')
       ).toBeInTheDocument();
       expect(
         screen.getByText('Application preferences and appearance')
@@ -151,17 +154,14 @@ describe('SettingsTab', () => {
   describe('Section Collapsing', () => {
     it('should render Credentials section expanded by default', async () => {
       render(<SettingsTab />);
-      // Wait for async data to load
       await waitFor(() => {
-        expect(
-          screen.getByText('Anthropic API Access')
-        ).toBeInTheDocument();
+        expect(screen.getByText('Anthropic API Access')).toBeInTheDocument();
       });
     });
 
     it('should render other sections collapsed by default', () => {
       render(<SettingsTab />);
-      // Docker section content should not be visible
+      // Container Runtime section content should not be visible
       expect(screen.queryByText('Connection Status')).not.toBeInTheDocument();
       // General section content should not be visible
       expect(screen.queryByText('Desktop Notifications')).not.toBeInTheDocument();
@@ -173,15 +173,12 @@ describe('SettingsTab', () => {
       const user = userEvent.setup();
       render(<SettingsTab />);
 
-      // Docker section should be collapsed initially
       expect(screen.queryByText('Connection Status')).not.toBeInTheDocument();
 
-      // Click the Docker section header
-      const dockerHeader = screen.getByText('Docker').closest('button');
-      expect(dockerHeader).toBeInTheDocument();
-      await user.click(dockerHeader!);
+      const runtimeHeader = screen.getByText('Container Runtime').closest('button');
+      expect(runtimeHeader).toBeInTheDocument();
+      await user.click(runtimeHeader!);
 
-      // Docker section should now be visible
       expect(screen.getByText('Connection Status')).toBeInTheDocument();
     });
 
@@ -189,40 +186,28 @@ describe('SettingsTab', () => {
       const user = userEvent.setup();
       render(<SettingsTab />);
 
-      // Credentials section should be expanded initially (wait for async load)
       await waitFor(() => {
-        expect(
-          screen.getByText('Anthropic API Access')
-        ).toBeInTheDocument();
+        expect(screen.getByText('Anthropic API Access')).toBeInTheDocument();
       });
 
-      // Click the Credentials section header
       const credentialsHeader = screen.getByText('Credentials').closest('button');
       expect(credentialsHeader).toBeInTheDocument();
       await user.click(credentialsHeader!);
 
-      // Credentials section should now be collapsed
-      expect(
-        screen.queryByText('Anthropic API Access')
-      ).not.toBeInTheDocument();
+      expect(screen.queryByText('Anthropic API Access')).not.toBeInTheDocument();
     });
 
     it('should allow multiple sections to be expanded simultaneously', async () => {
       const user = userEvent.setup();
       render(<SettingsTab />);
 
-      // Expand Docker section
-      const dockerHeader = screen.getByText('Docker').closest('button');
-      await user.click(dockerHeader!);
+      const runtimeHeader = screen.getByText('Container Runtime').closest('button');
+      await user.click(runtimeHeader!);
 
-      // Expand General section
       const generalHeader = screen.getByText('General').closest('button');
       await user.click(generalHeader!);
 
-      // Both should be visible along with initially expanded Credentials
-      expect(
-        screen.getByText('Anthropic API Access')
-      ).toBeInTheDocument();
+      expect(screen.getByText('Anthropic API Access')).toBeInTheDocument();
       expect(screen.getByText('Connection Status')).toBeInTheDocument();
       expect(screen.getByText('Desktop Notifications')).toBeInTheDocument();
     });
@@ -231,27 +216,25 @@ describe('SettingsTab', () => {
       const user = userEvent.setup();
       render(<SettingsTab />);
 
-      const dockerHeader = screen.getByText('Docker').closest('button');
-      expect(dockerHeader).toHaveAttribute('aria-expanded', 'false');
+      const runtimeHeader = screen.getByText('Container Runtime').closest('button');
+      expect(runtimeHeader).toHaveAttribute('aria-expanded', 'false');
 
-      await user.click(dockerHeader!);
-      expect(dockerHeader).toHaveAttribute('aria-expanded', 'true');
+      await user.click(runtimeHeader!);
+      expect(runtimeHeader).toHaveAttribute('aria-expanded', 'true');
 
-      await user.click(dockerHeader!);
-      expect(dockerHeader).toHaveAttribute('aria-expanded', 'false');
+      await user.click(runtimeHeader!);
+      expect(runtimeHeader).toHaveAttribute('aria-expanded', 'false');
     });
   });
 
   describe('Settings Data Display', () => {
-    it('should display Docker section content when expanded', async () => {
+    it('should display Container Runtime section content when expanded', async () => {
       const user = userEvent.setup();
       render(<SettingsTab />);
 
-      // Expand Docker section
-      const dockerHeader = screen.getByText('Docker').closest('button');
-      await user.click(dockerHeader!);
+      const runtimeHeader = screen.getByText('Container Runtime').closest('button');
+      await user.click(runtimeHeader!);
 
-      // Check that Docker section content is displayed
       expect(screen.getByText('Connection Status')).toBeInTheDocument();
       expect(screen.getByText('Max Concurrent Containers')).toBeInTheDocument();
     });
@@ -260,11 +243,9 @@ describe('SettingsTab', () => {
       const user = userEvent.setup();
       render(<SettingsTab />);
 
-      // Expand General section
       const generalHeader = screen.getByText('General').closest('button');
       await user.click(generalHeader!);
 
-      // Check that General section content is displayed
       expect(screen.getByText('Desktop Notifications')).toBeInTheDocument();
       expect(screen.getByText('Log Level')).toBeInTheDocument();
       expect(screen.getByText('Theme')).toBeInTheDocument();
@@ -313,9 +294,7 @@ describe('SettingsTab', () => {
 
     it('should not show error when error is null', () => {
       render(<SettingsTab />);
-      expect(
-        screen.queryByText(/Error loading settings/i)
-      ).not.toBeInTheDocument();
+      expect(screen.queryByText(/Error loading settings/i)).not.toBeInTheDocument();
       expect(screen.getByText('Settings')).toBeInTheDocument();
     });
   });
@@ -338,15 +317,13 @@ describe('SettingsTab', () => {
       const user = userEvent.setup();
       render(<SettingsTab />);
 
-      const dockerHeader = screen.getByText('Docker').closest('button');
-      const svg = dockerHeader!.querySelector('svg');
+      const runtimeHeader = screen.getByText('Container Runtime').closest('button');
+      const svg = runtimeHeader!.querySelector('svg');
 
-      // Should not have rotate-180 initially
       expect(svg).not.toHaveClass('rotate-180');
 
-      await user.click(dockerHeader!);
+      await user.click(runtimeHeader!);
 
-      // Should have rotate-180 when expanded
       expect(svg).toHaveClass('rotate-180');
     });
   });

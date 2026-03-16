@@ -15,8 +15,9 @@ import type { ScheduledLoop } from '../../services/scheduler';
 import type { ProjectConfig } from '../../shared/models';
 import type { PreValidationStore } from '../../services/pre-validation-store';
 import type { HooksStore } from '../../services/hooks-store';
+import type { KiroHooksStore } from '../../services/kiro-hooks-store';
 import type { ClaudeSettingsStore } from '../../services/claude-settings-store';
-import type { DockerManager } from '../../services/docker-manager';
+import type { ContainerRuntime } from '../../services/container-runtime';
 import type { AuthInjector } from '../../services/auth-injector';
 import type { CredentialManager } from '../../services/credential-manager';
 import type { SSHKeyManager } from '../../services/ssh-key-manager';
@@ -31,8 +32,9 @@ export interface LoopServices {
   projectStore?: { getProject: (id: string) => ProjectConfig | null };
   preValidationStore?: PreValidationStore;
   hooksStore?: HooksStore;
+  kiroHooksStore?: KiroHooksStore;
   claudeSettingsStore?: ClaudeSettingsStore;
-  dockerManager?: Pick<DockerManager, 'execCommand'>;
+  runtime?: Pick<ContainerRuntime, 'execCommand'>;
   authInjector?: AuthInjector;
   credentialManager?: CredentialManager;
   sshKeyManager?: SSHKeyManager;
@@ -48,8 +50,9 @@ export function registerLoopHandlers(services: LoopServices): void {
     projectStore,
     preValidationStore,
     hooksStore,
+    kiroHooksStore,
     claudeSettingsStore,
-    dockerManager,
+    runtime,
     authInjector,
     credentialManager,
     sshKeyManager,
@@ -129,7 +132,7 @@ export function registerLoopHandlers(services: LoopServices): void {
       //   - VM loops have no containerId to exec into
       //   - Single-mode container loops start the agent as their CMD, so exec
       //     injection would race against (or miss) the agent startup
-      // Hooks and settings go into a temp dir mounted at /root/.claude.
+      // Hooks and settings go into a temp dir mounted at /home/ralph/.claude.
       // Prompt files for single-mode container runs go to /workspace (see below).
       const isVm = opts.sandboxType === 'vm';
       const isSingleContainer = opts.mode === LoopMode.SINGLE && !isVm;
@@ -141,10 +144,18 @@ export function registerLoopHandlers(services: LoopServices): void {
         // docker exec injection would race against (or miss) the agent startup.
         const hasBrowserSession = authMethod === 'browser_session';
 
+        const hasKiroConfig = !!project.kiro_config;
+        const hasKiroHooks = (project.kiro_hooks ?? []).length > 0 && !!kiroHooksStore;
+
         if (hasHooks || hasClaudeSettings || hasBrowserSession) {
           const claudeDir = path.join(os.tmpdir(), `zephyr-claude-${opts.projectId}`);
           try {
             await fs.mkdir(path.join(claudeDir, 'hooks'), { recursive: true });
+
+            // Write default settings to keep the auto-updater disabled even when this
+            // directory is bind-mounted over the image's pre-baked /home/ralph/.claude.
+            // If the user has a custom settings file it will overwrite this below.
+            await fs.writeFile(path.join(claudeDir, 'settings.json'), '{"autoUpdaterStatus":"disabled"}\n', 'utf8');
 
             if (hasHooks && hooksStore) {
               for (const filename of project.hooks) {
@@ -188,16 +199,53 @@ export function registerLoopHandlers(services: LoopServices): void {
 
             opts = {
               ...opts,
-              volumeMounts: [...(opts.volumeMounts ?? []), `${claudeDir}:/root/.claude`],
+              // Mount at the ralph user's home .claude dir, not /root/.claude.
+              // The container runs as the "ralph" user (HOME=/home/ralph), so
+              // /root/.claude is inaccessible (drwx------ owned by root).
+              volumeMounts: [...(opts.volumeMounts ?? []), `${claudeDir}:/home/ralph/.claude`],
             };
           } catch (err) {
             logger.warn('Failed to prepare .claude directory for loop', { err });
           }
         }
 
+        // Pre-mount Kiro config and hooks at /home/ralph/.kiro for VM/single-mode runs.
+        if (hasKiroConfig || hasKiroHooks) {
+          const kiroDir = path.join(os.tmpdir(), `zephyr-kiro-${opts.projectId}`);
+          try {
+            await fs.mkdir(path.join(kiroDir, 'hooks'), { recursive: true });
+
+            if (hasKiroConfig && project.kiro_config) {
+              await fs.writeFile(path.join(kiroDir, 'config.json'), project.kiro_config, 'utf8');
+            }
+
+            if (hasKiroHooks && kiroHooksStore) {
+              for (const filename of project.kiro_hooks ?? []) {
+                try {
+                  const content = await kiroHooksStore.getHook(filename);
+                  if (content) {
+                    const safe = path.basename(filename);
+                    await fs.writeFile(path.join(kiroDir, 'hooks', safe), content, { mode: 0o755 });
+                  }
+                } catch (err) {
+                  logger.warn(`Failed to write kiro hook ${filename} for .kiro mount`, { err });
+                }
+              }
+            }
+
+            opts = {
+              ...opts,
+              // Same reason as the .claude mount: ralph's home is /home/ralph.
+              volumeMounts: [...(opts.volumeMounts ?? []), `${kiroDir}:/home/ralph/.kiro`],
+            };
+          } catch (err) {
+            logger.warn('Failed to prepare .kiro directory for loop', { err });
+          }
+        }
+
         // For single-mode container runs: write prompt files to /workspace so the
-        // claude CMD can read them at /workspace/<filename>. Writing to /root/.claude
-        // causes permission denied because the container process may not run as root.
+        // claude CMD can read them at /workspace/<filename>. Writing to /home/ralph/.claude
+        // would shadow the mount but prompts belong in /workspace where the agent reads them.
         // Prefer project.local_path (already volume-mounted as /workspace); fall back
         // to a temp dir mounted as /workspace when local_path is absent.
         if (isSingleContainer && hasPrompts) {
@@ -275,10 +323,10 @@ export function registerLoopHandlers(services: LoopServices): void {
       // Install workspace dependencies into the container so libraries are available
       // system-wide before the agent starts. Runs as root so pip can write to
       // system site-packages. Failures are non-fatal — the loop continues without them.
-      if (state.containerId && dockerManager) {
+      if (state.containerId && runtime) {
         // Python: install any requirements.txt / requirements-*.txt in /workspace
         try {
-          await dockerManager.execCommand(
+          await runtime.execCommand(
             state.containerId,
             ['sh', '-c', 'find /workspace -maxdepth 1 -name "requirements*.txt" | while read f; do pip3 install --break-system-packages -q -r "$f"; done'],
             { user: 'root' },
@@ -289,7 +337,7 @@ export function registerLoopHandlers(services: LoopServices): void {
 
         // Node.js: run npm install if package.json exists in /workspace
         try {
-          await dockerManager.execCommand(
+          await runtime.execCommand(
             state.containerId,
             ['sh', '-c', '[ -f /workspace/package.json ] && cd /workspace && npm install 2>&1 || true'],
             { user: 'root' },
@@ -300,7 +348,7 @@ export function registerLoopHandlers(services: LoopServices): void {
 
         // Rust: fetch Cargo dependencies if Cargo.toml exists in /workspace
         try {
-          await dockerManager.execCommand(
+          await runtime.execCommand(
             state.containerId,
             ['sh', '-c', '[ -f /workspace/Cargo.toml ] && cd /workspace && cargo fetch 2>&1 || true'],
             { user: 'ralph' },
@@ -311,7 +359,7 @@ export function registerLoopHandlers(services: LoopServices): void {
 
         // Go: download module dependencies if go.mod exists in /workspace
         try {
-          await dockerManager.execCommand(
+          await runtime.execCommand(
             state.containerId,
             ['sh', '-c', '[ -f /workspace/go.mod ] && cd /workspace && go mod download 2>&1 || true'],
             { user: 'ralph' },
@@ -323,12 +371,12 @@ export function registerLoopHandlers(services: LoopServices): void {
 
       // For browser_session auth: exec-write OAuth credentials to ~/.claude/.credentials.json
       // This is the file the Claude Code CLI reads for browser-based auth (not ~/.claude.json).
-      if (authMethod === 'browser_session' && state.containerId && credentialManager && dockerManager) {
+      if (authMethod === 'browser_session' && state.containerId && credentialManager && runtime) {
         try {
           const sessionJson = await credentialManager.getApiKey('anthropic_session');
           if (sessionJson) {
             const encoded = Buffer.from(sessionJson).toString('base64');
-            await dockerManager.execCommand(state.containerId, [
+            await runtime.execCommand(state.containerId, [
               'sh', '-c',
               `mkdir -p ~/.claude && printf '%s' '${encoded}' | base64 -d > ~/.claude/.credentials.json`,
             ]);
@@ -345,9 +393,9 @@ export function registerLoopHandlers(services: LoopServices): void {
       // Uses base64 to safely transfer file contents via docker exec.
       // Skipped for single-mode container runs: those already have hooks pre-mounted
       // as a volume (handled above), and the agent CMD starts before exec can run.
-      if (project && project.hooks.length > 0 && state.containerId && hooksStore && dockerManager && opts.mode !== LoopMode.SINGLE) {
+      if (project && project.hooks.length > 0 && state.containerId && hooksStore && runtime && opts.mode !== LoopMode.SINGLE) {
         try {
-          await dockerManager.execCommand(state.containerId, [
+          await runtime.execCommand(state.containerId, [
             'sh', '-c', 'mkdir -p ~/.claude/hooks',
           ]);
 
@@ -358,7 +406,7 @@ export function registerLoopHandlers(services: LoopServices): void {
                 // Buffer.from().toString('base64') produces no newlines, safe for single-quoting
                 const encoded = Buffer.from(content).toString('base64');
                 const safe = path.basename(filename);
-                await dockerManager.execCommand(state.containerId, [
+                await runtime.execCommand(state.containerId, [
                   'sh', '-c',
                   `printf '%s' '${encoded}' | base64 -d > ~/.claude/hooks/${safe} && chmod +x ~/.claude/hooks/${safe}`,
                 ]);
@@ -376,9 +424,9 @@ export function registerLoopHandlers(services: LoopServices): void {
       // Uses base64 to safely transfer file contents via docker exec.
       // VM-backed loops and single-mode container loops handle this via volume mount
       // above; this exec path covers continuous container runs only.
-      if (project && Object.keys(project.custom_prompts).length > 0 && state.containerId && dockerManager && opts.mode !== LoopMode.SINGLE) {
+      if (project && Object.keys(project.custom_prompts).length > 0 && state.containerId && runtime && opts.mode !== LoopMode.SINGLE) {
         try {
-          await dockerManager.execCommand(state.containerId, [
+          await runtime.execCommand(state.containerId, [
             'sh', '-c', 'mkdir -p ~/.claude',
           ]);
 
@@ -386,7 +434,7 @@ export function registerLoopHandlers(services: LoopServices): void {
             try {
               const encoded = Buffer.from(content).toString('base64');
               const safe = path.basename(filename);
-              await dockerManager.execCommand(state.containerId, [
+              await runtime.execCommand(state.containerId, [
                 'sh', '-c',
                 `printf '%s' '${encoded}' | base64 -d > ~/.claude/${safe}`,
               ]);
@@ -403,18 +451,62 @@ export function registerLoopHandlers(services: LoopServices): void {
       // Uses base64 to safely transfer file contents via docker exec.
       // Skipped for single-mode container and VM runs: those already have the file
       // pre-mounted as a volume (handled above).
-      if (project && project.claude_settings_file && state.containerId && claudeSettingsStore && dockerManager && opts.mode !== LoopMode.SINGLE) {
+      if (project && project.claude_settings_file && state.containerId && claudeSettingsStore && runtime && opts.mode !== LoopMode.SINGLE) {
         try {
           const content = await claudeSettingsStore.getFile(project.claude_settings_file);
           if (content) {
             const encoded = Buffer.from(content).toString('base64');
-            await dockerManager.execCommand(state.containerId, [
+            await runtime.execCommand(state.containerId, [
               'sh', '-c',
               `mkdir -p ~/.claude && printf '%s' '${encoded}' | base64 -d > ~/.claude/settings.json`,
             ]);
           }
         } catch (err) {
           logger.warn('Failed to inject claude settings.json into container', { err });
+        }
+      }
+
+      // Inject Kiro config into ~/.kiro/config.json inside the container.
+      // Uses base64 to safely transfer the JSON content via docker exec.
+      // Skipped for single-mode and VM runs: those already have the file pre-mounted.
+      if (project && project.kiro_config && state.containerId && runtime && opts.mode !== LoopMode.SINGLE) {
+        try {
+          const encoded = Buffer.from(project.kiro_config).toString('base64');
+          await runtime.execCommand(state.containerId, [
+            'sh', '-c',
+            `mkdir -p ~/.kiro && printf '%s' '${encoded}' | base64 -d > ~/.kiro/config.json`,
+          ]);
+        } catch (err) {
+          logger.warn('Failed to inject kiro config.json into container', { err });
+        }
+      }
+
+      // Inject Kiro hook files into ~/.kiro/hooks inside the container.
+      // Uses base64 to safely transfer file contents via docker exec.
+      // Skipped for single-mode and VM runs: those already have hooks pre-mounted.
+      if (project && (project.kiro_hooks ?? []).length > 0 && state.containerId && kiroHooksStore && runtime && opts.mode !== LoopMode.SINGLE) {
+        try {
+          await runtime.execCommand(state.containerId, [
+            'sh', '-c', 'mkdir -p ~/.kiro/hooks',
+          ]);
+
+          for (const filename of project.kiro_hooks ?? []) {
+            try {
+              const content = await kiroHooksStore.getHook(filename);
+              if (content) {
+                const encoded = Buffer.from(content).toString('base64');
+                const safe = path.basename(filename);
+                await runtime.execCommand(state.containerId, [
+                  'sh', '-c',
+                  `printf '%s' '${encoded}' | base64 -d > ~/.kiro/hooks/${safe} && chmod +x ~/.kiro/hooks/${safe}`,
+                ]);
+              }
+            } catch (err) {
+              logger.warn(`Failed to inject kiro hook ${filename} into container`, { err });
+            }
+          }
+        } catch (err) {
+          logger.warn('Failed to create ~/.kiro/hooks in container', { err });
         }
       }
 

@@ -1,5 +1,5 @@
 import React from 'react';
-import { useDockerStatus } from '../../hooks/useDockerStatus';
+import { useRuntimeStatus } from '../../hooks/useRuntimeStatus';
 
 export interface StatusBarProps {
   /**
@@ -15,30 +15,31 @@ export interface StatusBarProps {
 
 /**
  * StatusBar component displays real-time system status at the bottom of the application.
- * Shows Docker connection state, active loop count, and optional version information.
+ * Shows runtime connection state, active loop count, and optional version information.
  */
 export function StatusBar({ activeLoopCount = 0, appVersion }: StatusBarProps) {
-  const { isConnected, dockerInfo } = useDockerStatus();
+  const { available, info, runtimeType } = useRuntimeStatus();
+  const runtimeLabel = runtimeType === 'docker' ? 'Docker' : 'Podman';
 
   return (
     <div className="h-7 bg-gray-50 dark:bg-gray-800 flex items-center justify-between px-4 text-sm text-gray-700 dark:text-gray-300">
-      {/* Left section: Docker status */}
+      {/* Left section: runtime status */}
       <div className="flex items-center space-x-4">
         <div className="flex items-center space-x-2">
           <div
             className={`w-2.5 h-2.5 rounded-full ${
-              isConnected ? 'bg-green-500' : 'bg-red-500'
+              available ? 'bg-green-500' : 'bg-red-500'
             }`}
-            title={isConnected ? 'Docker connected' : 'Docker disconnected'}
+            title={available ? `${runtimeLabel} connected` : `${runtimeLabel} disconnected`}
           />
           <span className="text-xs">
-            Docker {isConnected ? 'Connected' : 'Disconnected'}
+            {runtimeLabel} {available ? 'Connected' : 'Disconnected'}
           </span>
         </div>
 
-        {isConnected && dockerInfo && (
+        {available && info && (
           <span className="text-xs text-gray-500 dark:text-gray-400">
-            v{dockerInfo.version}
+            v{info.version}
           </span>
         )}
       </div>

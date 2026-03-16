@@ -180,9 +180,22 @@ describe('createProjectConfig', () => {
         docker_image: 'python:3.12',
         pre_validation_scripts: ['lint.sh'],
         hooks: ['pre-tool-use.sh'],
+        kiro_hooks: [],
         custom_prompts: { 'task.md': 'Refactor everything' },
         created_at: '2024-01-01T00:00:00.000Z',
         updated_at: '2024-06-01T00:00:00.000Z',
+        local_path: undefined,
+        image_id: undefined,
+        loop_script: undefined,
+        claude_settings_file: undefined,
+        github_pat: undefined,
+        gitlab_pat: undefined,
+        additional_mounts: undefined,
+        sandbox_type: undefined,
+        vm_config: undefined,
+        factory_config: undefined,
+        feature_requests_content: undefined,
+        kiro_config: undefined,
       };
       const project = createProjectConfig(full);
       expect(project).toEqual(full);

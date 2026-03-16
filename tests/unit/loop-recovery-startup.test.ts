@@ -2,7 +2,7 @@
  * @vitest-environment node
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import type { DockerManager } from '../../src/services/docker-manager';
+import type { ContainerRuntime } from '../../src/services/container-runtime';
 import type { LoopRunner } from '../../src/services/loop-runner';
 import type { ProjectStore } from '../../src/services/project-store';
 import type { CleanupManager } from '../../src/services/cleanup-manager';
@@ -23,16 +23,16 @@ import { LoopStatus, LoopMode } from '../../src/shared/loop-types';
  */
 
 describe('Loop Recovery on Startup', () => {
-  let mockDockerManager: Partial<DockerManager>;
+  let mockRuntime: Partial<ContainerRuntime>;
   let mockLoopRunner: Partial<LoopRunner>;
   let mockProjectStore: Partial<ProjectStore>;
   let mockCleanupManager: Partial<CleanupManager>;
 
   beforeEach(() => {
-    // Mock DockerManager
-    mockDockerManager = {
-      isDockerAvailable: vi.fn(),
-      listRunningContainers: vi.fn(),
+    // Mock ContainerRuntime
+    mockRuntime = {
+      isAvailable: vi.fn(),
+      listContainers: vi.fn(),
     };
 
     // Mock LoopRunner
@@ -55,25 +55,25 @@ describe('Loop Recovery on Startup', () => {
   describe('recoverLoops() behavior', () => {
     it('should skip recovery when Docker is not available', async () => {
       // Setup
-      vi.mocked(mockDockerManager.isDockerAvailable!).mockResolvedValue(false);
+      vi.mocked(mockRuntime.isAvailable!).mockResolvedValue(false);
 
       // Execute: Simulate calling recoverLoops()
-      const dockerAvailable = await mockDockerManager.isDockerAvailable!();
+      const dockerAvailable = await mockRuntime.isAvailable!();
 
       // Verify
       expect(dockerAvailable).toBe(false);
-      expect(mockDockerManager.listRunningContainers).not.toHaveBeenCalled();
+      expect(mockRuntime.listContainers).not.toHaveBeenCalled();
       expect(mockLoopRunner.recoverLoops).not.toHaveBeenCalled();
     });
 
     it('should skip recovery when no running containers are found', async () => {
       // Setup
-      vi.mocked(mockDockerManager.isDockerAvailable!).mockResolvedValue(true);
-      vi.mocked(mockDockerManager.listRunningContainers!).mockResolvedValue([]);
+      vi.mocked(mockRuntime.isAvailable!).mockResolvedValue(true);
+      vi.mocked(mockRuntime.listContainers!).mockResolvedValue([]);
 
       // Execute
-      const dockerAvailable = await mockDockerManager.isDockerAvailable!();
-      const containers = await mockDockerManager.listRunningContainers!();
+      const dockerAvailable = await mockRuntime.isAvailable!();
+      const containers = await mockRuntime.listContainers!();
 
       // Verify
       expect(dockerAvailable).toBe(true);
@@ -102,8 +102,8 @@ describe('Loop Recovery on Startup', () => {
         },
       ];
 
-      vi.mocked(mockDockerManager.isDockerAvailable!).mockResolvedValue(true);
-      vi.mocked(mockDockerManager.listRunningContainers!).mockResolvedValue(mockContainers);
+      vi.mocked(mockRuntime.isAvailable!).mockResolvedValue(true);
+      vi.mocked(mockRuntime.listContainers!).mockResolvedValue(mockContainers);
       vi.mocked(mockLoopRunner.recoverLoops!).mockResolvedValue(['proj-1', 'proj-2']);
       vi.mocked(mockLoopRunner.getLoopState!).mockImplementation((projectId: string) => {
         const containerMap: Record<string, string> = {
@@ -125,8 +125,8 @@ describe('Loop Recovery on Startup', () => {
       });
 
       // Execute
-      const dockerAvailable = await mockDockerManager.isDockerAvailable!();
-      const containers = await mockDockerManager.listRunningContainers!();
+      const dockerAvailable = await mockRuntime.isAvailable!();
+      const containers = await mockRuntime.listContainers!();
       const recoveredIds = await mockLoopRunner.recoverLoops!(containers, mockProjectStore as any);
 
       // Register recovered containers
@@ -168,8 +168,8 @@ describe('Loop Recovery on Startup', () => {
         },
       ];
 
-      vi.mocked(mockDockerManager.isDockerAvailable!).mockResolvedValue(true);
-      vi.mocked(mockDockerManager.listRunningContainers!).mockResolvedValue(mockContainers);
+      vi.mocked(mockRuntime.isAvailable!).mockResolvedValue(true);
+      vi.mocked(mockRuntime.listContainers!).mockResolvedValue(mockContainers);
       // Only proj-1 recovered successfully
       vi.mocked(mockLoopRunner.recoverLoops!).mockResolvedValue(['proj-1']);
       vi.mocked(mockLoopRunner.getLoopState!).mockImplementation((projectId: string) => {
@@ -191,7 +191,7 @@ describe('Loop Recovery on Startup', () => {
       });
 
       // Execute
-      const containers = await mockDockerManager.listRunningContainers!();
+      const containers = await mockRuntime.listContainers!();
       const recoveredIds = await mockLoopRunner.recoverLoops!(containers, mockProjectStore as any);
 
       // Register only successfully recovered containers
@@ -210,15 +210,15 @@ describe('Loop Recovery on Startup', () => {
 
     it('should not block startup if recovery throws an error', async () => {
       // Setup
-      vi.mocked(mockDockerManager.isDockerAvailable!).mockResolvedValue(true);
-      vi.mocked(mockDockerManager.listRunningContainers!).mockRejectedValue(
+      vi.mocked(mockRuntime.isAvailable!).mockResolvedValue(true);
+      vi.mocked(mockRuntime.listContainers!).mockRejectedValue(
         new Error('Docker API error')
       );
 
       // Execute
       let error: Error | null = null;
       try {
-        await mockDockerManager.listRunningContainers!();
+        await mockRuntime.listContainers!();
       } catch (err) {
         error = err as Error;
       }
@@ -242,8 +242,8 @@ describe('Loop Recovery on Startup', () => {
         },
       ];
 
-      vi.mocked(mockDockerManager.isDockerAvailable!).mockResolvedValue(true);
-      vi.mocked(mockDockerManager.listRunningContainers!).mockResolvedValue(mockContainers);
+      vi.mocked(mockRuntime.isAvailable!).mockResolvedValue(true);
+      vi.mocked(mockRuntime.listContainers!).mockResolvedValue(mockContainers);
       vi.mocked(mockLoopRunner.recoverLoops!).mockResolvedValue(['proj-1']);
       // State has no containerId (shouldn't happen in practice, but defensive coding)
       vi.mocked(mockLoopRunner.getLoopState!).mockReturnValue({
@@ -260,7 +260,7 @@ describe('Loop Recovery on Startup', () => {
       });
 
       // Execute
-      const containers = await mockDockerManager.listRunningContainers!();
+      const containers = await mockRuntime.listContainers!();
       const recoveredIds = await mockLoopRunner.recoverLoops!(containers, mockProjectStore as any);
 
       // Register only if containerId exists
@@ -289,13 +289,13 @@ describe('Loop Recovery on Startup', () => {
         },
       ];
 
-      vi.mocked(mockDockerManager.isDockerAvailable!).mockResolvedValue(true);
-      vi.mocked(mockDockerManager.listRunningContainers!).mockResolvedValue(mockContainers);
+      vi.mocked(mockRuntime.isAvailable!).mockResolvedValue(true);
+      vi.mocked(mockRuntime.listContainers!).mockResolvedValue(mockContainers);
       // No loops recovered (e.g., all projects were deleted)
       vi.mocked(mockLoopRunner.recoverLoops!).mockResolvedValue([]);
 
       // Execute
-      const containers = await mockDockerManager.listRunningContainers!();
+      const containers = await mockRuntime.listContainers!();
       const recoveredIds = await mockLoopRunner.recoverLoops!(containers, mockProjectStore as any);
 
       // Verify
@@ -386,8 +386,8 @@ describe('Loop Recovery on Startup', () => {
         },
       ];
 
-      vi.mocked(mockDockerManager.isDockerAvailable!).mockResolvedValue(true);
-      vi.mocked(mockDockerManager.listRunningContainers!).mockResolvedValue(mockContainers);
+      vi.mocked(mockRuntime.isAvailable!).mockResolvedValue(true);
+      vi.mocked(mockRuntime.listContainers!).mockResolvedValue(mockContainers);
       vi.mocked(mockLoopRunner.recoverLoops!).mockResolvedValue(['proj-a', 'proj-b', 'proj-c']);
       vi.mocked(mockLoopRunner.getLoopState!).mockImplementation((projectId: string) => {
         const containerMap: Record<string, string> = {
@@ -410,12 +410,12 @@ describe('Loop Recovery on Startup', () => {
       });
 
       // Execute the full recovery flow
-      const dockerAvailable = await mockDockerManager.isDockerAvailable!();
+      const dockerAvailable = await mockRuntime.isAvailable!();
       if (!dockerAvailable) {
         throw new Error('Docker should be available');
       }
 
-      const containers = await mockDockerManager.listRunningContainers!();
+      const containers = await mockRuntime.listContainers!();
       if (containers.length === 0) {
         // No recovery needed
         expect(containers.length).toBeGreaterThan(0); // This assertion validates our test setup
@@ -432,8 +432,8 @@ describe('Loop Recovery on Startup', () => {
       }
 
       // Verify complete flow
-      expect(mockDockerManager.isDockerAvailable).toHaveBeenCalled();
-      expect(mockDockerManager.listRunningContainers).toHaveBeenCalled();
+      expect(mockRuntime.isAvailable).toHaveBeenCalled();
+      expect(mockRuntime.listContainers).toHaveBeenCalled();
       expect(mockLoopRunner.recoverLoops).toHaveBeenCalledWith(mockContainers, mockProjectStore);
       expect(recoveredIds).toEqual(['proj-a', 'proj-b', 'proj-c']);
       expect(mockCleanupManager.registerContainer).toHaveBeenCalledTimes(3);

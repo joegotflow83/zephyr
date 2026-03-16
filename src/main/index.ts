@@ -4,8 +4,10 @@ import started from 'electron-squirrel-startup';
 import { ConfigManager } from '../services/config-manager';
 import { ProjectStore } from '../services/project-store';
 import { ImportExportService } from '../services/import-export';
-import { DockerManager } from '../services/docker-manager';
-import { DockerHealthMonitor } from '../services/docker-health';
+import { DockerRuntime } from '../services/docker-runtime';
+import { PodmanRuntime } from '../services/podman-runtime';
+import { RuntimeHealthMonitor } from '../services/runtime-health';
+import type { ContainerRuntime } from '../services/container-runtime';
 import { CredentialManager } from '../services/credential-manager';
 import { LoginManager } from '../services/login-manager';
 import { LogParser } from '../services/log-parser';
@@ -18,7 +20,7 @@ import { CleanupManager } from '../services/cleanup-manager';
 import { getAutoUpdater } from '../services/auto-updater';
 import { setupLogging, getLogger, setLogLevel, type LogLevel } from '../services/logging';
 import { registerDataHandlers } from './ipc-handlers/data-handlers';
-import { registerDockerHandlers } from './ipc-handlers/docker-handlers';
+import { registerRuntimeHandlers } from './ipc-handlers/runtime-handlers';
 import { registerCredentialHandlers } from './ipc-handlers/credential-handlers';
 import { registerLoopHandlers } from './ipc-handlers/loop-handlers';
 import { registerLogHandlers } from './ipc-handlers/log-handlers';
@@ -32,6 +34,7 @@ import { PreValidationStore } from '../services/pre-validation-store';
 import { HooksStore } from '../services/hooks-store';
 import { LoopScriptsStore } from '../services/loop-scripts-store';
 import { ClaudeSettingsStore } from '../services/claude-settings-store';
+import { KiroHooksStore } from '../services/kiro-hooks-store';
 import { AuthInjector } from '../services/auth-injector';
 import { DeployKeyStore } from '../services/deploy-key-store';
 import { SSHKeyManager } from '../services/ssh-key-manager';
@@ -68,34 +71,42 @@ const logger = getLogger('main');
 const configManager = new ConfigManager();
 const projectStore = new ProjectStore(configManager);
 const importExport = new ImportExportService(configManager);
-const dockerManager = new DockerManager();
-const dockerHealth = new DockerHealthMonitor(dockerManager);
+
+// Read container_runtime from settings synchronously (loadJson uses readFileSync).
+// Defaults to 'docker' if settings are absent or the field is unset.
+const initialSettings = configManager.loadJson<AppSettings>('settings.json');
+const runtime: ContainerRuntime = initialSettings?.container_runtime === 'podman'
+  ? new PodmanRuntime()
+  : new DockerRuntime();
+const runtimeHealth = new RuntimeHealthMonitor(runtime);
+
 const credentialManager = new CredentialManager(
   path.join(os.homedir(), '.zephyr')
 );
 const loginManager = new LoginManager(credentialManager);
 const logParser = new LogParser();
 const vmManager = new VMManager();
-const loopRunner = new LoopRunner(dockerManager, logParser, 3, vmManager); // Default max 3 concurrent
+const loopRunner = new LoopRunner(runtime, logParser, 3, vmManager); // Default max 3 concurrent
 const scheduler = new LoopScheduler(loopRunner);
 const logExporter = new LogExporter();
-const terminalManager = new TerminalManager(dockerManager);
+const terminalManager = new TerminalManager(runtime);
 const selfUpdater = new SelfUpdater(app.getAppPath(), loopRunner);
-const cleanupManager = new CleanupManager(dockerManager);
+const cleanupManager = new CleanupManager(runtime);
 const autoUpdater = getAutoUpdater();
 const imageStore = new ImageStore(configManager);
-const imageBuilder = new ImageBuilder(dockerManager, imageStore);
+const imageBuilder = new ImageBuilder(runtime, imageStore);
 const preValidationStore = new PreValidationStore(configManager);
 const hooksStore = new HooksStore(configManager);
 const loopScriptsStore = new LoopScriptsStore(configManager);
 const claudeSettingsStore = new ClaudeSettingsStore(configManager);
+const kiroHooksStore = new KiroHooksStore(configManager);
 const authInjector = new AuthInjector(configManager, credentialManager);
 const deployKeyStore = new DeployKeyStore(path.join(os.homedir(), '.zephyr'));
-const sshKeyManager = new SSHKeyManager(dockerManager);
+const sshKeyManager = new SSHKeyManager(runtime);
 
 // Register all IPC handlers before the window is created.
-registerDataHandlers({ configManager, projectStore, importExport, preValidationStore, hooksStore, loopScriptsStore, claudeSettingsStore, loopRunner, dockerManager, credentialManager, sshKeyManager, deployKeyStore });
-registerDockerHandlers({ dockerManager, dockerHealth });
+registerDataHandlers({ configManager, projectStore, importExport, preValidationStore, hooksStore, kiroHooksStore, loopScriptsStore, claudeSettingsStore, loopRunner, runtime, credentialManager, sshKeyManager, deployKeyStore });
+registerRuntimeHandlers({ runtime, runtimeHealth });
 registerCredentialHandlers({ credentialManager, loginManager });
 registerLoopHandlers({
   loopRunner,
@@ -104,8 +115,9 @@ registerLoopHandlers({
   projectStore,
   preValidationStore,
   hooksStore,
+  kiroHooksStore,
   claudeSettingsStore,
-  dockerManager,
+  runtime,
   authInjector,
   credentialManager,
   sshKeyManager,
@@ -161,24 +173,25 @@ async function recoverLoops(): Promise<void> {
   try {
     logger.info('Attempting to recover running loops');
 
-    // 1. Check if Docker is available
-    const dockerAvailable = await dockerManager.isDockerAvailable();
-    if (!dockerAvailable) {
-      logger.info('Docker not available, skipping loop recovery');
+    // 1. Check if the container runtime is available
+    const runtimeAvailable = await runtime.isAvailable();
+    if (!runtimeAvailable) {
+      logger.info('Container runtime not available, skipping loop recovery');
       return;
     }
 
     // 2. List running containers with zephyr-managed label
-    const containers = await dockerManager.listRunningContainers();
-    if (containers.length === 0) {
+    const containers = await runtime.listContainers();
+    const runningContainers = containers.filter((c) => c.state === 'running');
+    if (runningContainers.length === 0) {
       logger.info('No running containers found, nothing to recover');
       return;
     }
 
-    logger.info(`Found ${containers.length} running container(s), attempting recovery`);
+    logger.info(`Found ${runningContainers.length} running container(s), attempting recovery`);
 
     // 3. Recover loops via LoopRunner
-    const recoveredIds = await loopRunner.recoverLoops(containers, projectStore);
+    const recoveredIds = await loopRunner.recoverLoops(runningContainers, projectStore);
 
     // 4. Register recovered containers with cleanup manager
     for (const projectId of recoveredIds) {
@@ -285,8 +298,8 @@ app.on('ready', async () => {
   await recoverLoops();
   // Clean up orphaned VMs from a previous session
   await cleanupOrphanedVMs();
-  // Start Docker health monitoring
-  dockerHealth.start();
+  // Start container runtime health monitoring
+  runtimeHealth.start();
   // Check for updates on startup (with delay)
   autoUpdater.checkForUpdatesOnStartup();
 
@@ -343,9 +356,9 @@ async function gracefulShutdown(): Promise<void> {
       });
     }
 
-    // 3. Stop Docker health monitor
-    logger.debug('Stopping Docker health monitor');
-    dockerHealth.stop();
+    // 3. Stop container runtime health monitor
+    logger.debug('Stopping runtime health monitor');
+    runtimeHealth.stop();
 
     // 4. Close all terminal sessions
     logger.debug('Closing all terminal sessions');

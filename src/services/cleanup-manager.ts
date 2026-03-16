@@ -1,4 +1,4 @@
-import { DockerManager } from './docker-manager';
+import type { ContainerRuntime } from './container-runtime';
 import { getLogger } from './logging';
 
 const logger = getLogger('cleanup');
@@ -9,10 +9,10 @@ const logger = getLogger('cleanup');
  */
 export class CleanupManager {
   private trackedContainers: Set<string>;
-  private dockerManager: DockerManager;
+  private runtime: ContainerRuntime;
 
-  constructor(dockerManager: DockerManager) {
-    this.dockerManager = dockerManager;
+  constructor(runtime: ContainerRuntime) {
+    this.runtime = runtime;
     this.trackedContainers = new Set();
   }
 
@@ -74,10 +74,10 @@ export class CleanupManager {
       containerIds.map(async (containerId) => {
         try {
           logger.debug('Attempting to stop container', { containerId });
-          await this.dockerManager.stopContainer(containerId);
+          await this.runtime.stopContainer(containerId);
 
           logger.debug('Attempting to remove container', { containerId });
-          await this.dockerManager.removeContainer(containerId);
+          await this.runtime.removeContainer(containerId);
 
           this.trackedContainers.delete(containerId);
           logger.info('Container cleaned up successfully', { containerId });

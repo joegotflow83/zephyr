@@ -17,20 +17,20 @@ export const IPC = {
   CONFIG_EXPORT: 'config:export',
   CONFIG_IMPORT: 'config:import',
 
-  // Docker operations
-  DOCKER_STATUS: 'docker:status',
-  DOCKER_PULL_IMAGE: 'docker:pull-image',
-  DOCKER_CREATE_CONTAINER: 'docker:create-container',
-  DOCKER_START: 'docker:start',
-  DOCKER_STOP: 'docker:stop',
-  DOCKER_REMOVE: 'docker:remove',
-  DOCKER_LIST_CONTAINERS: 'docker:list-containers',
-  DOCKER_EXEC: 'docker:exec',
-  DOCKER_CONTAINER_STATUS: 'docker:container-status',
+  // Container runtime operations (Docker or Podman)
+  RUNTIME_STATUS: 'runtime:status',
+  RUNTIME_PULL_IMAGE: 'runtime:pull-image',
+  RUNTIME_CREATE_CONTAINER: 'runtime:create-container',
+  RUNTIME_START: 'runtime:start',
+  RUNTIME_STOP: 'runtime:stop',
+  RUNTIME_REMOVE: 'runtime:remove',
+  RUNTIME_LIST_CONTAINERS: 'runtime:list-containers',
+  RUNTIME_EXEC: 'runtime:exec',
+  RUNTIME_CONTAINER_STATUS: 'runtime:container-status',
 
-  // Docker events (bidirectional)
-  DOCKER_STATUS_CHANGED: 'docker:status-changed',
-  DOCKER_PULL_PROGRESS: 'docker:pull-progress',
+  // Container runtime events (bidirectional)
+  RUNTIME_STATUS_CHANGED: 'runtime:status-changed',
+  RUNTIME_PULL_PROGRESS: 'runtime:pull-progress',
 
   // Credentials
   CREDENTIALS_STORE: 'credentials:store',
@@ -111,6 +111,12 @@ export const IPC = {
   LOOP_SCRIPTS_GET: 'loop-scripts:get',
   LOOP_SCRIPTS_ADD: 'loop-scripts:add',
   LOOP_SCRIPTS_REMOVE: 'loop-scripts:remove',
+
+  // Kiro hooks
+  KIRO_HOOKS_LIST: 'kiro-hooks:list',
+  KIRO_HOOKS_GET: 'kiro-hooks:get',
+  KIRO_HOOKS_ADD: 'kiro-hooks:add',
+  KIRO_HOOKS_REMOVE: 'kiro-hooks:remove',
 
   // Claude settings.json files
   CLAUDE_SETTINGS_LIST: 'claude-settings:list',

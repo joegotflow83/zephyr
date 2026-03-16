@@ -9,7 +9,7 @@ import { useAppStore, initializeStoreListeners } from '../../src/renderer/stores
 import type { ProjectConfig, AppSettings, ZephyrImage, ImageBuildConfig } from '../../src/shared/models';
 import type { LoopState } from '../../src/shared/loop-types';
 import { LoopStatus, LoopMode } from '../../src/shared/loop-types';
-import type { DockerInfo } from '../../src/services/docker-manager';
+import type { RuntimeInfo } from '../../src/services/container-runtime';
 
 // Mock window.api
 const mockApi = {
@@ -417,7 +417,7 @@ describe('useAppStore', () => {
     });
 
     it('should set docker status', () => {
-      const dockerInfo: DockerInfo = {
+      const dockerInfo: RuntimeInfo = {
         version: '24.0.0',
         os: 'linux',
         arch: 'x86_64',
@@ -429,7 +429,7 @@ describe('useAppStore', () => {
     });
 
     it('should set disconnected status', () => {
-      const dockerInfo: DockerInfo = {
+      const dockerInfo: RuntimeInfo = {
         version: '24.0.0',
         os: 'linux',
         arch: 'x86_64',
@@ -475,7 +475,7 @@ describe('useAppStore', () => {
       initializeStoreListeners();
       expect(mockApi.docker.onStatusChanged).toHaveBeenCalled();
 
-      const dockerInfo: DockerInfo = {
+      const dockerInfo: RuntimeInfo = {
         version: '24.0.0',
         os: 'linux',
         arch: 'x86_64',
