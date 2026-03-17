@@ -206,6 +206,10 @@ export interface ProjectConfig {
    * Used to configure the Kiro (Amazon) AI agent when it is the active agent.
    */
   kiro_config?: string;
+  /** Git user.name to set in the container via git config --global. Defaults to "Ralph". */
+  git_user_name?: string;
+  /** Git user.email to set in the container via git config --global. Defaults to "ralph@placeholder.com". */
+  git_user_email?: string;
 }
 
 /**

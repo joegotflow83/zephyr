@@ -389,6 +389,21 @@ export function registerLoopHandlers(services: LoopServices): void {
         }
       }
 
+      // Configure git user identity in the container so commits have a proper author.
+      if (state.containerId && runtime) {
+        try {
+          const gitName = project?.git_user_name?.trim() || 'Ralph';
+          const gitEmail = project?.git_user_email?.trim() || 'ralph@placeholder.com';
+          await runtime.execCommand(state.containerId, [
+            'sh', '-c',
+            `git config --global user.name "${gitName}" && git config --global user.email "${gitEmail}"`,
+          ]);
+          logger.info('Configured git user identity in container', { gitName, gitEmail });
+        } catch (err) {
+          logger.warn('Failed to configure git user identity in container', { err });
+        }
+      }
+
       // Inject hook files into ~/.claude/hooks inside the container.
       // Uses base64 to safely transfer file contents via docker exec.
       // Skipped for single-mode container runs: those already have hooks pre-mounted

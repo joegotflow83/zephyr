@@ -85,6 +85,10 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({ mode, project, onS
   const [showClaudeConfig, setShowClaudeConfig] = useState(false);
   const [showKiroConfig, setShowKiroConfig] = useState(false);
 
+  // Git identity state
+  const [gitUserName, setGitUserName] = useState('');
+  const [gitUserEmail, setGitUserEmail] = useState('');
+
   // Factory state
   const [factoryEnabled, setFactoryEnabled] = useState(false);
   const [factoryRoles, setFactoryRoles] = useState<FactoryRole[]>([...FACTORY_ROLES]);
@@ -132,6 +136,9 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({ mode, project, onS
       setFactoryEnabled(project.factory_config?.enabled ?? false);
       setFactoryRoles(project.factory_config?.roles ?? [...FACTORY_ROLES]);
       setFeatureRequestsContent(project.feature_requests_content ?? '');
+      // Git identity
+      setGitUserName(project.git_user_name ?? '');
+      setGitUserEmail(project.git_user_email ?? '');
     } else {
       // Add mode: default to library if images exist, custom if empty
       setImageMode(images.length > 0 ? 'library' : 'custom');
@@ -271,6 +278,8 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({ mode, project, onS
             feature_requests_content: effectiveFeatureRequestsContent,
             kiro_config: kiroConfig.trim() || undefined,
             kiro_hooks: kiroHooks,
+            git_user_name: gitUserName.trim() || undefined,
+            git_user_email: gitUserEmail.trim() || undefined,
           }
         : createProjectConfig({
             name: name.trim(),
@@ -290,6 +299,8 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({ mode, project, onS
             feature_requests_content: effectiveFeatureRequestsContent,
             kiro_config: kiroConfig.trim() || undefined,
             kiro_hooks: kiroHooks,
+            git_user_name: gitUserName.trim() || undefined,
+            git_user_email: gitUserEmail.trim() || undefined,
           });
 
     // Store GitHub PAT if the user entered one (uses config.id so it works in both add and edit mode)
@@ -430,6 +441,38 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({ mode, project, onS
               )}
               <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                 Absolute path on your machine to mount into the container at <code className="bg-gray-100 dark:bg-gray-700 px-1 rounded">/workspace</code> (optional)
+              </p>
+            </div>
+
+            {/* Git Identity */}
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Git Identity
+              </label>
+              <div className="flex gap-3">
+                <div className="flex-1">
+                  <input
+                    id="gitUserName"
+                    type="text"
+                    value={gitUserName}
+                    onChange={(e) => setGitUserName(e.target.value)}
+                    className="w-full px-3 py-2 bg-gray-100 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="Ralph"
+                  />
+                </div>
+                <div className="flex-1">
+                  <input
+                    id="gitUserEmail"
+                    type="text"
+                    value={gitUserEmail}
+                    onChange={(e) => setGitUserEmail(e.target.value)}
+                    className="w-full px-3 py-2 bg-gray-100 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="ralph@placeholder.com"
+                  />
+                </div>
+              </div>
+              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                Git <code className="bg-gray-100 dark:bg-gray-700 px-1 rounded">user.name</code> and <code className="bg-gray-100 dark:bg-gray-700 px-1 rounded">user.email</code> set inside the container (optional — defaults to Ralph / ralph@placeholder.com)
               </p>
             </div>
 
