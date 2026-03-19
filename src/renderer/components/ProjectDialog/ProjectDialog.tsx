@@ -15,6 +15,7 @@ import { ProjectConfig, VMConfig, createProjectConfig, FACTORY_ROLES, FACTORY_RO
 import type { FactoryRole, FactoryConfig } from '../../../shared/models';
 import type { ZephyrImage } from '../../../shared/models';
 import { PromptEditor } from './PromptEditor';
+import { SpecFilesSection } from './SpecFilesSection';
 import { PreValidationSection } from './PreValidationSection';
 import { HooksSection } from './HooksSection';
 import { LoopScriptsSection } from './LoopScriptsSection';
@@ -47,6 +48,7 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({ mode, project, onS
   const [localPath, setLocalPath] = useState('');
   const [dockerImage, setDockerImage] = useState('ubuntu:24.04');
   const [customPrompts, setCustomPrompts] = useState<Record<string, string>>({});
+  const [specFiles, setSpecFiles] = useState<Record<string, string>>({});
   const [preValidationScripts, setPreValidationScripts] = useState<string[]>([]);
   const [hooks, setHooks] = useState<string[]>([]);
   const [loopScript, setLoopScript] = useState<string | undefined>(undefined);
@@ -97,6 +99,7 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({ mode, project, onS
   // Validation state
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [showPromptEditor, setShowPromptEditor] = useState(false);
+  const [showSpecFilesEditor, setShowSpecFilesEditor] = useState(false);
 
   // Fetch images when the dialog opens so the library is always up to date.
   useEffect(() => {
@@ -139,6 +142,8 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({ mode, project, onS
       // Git identity
       setGitUserName(project.git_user_name ?? '');
       setGitUserEmail(project.git_user_email ?? '');
+      // Spec files
+      setSpecFiles(project.spec_files ?? {});
     } else {
       // Add mode: default to library if images exist, custom if empty
       setImageMode(images.length > 0 ? 'library' : 'custom');
@@ -280,6 +285,7 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({ mode, project, onS
             kiro_hooks: kiroHooks,
             git_user_name: gitUserName.trim() || undefined,
             git_user_email: gitUserEmail.trim() || undefined,
+            spec_files: Object.keys(specFiles).length > 0 ? specFiles : undefined,
           }
         : createProjectConfig({
             name: name.trim(),
@@ -301,6 +307,7 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({ mode, project, onS
             kiro_hooks: kiroHooks,
             git_user_name: gitUserName.trim() || undefined,
             git_user_email: gitUserEmail.trim() || undefined,
+            spec_files: Object.keys(specFiles).length > 0 ? specFiles : undefined,
           });
 
     // Store GitHub PAT if the user entered one (uses config.id so it works in both add and edit mode)
@@ -1109,6 +1116,37 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({ mode, project, onS
 
               {showPromptEditor && (
                 <PromptEditor prompts={customPrompts} onChange={setCustomPrompts} />
+              )}
+            </div>
+
+            {/* Spec Files section */}
+            <div className="mb-6">
+              <div className="flex items-center justify-between mb-2">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Spec Files
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setShowSpecFilesEditor(!showSpecFilesEditor)}
+                  className="text-sm text-blue-400 hover:text-blue-300 transition-colors"
+                >
+                  {showSpecFilesEditor ? 'Hide' : 'Manage Specs'}
+                </button>
+              </div>
+
+              <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+                Optional project-specific specification files. Written to{' '}
+                <span className="font-mono">/workspace/specs/</span> inside the container.
+              </p>
+
+              {Object.keys(specFiles).length > 0 && (
+                <div className="text-sm text-gray-500 dark:text-gray-400 mb-2">
+                  {Object.keys(specFiles).length} spec file(s) configured
+                </div>
+              )}
+
+              {showSpecFilesEditor && (
+                <SpecFilesSection specFiles={specFiles} onChange={setSpecFiles} />
               )}
             </div>
 

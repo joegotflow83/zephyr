@@ -225,7 +225,7 @@ describe('CredentialsSection', () => {
     });
   });
 
-  it('shows GitHub delete button when GitHub credential stored', async () => {
+  it('shows GitHub clear button when GitHub credential stored', async () => {
     mockCredentials.list.mockResolvedValue(['github']);
     mockCredentials.get.mockImplementation((service: string) => {
       if (service === 'github') return Promise.resolve('ghp_****5678');
@@ -235,19 +235,19 @@ describe('CredentialsSection', () => {
     render(<CredentialsSection />);
 
     await waitFor(() => {
-      expect(screen.getByText('Delete')).toBeInTheDocument();
+      expect(screen.getByText('Clear')).toBeInTheDocument();
     });
   });
 
-  it('deletes GitHub credential when Delete clicked', async () => {
+  it('deletes GitHub credential when Clear clicked', async () => {
     mockCredentials.list.mockResolvedValue(['github']);
     mockCredentials.get.mockResolvedValue('ghp_****5678');
 
     render(<CredentialsSection />);
 
-    await waitFor(() => screen.getByText('Delete'));
+    await waitFor(() => screen.getByText('Clear'));
 
-    fireEvent.click(screen.getByText('Delete'));
+    fireEvent.click(screen.getByText('Clear'));
 
     await waitFor(() => {
       expect(mockCredentials.delete).toHaveBeenCalledWith('github');

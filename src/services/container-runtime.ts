@@ -123,6 +123,12 @@ export interface ExecSession {
  */
 export interface LogStream {
   stop(): void;
+  /**
+   * Register a callback invoked once when the stream ends naturally
+   * (i.e., the container exited on its own — not because stop() was called).
+   * Use this to trigger immediate cleanup rather than waiting for a poll cycle.
+   */
+  onEnded?(callback: () => void): void;
 }
 
 /**

@@ -195,7 +195,7 @@ export class PodmanRuntime implements ContainerRuntime {
   readonly podmanPath: string;
 
   /** Active interactive exec sessions keyed by generated session ID. */
-  private readonly execSessions = new Map<string, ChildProcess>();
+  private readonly execSessions = new Map<string, { child: ChildProcess; containerId: string }>();
 
   constructor() {
     this.podmanPath = resolvePodmanPath();
@@ -634,24 +634,33 @@ export class PodmanRuntime implements ContainerRuntime {
       for (const e of opts.env) args.push('--env', e);
     }
 
+    // When host stdin is a pipe, podman cannot read the terminal dimensions via
+    // ioctl so the container PTY defaults to 0×0. Pass COLUMNS/LINES explicitly
+    // so programs (like kiro-cli) that read these env vars get a sensible width.
+    if (opts?.cols) args.push('--env', `COLUMNS=${opts.cols}`);
+    if (opts?.rows) args.push('--env', `LINES=${opts.rows}`);
+
     args.push(containerId, shell);
 
-    // `podman exec --tty` requires its own stdin to be a TTY, but Node.js
-    // spawns it with piped stdio.  Wrap the command in `script -q -c` which
-    // allocates a host-side PTY pair so podman sees a real TTY on its stdin,
-    // enabling interactive programs like vi to work correctly.
-    const innerCmd = [this.podmanPath, ...args]
-      .map((a) => `'${a.replace(/'/g, "'\\''")}'`)
-      .join(' ');
-    const child = spawn('script', ['-q', '-c', innerCmd, '/dev/null'], {
+    // Spawn podman exec directly. Podman v4+ allocates the container-side PTY
+    // on the server regardless of whether the host stdin is a real TTY, so the
+    // `script` wrapper is not needed and in fact causes the session to exit
+    // immediately on Linux (double-PTY interaction / hangup).
+    const machineSocket = resolveMachineSocket();
+    const env = machineSocket
+      ? { ...process.env, CONTAINER_HOST: machineSocket }
+      : undefined;
+    const child = spawn(this.podmanPath, args, {
       stdio: ['pipe', 'pipe', 'pipe'],
+      env,
     });
 
     // Build a Duplex that bridges the child's stdin/stdout so callers receive
     // the same ReadWriteStream contract they get from DockerRuntime.
     const duplexStream = new Duplex({
       read() {
-        // Push-mode: data is emitted from child stdout/stderr events below.
+        // Downstream wants more data — resume stdout if it was paused for backpressure.
+        child.stdout.resume();
       },
       write(chunk, _encoding, callback) {
         if (!child.stdin.destroyed) {
@@ -665,7 +674,12 @@ export class PodmanRuntime implements ContainerRuntime {
       },
     });
 
-    child.stdout.on('data', (data: Buffer) => duplexStream.push(data));
+    child.stdout.on('data', (data: Buffer) => {
+      if (!duplexStream.push(data)) {
+        // Buffer full — pause stdout until the consumer catches up (read() resumes it).
+        child.stdout.pause();
+      }
+    });
     child.stderr.on('data', (data: Buffer) => duplexStream.push(data));
     child.on('close', () => {
       duplexStream.push(null);
@@ -673,18 +687,26 @@ export class PodmanRuntime implements ContainerRuntime {
     child.on('error', (err: Error) => duplexStream.destroy(err));
 
     const sessionId = `podman-exec-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-    this.execSessions.set(sessionId, child);
+    this.execSessions.set(sessionId, { child, containerId });
     child.on('close', () => this.execSessions.delete(sessionId));
 
     return { id: sessionId, stream: duplexStream as unknown as NodeJS.ReadWriteStream };
   }
 
-  async resizeExec(execId: string, _rows: number, _cols: number): Promise<void> {
-    // For CLI-based exec sessions, direct PTY resize requires a PTY library
-    // (e.g. node-pty). As a best-effort, send SIGWINCH so the container shell
-    // re-queries its terminal size.  This has no effect without a proper PTY.
-    const child = this.execSessions.get(execId);
-    if (child?.pid !== undefined) {
+  async resizeExec(execId: string, rows: number, cols: number): Promise<void> {
+    const entry = this.execSessions.get(execId);
+    if (!entry) return;
+    const { child, containerId } = entry;
+
+    // Resize the container PTY via a fire-and-forget `podman exec stty` call.
+    // This updates TIOCSWINSZ inside the container so programs that call
+    // ioctl(TIOCGWINSZ) (e.g. bash, ncurses apps) see the correct dimensions.
+    runPodman(this.podmanPath, [
+      'exec', containerId, 'stty', 'cols', String(cols), 'rows', String(rows),
+    ]).catch(() => { /* container may have exited — ignore */ });
+
+    // Also signal the shell to re-read its terminal size.
+    if (child.pid !== undefined) {
       try {
         process.kill(child.pid, 'SIGWINCH');
       } catch {
@@ -708,6 +730,8 @@ export class PodmanRuntime implements ContainerRuntime {
     });
 
     let buffer = '';
+    let stoppedByCall = false;
+    let endCallback: (() => void) | undefined;
 
     const handleData = (chunk: Buffer) => {
       buffer += chunk.toString();
@@ -724,11 +748,18 @@ export class PodmanRuntime implements ContainerRuntime {
 
     child.on('close', () => {
       if (buffer.trim()) onLine(buffer);
+      // Only fire onEnded when the container exited on its own — not when
+      // stop() killed the log process as part of a manual stopLoop() call.
+      if (!stoppedByCall) endCallback?.();
     });
 
     return {
       stop() {
+        stoppedByCall = true;
         child.kill('SIGTERM');
+      },
+      onEnded(cb: () => void) {
+        endCallback = cb;
       },
     };
   }

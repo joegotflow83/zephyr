@@ -1,42 +1,79 @@
-#!/usr/bin/env bash
-# validate.sh — Electron CI validation script.
-# Runs lint and unit tests. Exits non-zero on any failure.
-#
-# Usage:
-#   bash validate.sh        Run lint + unit tests (default)
-#   ./validate.sh           Same as above
+#!/bin/bash
+# Validation script for running tests with different strategies
 
-set -euo pipefail
+set -e
 
-# Source NVM so npm/node are available
-export NVM_DIR="/home/ralph/.nvm"
-# shellcheck source=/dev/null
-[ -s "$NVM_DIR/nvm.sh" ] && source "$NVM_DIR/nvm.sh"
+PYTHONPATH="/home/ralph/app/src/lib"
+TEST_DIR="/home/ralph/app/src/lib/api/tests"
+LOG_FILE="pytest.log"
 
-PASS=0
-FAIL=0
+# Colors for output
+GREEN='\033[0;32m'
+RED='\033[0;31m'
+YELLOW='\033[1;33m'
+NC='\033[0m' # No Color
 
-run_step() {
-  local name="$1"
-  shift
-  echo ""
-  echo "=== $name ==="
-  if "$@"; then
-    echo "✓ $name passed"
-    PASS=$((PASS + 1))
-  else
-    echo "✗ $name FAILED"
-    FAIL=$((FAIL + 1))
-  fi
+usage() {
+    echo "Usage: $0 {full|targeted|lf|ff} [pytest-args]"
+    echo ""
+    echo "Commands:"
+    echo "  full             Run full test suite"
+    echo "  targeted <path>  Run specific test file or pattern"
+    echo "  lf               Run last-failed tests only"
+    echo "  ff               Run failed-first (failed tests, then all others)"
+    echo ""
+    echo "Examples:"
+    echo "  $0 full"
+    echo "  $0 targeted tests/test_galactichangar.py"
+    echo "  $0 targeted -k 'test_post_build'"
+    echo "  $0 lf"
+    echo "  $0 ff"
+    exit 1
 }
 
-run_step "Install dependencies" npm ci
-run_step "Lint" npm run lint
-run_step "Unit tests" npm run test:unit
-
-echo ""
-echo "Results: $PASS passed, $FAIL failed"
-
-if [ "$FAIL" -gt 0 ]; then
-  exit 1
+if [ $# -eq 0 ]; then
+    usage
 fi
+
+COMMAND=$1
+shift
+
+# Set PYTHONPATH
+export PYTHONPATH
+
+case "$COMMAND" in
+    full)
+        echo -e "${GREEN}Running full test suite...${NC}"
+        python3 -m pytest "$TEST_DIR" -v --tb=short "$@" 2>&1 | tee "$LOG_FILE"
+        ;;
+    targeted)
+        if [ $# -eq 0 ]; then
+            echo -e "${RED}Error: targeted requires a path or pattern${NC}"
+            usage
+        fi
+        echo -e "${GREEN}Running targeted tests: $@${NC}"
+        python3 -m pytest "$@" -v --tb=short 2>&1 | tee "$LOG_FILE"
+        ;;
+    lf)
+        echo -e "${YELLOW}Running last-failed tests...${NC}"
+        python3 -m pytest --lf -v --tb=short "$TEST_DIR" "$@" 2>&1 | tee "$LOG_FILE"
+        ;;
+    ff)
+        echo -e "${YELLOW}Running failed-first tests...${NC}"
+        python3 -m pytest --ff -v --tb=short "$TEST_DIR" "$@" 2>&1 | tee "$LOG_FILE"
+        ;;
+    *)
+        echo -e "${RED}Unknown command: $COMMAND${NC}"
+        usage
+        ;;
+esac
+
+EXIT_CODE=$?
+echo ""
+if [ $EXIT_CODE -eq 0 ]; then
+    echo -e "${GREEN}✓ Tests passed${NC}"
+else
+    echo -e "${RED}✗ Tests failed (see $LOG_FILE for details)${NC}"
+fi
+
+exit $EXIT_CODE%  

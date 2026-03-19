@@ -147,7 +147,8 @@ export function generateClaudeCodeInstallBlock(hasNodejs: boolean): string {
 export function generateClaudeCodeConfigBlock(): string {
   return [
     'RUN mkdir -p /home/ralph/.claude && \\',
-    `    printf '{"autoUpdaterStatus":"disabled"}\\n' > /home/ralph/.claude/settings.json`,
+    `    printf '{"autoUpdaterStatus":"disabled"}\\n' > /home/ralph/.claude/settings.json && \\`,
+    `    printf '{"hasCompletedOnboarding":true}\\n' > /home/ralph/.claude.json`,
   ].join('\n');
 }
 

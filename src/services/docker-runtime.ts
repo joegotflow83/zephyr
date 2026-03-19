@@ -417,6 +417,9 @@ export class DockerRuntime implements ContainerRuntime {
       }
     });
 
+    let stoppedByCall = false;
+    let endCallback: (() => void) | undefined;
+
     stream.on('end', () => {
       if (buffer.trim()) onLine(buffer);
       stream.destroy();
@@ -427,9 +430,19 @@ export class DockerRuntime implements ContainerRuntime {
       stream.destroy();
     });
 
+    // 'close' fires after both natural end and destroy(). Only notify onEnded
+    // when the container exited on its own — not when stop() was called.
+    stream.on('close', () => {
+      if (!stoppedByCall) endCallback?.();
+    });
+
     return {
       stop() {
+        stoppedByCall = true;
         stream.destroy();
+      },
+      onEnded(cb: () => void) {
+        endCallback = cb;
       },
     };
   }

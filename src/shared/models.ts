@@ -210,6 +210,12 @@ export interface ProjectConfig {
   git_user_name?: string;
   /** Git user.email to set in the container via git config --global. Defaults to "ralph@placeholder.com". */
   git_user_email?: string;
+  /**
+   * Map of spec filename → content for project-specific specification files.
+   * Files are written to a specs/ directory inside the container at /workspace/specs/.
+   * Optional and unique to each project.
+   */
+  spec_files?: Record<string, string>;
 }
 
 /**
@@ -323,5 +329,6 @@ export function createProjectConfig(partial: Partial<ProjectConfig> = {}): Proje
     factory_config: partial.factory_config,
     feature_requests_content: partial.feature_requests_content,
     kiro_config: partial.kiro_config,
+    spec_files: partial.spec_files,
   };
 }

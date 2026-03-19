@@ -590,7 +590,13 @@ export class LoopRunner {
 
       this.logStreams.set(loopKey, logStream);
 
-      // When container exits, update state accordingly
+      // React immediately when the log process ends naturally (container exited).
+      // This fires before the next monitorContainerExit poll (up to 8s later),
+      // allowing deploy key cleanup to happen right away instead of being delayed.
+      logStream.onEnded?.(() => this.handleContainerExited(loopKey, containerId, mode));
+
+      // Keep the polling loop as a fallback in case the log stream end event
+      // is missed (e.g., the stream never started cleanly).
       this.monitorContainerExit(loopKey, containerId, mode);
     } catch (error) {
       console.error(`Failed to start log stream for ${loopKey}:`, error);
@@ -625,8 +631,60 @@ export class LoopRunner {
 
     this.logStreams.set(loopKey, logStream);
 
+    logStream.onEnded?.(() => this.handleContainerExited(loopKey, containerId, LoopMode.CONTINUOUS));
+
     // Monitor container exit (assuming CONTINUOUS mode for recovered loops)
     this.monitorContainerExit(loopKey, containerId, LoopMode.CONTINUOUS);
+  }
+
+  /**
+   * Immediately handle a container that has exited on its own.
+   *
+   * Called by the LogStream.onEnded callback when the log process closes
+   * naturally (i.e., the container stopped without stopLoop() being invoked).
+   * Performs the same state transition as monitorContainerExit() but without
+   * the polling delay, so deploy key cleanup triggers right away.
+   */
+  private async handleContainerExited(
+    loopKey: string,
+    containerId: string,
+    mode: LoopMode,
+  ): Promise<void> {
+    const state = this.states.get(loopKey);
+    if (!state || isLoopTerminal(state.status) || state.status === LoopStatus.STOPPING) {
+      // Already handled — manual stop or prior terminal transition.
+      return;
+    }
+
+    const stoppedAt = new Date().toISOString();
+
+    try {
+      const status = await this.docker.getContainerStatus(containerId);
+      if (status.state === 'exited' || status.state === 'dead') {
+        if (mode === LoopMode.SINGLE) {
+          this.updateState(loopKey, { status: LoopStatus.COMPLETED, stoppedAt });
+        } else {
+          this.updateState(loopKey, {
+            status: LoopStatus.FAILED,
+            error: 'Container exited unexpectedly',
+            stoppedAt,
+          });
+        }
+        this.logStreams.delete(loopKey);
+        this.clearLogBroadcastTimer(loopKey);
+      }
+      // If status is still 'running', the log stream ended for another reason;
+      // monitorContainerExit will catch the eventual exit on the next poll.
+    } catch {
+      // Container no longer exists — treat as lost.
+      this.updateState(loopKey, {
+        status: LoopStatus.FAILED,
+        error: 'Container lost',
+        stoppedAt,
+      });
+      this.logStreams.delete(loopKey);
+      this.clearLogBroadcastTimer(loopKey);
+    }
   }
 
   /**

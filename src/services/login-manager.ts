@@ -226,7 +226,7 @@ export class LoginManager {
     // Claude Code CLI OAuth application constants
     const CLIENT_ID = '9d1c250a-e61b-44d9-88ed-5944d1962f5e';
     const AUTH_URL = 'https://claude.ai/oauth/authorize';
-    const TOKEN_URL = 'https://claude.ai/v1/oauth/token';
+    const TOKEN_URL = 'https://platform.claude.com/v1/oauth/token';
     const SCOPES = 'user:inference user:mcp_servers user:profile user:sessions:claude_code';
     const timeoutMs = DEFAULT_LOGIN_TIMEOUT_MS;
 
@@ -293,6 +293,7 @@ export class LoginManager {
               redirect_uri: redirectUri,
               client_id: CLIENT_ID,
               code_verifier: codeVerifier,
+              state,
             }),
           });
 

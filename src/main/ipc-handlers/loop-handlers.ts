@@ -139,6 +139,7 @@ export function registerLoopHandlers(services: LoopServices): void {
       if ((isVm || isSingleContainer) && project) {
         const hasHooks = project.hooks.length > 0 && !!hooksStore;
         const hasPrompts = Object.keys(project.custom_prompts).length > 0;
+        const hasSpecFiles = Object.keys(project.spec_files ?? {}).length > 0;
         const hasClaudeSettings = !!project.claude_settings_file && !!claudeSettingsStore;
         // browser_session credentials must be pre-mounted for VM/SINGLE runs because
         // docker exec injection would race against (or miss) the agent startup.
@@ -273,6 +274,41 @@ export function registerLoopHandlers(services: LoopServices): void {
               };
             } catch (err) {
               logger.warn('Failed to prepare prompt files directory for single-mode run', { err });
+            }
+          }
+        }
+
+        // Write spec files to specs/ inside the workspace for single-mode and VM runs.
+        // When local_path is set it is already volume-mounted as /workspace, so writing
+        // to local_path/specs/ makes them available at /workspace/specs/ in the container.
+        if (hasSpecFiles) {
+          const specFilesMap = project.spec_files ?? {};
+          if (project.local_path) {
+            const specsDir = path.join(project.local_path, 'specs');
+            try {
+              await fs.mkdir(specsDir, { recursive: true });
+              for (const [filename, content] of Object.entries(specFilesMap)) {
+                const safe = path.basename(filename);
+                await fs.writeFile(path.join(specsDir, safe), content, 'utf8');
+              }
+            } catch (err) {
+              logger.warn('Failed to write spec files to local_path/specs for run', { err });
+            }
+          } else {
+            // No local_path: write to a temp dir and mount it as a separate volume at /workspace/specs.
+            const specsDir = path.join(os.tmpdir(), `zephyr-specs-${opts.projectId}`);
+            try {
+              await fs.mkdir(specsDir, { recursive: true });
+              for (const [filename, content] of Object.entries(specFilesMap)) {
+                const safe = path.basename(filename);
+                await fs.writeFile(path.join(specsDir, safe), content, 'utf8');
+              }
+              opts = {
+                ...opts,
+                volumeMounts: [...(opts.volumeMounts ?? []), `${specsDir}:/workspace/specs`],
+              };
+            } catch (err) {
+              logger.warn('Failed to prepare spec files directory for run', { err });
             }
           }
         }
@@ -459,6 +495,32 @@ export function registerLoopHandlers(services: LoopServices): void {
           }
         } catch (err) {
           logger.warn('Failed to create ~/.claude in container for custom prompts', { err });
+        }
+      }
+
+      // Inject spec files into /workspace/specs/ inside the container.
+      // Uses base64 to safely transfer file contents via docker exec.
+      // Single-mode container and VM runs handle this via volume mount above.
+      if (project && Object.keys(project.spec_files ?? {}).length > 0 && state.containerId && runtime && opts.mode !== LoopMode.SINGLE) {
+        try {
+          await runtime.execCommand(state.containerId, [
+            'sh', '-c', 'mkdir -p /workspace/specs',
+          ]);
+
+          for (const [filename, content] of Object.entries(project.spec_files ?? {})) {
+            try {
+              const encoded = Buffer.from(content).toString('base64');
+              const safe = path.basename(filename);
+              await runtime.execCommand(state.containerId, [
+                'sh', '-c',
+                `printf '%s' '${encoded}' | base64 -d > /workspace/specs/${safe}`,
+              ]);
+            } catch (err) {
+              logger.warn(`Failed to inject spec file ${filename} into container`, { err });
+            }
+          }
+        } catch (err) {
+          logger.warn('Failed to create /workspace/specs in container for spec files', { err });
         }
       }
 
