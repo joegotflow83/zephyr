@@ -394,8 +394,6 @@ async function gracefulShutdown(): Promise<void> {
     logger.info('Graceful shutdown complete');
   } catch (error) {
     logger.error('Error during graceful shutdown', { error });
-  } finally {
-    isShuttingDown = false;
   }
 }
 
