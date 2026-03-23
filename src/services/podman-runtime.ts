@@ -725,20 +725,38 @@ export class PodmanRuntime implements ContainerRuntime {
 
     args.push(containerId);
 
+    // Inject CONTAINER_HOST so `podman logs` can reach the Podman VM on
+    // macOS/Windows (same as createExecSession and runPodman do).
+    const machineSocket = resolveMachineSocket();
+    const env = machineSocket
+      ? { ...process.env, CONTAINER_HOST: machineSocket }
+      : undefined;
+
     const child = spawn(this.podmanPath, args, {
       stdio: ['ignore', 'pipe', 'pipe'],
+      env,
     });
 
     let buffer = '';
     let stoppedByCall = false;
     let endCallback: (() => void) | undefined;
 
+    // Strip the RFC 3339 timestamp prefix that `--timestamps` prepends to
+    // every line (e.g. "2026-03-20T11:09:48.123456789-04:00 " or
+    // "2026-03-20T11:09:48-04:00 ").  Keeping the raw prefix in the line
+    // breaks the log-parser's start-of-line patterns (commit hashes, error
+    // markers, etc.) because they anchor at `^` and the timestamp comes first.
+    const RE_PODMAN_TS =
+      /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2}) /;
+
+    const stripTs = (line: string) => line.replace(RE_PODMAN_TS, '');
+
     const handleData = (chunk: Buffer) => {
       buffer += chunk.toString();
       const lines = buffer.split('\n');
       buffer = lines.pop() ?? '';
       for (const line of lines) {
-        if (line.trim()) onLine(line);
+        if (line.trim()) onLine(stripTs(line));
       }
     };
 
@@ -747,7 +765,7 @@ export class PodmanRuntime implements ContainerRuntime {
     child.stderr.on('data', handleData);
 
     child.on('close', () => {
-      if (buffer.trim()) onLine(buffer);
+      if (buffer.trim()) onLine(stripTs(buffer));
       // Only fire onEnded when the container exited on its own — not when
       // stop() killed the log process as part of a manual stopLoop() call.
       if (!stoppedByCall) endCallback?.();

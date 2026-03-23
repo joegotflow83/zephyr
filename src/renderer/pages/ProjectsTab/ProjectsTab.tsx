@@ -9,7 +9,7 @@ import { RunModeDialog } from '../../components/RunModeDialog/RunModeDialog';
 import type { RunModeSelection } from '../../components/RunModeDialog/RunModeDialog';
 import type { ProjectConfig } from '../../../shared/models';
 import type { LoopStartOpts } from '../../../shared/loop-types';
-import { LoopMode } from '../../../shared/loop-types';
+import { LoopMode, LoopStatus, createLoopState } from '../../../shared/loop-types';
 
 interface ToastMethods {
   success: (message: string) => void;
@@ -29,8 +29,9 @@ interface ProjectsTabProps {
  */
 export const ProjectsTab: React.FC<ProjectsTabProps> = ({ onRunProject, toast }) => {
   const { projects, loading, error, refresh } = useProjects();
-  const { get: getLoop, factoryStart, schedule } = useLoops();
+  const { getForProject: getLoop, factoryStart, schedule } = useLoops();
   const removeLoop = useAppStore((state) => state.removeLoop);
+  const updateLoop = useAppStore((state) => state.updateLoop);
   const vmInfos = useAppStore((state) => state.vmInfos);
   const multipassAvailable = useAppStore((state) => state.multipassAvailable);
 
@@ -136,6 +137,7 @@ export const ProjectsTab: React.FC<ProjectsTabProps> = ({ onRunProject, toast })
         await schedule(project.id, selection.scheduleExpression, baseOpts);
         toast.success(`Loop scheduled for "${project.name}"`);
       } else if (selection.factory) {
+        updateLoop({ ...createLoopState(project.id, selection.mode, project.name), status: LoopStatus.STARTING });
         await factoryStart(project.id, {
           ...baseOpts,
           mode: selection.mode,
@@ -146,8 +148,13 @@ export const ProjectsTab: React.FC<ProjectsTabProps> = ({ onRunProject, toast })
         const opts: LoopStartOpts = {
           ...baseOpts,
           mode: selection.mode,
+          ...(selection.role ? { role: selection.role } : {}),
+          ...(selection.maxIterations !== undefined
+            ? { envVars: { ...(baseOpts.envVars ?? {}), MAX_ITERATIONS: String(selection.maxIterations) } }
+            : {}),
           ...(selection.cmd ? { cmd: selection.cmd } : {}),
         };
+        updateLoop({ ...createLoopState(project.id, selection.mode, project.name, selection.role), status: LoopStatus.STARTING });
         await window.api.loops.start(opts);
         toast.success(`Loop started for "${project.name}"`);
       }
@@ -361,6 +368,7 @@ export const ProjectsTab: React.FC<ProjectsTabProps> = ({ onRunProject, toast })
         <RunModeDialog
           projectName={runModeProject.name}
           promptFiles={Object.keys(runModeProject.custom_prompts)}
+          factoryRoles={runModeProject.factory_config?.roles ?? []}
           factoryEnabled={!!runModeProject.factory_config?.enabled}
           onConfirm={handleRunModeConfirm}
           onCancel={() => setRunModeProject(null)}

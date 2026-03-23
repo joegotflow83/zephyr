@@ -68,6 +68,7 @@ const mockLoopRunner = {
   startLoop: vi.fn(),
   stopLoop: vi.fn(),
   listAll: vi.fn(),
+  listByProject: vi.fn().mockReturnValue([]),
   getLoopState: vi.fn(),
   removeLoop: vi.fn(),
   onStateChange: vi.fn(),
@@ -89,6 +90,7 @@ const mockCleanupManager = {
 describe('registerLoopHandlers', () => {
   beforeEach(() => {
     vi.resetAllMocks();
+    mockLoopRunner.listByProject.mockReturnValue([]);
     // Clear registry between test suites
     for (const key of Object.keys(handlerRegistry)) {
       delete handlerRegistry[key];
@@ -164,6 +166,7 @@ describe('registerLoopHandlers', () => {
     it('should handle cleanup manager not being provided', async () => {
       // Re-register without cleanup manager
       vi.resetAllMocks();
+      mockLoopRunner.listByProject.mockReturnValue([]);
       for (const key of Object.keys(handlerRegistry)) {
         delete handlerRegistry[key];
       }

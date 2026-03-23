@@ -123,6 +123,7 @@ registerLoopHandlers({
   sshKeyManager,
   deployKeyStore,
   loopScriptsStore,
+  configManager,
 });
 registerLogHandlers({ logExporter, loopRunner });
 registerTerminalHandlers({ terminalManager, vmManager });

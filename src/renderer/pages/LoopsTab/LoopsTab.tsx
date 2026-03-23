@@ -123,7 +123,8 @@ export const LoopsTab: React.FC = () => {
     const nonFactoryLoops: LoopState[] = [];
 
     for (const loop of loops) {
-      if (loop.role) {
+      const project = projects.find((p) => p.id === loop.projectId);
+      if (loop.role && project?.factory_config?.enabled) {
         if (!factoryByProject.has(loop.projectId)) {
           projectOrder.push(loop.projectId);
           factoryByProject.set(loop.projectId, []);
@@ -161,7 +162,8 @@ export const LoopsTab: React.FC = () => {
   const factoryGroups = useMemo(() => {
     const groups = new Map<string, LoopState[]>();
     for (const loop of loops) {
-      if (loop.role) {
+      const project = projects.find((p) => p.id === loop.projectId);
+      if (loop.role && project?.factory_config?.enabled) {
         if (!groups.has(loop.projectId)) {
           groups.set(loop.projectId, []);
         }

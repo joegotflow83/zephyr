@@ -5,14 +5,15 @@
 import * as fs from 'fs/promises';
 import * as os from 'os';
 import * as path from 'path';
-import { ipcMain, BrowserWindow } from 'electron';
+import { ipcMain, BrowserWindow, Notification } from 'electron';
 import { IPC } from '../../shared/ipc-channels';
 import type { LoopRunner } from '../../services/loop-runner';
 import type { LoopScheduler } from '../../services/scheduler';
 import type { LoopState, LoopStartOpts } from '../../shared/loop-types';
-import { isLoopTerminal, LoopMode, getLoopKey } from '../../shared/loop-types';
+import { isLoopTerminal, LoopMode, LoopStatus, getLoopKey } from '../../shared/loop-types';
 import type { ScheduledLoop } from '../../services/scheduler';
-import type { ProjectConfig } from '../../shared/models';
+import type { AppSettings, ProjectConfig } from '../../shared/models';
+import type { ConfigManager } from '../../services/config-manager';
 import type { PreValidationStore } from '../../services/pre-validation-store';
 import type { HooksStore } from '../../services/hooks-store';
 import type { KiroHooksStore } from '../../services/kiro-hooks-store';
@@ -40,6 +41,7 @@ export interface LoopServices {
   sshKeyManager?: SSHKeyManager;
   deployKeyStore?: DeployKeyStore;
   loopScriptsStore?: LoopScriptsStore;
+  configManager?: ConfigManager;
 }
 
 export function registerLoopHandlers(services: LoopServices): void {
@@ -58,6 +60,7 @@ export function registerLoopHandlers(services: LoopServices): void {
     sshKeyManager,
     deployKeyStore,
     loopScriptsStore,
+    configManager,
   } = services;
 
   const logger = getLogger('loop');
@@ -346,6 +349,35 @@ export function registerLoopHandlers(services: LoopServices): void {
           };
         } catch (err) {
           logger.warn('Failed to prepare pre-validation scripts directory for VM loop', { err });
+        }
+      }
+
+      // For single-mode runs with no explicit cmd, build cmd from the project's loop script.
+      // Mirrors factory mode: ./loop-script <role> <maxIterations>
+      // The role (e.g. "plan", "build") comes from the dialog selection; maxIterations from envVars.
+      // Falls back to claude --print if no loop script is configured.
+      if (opts.mode === LoopMode.SINGLE && !opts.cmd && project) {
+        const loopScript = project.loop_script;
+        const maxIterations = opts.envVars?.MAX_ITERATIONS ?? '10';
+        const role = opts.role;
+        opts = {
+          ...opts,
+          cmd: loopScript
+            ? ['bash', '-c', role
+                ? `./${loopScript} ${role} ${maxIterations}`
+                : `./${loopScript} ${maxIterations}`]
+            : ['bash', '-c', role
+                ? `claude --max-turns ${maxIterations} --print "$(cat /workspace/PROMPT_${role}.md)"`
+                : `claude --max-turns ${maxIterations}`],
+        };
+      }
+
+      // Remove any stale terminal loops for this project before starting a new one.
+      // This clears leftover factory role loops when switching to a non-factory run
+      // (and vice versa), so the UI doesn't show ghost entries from the previous mode.
+      for (const stale of loopRunner.listByProject(opts.projectId)) {
+        if (isLoopTerminal(stale.status)) {
+          loopRunner.removeLoop(stale.projectId, stale.role);
         }
       }
 
@@ -912,6 +944,21 @@ export function registerLoopHandlers(services: LoopServices): void {
     windows.forEach((win) => {
       win.webContents.send(IPC.LOOP_STATE_CHANGED, state);
     });
+
+    // Fire OS desktop notification on loop completion or failure
+    if (state.status === LoopStatus.COMPLETED || state.status === LoopStatus.FAILED) {
+      const settings = configManager?.loadJson<AppSettings>('settings.json');
+      if (settings?.notification_enabled) {
+        const projectName = projectStore?.getProject(state.projectId)?.name ?? state.projectId;
+        const isCompleted = state.status === LoopStatus.COMPLETED;
+        new Notification({
+          title: isCompleted ? 'Loop completed' : 'Loop failed',
+          body: isCompleted
+            ? `"${projectName}" finished successfully.`
+            : `"${projectName}" stopped with an error.`,
+        }).show();
+      }
+    }
   });
 
   // Throttle log line IPC broadcasts: buffer lines and flush every 250ms

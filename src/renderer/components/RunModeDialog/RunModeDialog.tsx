@@ -9,8 +9,10 @@ export interface RunModeSelection {
   factory?: boolean;
   /** Schedule expression for SCHEDULED mode (e.g. "every 30 minutes", "every 2 hours", "daily 09:00", "once <ISO>") */
   scheduleExpression?: string;
-  /** Max iterations for factory single-run mode */
+  /** Max iterations for single-run and factory single-run mode */
   maxIterations?: number;
+  /** Role/mode label for single-run (e.g. "plan", "build") — used by startLoopCore to build the cmd */
+  role?: string;
 }
 
 const SCHEDULE_PRESETS = [
@@ -30,29 +32,40 @@ interface RunModeDialogProps {
   promptFiles: string[];
   /** Whether factory mode is available for this project */
   factoryEnabled?: boolean;
+  /** Role names from the project's factory config (e.g. ["plan", "build"]) */
+  factoryRoles?: string[];
   onConfirm: (selection: RunModeSelection) => void;
   onCancel: () => void;
 }
+
+const getLabelForPromptFile = (filename: string): string =>
+  filename.replace(/^PROMPT_/i, '').replace(/\.[^.]+$/, '');
 
 /**
  * Modal for selecting how to run a loop.
  *
  * Presents:
  *  - Continuous mode (existing behaviour)
- *  - One Single-run option per custom_prompt file in the project
- *
- * For single runs the dialog constructs a CMD that invokes claude with the
- * content of the selected prompt file, which must be mounted at /root/.claude
- * before the container starts (handled in loop-handlers.ts).
+ *  - Single run with role selector (plan, build, etc.)
+ *  - Coding Factory (all roles in parallel)
+ *  - Scheduled / run-once modes
  */
 export const RunModeDialog: React.FC<RunModeDialogProps> = ({
   projectName,
   promptFiles,
   factoryEnabled = false,
+  factoryRoles = [],
   onConfirm,
   onCancel,
 }) => {
+  // Derive available roles from factory config + prompt file labels, deduplicated.
+  const availableRoles = Array.from(new Set([
+    ...factoryRoles,
+    ...promptFiles.map(getLabelForPromptFile),
+  ]));
+
   const [selected, setSelected] = useState<string>(factoryEnabled ? 'factory' : 'continuous');
+  const [singleRole, setSingleRole] = useState<string>(availableRoles[0] ?? '');
   const [maxIterations, setMaxIterations] = useState<number>(10);
   const [schedulePreset, setSchedulePreset] = useState<string>('*/30 minutes');
   const [dailyTime, setDailyTime] = useState<string>('09:00');
@@ -83,24 +96,12 @@ export const RunModeDialog: React.FC<RunModeDialogProps> = ({
     if (selected === 'run-once') {
       return { mode: LoopMode.SCHEDULED, scheduleExpression: `once ${new Date(runOnceAt).toISOString()}` };
     }
-    // selected is a prompt filename
-    const cmd = [
-      'bash',
-      '-c',
-      `claude --max-turns ${maxIterations} --print "$(cat /workspace/${selected})"`,
-    ];
-    return { mode: LoopMode.SINGLE, cmd, maxIterations };
+    // 'single' — pass selected role to loop script
+    return { mode: LoopMode.SINGLE, role: singleRole, maxIterations };
   };
 
   const handleConfirm = () => {
     onConfirm(buildSelection());
-  };
-
-  const getLabelForPromptFile = (filename: string): string => {
-    // Strip extension and "PROMPT_" prefix for a friendlier label
-    return filename
-      .replace(/^PROMPT_/i, '')
-      .replace(/\.[^.]+$/, '');
   };
 
   return (
@@ -263,29 +264,50 @@ export const RunModeDialog: React.FC<RunModeDialogProps> = ({
             </div>
           </label>
 
-          {/* Single-run option per prompt file */}
-          {promptFiles.map((filename) => (
-            <label
-              key={filename}
-              className="flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 has-[:checked]:border-blue-500 has-[:checked]:bg-blue-50 dark:has-[:checked]:bg-blue-900/20"
-            >
-              <input
-                type="radio"
-                name="run-mode"
-                value={filename}
-                checked={selected === filename}
-                onChange={() => setSelected(filename)}
-                className="mt-0.5 accent-blue-600"
-              />
-              <div className="flex-1 min-w-0">
-                <div className="text-sm font-medium text-gray-900 dark:text-white capitalize">
-                  {getLabelForPromptFile(filename)}
-                </div>
-                <div className="text-xs text-gray-500 dark:text-gray-400">
-                  Single run using {filename}
-                </div>
-                {selected === filename && (
-                  <div className="mt-2 flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+          {/* Single run */}
+          <label className="flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 has-[:checked]:border-blue-500 has-[:checked]:bg-blue-50 dark:has-[:checked]:bg-blue-900/20">
+            <input
+              type="radio"
+              name="run-mode"
+              value="single"
+              checked={selected === 'single'}
+              onChange={() => setSelected('single')}
+              className="mt-0.5 accent-blue-600"
+            />
+            <div className="flex-1 min-w-0">
+              <div className="text-sm font-medium text-gray-900 dark:text-white">
+                Single run
+              </div>
+              <div className="text-xs text-gray-500 dark:text-gray-400">
+                Run once using the project loop script
+              </div>
+              {selected === 'single' && (
+                <div className="mt-2 space-y-2" onClick={(e) => e.stopPropagation()}>
+                  <div className="flex items-center gap-2">
+                    <label className="text-xs text-gray-600 dark:text-gray-300 whitespace-nowrap">
+                      Role
+                    </label>
+                    {availableRoles.length > 0 ? (
+                      <select
+                        value={singleRole}
+                        onChange={(e) => setSingleRole(e.target.value)}
+                        className="flex-1 text-xs rounded border border-gray-300 dark:border-gray-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      >
+                        {availableRoles.map((role) => (
+                          <option key={role} value={role}>{role}</option>
+                        ))}
+                      </select>
+                    ) : (
+                      <input
+                        type="text"
+                        value={singleRole}
+                        onChange={(e) => setSingleRole(e.target.value)}
+                        placeholder="e.g. plan, build"
+                        className="flex-1 text-xs rounded border border-gray-300 dark:border-gray-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-500 placeholder-gray-400"
+                      />
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2">
                     <label className="text-xs text-gray-600 dark:text-gray-300 whitespace-nowrap">
                       Max iterations
                     </label>
@@ -298,17 +320,10 @@ export const RunModeDialog: React.FC<RunModeDialogProps> = ({
                       className="w-20 text-xs rounded border border-gray-300 dark:border-gray-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-500"
                     />
                   </div>
-                )}
-              </div>
-            </label>
-          ))}
-
-          {/* If no prompt files, single mode is unavailable */}
-          {promptFiles.length === 0 && (
-            <p className="text-xs text-gray-400 dark:text-gray-500 px-1">
-              Add custom prompt files to the project to enable single-run modes.
-            </p>
-          )}
+                </div>
+              )}
+            </div>
+          </label>
         </div>
 
         <div className="flex gap-3 justify-end">

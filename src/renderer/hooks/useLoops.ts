@@ -7,7 +7,7 @@
 
 import { useAppStore } from '../stores/app-store';
 import type { LoopState, LoopStartOpts } from '../../shared/loop-types';
-import { getLoopKey } from '../../shared/loop-types';
+import { getLoopKey, LoopStatus } from '../../shared/loop-types';
 import type { ScheduledLoop } from '../../services/scheduler';
 
 export interface UseLoopsResult {
@@ -19,6 +19,8 @@ export interface UseLoopsResult {
   stop: (projectId: string, role?: string) => Promise<void>;
   remove: (projectId: string, role?: string) => Promise<void>;
   get: (projectId: string, role?: string) => LoopState | undefined;
+  /** Returns the most active loop for a project, regardless of role. */
+  getForProject: (projectId: string) => LoopState | undefined;
   factoryStart: (projectId: string, baseOpts: LoopStartOpts) => Promise<LoopState[]>;
   factoryStop: (projectId: string) => Promise<void>;
   schedule: (
@@ -63,6 +65,26 @@ export function useLoops(): UseLoopsResult {
     return loops.find((l) => getLoopKey(l) === key);
   };
 
+  // Priority order for picking the "most active" loop when multiple exist for a project
+  const statusPriority: Record<LoopStatus, number> = {
+    [LoopStatus.RUNNING]: 0,
+    [LoopStatus.STARTING]: 1,
+    [LoopStatus.PAUSED]: 2,
+    [LoopStatus.STOPPING]: 3,
+    [LoopStatus.FAILED]: 4,
+    [LoopStatus.COMPLETED]: 5,
+    [LoopStatus.STOPPED]: 6,
+    [LoopStatus.IDLE]: 7,
+  };
+
+  const getForProject = (projectId: string): LoopState | undefined => {
+    const projectLoops = loops.filter((l) => l.projectId === projectId);
+    if (projectLoops.length === 0) return undefined;
+    return projectLoops.reduce((best, l) =>
+      statusPriority[l.status] < statusPriority[best.status] ? l : best
+    );
+  };
+
   const factoryStart = async (projectId: string, baseOpts: LoopStartOpts): Promise<LoopState[]> => {
     const states = await window.api.factory.start(projectId, baseOpts);
     for (const state of states) {
@@ -101,6 +123,7 @@ export function useLoops(): UseLoopsResult {
     stop,
     remove,
     get,
+    getForProject,
     factoryStart,
     factoryStop,
     schedule,
