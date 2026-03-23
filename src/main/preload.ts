@@ -234,6 +234,8 @@ contextBridge.exposeInMainWorld('api', {
     listOrphaned: () => ipcRenderer.invoke(IPC.DEPLOY_KEYS_LIST_ORPHANED),
     getUrl: (repo: string, service?: 'github' | 'gitlab') =>
       ipcRenderer.invoke(IPC.DEPLOY_KEYS_GET_URL, repo, service),
+    markCleaned: (keyId: number) =>
+      ipcRenderer.invoke(IPC.DEPLOY_KEYS_MARK_CLEANED, keyId),
   },
 
   shell: {

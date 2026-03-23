@@ -127,6 +127,7 @@ export const IPC = {
   // Deploy keys (ephemeral GitHub SSH deploy keys for container access)
   DEPLOY_KEYS_LIST_ORPHANED: 'deploy-keys:list-orphaned',
   DEPLOY_KEYS_GET_URL: 'deploy-keys:get-url',
+  DEPLOY_KEYS_MARK_CLEANED: 'deploy-keys:mark-cleaned',
 
   // GitHub PAT storage per project (for deploy key management)
   GITHUB_PAT_SET: 'github-pat:set',

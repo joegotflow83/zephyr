@@ -27,4 +27,10 @@ export function registerDeployKeyHandlers(services: DeployKeyServices): void {
       return deployKeyStore.getDeployKeysUrl(repo, service);
     },
   );
+
+  // ── Mark Orphaned Key as Cleaned ─────────────────────────────────────────
+
+  ipcMain.handle(IPC.DEPLOY_KEYS_MARK_CLEANED, async (_event, keyId: number): Promise<void> => {
+    deployKeyStore.markCleaned(keyId);
+  });
 }

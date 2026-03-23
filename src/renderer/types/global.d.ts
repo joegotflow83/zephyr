@@ -304,6 +304,8 @@ declare global {
         listOrphaned: () => Promise<DeployKeyRecord[]>;
         /** Get the deploy keys management URL for a repo. Pass service to get GitLab URL. */
         getUrl: (repo: string, service?: 'github' | 'gitlab') => Promise<string>;
+        /** Mark an orphaned key as cleaned so it no longer appears in the UI */
+        markCleaned: (keyId: number) => Promise<void>;
       };
 
       shell: {

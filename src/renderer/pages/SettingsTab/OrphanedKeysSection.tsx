@@ -11,6 +11,7 @@ import type { DeployKeyRecord } from '../../../services/deploy-key-store';
 export const OrphanedKeysSection: React.FC = () => {
   const [keys, setKeys] = useState<DeployKeyRecord[]>([]);
   const [loading, setLoading] = useState(true);
+  const [removing, setRemoving] = useState<number | null>(null);
 
   const fetchKeys = useCallback(async () => {
     setLoading(true);
@@ -29,6 +30,16 @@ export const OrphanedKeysSection: React.FC = () => {
   const handleViewOnService = async (repo: string, service?: 'github' | 'gitlab') => {
     const url = await window.api.deployKeys.getUrl(repo, service);
     await window.api.shell.openExternal(url);
+  };
+
+  const handleRemove = async (keyId: number) => {
+    setRemoving(keyId);
+    try {
+      await window.api.deployKeys.markCleaned(keyId);
+      setKeys((prev) => prev.filter((k) => k.key_id !== keyId));
+    } finally {
+      setRemoving(null);
+    }
   };
 
   const formatDate = (iso: string) => {
@@ -74,12 +85,21 @@ export const OrphanedKeysSection: React.FC = () => {
                 <td className="py-2 pr-4 text-gray-500 dark:text-gray-400 capitalize">{key.service ?? 'github'}</td>
                 <td className="py-2 pr-4 text-gray-500 dark:text-gray-400">{formatDate(key.created_at)}</td>
                 <td className="py-2">
-                  <button
-                    onClick={() => handleViewOnService(key.repo, key.service)}
-                    className="px-3 py-1 text-xs bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-900 dark:text-white rounded border border-gray-200 dark:border-gray-600 transition-colors"
-                  >
-                    View on {key.service === 'gitlab' ? 'GitLab' : 'GitHub'}
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => handleViewOnService(key.repo, key.service)}
+                      className="px-3 py-1 text-xs bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-900 dark:text-white rounded border border-gray-200 dark:border-gray-600 transition-colors"
+                    >
+                      View on {key.service === 'gitlab' ? 'GitLab' : 'GitHub'}
+                    </button>
+                    <button
+                      onClick={() => handleRemove(key.key_id)}
+                      disabled={removing === key.key_id}
+                      className="px-3 py-1 text-xs bg-red-100 dark:bg-red-900/30 hover:bg-red-200 dark:hover:bg-red-900/50 text-red-700 dark:text-red-400 rounded border border-red-200 dark:border-red-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {removing === key.key_id ? 'Removing…' : 'Remove'}
+                    </button>
+                  </div>
                 </td>
               </tr>
             ))}
