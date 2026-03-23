@@ -1,298 +1,229 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import { UpdatesSection } from '../../src/renderer/pages/SettingsTab/UpdatesSection';
+import type { AutoUpdateState } from '../../src/services/auto-updater';
 
-// Mock window.api.updates
-const mockUpdates = {
-  check: vi.fn(),
+const idleState: AutoUpdateState = { status: 'idle' };
+
+const mockAutoUpdate = {
+  getState: vi.fn().mockResolvedValue(idleState),
+  check: vi.fn().mockResolvedValue(undefined),
+  download: vi.fn().mockResolvedValue(undefined),
+  install: vi.fn().mockResolvedValue(undefined),
+  onStateChanged: vi.fn().mockReturnValue(() => {}),
 };
 
 // @ts-expect-error - mocking window.api
 globalThis.window.api = {
   ...globalThis.window.api,
-  updates: mockUpdates,
+  autoUpdate: mockAutoUpdate,
 };
 
 describe('UpdatesSection', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockUpdates.check.mockResolvedValue({
-      available: false,
-      currentVersion: '0.1.0',
-      latestVersion: '0.1.0',
-    });
+    mockAutoUpdate.getState.mockResolvedValue(idleState);
+    mockAutoUpdate.onStateChanged.mockReturnValue(() => {});
   });
 
   describe('Initial State', () => {
-    it('should render check button and initial message', () => {
-      render(<UpdatesSection />);
+    it('should render check button and initial message', async () => {
+      await act(async () => {
+        render(<UpdatesSection />);
+      });
 
       expect(screen.getByTestId('check-updates-button')).toBeInTheDocument();
       expect(screen.getByTestId('initial-message')).toBeInTheDocument();
-      expect(screen.getByText(/Click "Check for Updates"/)).toBeInTheDocument();
     });
 
-    it('should not display update info initially', () => {
-      render(<UpdatesSection />);
+    it('should not display update info initially', async () => {
+      await act(async () => {
+        render(<UpdatesSection />);
+      });
 
-      expect(screen.queryByTestId('current-version')).not.toBeInTheDocument();
-      expect(screen.queryByTestId('latest-version')).not.toBeInTheDocument();
       expect(screen.queryByTestId('update-available')).not.toBeInTheDocument();
-    });
-
-    it('should not render docker image input', () => {
-      render(<UpdatesSection />);
-
-      expect(screen.queryByTestId('docker-image-input')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('no-update')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('update-downloaded')).not.toBeInTheDocument();
     });
   });
 
   describe('Check for Updates', () => {
-    it('should call window.api.updates.check when button clicked', async () => {
-      mockUpdates.check.mockResolvedValue({
-        available: false,
-        currentVersion: '0.1.0',
-        latestVersion: '0.1.0',
-      });
-
-      render(<UpdatesSection />);
-
-      const button = screen.getByTestId('check-updates-button');
-      fireEvent.click(button);
-
-      expect(mockUpdates.check).toHaveBeenCalledTimes(1);
-    });
-
-    it('should disable button while checking', async () => {
-      mockUpdates.check.mockImplementation(
-        () => new Promise(() => {}) // Never resolves — avoids dangling timers causing act() errors
-      );
-
-      render(<UpdatesSection />);
-
-      const button = screen.getByTestId('check-updates-button');
-      fireEvent.click(button);
-
-      expect(button).toBeDisabled();
-      expect(button).toHaveTextContent('Checking...');
-    });
-
-    it('should display version info after successful check', async () => {
-      mockUpdates.check.mockResolvedValue({
-        available: false,
-        currentVersion: '0.1.0',
-        latestVersion: '0.1.0',
-      });
-
-      render(<UpdatesSection />);
-
-      fireEvent.click(screen.getByTestId('check-updates-button'));
-
-      await waitFor(() => {
-        expect(screen.getByTestId('current-version')).toHaveTextContent('0.1.0');
-        expect(screen.getByTestId('latest-version')).toHaveTextContent('0.1.0');
-      });
-    });
-
-    it('should display error message on check failure', async () => {
-      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-      mockUpdates.check.mockRejectedValue(new Error('Network error'));
-
-      render(<UpdatesSection />);
-
-      fireEvent.click(screen.getByTestId('check-updates-button'));
-
-      await waitFor(() => {
-        expect(screen.getByTestId('update-error')).toBeInTheDocument();
-        expect(screen.getByTestId('update-error')).toHaveTextContent('Network error');
-      });
-
-      expect(consoleErrorSpy).toHaveBeenCalledWith(
-        'Failed to check for updates:',
-        expect.any(Error)
-      );
-
-      consoleErrorSpy.mockRestore();
-    });
-
-    it('should clear previous error when checking again', async () => {
-      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-      mockUpdates.check.mockRejectedValueOnce(new Error('Network error'));
-
-      render(<UpdatesSection />);
-
-      // First check fails
-      fireEvent.click(screen.getByTestId('check-updates-button'));
-      await waitFor(() => {
-        expect(screen.getByTestId('update-error')).toBeInTheDocument();
-      });
-
-      // Second check succeeds
-      mockUpdates.check.mockResolvedValue({
-        available: false,
-        currentVersion: '0.1.0',
-        latestVersion: '0.1.0',
+    it('should call window.api.autoUpdate.check when button clicked', async () => {
+      await act(async () => {
+        render(<UpdatesSection />);
       });
 
       fireEvent.click(screen.getByTestId('check-updates-button'));
 
-      await waitFor(() => {
-        expect(screen.queryByTestId('update-error')).not.toBeInTheDocument();
+      expect(mockAutoUpdate.check).toHaveBeenCalledTimes(1);
+    });
+
+    it('should show checking state while in progress', async () => {
+      mockAutoUpdate.getState.mockResolvedValue({ status: 'checking' } as AutoUpdateState);
+
+      await act(async () => {
+        render(<UpdatesSection />);
       });
 
-      consoleErrorSpy.mockRestore();
+      expect(screen.getByTestId('check-updates-button')).toBeDisabled();
+      expect(screen.getByTestId('check-updates-button')).toHaveTextContent('Checking...');
     });
   });
 
   describe('No Update Available', () => {
     it('should display "no update" message when up-to-date', async () => {
-      mockUpdates.check.mockResolvedValue({
-        available: false,
-        currentVersion: '0.1.0',
-        latestVersion: '0.1.0',
+      mockAutoUpdate.getState.mockResolvedValue({ status: 'not-available' } as AutoUpdateState);
+
+      await act(async () => {
+        render(<UpdatesSection />);
       });
 
-      render(<UpdatesSection />);
-
-      fireEvent.click(screen.getByTestId('check-updates-button'));
-
-      await waitFor(() => {
-        expect(screen.getByTestId('no-update')).toBeInTheDocument();
-        expect(screen.getByTestId('no-update')).toHaveTextContent(
-          "You're running the latest version"
-        );
-      });
-    });
-
-    it('should not show releases link when no update available', async () => {
-      mockUpdates.check.mockResolvedValue({
-        available: false,
-        currentVersion: '0.1.0',
-        latestVersion: '0.1.0',
-      });
-
-      render(<UpdatesSection />);
-
-      fireEvent.click(screen.getByTestId('check-updates-button'));
-
-      await waitFor(() => {
-        expect(screen.queryByTestId('releases-link')).not.toBeInTheDocument();
-      });
+      expect(screen.getByTestId('no-update')).toBeInTheDocument();
+      expect(screen.getByTestId('no-update')).toHaveTextContent("You're running the latest version");
     });
   });
 
   describe('Update Available', () => {
-    it('should display update available message', async () => {
-      mockUpdates.check.mockResolvedValue({
-        available: true,
-        currentVersion: '0.1.0',
-        latestVersion: '0.2.0',
+    it('should display update available message and download button', async () => {
+      mockAutoUpdate.getState.mockResolvedValue({
+        status: 'available',
+        updateInfo: { version: '0.3.0', releaseDate: '2026-01-01T00:00:00.000Z' },
+      } as AutoUpdateState);
+
+      await act(async () => {
+        render(<UpdatesSection />);
       });
 
-      render(<UpdatesSection />);
-
-      fireEvent.click(screen.getByTestId('check-updates-button'));
-
-      await waitFor(() => {
-        expect(screen.getByTestId('update-available')).toBeInTheDocument();
-        expect(screen.getByTestId('update-available')).toHaveTextContent(
-          'Update Available!'
-        );
-      });
+      expect(screen.getByTestId('update-available')).toBeInTheDocument();
+      expect(screen.getByTestId('update-available')).toHaveTextContent('Update Available!');
+      expect(screen.getByTestId('download-button')).toBeInTheDocument();
     });
 
-    it('should highlight latest version when update available', async () => {
-      mockUpdates.check.mockResolvedValue({
-        available: true,
-        currentVersion: '0.1.0',
-        latestVersion: '0.2.0',
+    it('should show latest version when update available', async () => {
+      mockAutoUpdate.getState.mockResolvedValue({
+        status: 'available',
+        updateInfo: { version: '0.3.0' },
+      } as AutoUpdateState);
+
+      await act(async () => {
+        render(<UpdatesSection />);
       });
 
-      render(<UpdatesSection />);
-
-      fireEvent.click(screen.getByTestId('check-updates-button'));
-
-      await waitFor(() => {
-        const latestVersion = screen.getByTestId('latest-version');
-        expect(latestVersion).toHaveTextContent('0.2.0');
-        expect(latestVersion).toHaveClass('text-green-400');
-      });
+      expect(screen.getByTestId('latest-version')).toHaveTextContent('0.3.0');
+      expect(screen.getByTestId('latest-version')).toHaveClass('text-green-400');
     });
 
-    it('should display changelog when provided', async () => {
-      mockUpdates.check.mockResolvedValue({
-        available: true,
-        currentVersion: '0.1.0',
-        latestVersion: '0.2.0',
-        changelog: 'New feature: Terminal support\nBug fix: Memory leak',
+    it('should call download when download button clicked', async () => {
+      mockAutoUpdate.getState.mockResolvedValue({
+        status: 'available',
+        updateInfo: { version: '0.3.0' },
+      } as AutoUpdateState);
+
+      await act(async () => {
+        render(<UpdatesSection />);
       });
 
-      render(<UpdatesSection />);
-
-      fireEvent.click(screen.getByTestId('check-updates-button'));
-
-      await waitFor(() => {
-        const changelog = screen.getByTestId('changelog');
-        expect(changelog).toBeInTheDocument();
-        expect(changelog).toHaveTextContent('New feature: Terminal support');
-        expect(changelog).toHaveTextContent('Bug fix: Memory leak');
-      });
-    });
-
-    it('should not display changelog section when not provided', async () => {
-      mockUpdates.check.mockResolvedValue({
-        available: true,
-        currentVersion: '0.1.0',
-        latestVersion: '0.2.0',
-      });
-
-      render(<UpdatesSection />);
-
-      fireEvent.click(screen.getByTestId('check-updates-button'));
-
-      await waitFor(() => {
-        expect(screen.queryByTestId('changelog')).not.toBeInTheDocument();
-      });
-    });
-
-    it('should display releases link when update available', async () => {
-      mockUpdates.check.mockResolvedValue({
-        available: true,
-        currentVersion: '0.1.0',
-        latestVersion: '0.2.0',
-      });
-
-      render(<UpdatesSection />);
-
-      fireEvent.click(screen.getByTestId('check-updates-button'));
-
-      await waitFor(() => {
-        const link = screen.getByTestId('releases-link');
-        expect(link).toBeInTheDocument();
-        expect(link).toHaveTextContent('Download Latest Release');
-        expect(link).toHaveAttribute('href', 'https://github.com/joegotflow83/zephyr/releases');
-      });
+      fireEvent.click(screen.getByTestId('download-button'));
+      expect(mockAutoUpdate.download).toHaveBeenCalledTimes(1);
     });
   });
 
-  describe('UI Elements', () => {
-    it('should hide initial message after checking', async () => {
-      mockUpdates.check.mockResolvedValue({
-        available: false,
-        currentVersion: '0.1.0',
-        latestVersion: '0.1.0',
+  describe('Downloading', () => {
+    it('should show progress bar while downloading', async () => {
+      mockAutoUpdate.getState.mockResolvedValue({
+        status: 'downloading',
+        downloadProgress: { percent: 42, bytesPerSecond: 0, transferred: 0, total: 0 },
+      } as AutoUpdateState);
+
+      await act(async () => {
+        render(<UpdatesSection />);
       });
 
-      render(<UpdatesSection />);
+      expect(screen.getByTestId('download-progress')).toBeInTheDocument();
+      expect(screen.getByTestId('download-progress')).toHaveTextContent('42%');
+    });
 
-      expect(screen.getByTestId('initial-message')).toBeInTheDocument();
+    it('should hide check button while downloading', async () => {
+      mockAutoUpdate.getState.mockResolvedValue({
+        status: 'downloading',
+        downloadProgress: { percent: 10, bytesPerSecond: 0, transferred: 0, total: 0 },
+      } as AutoUpdateState);
 
-      fireEvent.click(screen.getByTestId('check-updates-button'));
-
-      await waitFor(() => {
-        expect(screen.queryByTestId('initial-message')).not.toBeInTheDocument();
+      await act(async () => {
+        render(<UpdatesSection />);
       });
+
+      expect(screen.queryByTestId('check-updates-button')).not.toBeInTheDocument();
+    });
+  });
+
+  describe('Downloaded', () => {
+    it('should show install button when update downloaded', async () => {
+      mockAutoUpdate.getState.mockResolvedValue({
+        status: 'downloaded',
+        updateInfo: { version: '0.3.0' },
+      } as AutoUpdateState);
+
+      await act(async () => {
+        render(<UpdatesSection />);
+      });
+
+      expect(screen.getByTestId('update-downloaded')).toBeInTheDocument();
+      expect(screen.getByTestId('install-button')).toBeInTheDocument();
+    });
+
+    it('should call install when install button clicked', async () => {
+      mockAutoUpdate.getState.mockResolvedValue({
+        status: 'downloaded',
+        updateInfo: { version: '0.3.0' },
+      } as AutoUpdateState);
+
+      await act(async () => {
+        render(<UpdatesSection />);
+      });
+
+      fireEvent.click(screen.getByTestId('install-button'));
+      expect(mockAutoUpdate.install).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('Error State', () => {
+    it('should display error message on failure', async () => {
+      mockAutoUpdate.getState.mockResolvedValue({
+        status: 'error',
+        error: 'Network error',
+      } as AutoUpdateState);
+
+      await act(async () => {
+        render(<UpdatesSection />);
+      });
+
+      expect(screen.getByTestId('update-error')).toBeInTheDocument();
+      expect(screen.getByTestId('update-error')).toHaveTextContent('Network error');
+    });
+  });
+
+  describe('State subscription', () => {
+    it('should subscribe to state changes on mount', async () => {
+      await act(async () => {
+        render(<UpdatesSection />);
+      });
+
+      expect(mockAutoUpdate.onStateChanged).toHaveBeenCalledTimes(1);
+    });
+
+    it('should unsubscribe on unmount', async () => {
+      const cleanup = vi.fn();
+      mockAutoUpdate.onStateChanged.mockReturnValue(cleanup);
+
+      let unmount: () => void;
+      await act(async () => {
+        ({ unmount } = render(<UpdatesSection />));
+      });
+
+      act(() => unmount());
+      expect(cleanup).toHaveBeenCalledTimes(1);
     });
   });
 });

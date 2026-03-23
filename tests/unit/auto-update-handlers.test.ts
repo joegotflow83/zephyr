@@ -107,7 +107,7 @@ describe('Auto-Update IPC Handlers', () => {
 
       await handler!();
 
-      expect(mockAutoUpdater.checkForUpdates).toHaveBeenCalledWith(true);
+      expect(mockAutoUpdater.checkForUpdates).toHaveBeenCalledWith(false);
     });
   });
 
