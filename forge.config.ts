@@ -30,6 +30,7 @@ const config: ForgeConfig = {
       // Unpack them so Electron can require() them at runtime.
       unpack: '**/*.node',
     },
+    extraResource: ['./app-update.yml'],
     name: 'Zephyr Desktop',
     executableName: 'zephyr-desktop',
     appBundleId: 'com.zephyr.desktop',

@@ -1,0 +1,4 @@
+owner: joegotflow83
+repo: zephyr
+provider: github
+updaterCacheDirName: zephyr-desktop-updater
