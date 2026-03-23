@@ -60,7 +60,6 @@ globalThis.window.api = {
   deployKeys: mockDeployKeys,
   shell: mockShell,
   autoUpdate: {
-    getState: vi.fn().mockResolvedValue({ status: 'idle' }),
     check: vi.fn().mockResolvedValue(undefined),
     download: vi.fn().mockResolvedValue(undefined),
     install: vi.fn().mockResolvedValue(undefined),

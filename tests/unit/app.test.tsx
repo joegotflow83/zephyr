@@ -35,7 +35,6 @@ beforeEach(() => {
       onError: vi.fn(() => vi.fn()),
     },
     autoUpdate: {
-      getState: vi.fn().mockResolvedValue({ status: 'idle' }),
       check: vi.fn().mockResolvedValue(undefined),
       download: vi.fn().mockResolvedValue(undefined),
       install: vi.fn().mockResolvedValue(undefined),

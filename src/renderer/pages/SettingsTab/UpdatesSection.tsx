@@ -5,10 +5,8 @@ export const UpdatesSection: React.FC = () => {
   const [state, setState] = useState<AutoUpdateState>({ status: 'idle' });
 
   useEffect(() => {
-    // Load initial state
-    window.api.autoUpdate.getState().then(setState).catch(console.error);
-
-    // Subscribe to state changes from main process
+    // SettingsTab is always mounted, so this listener is set up on app launch
+    // and will capture all state changes (including the startup check at ~10s).
     const cleanup = window.api.autoUpdate.onStateChanged(setState);
     return cleanup;
   }, []);
