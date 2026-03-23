@@ -22,10 +22,10 @@ export function registerAutoUpdateHandlers(deps: AutoUpdateHandlersDeps): void {
     return autoUpdater.getState();
   });
 
-  // Manually check for updates
+  // Manually check for updates (UI handles result display, no dialog needed)
   ipcMain.handle(IPC.AUTO_UPDATE_CHECK, async () => {
     logger.info('IPC: auto-update:check');
-    await autoUpdater.checkForUpdates(true);
+    await autoUpdater.checkForUpdates(false);
   });
 
   // Download available update

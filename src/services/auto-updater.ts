@@ -166,7 +166,6 @@ export class AutoUpdater {
         releaseDate: info.releaseDate,
       });
       this.updateState({ status: 'available', updateInfo: info });
-      this.notifyUpdateAvailable(info);
     });
 
     autoUpdater.on('update-not-available', (info: UpdateInfo) => {

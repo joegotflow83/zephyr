@@ -23,6 +23,7 @@ import type { ScheduledLoop } from '../../services/scheduler';
 import type { ParsedLogLine } from '../../services/log-parser';
 import type { TerminalSession, TerminalSessionOpts } from '../../services/terminal-manager';
 import type { UpdateInfo } from '../../services/self-updater';
+import type { AutoUpdateState } from '../../services/auto-updater';
 import type { VMInfo } from '../../services/vm-manager';
 
 export {};
@@ -195,6 +196,19 @@ declare global {
         check: () => Promise<UpdateInfo>;
         /** Apply an update by starting a self-update loop */
         apply: (dockerImage: string, envVars?: Record<string, string>) => Promise<void>;
+      };
+
+      autoUpdate: {
+        /** Get current auto-update state */
+        getState: () => Promise<AutoUpdateState>;
+        /** Check for updates (result reflected in state changes) */
+        check: () => Promise<void>;
+        /** Download the available update */
+        download: () => Promise<void>;
+        /** Install the downloaded update and restart */
+        install: () => Promise<void>;
+        /** Listen for auto-update state changes. Returns cleanup function. */
+        onStateChanged: (callback: (state: AutoUpdateState) => void) => () => void;
       };
 
       images: {

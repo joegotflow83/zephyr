@@ -202,6 +202,76 @@ jobs:
           echo "Release assets prepared:"
           ls -lh release-assets/
 
+      - name: Generate electron-updater metadata
+        env:
+          VERSION: ${{ steps.version.outputs.VERSION }}
+        run: |
+          python3 - <<'PYEOF'
+          import os, hashlib, base64
+          from datetime import datetime, timezone
+
+          version = os.environ['VERSION']
+          date = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%S.000Z')
+          assets = 'release-assets'
+
+          def sha512_b64(path):
+              h = hashlib.sha512()
+              with open(path, 'rb') as f:
+                  for chunk in iter(lambda: f.read(65536), b''):
+                      h.update(chunk)
+              return base64.b64encode(h.digest()).decode()
+
+          def write_yaml(out_path, version, files, main_file, main_sha, date):
+              lines = [f"version: {version}", "files:"]
+              for entry in files:
+                  lines += [
+                      f"  - url: {entry['url']}",
+                      f"    sha512: {entry['sha512']}",
+                      f"    size: {entry['size']}",
+                  ]
+              lines += [
+                  f"path: {main_file}",
+                  f"sha512: {main_sha}",
+                  f"releaseDate: '{date}'",
+              ]
+              with open(out_path, 'w') as f:
+                  f.write('\n'.join(lines) + '\n')
+              print(f"Generated {out_path}")
+
+          # latest-linux.yml (DEB)
+          debs = [f for f in os.listdir(assets) if f.endswith('.deb')]
+          if debs:
+              p = os.path.join(assets, debs[0])
+              sha = sha512_b64(p)
+              write_yaml(
+                  os.path.join(assets, 'latest-linux.yml'), version,
+                  [{'url': debs[0], 'sha512': sha, 'size': os.path.getsize(p)}],
+                  debs[0], sha, date
+              )
+
+          # latest-mac.yml (ZIP — electron-updater uses ZIP for macOS in-place update)
+          zips = [f for f in os.listdir(assets) if f.endswith('.zip')]
+          if zips:
+              p = os.path.join(assets, zips[0])
+              sha = sha512_b64(p)
+              write_yaml(
+                  os.path.join(assets, 'latest-mac.yml'), version,
+                  [{'url': zips[0], 'sha512': sha, 'size': os.path.getsize(p)}],
+                  zips[0], sha, date
+              )
+
+          # latest.yml (Windows EXE)
+          exes = [f for f in os.listdir(assets) if f.endswith('.exe')]
+          if exes:
+              p = os.path.join(assets, exes[0])
+              sha = sha512_b64(p)
+              write_yaml(
+                  os.path.join(assets, 'latest.yml'), version,
+                  [{'url': exes[0], 'sha512': sha, 'size': os.path.getsize(p)}],
+                  exes[0], sha, date
+              )
+          PYEOF
+
       - name: Determine pre-release status
         id: prerelease
         run: |

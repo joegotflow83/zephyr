@@ -150,6 +150,18 @@ contextBridge.exposeInMainWorld('api', {
       ipcRenderer.invoke(IPC.UPDATES_APPLY, dockerImage, envVars),
   },
 
+  autoUpdate: {
+    getState: () => ipcRenderer.invoke(IPC.AUTO_UPDATE_GET_STATE),
+    check: () => ipcRenderer.invoke(IPC.AUTO_UPDATE_CHECK),
+    download: () => ipcRenderer.invoke(IPC.AUTO_UPDATE_DOWNLOAD),
+    install: () => ipcRenderer.invoke(IPC.AUTO_UPDATE_INSTALL),
+    onStateChanged: (callback: (state: unknown) => void) => {
+      const listener = (_event: unknown, state: unknown) => callback(state);
+      ipcRenderer.on(IPC.AUTO_UPDATE_STATE_CHANGED, listener);
+      return () => ipcRenderer.removeListener(IPC.AUTO_UPDATE_STATE_CHANGED, listener);
+    },
+  },
+
   images: {
     list: () => ipcRenderer.invoke(IPC.IMAGE_LIST),
     get: (id: string) => ipcRenderer.invoke(IPC.IMAGE_GET, id),
