@@ -18,18 +18,21 @@ Zephyr Desktop provides a graphical interface for:
 - **Scheduling** -- schedule loops with cron expressions for automated execution
 - **Credential management** -- securely store API keys and session cookies via Electron's `safeStorage`; optionally use browser-based login via Playwright
 - **AWS Bedrock auth** -- built-in support for AWS Bedrock authentication
-- **GitHub deploy keys** -- ephemeral SSH deploy key management for private repositories
-- **Docker health monitoring** -- background polling detects Docker daemon availability changes and warns when disk space is low
+- **GitHub deploy keys** -- ephemeral SSH deploy key management for private repositories; keys are cleaned up automatically when the container exits
+- **Runtime health monitoring** -- background polling detects Docker/Podman daemon availability changes and warns when disk space is low
 - **Self-update** -- check for and apply updates via `electron-updater`
 - **Desktop notifications** -- get notified when loops complete or fail
 - **Log export** -- export individual or all loop logs to disk
-- **Coding Factory** -- run multiple AI agent roles (coder, reviewer, tester, planner) in parallel on a single project; each role gets its own container with shared workspace
-- **VM Sandbox** -- run Docker containers inside Multipass VMs for full admin access, nested Docker, and system-level testing; supports persistent VMs (created once, reused) and ephemeral VMs (fresh per loop run)
+- **Coding Factory** -- run multiple AI agent roles (coder, reviewer, tester, planner) in parallel on a single project; each role gets its own container with shared workspace; supports role-based single run to trigger one role independently
+- **VM Sandbox** -- run containers inside Multipass VMs for full admin access, nested Docker, and system-level testing; supports persistent VMs (created once, reused) and ephemeral VMs (fresh per loop run)
+- **Podman support** -- use Podman as an alternative container runtime; the runtime is auto-detected at startup with no configuration required
+- **Per-project git identity** -- configure a git user name and email per project, injected into the container environment at run time
+- **Spec files** -- attach specification or requirements documents to a project; they are copied into the container workspace alongside source files
 
 ## Requirements
 
 - Node.js 18+
-- Docker Desktop (for loop execution; project management works without it)
+- Docker Desktop or Podman (for loop execution; project management works without either)
 - Multipass (optional; required for VM Sandbox mode)
 
 ## Installation
