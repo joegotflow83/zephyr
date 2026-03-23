@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useSettings } from '../../hooks/useSettings';
 import type { AppSettings } from '../../../shared/models';
+import { version } from '../../../../package.json';
 
 /**
  * GeneralSection component for Settings tab
@@ -101,8 +102,7 @@ export const GeneralSection: React.FC = () => {
     setTheme(e.target.value as AppSettings['theme']);
   };
 
-  // Read version from package.json (hardcoded for now, ideally via IPC)
-  const appVersion = '0.1.0';
+  const appVersion = version;
 
   return (
     <div className="space-y-6">
