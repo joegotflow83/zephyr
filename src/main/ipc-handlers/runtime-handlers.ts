@@ -7,7 +7,7 @@
 
 import { ipcMain, BrowserWindow } from 'electron';
 import { IPC } from '../../shared/ipc-channels';
-import type { ContainerRuntime, ContainerCreateOpts, ExecOpts } from '../../services/container-runtime';
+import type { ContainerRuntime, ContainerCreateOpts, ExecOpts, RuntimeInfo } from '../../services/container-runtime';
 import type { RuntimeHealthMonitor } from '../../services/runtime-health';
 
 export interface RuntimeServices {
@@ -102,7 +102,7 @@ export function registerRuntimeHandlers(services: RuntimeServices): void {
   // Include runtime info when available so the renderer can display version/stats
   // without a separate round-trip query.
   runtimeHealth.onStatusChange(async (isAvailable) => {
-    let info;
+    let info: RuntimeInfo | undefined;
     if (isAvailable) {
       try {
         info = await runtime.getInfo();

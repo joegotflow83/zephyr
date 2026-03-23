@@ -150,7 +150,7 @@ export const ProjectsTab: React.FC<ProjectsTabProps> = ({ onRunProject, toast })
           mode: selection.mode,
           ...(selection.role ? { role: selection.role } : {}),
           ...(selection.maxIterations !== undefined
-            ? { envVars: { ...(baseOpts.envVars ?? {}), MAX_ITERATIONS: String(selection.maxIterations) } }
+            ? { envVars: { MAX_ITERATIONS: String(selection.maxIterations) } }
             : {}),
           ...(selection.cmd ? { cmd: selection.cmd } : {}),
         };
