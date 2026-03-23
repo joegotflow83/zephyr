@@ -251,7 +251,7 @@ describe('GeneralSection', () => {
       render(<GeneralSection />);
 
       const version = screen.getByTestId('app-version');
-      expect(version).toHaveTextContent('Zephyr Desktop v0.1.0');
+      expect(version).toHaveTextContent(/Zephyr Desktop v\d+\.\d+\.\d+/);
     });
   });
 

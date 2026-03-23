@@ -53,6 +53,21 @@ describe('App Navigation', () => {
         install: vi.fn().mockResolvedValue(undefined),
         onStateChanged: vi.fn(() => vi.fn()),
       },
+      credentials: {
+        checkAuth: vi.fn().mockResolvedValue({ api_key: false, browser_session: false, aws_bedrock: false }),
+        list: vi.fn().mockResolvedValue([]),
+        get: vi.fn().mockResolvedValue(null),
+        store: vi.fn().mockResolvedValue(undefined),
+        delete: vi.fn().mockResolvedValue(undefined),
+        login: vi.fn().mockResolvedValue({ success: false }),
+      },
+      deployKeys: {
+        listOrphaned: vi.fn().mockResolvedValue([]),
+        getUrl: vi.fn().mockResolvedValue(''),
+      },
+      shell: {
+        openExternal: vi.fn().mockResolvedValue(undefined),
+      },
     } as any;
   });
 
