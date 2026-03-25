@@ -38,6 +38,7 @@ export class AutoUpdater {
   private state: AutoUpdateState = { status: 'idle' };
   private checkOnStartupDelay = 10000; // 10 seconds
   private startupCheckCompleted = false;
+  private quitAndInstallPending = false;
 
   constructor() {
     // Configure auto-updater
@@ -139,6 +140,15 @@ export class AutoUpdater {
   }
 
   /**
+   * Returns true if quitAndInstall has been called and the app is about to
+   * be replaced by the update. Used by the before-quit handler to skip
+   * graceful shutdown and let Squirrel's install sequence run uninterrupted.
+   */
+  isQuitAndInstallPending(): boolean {
+    return this.quitAndInstallPending;
+  }
+
+  /**
    * Install the downloaded update and restart the app
    */
   quitAndInstall(): void {
@@ -148,6 +158,7 @@ export class AutoUpdater {
     }
 
     logger.info('Quitting and installing update');
+    this.quitAndInstallPending = true;
     autoUpdater.quitAndInstall(false, true);
   }
 

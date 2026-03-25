@@ -448,8 +448,9 @@ app.on('window-all-closed', () => {
 });
 
 app.on('before-quit', async (event) => {
-  if (isShuttingDown) {
-    // Shutdown already in progress, allow quit to proceed
+  if (isShuttingDown || autoUpdater.isQuitAndInstallPending()) {
+    // Shutdown already in progress, or Squirrel is about to replace the app —
+    // let the quit through uninterrupted so the update installs correctly.
     return;
   }
 
