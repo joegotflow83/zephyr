@@ -37,6 +37,8 @@ const {
   // Mock BrowserWindow instance
   const mockWebContents = {
     send: vi.fn(),
+    isLoading: vi.fn().mockReturnValue(false),
+    once: vi.fn(),
   };
 
   const mockBrowserWindow = {

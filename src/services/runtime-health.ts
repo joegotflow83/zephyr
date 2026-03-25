@@ -20,6 +20,7 @@ export class RuntimeHealthMonitor {
   private runtime: ContainerRuntime;
   private intervalId: NodeJS.Timeout | null = null;
   private lastKnownStatus: boolean | null = null;
+  private lastKnownVersion: string | null = null;
   private callbacks: RuntimeStatusChangeCallback[] = [];
   private defaultIntervalMs = 5000; // 5 seconds
 
@@ -89,21 +90,43 @@ export class RuntimeHealthMonitor {
   }
 
   /**
-   * Check runtime status and fire callbacks only on state transitions
+   * Check runtime status and fire callbacks on state transitions or version changes
    */
   private async checkStatus(): Promise<void> {
     try {
       const isAvailable = await this.runtime.isAvailable();
 
-      if (this.lastKnownStatus !== isAvailable) {
+      if (isAvailable) {
+        let version: string | null = null;
+        try {
+          const info = await this.runtime.getInfo();
+          version = info.version ?? null;
+        } catch {
+          // version stays null — availability still propagates correctly
+        }
+
+        const statusChanged = this.lastKnownStatus !== isAvailable;
+        const versionChanged = version !== null && this.lastKnownVersion !== null && version !== this.lastKnownVersion;
+
         this.lastKnownStatus = isAvailable;
-        this.fireCallbacks(isAvailable);
+        this.lastKnownVersion = version;
+
+        if (statusChanged || versionChanged) {
+          this.fireCallbacks(isAvailable);
+        }
+      } else {
+        if (this.lastKnownStatus !== isAvailable) {
+          this.lastKnownStatus = isAvailable;
+          this.lastKnownVersion = null;
+          this.fireCallbacks(isAvailable);
+        }
       }
     } catch (error) {
       console.error('Error checking runtime availability:', error);
 
       if (this.lastKnownStatus !== false) {
         this.lastKnownStatus = false;
+        this.lastKnownVersion = null;
         this.fireCallbacks(false);
       }
     }

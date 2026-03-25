@@ -68,6 +68,9 @@ describe('App Navigation', () => {
       shell: {
         openExternal: vi.fn().mockResolvedValue(undefined),
       },
+      app: {
+        onReady: vi.fn(() => vi.fn()),
+      },
     } as any;
   });
 

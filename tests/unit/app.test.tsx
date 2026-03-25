@@ -40,6 +40,9 @@ beforeEach(() => {
       install: vi.fn().mockResolvedValue(undefined),
       onStateChanged: vi.fn(() => vi.fn()),
     },
+    app: {
+      onReady: vi.fn(() => vi.fn()),
+    },
   } as any;
 });
 
