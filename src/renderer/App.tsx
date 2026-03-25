@@ -49,16 +49,6 @@ const App: React.FC = () => {
     }
   }, [settings?.theme]);
 
-  // Factory startup toasts
-  useEffect(() => {
-    info('The factory is starting... you will see a message when fully up and running.', 10000);
-    const cleanup = window.api.app.onReady(() => {
-      success('The factory is up and running!', 10000);
-    });
-    return cleanup;
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
   // Keyboard shortcuts: Ctrl+1/2/3/4/5 for tab switching
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
