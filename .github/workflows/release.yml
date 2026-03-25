@@ -223,6 +223,13 @@ jobs:
           find artifacts -path "*/Zephyr-Windows-*" -name "RELEASES" -exec cp {} release-assets/ \;
           find artifacts -path "*/Zephyr-Windows-*" -name "*.nupkg" -exec cp {} release-assets/ \;
 
+          # Rename files: replace spaces with hyphens so electron-updater's
+          # space→hyphen path transformer produces URLs that match the actual filenames
+          for f in release-assets/*; do
+            newf="${f// /-}"
+            [ "$f" != "$newf" ] && mv "$f" "$newf"
+          done
+
           echo "Release assets prepared:"
           ls -lh release-assets/
 
