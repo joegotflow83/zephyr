@@ -87,6 +87,10 @@ export function useLoops(): UseLoopsResult {
 
   const factoryStart = async (projectId: string, baseOpts: LoopStartOpts): Promise<LoopState[]> => {
     const states = await window.api.factory.start(projectId, baseOpts);
+    // Factory start silently removes old terminal no-role loops on the main process
+    // (via startLoopCore's stale cleanup). Mirror that removal in the renderer store
+    // so the previous single-container run's ghost entry doesn't linger.
+    removeFromStore(projectId, undefined);
     for (const state of states) {
       updateInStore(state);
     }

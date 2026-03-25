@@ -150,6 +150,9 @@ export const IPC = {
   // VM events (main → renderer)
   VM_STATUS_CHANGED: 'vm:status-changed',
 
+  // App lifecycle events (main → renderer)
+  APP_READY: 'app:ready',
+
   // Misc
   PING: 'ping',
 } as const;

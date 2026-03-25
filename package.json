@@ -1,7 +1,7 @@
 {
   "name": "zephyr-desktop",
   "productName": "Zephyr Desktop",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Zephyr Desktop - AI loop execution manager with Docker integration",
   "main": ".vite/build/index.js",
   "private": true,

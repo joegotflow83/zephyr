@@ -9,7 +9,7 @@ permissions:
   contents: write
 
 jobs:
-  build-macos:
+  build-macos-arm64:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
@@ -58,14 +58,74 @@ jobs:
       - name: Upload DMG artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Zephyr-macOS-${{ steps.pkg_version.outputs.VERSION }}-dmg
+          name: Zephyr-macOS-arm64-${{ steps.pkg_version.outputs.VERSION }}-dmg
           path: out/make/*.dmg
           if-no-files-found: warn
 
       - name: Upload ZIP artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Zephyr-macOS-${{ steps.pkg_version.outputs.VERSION }}-zip
+          name: Zephyr-macOS-arm64-${{ steps.pkg_version.outputs.VERSION }}-zip
+          path: out/make/zip/darwin/**/*.zip
+          if-no-files-found: warn
+
+  build-macos-x64:
+    runs-on: macos-13
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Extract version from tag
+        id: version
+        run: echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Get package version
+        id: pkg_version
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          echo "VERSION=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests
+        run: npm run test:unit
+
+      - name: Install appdmg for DMG creation
+        run: npm install --save-dev appdmg
+
+      - name: Import macOS signing certificate
+        if: ${{ env.APPLE_CERTIFICATE != '' }}
+        uses: apple-actions/import-codesign-certs@v3
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+        with:
+          p12-file-base64: ${{ secrets.APPLE_CERTIFICATE }}
+          p12-password: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+
+      - name: Build with Electron Forge
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_ID_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: npm run make
+
+      - name: Upload DMG artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Zephyr-macOS-x64-${{ steps.pkg_version.outputs.VERSION }}-dmg
+          path: out/make/*.dmg
+          if-no-files-found: warn
+
+      - name: Upload ZIP artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Zephyr-macOS-x64-${{ steps.pkg_version.outputs.VERSION }}-zip
           path: out/make/zip/darwin/**/*.zip
           if-no-files-found: warn
 
@@ -162,7 +222,7 @@ jobs:
 
   publish:
     runs-on: ubuntu-latest
-    needs: [build-macos, build-linux, build-windows]
+    needs: [build-macos-arm64, build-macos-x64, build-linux, build-windows]
     steps:
       - uses: actions/checkout@v4
 
@@ -238,26 +298,42 @@ jobs:
                   f.write('\n'.join(lines) + '\n')
               print(f"Generated {out_path}")
 
-          # latest-linux.yml (DEB)
-          debs = [f for f in os.listdir(assets) if f.endswith('.deb')]
-          if debs:
-              p = os.path.join(assets, debs[0])
-              sha = sha512_b64(p)
+          # latest-linux.yml (DEB + RPM — include both so electron-updater can
+          # pick the right format regardless of how the app was installed)
+          linux_files = []
+          main_deb = None
+          for f in sorted(os.listdir(assets)):
+              if f.endswith('.deb') or f.endswith('.rpm'):
+                  p = os.path.join(assets, f)
+                  sha = sha512_b64(p)
+                  linux_files.append({'url': f, 'sha512': sha, 'size': os.path.getsize(p)})
+                  if f.endswith('.deb') and main_deb is None:
+                      main_deb = (f, sha)
+          if linux_files:
+              # Use the DEB as the primary path (fallback for legacy electron-updater)
+              main_file, main_sha = main_deb if main_deb else (linux_files[0]['url'], linux_files[0]['sha512'])
               write_yaml(
                   os.path.join(assets, 'latest-linux.yml'), version,
-                  [{'url': debs[0], 'sha512': sha, 'size': os.path.getsize(p)}],
-                  debs[0], sha, date
+                  linux_files, main_file, main_sha, date
               )
 
-          # latest-mac.yml (ZIP — electron-updater uses ZIP for macOS in-place update)
-          zips = [f for f in os.listdir(assets) if f.endswith('.zip')]
-          if zips:
-              p = os.path.join(assets, zips[0])
-              sha = sha512_b64(p)
+          # latest-mac.yml (ZIP — include both arm64 and x64 so electron-updater
+          # picks the right arch; arm64 is listed first as the primary path fallback)
+          mac_files = []
+          main_arm64 = None
+          for f in sorted(os.listdir(assets)):
+              if f.endswith('.zip'):
+                  p = os.path.join(assets, f)
+                  sha = sha512_b64(p)
+                  mac_files.append({'url': f, 'sha512': sha, 'size': os.path.getsize(p)})
+                  if 'arm64' in f and main_arm64 is None:
+                      main_arm64 = (f, sha)
+          if mac_files:
+              # Prefer arm64 as the primary path (fallback for legacy electron-updater)
+              main_file, main_sha = main_arm64 if main_arm64 else (mac_files[0]['url'], mac_files[0]['sha512'])
               write_yaml(
                   os.path.join(assets, 'latest-mac.yml'), version,
-                  [{'url': zips[0], 'sha512': sha, 'size': os.path.getsize(p)}],
-                  zips[0], sha, date
+                  mac_files, main_file, main_sha, date
               )
 
           # latest.yml (Windows EXE)

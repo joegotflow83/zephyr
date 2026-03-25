@@ -137,7 +137,6 @@ export const ProjectsTab: React.FC<ProjectsTabProps> = ({ onRunProject, toast })
         await schedule(project.id, selection.scheduleExpression, baseOpts);
         toast.success(`Loop scheduled for "${project.name}"`);
       } else if (selection.factory) {
-        updateLoop({ ...createLoopState(project.id, selection.mode, project.name), status: LoopStatus.STARTING });
         await factoryStart(project.id, {
           ...baseOpts,
           mode: selection.mode,

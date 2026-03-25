@@ -238,6 +238,14 @@ contextBridge.exposeInMainWorld('api', {
       ipcRenderer.invoke(IPC.DEPLOY_KEYS_MARK_CLEANED, keyId),
   },
 
+  app: {
+    onReady: (callback: () => void) => {
+      const listener = () => callback();
+      ipcRenderer.once(IPC.APP_READY, listener);
+      return () => ipcRenderer.removeListener(IPC.APP_READY, listener);
+    },
+  },
+
   shell: {
     openExternal: (url: string) => shell.openExternal(url),
   },

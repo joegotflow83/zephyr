@@ -290,7 +290,7 @@ app.on('ready', async () => {
     logger.warn('Could not load settings, using default log level', { error });
   }
 
-  createWindow();
+  const mainWindow = createWindow();
   // Build the application menu bar
   buildApplicationMenu();
   // Mark any deploy keys still 'active' from a previous session as orphaned
@@ -303,6 +303,15 @@ app.on('ready', async () => {
   runtimeHealth.start();
   // Check for updates on startup (with delay)
   autoUpdater.checkForUpdatesOnStartup();
+
+  // Signal renderer that startup is complete
+  if (mainWindow.webContents.isLoading()) {
+    mainWindow.webContents.once('did-finish-load', () => {
+      mainWindow.webContents.send(IPC.APP_READY);
+    });
+  } else {
+    mainWindow.webContents.send(IPC.APP_READY);
+  }
 
   logger.info('Application started successfully');
 });
