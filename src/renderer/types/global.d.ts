@@ -308,6 +308,11 @@ declare global {
         markCleaned: (keyId: number) => Promise<void>;
       };
 
+      app: {
+        /** Listen for the app-ready event (fires after startup completes). Returns cleanup function. */
+        onReady: (callback: () => void) => () => void;
+      };
+
       shell: {
         /** Open a URL in the system's default browser */
         openExternal: (url: string) => Promise<void>;
