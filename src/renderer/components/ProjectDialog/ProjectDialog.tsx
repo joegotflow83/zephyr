@@ -876,7 +876,7 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({ mode, project, onS
                   </div>
 
                   <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
-                    Team coordination files (@feature_requests.md, @team_plan.md, team/handovers/*, team/tasks/pending/)
+                    Team coordination files (@feature_requests.md, @team_plan.md, team/handovers/*, team/tasks/pending/, tasks/pending/)
                     will be created in the workspace automatically.
                   </p>
                 </div>

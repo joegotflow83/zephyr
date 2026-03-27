@@ -882,6 +882,7 @@ export function registerLoopHandlers(services: LoopServices): void {
     // Create directory tree
     await fs.mkdir(path.join(workspacePath, 'team', 'handovers'), { recursive: true });
     await fs.mkdir(path.join(workspacePath, 'team', 'tasks', 'pending'), { recursive: true });
+    await fs.mkdir(path.join(workspacePath, 'tasks', 'pending'), { recursive: true });
 
     const defaultFeatureRequests = '# Feature Requests\n\nAdd feature requests here. Each entry should include:\n- Description of the feature\n- Priority (high/medium/low)\n- Acceptance criteria\n';
 
