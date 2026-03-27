@@ -218,7 +218,11 @@ export const LoopsTab: React.FC = () => {
       if (selection.mode === LoopMode.SCHEDULED && selection.scheduleExpression) {
         await schedule(project.id, selection.scheduleExpression, baseOpts);
       } else if (selection.factory) {
-        await factoryStart(project.id, { ...baseOpts, mode: selection.mode });
+        await factoryStart(project.id, {
+          ...baseOpts,
+          mode: selection.mode,
+          envVars: { MAX_ITERATIONS: String(selection.maxIterations ?? 10) },
+        });
       } else {
         const opts: LoopStartOpts = {
           ...baseOpts,

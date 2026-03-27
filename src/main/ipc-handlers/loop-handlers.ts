@@ -3,6 +3,7 @@
 // All handlers run in the main process and delegate to service instances.
 
 import * as fs from 'fs/promises';
+import * as fsSync from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 import { ipcMain, BrowserWindow, Notification } from 'electron';
@@ -25,6 +26,53 @@ import type { SSHKeyManager } from '../../services/ssh-key-manager';
 import type { DeployKeyStore } from '../../services/deploy-key-store';
 import type { LoopScriptsStore } from '../../services/loop-scripts-store';
 import { getLogger } from '../../services/logging';
+
+/**
+ * Bash hook script injected into containers for factory mode loops.
+ * Runs as a PostToolUse hook: when the agent writes @human_clarification.md,
+ * it writes a timestamp to @human_clarification.requested so the host-side
+ * file watcher can trigger an OS notification without false-positives from
+ * user edits to the clarification file itself.
+ */
+const CLARIFICATION_HOOK_SCRIPT = `#!/bin/bash
+# Description: Signal host when agent writes @human_clarification.md
+INPUT=$(cat)
+FILE_PATH=$(echo "$INPUT" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('tool_input',{}).get('file_path',''))" 2>/dev/null || echo "")
+if [[ "$FILE_PATH" == *"@human_clarification.md"* ]]; then
+  date -u +"%Y-%m-%dT%H:%M:%SZ" > /workspace/@human_clarification.requested
+fi
+exit 0
+`;
+
+/**
+ * Merges the clarification PostToolUse hook registration into a Claude
+ * settings.json string, returning the merged JSON. Safe to call on an
+ * empty string or invalid JSON (falls back to a minimal object).
+ */
+function mergeClarificationHook(settingsContent: string): string {
+  let settings: Record<string, unknown> = {};
+  try {
+    settings = JSON.parse(settingsContent);
+  } catch { /* start from empty */ }
+
+  const hooks = (settings.hooks as Record<string, unknown[]> | undefined) ?? {};
+  const postToolUse = ((hooks.PostToolUse as unknown[]) ?? []) as Array<Record<string, unknown>>;
+
+  const hookCmd = 'bash ~/.claude/hooks/clarification-notify.sh';
+  const alreadyPresent = postToolUse.some((entry) =>
+    (entry.hooks as Array<Record<string, unknown>>)?.some((h) => h.command === hookCmd)
+  );
+
+  if (!alreadyPresent) {
+    postToolUse.push({
+      matcher: 'Write|Edit|MultiEdit',
+      hooks: [{ type: 'command', command: hookCmd }],
+    });
+  }
+
+  settings.hooks = { ...hooks, PostToolUse: postToolUse };
+  return JSON.stringify(settings, null, 2);
+}
 
 export interface LoopServices {
   loopRunner: LoopRunner;
@@ -64,6 +112,11 @@ export function registerLoopHandlers(services: LoopServices): void {
   } = services;
 
   const logger = getLogger('loop');
+
+  // Shell snippet that ensures ~/.claude.json exists with minimal onboarding state.
+  // Used as a preamble in SINGLE-mode container CMDs: the agent starts immediately
+  // so there is no pre-exec window to create the file after the container boots.
+  const ENSURE_CLAUDE_JSON = `test -f ~/.claude.json || printf '{"hasCompletedOnboarding":true}\\n' > ~/.claude.json`;
 
   // In-memory map tracking active deploy keys for cleanup on loop termination.
   // Maps projectId -> { keyId, repoUrl, pat, service } so we can delete keys from
@@ -151,7 +204,7 @@ export function registerLoopHandlers(services: LoopServices): void {
         const hasKiroConfig = !!project.kiro_config;
         const hasKiroHooks = (project.kiro_hooks ?? []).length > 0 && !!kiroHooksStore;
 
-        if (hasHooks || hasClaudeSettings || hasBrowserSession) {
+        if (hasHooks || hasClaudeSettings || hasBrowserSession || !!project.local_path) {
           const claudeDir = path.join(os.tmpdir(), `zephyr-claude-${opts.projectId}`);
           try {
             await fs.mkdir(path.join(claudeDir, 'hooks'), { recursive: true });
@@ -183,6 +236,19 @@ export function registerLoopHandlers(services: LoopServices): void {
                 }
               } catch (err) {
                 logger.warn(`Failed to write claude settings.json for .claude mount`, { err });
+              }
+            }
+
+            // Inject the built-in clarification notify hook for workspace-backed loops.
+            // Merges the PostToolUse registration into whatever settings.json was written
+            // above (default or user's), then writes the hook script alongside it.
+            if (project.local_path) {
+              try {
+                const existingSettings = await fs.readFile(path.join(claudeDir, 'settings.json'), 'utf8').catch(() => '{"autoUpdaterStatus":"disabled"}');
+                await fs.writeFile(path.join(claudeDir, 'settings.json'), mergeClarificationHook(existingSettings), 'utf8');
+                await fs.writeFile(path.join(claudeDir, 'hooks', 'clarification-notify.sh'), CLARIFICATION_HOOK_SCRIPT, { mode: 0o755 });
+              } catch (err) {
+                logger.warn('Failed to inject clarification notify hook for .claude mount', { err });
               }
             }
 
@@ -364,11 +430,11 @@ export function registerLoopHandlers(services: LoopServices): void {
           ...opts,
           cmd: loopScript
             ? ['bash', '-c', role
-                ? `./${loopScript} ${role} ${maxIterations}`
-                : `./${loopScript} ${maxIterations}`]
+                ? `${ENSURE_CLAUDE_JSON} && ./${loopScript} ${role} ${maxIterations}`
+                : `${ENSURE_CLAUDE_JSON} && ./${loopScript} ${maxIterations}`]
             : ['bash', '-c', role
-                ? `claude --max-turns ${maxIterations} --print "$(cat /workspace/PROMPT_${role}.md)"`
-                : `claude --max-turns ${maxIterations}`],
+                ? `${ENSURE_CLAUDE_JSON} && claude --max-turns ${maxIterations} --print "$(cat /workspace/PROMPT_${role}.md)"`
+                : `${ENSURE_CLAUDE_JSON} && claude --max-turns ${maxIterations}`],
         };
       }
 
@@ -434,6 +500,19 @@ export function registerLoopHandlers(services: LoopServices): void {
           );
         } catch (err) {
           logger.warn('Failed to download Go workspace dependencies', { err });
+        }
+      }
+
+      // Ensure ~/.claude.json exists — safety net for containers running images built
+      // before this file was added to generateClaudeCodeConfigBlock().
+      // Only needed for CONTINUOUS mode; SINGLE-mode containers use the CMD preamble above.
+      if (opts.mode !== LoopMode.SINGLE && state.containerId && runtime) {
+        try {
+          await runtime.execCommand(state.containerId, [
+            'sh', '-c', ENSURE_CLAUDE_JSON,
+          ]);
+        } catch (err) {
+          logger.warn('Failed to ensure ~/.claude.json exists in container', { err });
         }
       }
 
@@ -572,6 +651,31 @@ export function registerLoopHandlers(services: LoopServices): void {
           }
         } catch (err) {
           logger.warn('Failed to inject claude settings.json into container', { err });
+        }
+      }
+
+      // Inject built-in clarification notify hook for workspace-backed continuous loops.
+      // Must run AFTER the user's settings.json injection above so the merge sees the
+      // final user settings rather than the image default.
+      if (project?.local_path && state.containerId && runtime && opts.mode !== LoopMode.SINGLE) {
+        try {
+          await runtime.execCommand(state.containerId, ['sh', '-c', 'mkdir -p ~/.claude/hooks']);
+          const hookEncoded = Buffer.from(CLARIFICATION_HOOK_SCRIPT).toString('base64');
+          await runtime.execCommand(state.containerId, [
+            'sh', '-c',
+            `printf '%s' '${hookEncoded}' | base64 -d > ~/.claude/hooks/clarification-notify.sh && chmod +x ~/.claude/hooks/clarification-notify.sh`,
+          ]);
+          // Load user settings (if any) so we merge rather than clobber them.
+          const baseSettings = project.claude_settings_file && claudeSettingsStore
+            ? (await claudeSettingsStore.getFile(project.claude_settings_file) ?? '{"autoUpdaterStatus":"disabled"}')
+            : '{"autoUpdaterStatus":"disabled"}';
+          const settingsEncoded = Buffer.from(mergeClarificationHook(baseSettings)).toString('base64');
+          await runtime.execCommand(state.containerId, [
+            'sh', '-c',
+            `printf '%s' '${settingsEncoded}' | base64 -d > ~/.claude/settings.json`,
+          ]);
+        } catch (err) {
+          logger.warn('Failed to inject clarification notify hook into container', { err });
         }
       }
 
@@ -786,6 +890,7 @@ export function registerLoopHandlers(services: LoopServices): void {
       '@feature_requests.md': featureRequestsContent?.trim() ? featureRequestsContent : defaultFeatureRequests,
       '@team_plan.md': '# Team Plan\n\nOverall plan and current sprint objectives.\n',
       '@human_clarification.md': '# Human Clarification\n\nUse this file to provide clarifications, answers, or guidance requested by the AI agents.\n',
+      '@human_clarification.requested': '',
       'team/handovers/coder_to_security.md': '# Coder to Security Handover\n\nDocument code changes that need security review.\n',
       'team/handovers/security_to_qa.md': '# Security to QA Handover\n\nDocument security findings and items cleared for QA testing.\n',
       'team/handovers/qa_feedback.md': '# QA Feedback\n\nDocument test results, bugs found, and items that need rework.\n',
@@ -851,8 +956,8 @@ export function registerLoopHandlers(services: LoopServices): void {
         if (isSingleFactory) {
           const promptFile = `PROMPT_${role}.md`;
           roleCmd = loopScript
-            ? ['bash', '-c', `./${loopScript} ${promptFile} ${maxIterations}`]
-            : ['bash', '-c', `claude --max-turns ${maxIterations} --print "$(cat /workspace/${promptFile})"`];
+            ? ['bash', '-c', `${ENSURE_CLAUDE_JSON} && ./${loopScript} ${promptFile} ${maxIterations}`]
+            : ['bash', '-c', `${ENSURE_CLAUDE_JSON} && claude --max-turns ${maxIterations} --print "$(cat /workspace/${promptFile})"`];
         }
 
         const roleOpts: LoopStartOpts = {
@@ -939,17 +1044,57 @@ export function registerLoopHandlers(services: LoopServices): void {
 
   // Register callbacks to broadcast state changes and log lines to all renderer windows
 
+  // Watchers for @human_clarification.requested per active loop key.
+  // The trigger file is written only by the injected hook when the agent writes
+  // @human_clarification.md, so no cooldown is needed.
+  const clarificationWatchers = new Map<string, fsSync.FSWatcher>();
+
   loopRunner.onStateChange((state: LoopState) => {
     const windows = BrowserWindow.getAllWindows();
     windows.forEach((win) => {
       win.webContents.send(IPC.LOOP_STATE_CHANGED, state);
     });
 
+    const loopKey = getLoopKey(state.projectId, state.role);
+    const project = projectStore?.getProject(state.projectId);
+
+    // Start watching @human_clarification.md when a loop becomes active
+    if (state.status === LoopStatus.RUNNING && !clarificationWatchers.has(loopKey)) {
+      const workspacePath = project?.local_path;
+      if (workspacePath) {
+        const clarificationFile = path.join(workspacePath, '@human_clarification.requested');
+        try {
+          const watcher = fsSync.watch(clarificationFile, () => {
+            const settings = configManager?.loadJson<AppSettings>('settings.json');
+            if (settings?.notification_enabled) {
+              const projectName = project?.name ?? state.projectId;
+              new Notification({
+                title: 'Agent needs clarification',
+                body: `"${projectName}" is waiting for your input in @human_clarification.md`,
+              }).show();
+            }
+          });
+          clarificationWatchers.set(loopKey, watcher);
+        } catch {
+          // File may not exist yet — ignore
+        }
+      }
+    }
+
+    // Tear down the watcher when the loop reaches a terminal state
+    if (isLoopTerminal(state.status)) {
+      const watcher = clarificationWatchers.get(loopKey);
+      if (watcher) {
+        watcher.close();
+        clarificationWatchers.delete(loopKey);
+      }
+    }
+
     // Fire OS desktop notification on loop completion or failure
     if (state.status === LoopStatus.COMPLETED || state.status === LoopStatus.FAILED) {
       const settings = configManager?.loadJson<AppSettings>('settings.json');
       if (settings?.notification_enabled) {
-        const projectName = projectStore?.getProject(state.projectId)?.name ?? state.projectId;
+        const projectName = project?.name ?? state.projectId;
         const isCompleted = state.status === LoopStatus.COMPLETED;
         new Notification({
           title: isCompleted ? 'Loop completed' : 'Loop failed',

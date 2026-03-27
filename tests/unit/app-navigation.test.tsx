@@ -1,8 +1,38 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, fireEvent, act, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, act, waitFor, cleanup } from '@testing-library/react';
 import App from '../../src/renderer/App';
+import { useAppStore } from '../../src/renderer/stores/app-store';
+
+function renderApp() {
+  return render(<App />);
+}
 
 describe('App Navigation', () => {
+  afterEach(() => {
+    cleanup();
+    // Reset Zustand store data to prevent cross-test state leakage
+    useAppStore.setState({
+      projects: [],
+      projectsLoading: false,
+      projectsError: null,
+      loops: [],
+      loopsLoading: false,
+      loopsError: null,
+      settings: null,
+      settingsLoading: false,
+      settingsError: null,
+      images: [],
+      imagesLoading: false,
+      imagesError: null,
+      imageBuildProgress: null,
+      imageBuildActive: false,
+      dockerConnected: false,
+      dockerInfo: undefined,
+      vmInfos: [],
+      multipassAvailable: false,
+    });
+  });
+
   beforeEach(() => {
     // Mock window.api for StatusBar, useActiveLoops, TerminalTab, and SettingsTab
     global.window.api = {
@@ -74,8 +104,8 @@ describe('App Navigation', () => {
     } as any;
   });
 
-  it('renders with Projects tab active by default', () => {
-    render(<App />);
+  it('renders with Projects tab active by default', async () => {
+    await renderApp();
 
     // Check that Projects page content is visible
     expect(screen.getByRole('heading', { name: /projects/i })).toBeInTheDocument();
@@ -83,8 +113,8 @@ describe('App Navigation', () => {
     expect(projectsButton).toHaveClass('text-blue-500');
   });
 
-  it('renders all five tabs', () => {
-    render(<App />);
+  it('renders all five tabs', async () => {
+    await renderApp();
 
     expect(screen.getByRole('button', { name: /projects/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /running loops/i })).toBeInTheDocument();
@@ -93,8 +123,8 @@ describe('App Navigation', () => {
     expect(screen.getByRole('button', { name: /settings/i })).toBeInTheDocument();
   });
 
-  it('switches to Loops tab when clicked', () => {
-    render(<App />);
+  it('switches to Loops tab when clicked', async () => {
+    await renderApp();
 
     const loopsButton = screen.getByRole('button', { name: /running loops/i });
     fireEvent.click(loopsButton);
@@ -103,8 +133,8 @@ describe('App Navigation', () => {
     expect(loopsButton).toHaveClass('text-blue-500');
   });
 
-  it('switches to Terminal tab when clicked', () => {
-    render(<App />);
+  it('switches to Terminal tab when clicked', async () => {
+    await renderApp();
 
     const terminalButton = screen.getByRole('button', { name: /terminal/i });
     fireEvent.click(terminalButton);
@@ -116,7 +146,7 @@ describe('App Navigation', () => {
   });
 
   it('switches to Settings tab when clicked', async () => {
-    render(<App />);
+    await renderApp();
 
     // Get the tab button specifically (not the section header buttons)
     const settingsButtons = screen.getAllByRole('button', { name: /settings/i });
@@ -131,10 +161,9 @@ describe('App Navigation', () => {
     expect(activeSettingsButton).toHaveClass('text-blue-500');
   });
 
-  it('switches tabs with Ctrl+1 keyboard shortcut', () => {
-    render(<App />);
+  it('switches tabs with Ctrl+1 keyboard shortcut', async () => {
+    await renderApp();
 
-    // Dispatch event directly to window wrapped in act
     act(() => {
       window.dispatchEvent(new KeyboardEvent('keydown', { key: '1', ctrlKey: true }));
     });
@@ -143,10 +172,9 @@ describe('App Navigation', () => {
     expect(projectsButton).toHaveClass('text-blue-500');
   });
 
-  it('switches tabs with Ctrl+2 keyboard shortcut', () => {
-    render(<App />);
+  it('switches tabs with Ctrl+2 keyboard shortcut', async () => {
+    await renderApp();
 
-    // Dispatch event directly to window wrapped in act
     act(() => {
       window.dispatchEvent(new KeyboardEvent('keydown', { key: '2', ctrlKey: true }));
     });
@@ -156,10 +184,9 @@ describe('App Navigation', () => {
     expect(loopsButton).toHaveClass('text-blue-500');
   });
 
-  it('switches tabs with Ctrl+3 keyboard shortcut', () => {
-    render(<App />);
+  it('switches tabs with Ctrl+3 keyboard shortcut', async () => {
+    await renderApp();
 
-    // Dispatch event directly to window wrapped in act
     act(() => {
       window.dispatchEvent(new KeyboardEvent('keydown', { key: '3', ctrlKey: true }));
     });
@@ -173,10 +200,9 @@ describe('App Navigation', () => {
     expect(terminalTabButton).toHaveClass('text-blue-500');
   });
 
-  it('switches tabs with Ctrl+4 keyboard shortcut', () => {
-    render(<App />);
+  it('switches tabs with Ctrl+4 keyboard shortcut', async () => {
+    await renderApp();
 
-    // Dispatch event directly to window wrapped in act
     act(() => {
       window.dispatchEvent(new KeyboardEvent('keydown', { key: '4', ctrlKey: true }));
     });
@@ -187,9 +213,8 @@ describe('App Navigation', () => {
   });
 
   it('switches tabs with Ctrl+5 keyboard shortcut', async () => {
-    render(<App />);
+    await renderApp();
 
-    // Dispatch event directly to window wrapped in act
     act(() => {
       window.dispatchEvent(new KeyboardEvent('keydown', { key: '5', ctrlKey: true }));
     });
@@ -203,10 +228,9 @@ describe('App Navigation', () => {
     expect(settingsTabButton).toHaveClass('text-blue-500');
   });
 
-  it('ignores keyboard shortcuts without Ctrl key', () => {
-    render(<App />);
+  it('ignores keyboard shortcuts without Ctrl key', async () => {
+    await renderApp();
 
-    // Dispatch event directly to window wrapped in act
     act(() => {
       window.dispatchEvent(new KeyboardEvent('keydown', { key: '2' }));
     });
@@ -216,10 +240,9 @@ describe('App Navigation', () => {
     expect(projectsButton).toHaveClass('text-blue-500');
   });
 
-  it('ignores invalid keyboard shortcuts', () => {
-    render(<App />);
+  it('ignores invalid keyboard shortcuts', async () => {
+    await renderApp();
 
-    // Dispatch event directly to window wrapped in act
     act(() => {
       window.dispatchEvent(new KeyboardEvent('keydown', { key: '6', ctrlKey: true }));
     });
@@ -229,9 +252,9 @@ describe('App Navigation', () => {
     expect(projectsButton).toHaveClass('text-blue-500');
   });
 
-  it('cleans up keyboard event listener on unmount', () => {
+  it('cleans up keyboard event listener on unmount', async () => {
     const removeEventListenerSpy = vi.spyOn(window, 'removeEventListener');
-    const { unmount } = render(<App />);
+    const { unmount } = await renderApp();
 
     unmount();
 
