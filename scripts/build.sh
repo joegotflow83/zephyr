@@ -64,7 +64,7 @@ fi
 # on Apple Silicon). 'npm ci' uses the lockfile verbatim, which may have
 # been generated on a different OS and won't include your platform's binary.
 echo -e "${GREEN}Step 1: Installing dependencies${NC}"
-npm install
+npm install --ignore-scripts
 echo ""
 
 # Step 2: Lint

@@ -371,11 +371,12 @@ describe('generateClaudeCodeConfigBlock', () => {
     expect(result).toContain('mkdir -p /home/ralph/.claude');
   });
 
-  it('writes settings.json with autoUpdaterStatus disabled', () => {
+  it('writes settings.json with autoUpdaterStatus disabled and hasCompletedOnboarding true', () => {
     const result = generateClaudeCodeConfigBlock();
     expect(result).toContain('settings.json');
     expect(result).toContain('autoUpdaterStatus');
     expect(result).toContain('disabled');
+    expect(result).toContain('hasCompletedOnboarding');
   });
 });
 

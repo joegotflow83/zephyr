@@ -7,7 +7,7 @@
  */
 
 import { autoUpdater, UpdateInfo } from 'electron-updater';
-import { BrowserWindow, dialog } from 'electron';
+import { app, BrowserWindow, dialog } from 'electron';
 import { getLogger } from './logging';
 
 const logger = getLogger('updater');
@@ -160,6 +160,20 @@ export class AutoUpdater {
     logger.info('Quitting and installing update');
     this.quitAndInstallPending = true;
     autoUpdater.quitAndInstall(false, true);
+
+    // Guarantee the app quits even if electron-updater fails to call app.quit()
+    // (e.g. MacUpdater.quitAndInstall() can return without quitting when
+    // squirrelDownloadedUpdate is false, or nativeUpdater.quitAndInstall() may
+    // not trigger app.quit() on all Electron/platform combinations).
+    //
+    // The before-quit handler returns early when quitAndInstallPending is true,
+    // so this won't trigger graceful shutdown and won't interrupt the install.
+    // If install failed synchronously (e.g. RPM pkexec cancelled), the error
+    // listener above resets quitAndInstallPending to false before we reach here,
+    // and we skip the explicit quit so the user can see the error and try again.
+    if (this.quitAndInstallPending) {
+      app.quit();
+    }
   }
 
   /**
@@ -189,6 +203,9 @@ export class AutoUpdater {
     autoUpdater.on('error', (error: Error) => {
       logger.error('Auto-updater error', { error: error.message });
       this.updateState({ status: 'error', error: error.message });
+      // If install failed, clear the pending flag so before-quit runs graceful shutdown
+      // instead of passing through, and so we don't call app.quit() as a fallback.
+      this.quitAndInstallPending = false;
     });
 
     autoUpdater.on('download-progress', (progressObj) => {

@@ -205,14 +205,15 @@ export function registerLoopHandlers(services: LoopServices): void {
         const hasKiroHooks = (project.kiro_hooks ?? []).length > 0 && !!kiroHooksStore;
 
         if (hasHooks || hasClaudeSettings || hasBrowserSession || !!project.local_path) {
-          const claudeDir = path.join(os.tmpdir(), `zephyr-claude-${opts.projectId}`);
+          const claudeDir = path.join(os.tmpdir(), `zephyr-claude-${opts.projectId}${opts.role ? `-${opts.role}` : ''}`);
           try {
             await fs.mkdir(path.join(claudeDir, 'hooks'), { recursive: true });
 
-            // Write default settings to keep the auto-updater disabled even when this
-            // directory is bind-mounted over the image's pre-baked /home/ralph/.claude.
-            // If the user has a custom settings file it will overwrite this below.
-            await fs.writeFile(path.join(claudeDir, 'settings.json'), '{"autoUpdaterStatus":"disabled"}\n', 'utf8');
+            // Write default settings to keep the auto-updater disabled and onboarding
+            // pre-completed even when this directory is bind-mounted over the image's
+            // pre-baked /home/ralph/.claude. If the user has a custom settings file it
+            // will overwrite this below.
+            await fs.writeFile(path.join(claudeDir, 'settings.json'), '{"autoUpdaterStatus":"disabled","hasCompletedOnboarding":true}\n', 'utf8');
 
             if (hasHooks && hooksStore) {
               for (const filename of project.hooks) {
@@ -244,7 +245,7 @@ export function registerLoopHandlers(services: LoopServices): void {
             // above (default or user's), then writes the hook script alongside it.
             if (project.local_path) {
               try {
-                const existingSettings = await fs.readFile(path.join(claudeDir, 'settings.json'), 'utf8').catch(() => '{"autoUpdaterStatus":"disabled"}');
+                const existingSettings = await fs.readFile(path.join(claudeDir, 'settings.json'), 'utf8').catch(() => '{"autoUpdaterStatus":"disabled","hasCompletedOnboarding":true}');
                 await fs.writeFile(path.join(claudeDir, 'settings.json'), mergeClarificationHook(existingSettings), 'utf8');
                 await fs.writeFile(path.join(claudeDir, 'hooks', 'clarification-notify.sh'), CLARIFICATION_HOOK_SCRIPT, { mode: 0o755 });
               } catch (err) {
@@ -281,7 +282,7 @@ export function registerLoopHandlers(services: LoopServices): void {
 
         // Pre-mount Kiro config and hooks at /home/ralph/.kiro for VM/single-mode runs.
         if (hasKiroConfig || hasKiroHooks) {
-          const kiroDir = path.join(os.tmpdir(), `zephyr-kiro-${opts.projectId}`);
+          const kiroDir = path.join(os.tmpdir(), `zephyr-kiro-${opts.projectId}${opts.role ? `-${opts.role}` : ''}`);
           try {
             await fs.mkdir(path.join(kiroDir, 'hooks'), { recursive: true });
 
@@ -433,8 +434,8 @@ export function registerLoopHandlers(services: LoopServices): void {
                 ? `${ENSURE_CLAUDE_JSON} && ./${loopScript} ${role} ${maxIterations}`
                 : `${ENSURE_CLAUDE_JSON} && ./${loopScript} ${maxIterations}`]
             : ['bash', '-c', role
-                ? `${ENSURE_CLAUDE_JSON} && claude --max-turns ${maxIterations} --print "$(cat /workspace/PROMPT_${role}.md)"`
-                : `${ENSURE_CLAUDE_JSON} && claude --max-turns ${maxIterations}`],
+                ? `${ENSURE_CLAUDE_JSON} && claude --dangerously-skip-permissions --max-turns ${maxIterations} --output-format json --print "$(cat /workspace/PROMPT_${role}.md)"`
+                : `${ENSURE_CLAUDE_JSON} && claude --dangerously-skip-permissions --max-turns ${maxIterations} --output-format json`],
         };
       }
 
@@ -667,8 +668,8 @@ export function registerLoopHandlers(services: LoopServices): void {
           ]);
           // Load user settings (if any) so we merge rather than clobber them.
           const baseSettings = project.claude_settings_file && claudeSettingsStore
-            ? (await claudeSettingsStore.getFile(project.claude_settings_file) ?? '{"autoUpdaterStatus":"disabled"}')
-            : '{"autoUpdaterStatus":"disabled"}';
+            ? (await claudeSettingsStore.getFile(project.claude_settings_file) ?? '{"autoUpdaterStatus":"disabled","hasCompletedOnboarding":true}')
+            : '{"autoUpdaterStatus":"disabled","hasCompletedOnboarding":true}';
           const settingsEncoded = Buffer.from(mergeClarificationHook(baseSettings)).toString('base64');
           await runtime.execCommand(state.containerId, [
             'sh', '-c',
@@ -879,10 +880,16 @@ export function registerLoopHandlers(services: LoopServices): void {
    *   Defaults to the built-in template when omitted or empty.
    */
   async function scaffoldTeamFiles(workspacePath: string, featureRequestsContent?: string): Promise<void> {
-    // Create directory tree
-    await fs.mkdir(path.join(workspacePath, 'team', 'handovers'), { recursive: true });
-    await fs.mkdir(path.join(workspacePath, 'team', 'tasks', 'pending'), { recursive: true });
-    await fs.mkdir(path.join(workspacePath, 'tasks', 'pending'), { recursive: true });
+    // Create directory tree with world-writable permissions so the container's
+    // ralph user can write regardless of host UID mismatch.
+    for (const dir of [
+      path.join(workspacePath, 'team', 'handovers'),
+      path.join(workspacePath, 'team', 'tasks', 'pending'),
+      path.join(workspacePath, 'tasks', 'pending'),
+    ]) {
+      await fs.mkdir(dir, { recursive: true });
+      await fs.chmod(dir, 0o777);
+    }
 
     const defaultFeatureRequests = '# Feature Requests\n\nAdd feature requests here. Each entry should include:\n- Description of the feature\n- Priority (high/medium/low)\n- Acceptance criteria\n';
 
@@ -891,7 +898,6 @@ export function registerLoopHandlers(services: LoopServices): void {
       '@feature_requests.md': featureRequestsContent?.trim() ? featureRequestsContent : defaultFeatureRequests,
       '@team_plan.md': '# Team Plan\n\nOverall plan and current sprint objectives.\n',
       '@human_clarification.md': '# Human Clarification\n\nUse this file to provide clarifications, answers, or guidance requested by the AI agents.\n',
-      '@human_clarification.requested': '',
       'team/handovers/coder_to_security.md': '# Coder to Security Handover\n\nDocument code changes that need security review.\n',
       'team/handovers/security_to_qa.md': '# Security to QA Handover\n\nDocument security findings and items cleared for QA testing.\n',
       'team/handovers/qa_feedback.md': '# QA Feedback\n\nDocument test results, bugs found, and items that need rework.\n',
@@ -913,11 +919,16 @@ export function registerLoopHandlers(services: LoopServices): void {
       const fullPath = path.join(workspacePath, filePath);
       try {
         await fs.access(fullPath);
-        // File exists — don't overwrite
+        // File exists — ensure it's writable by the container user.
+        await fs.chmod(fullPath, 0o777);
       } catch {
-        await fs.writeFile(fullPath, defaultContent, 'utf8');
+        await fs.writeFile(fullPath, defaultContent, { encoding: 'utf8', mode: 0o777 });
       }
     }
+
+    // Always reset the clarification-requested flag so stale requests from a
+    // previous factory run don't cause agents to stall waiting for human input.
+    await fs.writeFile(path.join(workspacePath, '@human_clarification.requested'), '', { encoding: 'utf8', mode: 0o666 });
   }
 
   ipcMain.handle(
@@ -958,7 +969,7 @@ export function registerLoopHandlers(services: LoopServices): void {
           const promptFile = `PROMPT_${role}.md`;
           roleCmd = loopScript
             ? ['bash', '-c', `${ENSURE_CLAUDE_JSON} && ./${loopScript} ${promptFile} ${maxIterations}`]
-            : ['bash', '-c', `${ENSURE_CLAUDE_JSON} && claude --max-turns ${maxIterations} --print "$(cat /workspace/${promptFile})"`];
+            : ['bash', '-c', `${ENSURE_CLAUDE_JSON} && claude --dangerously-skip-permissions --max-turns ${maxIterations} --output-format json --print "$(cat /workspace/${promptFile})"`];
         }
 
         const roleOpts: LoopStartOpts = {

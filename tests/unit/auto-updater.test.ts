@@ -23,6 +23,9 @@ vi.mock('electron-updater', () => ({
 
 // Mock electron
 vi.mock('electron', () => ({
+  app: {
+    quit: vi.fn(),
+  },
   BrowserWindow: vi.fn(),
   dialog: {
     showMessageBox: vi.fn(),
