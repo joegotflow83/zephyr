@@ -234,6 +234,7 @@ describe('LoopScheduler', () => {
     });
 
     it('should not cancel schedule if loop start fails', async () => {
+      const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
       (mockLoopRunner.startLoop as any).mockRejectedValueOnce(
         new Error('Docker unavailable')
       );
@@ -247,6 +248,7 @@ describe('LoopScheduler', () => {
 
       // Trigger should fail but schedule remains
       await vi.advanceTimersByTimeAsync(5 * 60 * 1000);
+      errorSpy.mockRestore();
       expect(scheduler.isScheduled('proj-6')).toBe(true);
 
       // Next trigger should still attempt

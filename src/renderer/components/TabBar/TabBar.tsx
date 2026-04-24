@@ -1,6 +1,6 @@
 import React from 'react';
 
-export type TabId = 'projects' | 'loops' | 'terminal' | 'images' | 'settings';
+export type TabId = 'projects' | 'loops' | 'factory' | 'terminal' | 'images' | 'settings';
 
 export interface Tab {
   id: TabId;

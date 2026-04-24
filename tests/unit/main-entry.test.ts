@@ -520,6 +520,8 @@ const {
   mockRegisterTerminalHandlers,
   mockRegisterUpdateHandlers,
   mockRegisterVMHandlers,
+  mockRegisterFactoryTaskHandlers,
+  MockFactoryTaskStore,
 } = vi.hoisted(() => {
   const mockRegisterDataHandlers = vi.fn();
   const mockRegisterDockerHandlers = vi.fn();
@@ -529,6 +531,8 @@ const {
   const mockRegisterTerminalHandlers = vi.fn();
   const mockRegisterUpdateHandlers = vi.fn();
   const mockRegisterVMHandlers = vi.fn();
+  const mockRegisterFactoryTaskHandlers = vi.fn();
+  const MockFactoryTaskStore = vi.fn(function() { return {}; });
 
   return {
     mockRegisterDataHandlers,
@@ -539,6 +543,8 @@ const {
     mockRegisterTerminalHandlers,
     mockRegisterUpdateHandlers,
     mockRegisterVMHandlers,
+    mockRegisterFactoryTaskHandlers,
+    MockFactoryTaskStore,
   };
 });
 
@@ -572,6 +578,14 @@ vi.mock('../../src/main/ipc-handlers/update-handlers', () => ({
 
 vi.mock('../../src/main/ipc-handlers/vm-handlers', () => ({
   registerVMHandlers: mockRegisterVMHandlers,
+}));
+
+vi.mock('../../src/main/ipc-handlers/factory-task-handlers', () => ({
+  registerFactoryTaskHandlers: mockRegisterFactoryTaskHandlers,
+}));
+
+vi.mock('../../src/services/factory-task-store', () => ({
+  FactoryTaskStore: MockFactoryTaskStore,
 }));
 
 // ── Mock menu ────────────────────────────────────────────────────────────────

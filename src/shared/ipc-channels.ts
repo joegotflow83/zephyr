@@ -58,6 +58,16 @@ export const IPC = {
   FACTORY_START: 'factory:start',
   FACTORY_STOP: 'factory:stop',
 
+  // Factory task kanban
+  FACTORY_TASK_LIST: 'factory:task:list',
+  FACTORY_TASK_ADD: 'factory:task:add',
+  FACTORY_TASK_MOVE: 'factory:task:move',
+  FACTORY_TASK_REMOVE: 'factory:task:remove',
+  FACTORY_TASK_SYNC: 'factory:task:sync',
+  FACTORY_TASK_GET: 'factory:task:get',
+  FACTORY_TASK_UPDATE: 'factory:task:update',
+  FACTORY_TASK_CHANGED: 'factory:task:changed',
+
   // Log export
   LOGS_EXPORT: 'logs:export',
   LOGS_EXPORT_ALL: 'logs:export-all',

@@ -56,6 +56,16 @@ const mockApi = {
     delete: vi.fn(),
     onStatusChanged: vi.fn(() => vi.fn()),
   },
+  factoryTasks: {
+    list: vi.fn(),
+    get: vi.fn(),
+    add: vi.fn(),
+    move: vi.fn(),
+    remove: vi.fn(),
+    update: vi.fn(),
+    sync: vi.fn(),
+    onChanged: vi.fn(() => vi.fn()),
+  },
 };
 
 (global as any).window = { api: mockApi };

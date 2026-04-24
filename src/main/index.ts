@@ -37,10 +37,12 @@ import { ClaudeSettingsStore } from '../services/claude-settings-store';
 import { KiroHooksStore } from '../services/kiro-hooks-store';
 import { AuthInjector } from '../services/auth-injector';
 import { DeployKeyStore } from '../services/deploy-key-store';
+import { FactoryTaskStore } from '../services/factory-task-store';
 import { SSHKeyManager } from '../services/ssh-key-manager';
 import { buildApplicationMenu } from './menu';
 import { IPC } from '../shared/ipc-channels';
 import { registerDeployKeyHandlers } from './ipc-handlers/deploy-key-handlers';
+import { registerFactoryTaskHandlers } from './ipc-handlers/factory-task-handlers';
 import { registerVMHandlers } from './ipc-handlers/vm-handlers';
 import { VMManager } from '../services/vm-manager';
 import os from 'node:os';
@@ -102,6 +104,7 @@ const claudeSettingsStore = new ClaudeSettingsStore(configManager);
 const kiroHooksStore = new KiroHooksStore(configManager);
 const authInjector = new AuthInjector(configManager, credentialManager);
 const deployKeyStore = new DeployKeyStore(path.join(os.homedir(), '.zephyr'));
+const factoryTaskStore = new FactoryTaskStore(path.join(os.homedir(), '.zephyr', 'factory-tasks'));
 const sshKeyManager = new SSHKeyManager(runtime);
 
 // Register all IPC handlers before the window is created.
@@ -124,6 +127,7 @@ registerLoopHandlers({
   deployKeyStore,
   loopScriptsStore,
   configManager,
+  factoryTaskStore,
 });
 registerLogHandlers({ logExporter, loopRunner });
 registerTerminalHandlers({ terminalManager, vmManager });
@@ -131,6 +135,7 @@ registerUpdateHandlers({ selfUpdater });
 registerAutoUpdateHandlers({ autoUpdater });
 registerImageHandlers({ imageStore, imageBuilder });
 registerDeployKeyHandlers({ deployKeyStore });
+registerFactoryTaskHandlers({ factoryTaskStore, projectStore });
 registerVMHandlers({ vmManager, loopRunner });
 
 // Legacy ping handler kept for backwards compatibility with existing tests.

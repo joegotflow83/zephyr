@@ -53,7 +53,6 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({ mode, project, onS
   const [hooks, setHooks] = useState<string[]>([]);
   const [loopScript, setLoopScript] = useState<string | undefined>(undefined);
   const [claudeSettingsFile, setClaudeSettingsFile] = useState<string | undefined>(undefined);
-  const [kiroConfig, setKiroConfig] = useState('');
   const [kiroHooks, setKiroHooks] = useState<string[]>([]);
 
   // Image picker state: library = pick from ZephyrImage library, custom = free-text
@@ -119,7 +118,6 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({ mode, project, onS
       setHooks(project.hooks ?? []);
       setLoopScript(project.loop_script);
       setClaudeSettingsFile(project.claude_settings_file);
-      setKiroConfig(project.kiro_config ?? '');
       setKiroHooks(project.kiro_hooks ?? []);
       setAdditionalMounts(project.additional_mounts ?? []);
       setImageId(project.image_id);
@@ -281,7 +279,6 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({ mode, project, onS
             vm_config: effectiveVmConfig,
             factory_config: effectiveFactoryConfig,
             feature_requests_content: effectiveFeatureRequestsContent,
-            kiro_config: kiroConfig.trim() || undefined,
             kiro_hooks: kiroHooks,
             git_user_name: gitUserName.trim() || undefined,
             git_user_email: gitUserEmail.trim() || undefined,
@@ -303,7 +300,6 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({ mode, project, onS
             vm_config: effectiveVmConfig,
             factory_config: effectiveFactoryConfig,
             feature_requests_content: effectiveFeatureRequestsContent,
-            kiro_config: kiroConfig.trim() || undefined,
             kiro_hooks: kiroHooks,
             git_user_name: gitUserName.trim() || undefined,
             git_user_email: gitUserEmail.trim() || undefined,
@@ -934,21 +930,6 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({ mode, project, onS
                   {showKiroConfig && (
                     <div className="pl-1 mt-2">
                       <KiroHooksSection selected={kiroHooks} onChange={setKiroHooks} />
-                      <div className="mb-4">
-                        <div className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Kiro Config</div>
-                        <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
-                          Paste a JSON config to inject into the container at{' '}
-                          <code className="bg-gray-100 dark:bg-gray-700 px-1 rounded">~/.kiro/config.json</code>.
-                          Leave blank to skip.
-                        </p>
-                        <textarea
-                          value={kiroConfig}
-                          onChange={(e) => setKiroConfig(e.target.value)}
-                          placeholder={'{\n  "model": "...",\n  "apiKey": "..."\n}'}
-                          rows={6}
-                          className="w-full px-2 py-1 text-sm bg-gray-100 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded text-gray-900 dark:text-white font-mono focus:outline-none focus:ring-1 focus:ring-blue-500"
-                        />
-                      </div>
                     </div>
                   )}
                 </div>

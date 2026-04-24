@@ -1,5 +1,6 @@
 import { defineConfig } from 'vite';
 import type { Plugin } from 'vite';
+import path from 'node:path';
 
 // Prevent Rollup/Vite from loading and parsing native .node addon binaries.
 // enforce:'pre' ensures this runs before Vite's bundled commonjs plugin.
@@ -30,6 +31,14 @@ export default defineConfig({
   // are visible instead of silently producing a missing .vite/build/index.js
   logLevel: 'error',
   plugins: [nativeNodeModulesPlugin()],
+  resolve: {
+    alias: {
+      // cpu-features is a native addon used by ssh2 purely for crypto algorithm
+      // selection. Replace with a stub so Vite never tries to bundle the .node
+      // binary — ssh2 falls back to its default algorithm set safely.
+      'cpu-features': path.resolve(__dirname, 'src/mocks/cpu-features-stub.js'),
+    },
+  },
   build: {
     rollupOptions: {
       // Externalize all node_modules so Rollup never attempts to bundle them.

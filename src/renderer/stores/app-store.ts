@@ -17,6 +17,7 @@ import type { LoopState } from '../../shared/loop-types';
 import { getLoopKey } from '../../shared/loop-types';
 import type { RuntimeInfo } from '../../services/container-runtime';
 import type { VMInfo } from '../../services/vm-manager';
+import type { FactoryTask } from '../../shared/factory-types';
 
 /**
  * Complete application state shape
@@ -91,6 +92,12 @@ export interface AppState {
   updateVMInfo: (info: VMInfo) => void;
   refreshVMStatus: () => Promise<void>;
   refreshVMInfos: () => Promise<void>;
+
+  // Factory Tasks
+  factoryTasks: Record<string, FactoryTask[]>;
+  factoryTasksLoading: boolean;
+  setFactoryTasks: (projectId: string, tasks: FactoryTask[]) => void;
+  refreshFactoryTasks: (projectId: string) => Promise<void>;
 }
 
 /**
@@ -122,6 +129,9 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   vmInfos: [],
   multipassAvailable: false,
+
+  factoryTasks: {},
+  factoryTasksLoading: false,
 
   // Project actions
   setProjects: (projects) => set({ projects, projectsError: null }),
@@ -320,6 +330,23 @@ export const useAppStore = create<AppState>((set, get) => ({
       set({ vmInfos: [] });
     }
   },
+
+  // Factory Task actions
+  setFactoryTasks: (projectId, tasks) =>
+    set((state) => ({ factoryTasks: { ...state.factoryTasks, [projectId]: tasks } })),
+
+  refreshFactoryTasks: async (projectId) => {
+    set({ factoryTasksLoading: true });
+    try {
+      const tasks = await window.api.factoryTasks.list(projectId);
+      set((state) => ({
+        factoryTasks: { ...state.factoryTasks, [projectId]: tasks },
+        factoryTasksLoading: false,
+      }));
+    } catch {
+      set({ factoryTasksLoading: false });
+    }
+  },
 }));
 
 /**
@@ -358,6 +385,11 @@ export function initializeStoreListeners() {
   // VM status changes
   window.api.vm.onStatusChanged((info) => {
     useAppStore.getState().updateVMInfo(info as VMInfo);
+  });
+
+  // Factory task changes
+  window.api.factoryTasks.onChanged((projectId, tasks) => {
+    useAppStore.getState().setFactoryTasks(projectId, tasks);
   });
 
   // Initial data load

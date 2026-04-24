@@ -77,7 +77,6 @@ describe('Icon Generation Script (Integration)', () => {
 
       // Check icon references
       expect(forgeConfig).toContain('./resources/icon.ico');
-      expect(forgeConfig).toContain('./resources/icon.icns');
       expect(forgeConfig).toContain('./resources/icon.png');
     });
 

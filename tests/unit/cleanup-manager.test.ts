@@ -1,4 +1,16 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+
+vi.mock('electron', () => ({
+  app: { getPath: vi.fn(() => '/mock') },
+}));
+
+vi.mock('electron-log', () => ({
+  default: {
+    transports: { file: { level: 'info', resolvePathFn: vi.fn(), maxSize: 0, format: '' }, console: { level: 'info', format: '' } },
+    error: vi.fn(), warn: vi.fn(), info: vi.fn(), verbose: vi.fn(), debug: vi.fn(), silly: vi.fn(),
+  },
+}));
+
 import { CleanupManager } from '../../src/services/cleanup-manager';
 import type { ContainerRuntime } from '../../src/services/container-runtime';
 

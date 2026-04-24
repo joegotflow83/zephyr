@@ -10,7 +10,7 @@ You are building Zephyr Desktop — an Electron + React + TypeScript desktop app
 - TypeScript 5.3.x required (4.5.x is incompatible with @types/node)
 
 ## Key Commands
-- Build check: `npx tsc --noEmit`
+- Build check: `node_modules/.bin/tsc --noEmit` (run `npm install` first if node_modules is missing)
 - Unit tests: `npm run test:unit`
 - If unit tests fail with `@rollup/rollup-linux-x64-gnu` missing: run `npm install @rollup/rollup-linux-x64-gnu` once
 - Lint: `npm run lint`

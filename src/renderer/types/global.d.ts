@@ -2,6 +2,7 @@
 // window.api is exposed by the preload script via contextBridge.
 
 import type { AppSettings, ProjectConfig, VMConfig, ZephyrImage, ImageBuildConfig } from '../../shared/models';
+import type { FactoryTask, FactoryColumn } from '../../shared/factory-types';
 import type { DeployKeyRecord } from '../../services/deploy-key-store';
 import type { PreValidationScript } from '../../services/pre-validation-store';
 import type { HookFile } from '../../services/hooks-store';
@@ -145,6 +146,25 @@ declare global {
         start: (projectId: string, baseOpts: LoopStartOpts) => Promise<LoopState[]>;
         /** Stop all factory roles for a project */
         stop: (projectId: string) => Promise<void>;
+      };
+
+      factoryTasks: {
+        /** List all tasks for a project */
+        list: (projectId: string) => Promise<FactoryTask[]>;
+        /** Get a single task by ID */
+        get: (projectId: string, taskId: string) => Promise<FactoryTask | null>;
+        /** Add a new task to the backlog */
+        add: (projectId: string, title: string, description: string) => Promise<FactoryTask>;
+        /** Move a task to a different column (validates against ALLOWED_TRANSITIONS) */
+        move: (projectId: string, taskId: string, toColumn: FactoryColumn) => Promise<FactoryTask>;
+        /** Remove a task by ID */
+        remove: (projectId: string, taskId: string) => Promise<boolean>;
+        /** Update task fields (title, description) */
+        update: (projectId: string, taskId: string, updates: Partial<Pick<FactoryTask, 'title' | 'description'>>) => Promise<FactoryTask>;
+        /** Sync tasks from spec files in the project's specs directory */
+        sync: (projectId: string) => Promise<FactoryTask[]>;
+        /** Listen for task changes broadcast from the main process. Returns cleanup function. */
+        onChanged: (callback: (projectId: string, tasks: FactoryTask[]) => void) => () => void;
       };
 
       logs: {

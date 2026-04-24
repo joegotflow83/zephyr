@@ -8,6 +8,7 @@ import { LoopsTab } from './pages/LoopsTab/LoopsTab';
 import { TerminalTab } from './pages/TerminalTab/TerminalTab';
 import { SettingsTab } from './pages/SettingsTab/SettingsTab';
 import { ImagesTab } from './pages/ImagesTab/ImagesTab';
+import { FactoryTab } from './pages/FactoryTab/FactoryTab';
 import { useActiveLoops } from './hooks/useActiveLoops';
 import { useToast } from './hooks/useToast';
 import { useAppStore } from './stores/app-store';
@@ -15,6 +16,7 @@ import { useAppStore } from './stores/app-store';
 const tabs: Tab[] = [
   { id: 'projects', label: 'Projects', icon: '📁' },
   { id: 'loops', label: 'Running Loops', icon: '🔄' },
+  { id: 'factory', label: 'Factory', icon: '🏭' },
   { id: 'terminal', label: 'Terminal', icon: '💻' },
   { id: 'images', label: 'Images', icon: '🖼️' },
   { id: 'settings', label: 'Settings', icon: '⚙️' },
@@ -52,7 +54,7 @@ const App: React.FC = () => {
   // Keyboard shortcuts: Ctrl+1/2/3/4/5 for tab switching
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.ctrlKey && e.key >= '1' && e.key <= '5') {
+      if (e.ctrlKey && e.key >= '1' && e.key <= '6') {
         e.preventDefault();
         const tabIndex = parseInt(e.key, 10) - 1;
         const newTab = tabs[tabIndex];
@@ -78,6 +80,9 @@ const App: React.FC = () => {
       </div>
       <div style={{ display: activeTab === 'loops' ? undefined : 'none', height: '100%' }}>
         <LoopsTab />
+      </div>
+      <div style={{ display: activeTab === 'factory' ? undefined : 'none', height: '100%' }}>
+        <FactoryTab />
       </div>
       <div style={{ display: activeTab === 'terminal' ? undefined : 'none', height: '100%' }}>
         <TerminalTab isActive={activeTab === 'terminal'} />

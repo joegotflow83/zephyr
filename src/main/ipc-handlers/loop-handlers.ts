@@ -25,6 +25,8 @@ import type { CredentialManager } from '../../services/credential-manager';
 import type { SSHKeyManager } from '../../services/ssh-key-manager';
 import type { DeployKeyStore } from '../../services/deploy-key-store';
 import type { LoopScriptsStore } from '../../services/loop-scripts-store';
+import type { FactoryTaskStore } from '../../services/factory-task-store';
+import { FORWARD_TRANSITIONS } from '../../shared/factory-types';
 import { getLogger } from '../../services/logging';
 
 /**
@@ -42,6 +44,62 @@ if [[ "$FILE_PATH" == *"@human_clarification.md"* ]]; then
   date -u +"%Y-%m-%dT%H:%M:%SZ" > /workspace/@human_clarification.requested
 fi
 exit 0
+`;
+
+/**
+ * Bash hook script injected into containers for factory mode loops.
+ * Runs as a PostToolUse hook: when the agent writes @task-status.json,
+ * it writes a timestamp to @task-status.requested so the host-side
+ * file watcher can advance the kanban task state without false-positives
+ * from user edits to the status file itself.
+ */
+const TASK_STATUS_HOOK_SCRIPT = `#!/bin/bash
+# Description: Signal host when agent writes @task-status.json
+INPUT=$(cat)
+FILE_PATH=$(echo "$INPUT" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('tool_input',{}).get('file_path',''))" 2>/dev/null || echo "")
+if [[ "$FILE_PATH" == *"@task-status.json"* ]]; then
+  date -u +"%Y-%m-%dT%H:%M:%SZ" > /workspace/@task-status.requested
+fi
+exit 0
+`;
+
+/**
+ * Instructions scaffolded into each factory workspace so agents know how to
+ * signal task completion. Written as @TASK_STATUS_INSTRUCTIONS.md so it
+ * appears alongside the other @ control files agents are already aware of.
+ */
+const TASK_STATUS_INSTRUCTIONS = `# Task Status Instructions
+
+When you complete your assigned phase for a task, write the following JSON to
+\`/workspace/@task-status.json\`:
+
+\`\`\`json
+{
+  "task": "<exact task title>",
+  "status": "complete",
+  "role": "<your-role>",
+  "timestamp": "<current ISO 8601 timestamp>"
+}
+\`\`\`
+
+## Pipeline stages and roles
+
+Each factory role owns one stage. Writing this file advances the task to the next stage:
+
+| Your role    | Task advances from  | To             |
+|--------------|---------------------|----------------|
+| pm           | Ready (start)       | In Progress    |
+| coder        | In Progress         | Security Review|
+| security     | Security Review     | QA             |
+| qa           | QA                  | Documentation  |
+| documentation| Documentation       | Done           |
+
+## Important
+
+- Use the **exact task title** as it appears in the kanban board.
+- The \`role\` field must match your container role name (e.g. \`coder\`, \`qa\`).
+- Only signal completion when your phase work is fully done and committed.
+- The host detects this file via a PostToolUse hook — do not delete or rename it.
 `;
 
 /**
@@ -74,6 +132,37 @@ function mergeClarificationHook(settingsContent: string): string {
   return JSON.stringify(settings, null, 2);
 }
 
+/**
+ * Merges the task-status PostToolUse hook registration into a Claude
+ * settings.json string, returning the merged JSON. Safe to call on an
+ * empty string or invalid JSON (falls back to a minimal object).
+ * Idempotent — skips insertion if the hook command is already present.
+ */
+export function mergeTaskStatusHook(settingsContent: string): string {
+  let settings: Record<string, unknown> = {};
+  try {
+    settings = JSON.parse(settingsContent);
+  } catch { /* start from empty */ }
+
+  const hooks = (settings.hooks as Record<string, unknown[]> | undefined) ?? {};
+  const postToolUse = ((hooks.PostToolUse as unknown[]) ?? []) as Array<Record<string, unknown>>;
+
+  const hookCmd = 'bash ~/.claude/hooks/task-status-notify.sh';
+  const alreadyPresent = postToolUse.some((entry) =>
+    (entry.hooks as Array<Record<string, unknown>>)?.some((h) => h.command === hookCmd)
+  );
+
+  if (!alreadyPresent) {
+    postToolUse.push({
+      matcher: 'Write|Edit|MultiEdit',
+      hooks: [{ type: 'command', command: hookCmd }],
+    });
+  }
+
+  settings.hooks = { ...hooks, PostToolUse: postToolUse };
+  return JSON.stringify(settings, null, 2);
+}
+
 export interface LoopServices {
   loopRunner: LoopRunner;
   scheduler: LoopScheduler;
@@ -90,6 +179,7 @@ export interface LoopServices {
   deployKeyStore?: DeployKeyStore;
   loopScriptsStore?: LoopScriptsStore;
   configManager?: ConfigManager;
+  factoryTaskStore?: FactoryTaskStore;
 }
 
 export function registerLoopHandlers(services: LoopServices): void {
@@ -109,6 +199,7 @@ export function registerLoopHandlers(services: LoopServices): void {
     deployKeyStore,
     loopScriptsStore,
     configManager,
+    factoryTaskStore,
   } = services;
 
   const logger = getLogger('loop');
@@ -250,6 +341,18 @@ export function registerLoopHandlers(services: LoopServices): void {
                 await fs.writeFile(path.join(claudeDir, 'hooks', 'clarification-notify.sh'), CLARIFICATION_HOOK_SCRIPT, { mode: 0o755 });
               } catch (err) {
                 logger.warn('Failed to inject clarification notify hook for .claude mount', { err });
+              }
+            }
+
+            // Inject the built-in task-status notify hook for factory-enabled workspace-backed loops.
+            // Only factory projects need this hook — it advances kanban tasks when agents complete phases.
+            if (project.local_path && project.factory_config?.enabled) {
+              try {
+                const existingSettings = await fs.readFile(path.join(claudeDir, 'settings.json'), 'utf8').catch(() => '{"autoUpdaterStatus":"disabled","hasCompletedOnboarding":true}');
+                await fs.writeFile(path.join(claudeDir, 'settings.json'), mergeTaskStatusHook(existingSettings), 'utf8');
+                await fs.writeFile(path.join(claudeDir, 'hooks', 'task-status-notify.sh'), TASK_STATUS_HOOK_SCRIPT, { mode: 0o755 });
+              } catch (err) {
+                logger.warn('Failed to inject task-status notify hook for .claude mount', { err });
               }
             }
 
@@ -680,6 +783,29 @@ export function registerLoopHandlers(services: LoopServices): void {
         }
       }
 
+      // Inject built-in task-status notify hook for factory-enabled workspace-backed continuous loops.
+      // Re-derives baseSettings and applies both hooks so neither is overwritten (both merges are idempotent).
+      if (project?.local_path && project.factory_config?.enabled && state.containerId && runtime && opts.mode !== LoopMode.SINGLE) {
+        try {
+          const taskHookEncoded = Buffer.from(TASK_STATUS_HOOK_SCRIPT).toString('base64');
+          await runtime.execCommand(state.containerId, [
+            'sh', '-c',
+            `printf '%s' '${taskHookEncoded}' | base64 -d > ~/.claude/hooks/task-status-notify.sh && chmod +x ~/.claude/hooks/task-status-notify.sh`,
+          ]);
+          // Merge both hooks into settings so neither overwrites the other.
+          const baseSettings = project.claude_settings_file && claudeSettingsStore
+            ? (await claudeSettingsStore.getFile(project.claude_settings_file) ?? '{"autoUpdaterStatus":"disabled","hasCompletedOnboarding":true}')
+            : '{"autoUpdaterStatus":"disabled","hasCompletedOnboarding":true}';
+          const settingsEncoded = Buffer.from(mergeTaskStatusHook(mergeClarificationHook(baseSettings))).toString('base64');
+          await runtime.execCommand(state.containerId, [
+            'sh', '-c',
+            `printf '%s' '${settingsEncoded}' | base64 -d > ~/.claude/settings.json`,
+          ]);
+        } catch (err) {
+          logger.warn('Failed to inject task-status notify hook into container', { err });
+        }
+      }
+
       // Inject Kiro config into ~/.kiro/config.json inside the container.
       // Uses base64 to safely transfer the JSON content via docker exec.
       // Skipped for single-mode and VM runs: those already have the file pre-mounted.
@@ -898,6 +1024,9 @@ export function registerLoopHandlers(services: LoopServices): void {
       '@feature_requests.md': featureRequestsContent?.trim() ? featureRequestsContent : defaultFeatureRequests,
       '@team_plan.md': '# Team Plan\n\nOverall plan and current sprint objectives.\n',
       '@human_clarification.md': '# Human Clarification\n\nUse this file to provide clarifications, answers, or guidance requested by the AI agents.\n',
+      '@task-status.json': '{}',
+      '@task-status.requested': '',
+      '@TASK_STATUS_INSTRUCTIONS.md': TASK_STATUS_INSTRUCTIONS,
       'team/handovers/coder_to_security.md': '# Coder to Security Handover\n\nDocument code changes that need security review.\n',
       'team/handovers/security_to_qa.md': '# Security to QA Handover\n\nDocument security findings and items cleared for QA testing.\n',
       'team/handovers/qa_feedback.md': '# QA Feedback\n\nDocument test results, bugs found, and items that need rework.\n',
@@ -912,6 +1041,8 @@ export function registerLoopHandlers(services: LoopServices): void {
         '.last_*',
         'tasks/pending/*',
         'team/human_*.md',
+        '@task-status.json',
+        '@task-status.requested',
       ].join('\n') + '\n',
     };
 
@@ -1061,6 +1192,15 @@ export function registerLoopHandlers(services: LoopServices): void {
   // @human_clarification.md, so no cooldown is needed.
   const clarificationWatchers = new Map<string, fsSync.FSWatcher>();
 
+  // Watcher for @task-status.requested per project (shared across all roles).
+  // The trigger file is written only by the injected hook when the agent writes
+  // @task-status.json, so reads are always fresh agent output.
+  const taskStatusWatchers = new Map<string, fsSync.FSWatcher>();
+
+  // Tracks the set of active loop keys per project to know when all loops for
+  // a project have terminated and the task status watcher can be torn down.
+  const activeLoopKeysByProject = new Map<string, Set<string>>();
+
   loopRunner.onStateChange((state: LoopState) => {
     const windows = BrowserWindow.getAllWindows();
     windows.forEach((win) => {
@@ -1069,6 +1209,58 @@ export function registerLoopHandlers(services: LoopServices): void {
 
     const loopKey = getLoopKey(state.projectId, state.role);
     const project = projectStore?.getProject(state.projectId);
+
+    // Track active loop keys per project and start task status watcher on first RUNNING loop
+    if (state.status === LoopStatus.RUNNING) {
+      if (!activeLoopKeysByProject.has(state.projectId)) {
+        activeLoopKeysByProject.set(state.projectId, new Set());
+      }
+      activeLoopKeysByProject.get(state.projectId)!.add(loopKey);
+
+      // Start per-project task status watcher only once (not per role)
+      if (!taskStatusWatchers.has(state.projectId)) {
+        const workspacePath = project?.local_path;
+        if (workspacePath && factoryTaskStore) {
+          const taskStatusTrigger = path.join(workspacePath, '@task-status.requested');
+          try {
+            const watcher = fsSync.watch(taskStatusTrigger, () => {
+              try {
+                const statusRaw = fsSync.readFileSync(
+                  path.join(workspacePath, '@task-status.json'),
+                  'utf-8'
+                );
+                const statusData = JSON.parse(statusRaw) as { task?: string; role?: string };
+                if (!statusData.task) return;
+
+                // Find task by title in the project's queue
+                const queue = factoryTaskStore.getQueue(state.projectId);
+                const task = queue.tasks.find((t) => t.title === statusData.task);
+                if (!task) return;
+
+                // Advance to next pipeline column using forward-only transitions
+                const nextColumn = FORWARD_TRANSITIONS[task.column];
+                if (!nextColumn) return; // Already at terminal column (done)
+
+                factoryTaskStore.moveTask(state.projectId, task.id, nextColumn);
+
+                // Broadcast updated task list to all renderer windows
+                const updatedQueue = factoryTaskStore.getQueue(state.projectId);
+                BrowserWindow.getAllWindows().forEach((win) => {
+                  if (!win.isDestroyed()) {
+                    win.webContents.send(IPC.FACTORY_TASK_CHANGED, state.projectId, updatedQueue.tasks);
+                  }
+                });
+              } catch {
+                // Silent — @task-status.json may not exist yet or contain invalid JSON
+              }
+            });
+            taskStatusWatchers.set(state.projectId, watcher);
+          } catch {
+            // @task-status.requested may not exist yet — ignore
+          }
+        }
+      }
+    }
 
     // Start watching @human_clarification.md when a loop becomes active
     if (state.status === LoopStatus.RUNNING && !clarificationWatchers.has(loopKey)) {
@@ -1093,12 +1285,27 @@ export function registerLoopHandlers(services: LoopServices): void {
       }
     }
 
-    // Tear down the watcher when the loop reaches a terminal state
+    // Tear down watchers when the loop reaches a terminal state
     if (isLoopTerminal(state.status)) {
       const watcher = clarificationWatchers.get(loopKey);
       if (watcher) {
         watcher.close();
         clarificationWatchers.delete(loopKey);
+      }
+
+      // Remove this loop from the project's active-key set; tear down task
+      // status watcher only when no other loops for this project remain active.
+      const activeKeys = activeLoopKeysByProject.get(state.projectId);
+      if (activeKeys) {
+        activeKeys.delete(loopKey);
+        if (activeKeys.size === 0) {
+          activeLoopKeysByProject.delete(state.projectId);
+          const taskWatcher = taskStatusWatchers.get(state.projectId);
+          if (taskWatcher) {
+            taskWatcher.close();
+            taskStatusWatchers.delete(state.projectId);
+          }
+        }
       }
     }
 

@@ -4,24 +4,10 @@ import { version } from './package.json';
 import { MakerZIP } from '@electron-forge/maker-zip';
 import { MakerDeb } from '@electron-forge/maker-deb';
 import { MakerRpm } from '@electron-forge/maker-rpm';
+import { AutoUnpackNativesPlugin } from '@electron-forge/plugin-auto-unpack-natives';
 import { VitePlugin } from '@electron-forge/plugin-vite';
 import { FusesPlugin } from '@electron-forge/plugin-fuses';
 import { FuseV1Options, FuseVersion } from '@electron/fuses';
-
-// Conditionally load DMG maker only on macOS and only if appdmg is available
-// Note: MakerDMG requires 'appdmg' to be installed as a dev dependency
-let MakerDMG: any = null;
-if (process.platform === 'darwin') {
-  try {
-    // First check if appdmg is available
-    require.resolve('appdmg');
-    // Only then import MakerDMG
-    MakerDMG = require('@electron-forge/maker-dmg').MakerDMG;
-  } catch (error) {
-    console.warn('⚠️  MakerDMG not available - appdmg not installed. Only ZIP will be created for macOS.');
-    console.warn('   To enable DMG creation, install appdmg: npm install --save-dev appdmg');
-  }
-}
 
 const config: ForgeConfig = {
   packagerConfig: {
@@ -78,16 +64,6 @@ const config: ForgeConfig = {
     ] : []),
     // macOS - only on darwin
     ...(process.platform === 'darwin' ? [
-      // Include DMG maker only if appdmg is available
-      ...(MakerDMG ? [
-        new MakerDMG({
-          name: 'Zephyr Desktop',
-          icon: './resources/icon.icns',
-          background: undefined,
-          format: 'ULFO',
-        }),
-      ] : []),
-      // Always include ZIP maker for macOS
       new MakerZIP({}, ['darwin']),
     ] : []),
     // Linux - only on linux
@@ -117,6 +93,7 @@ const config: ForgeConfig = {
     ] : []),
   ],
   plugins: [
+    new AutoUnpackNativesPlugin({}),
     new VitePlugin({
       // `build` can specify multiple entry builds, which can be Main process, Preload scripts, Worker process, etc.
       // If you are familiar with Vite configuration, it will look really familiar.

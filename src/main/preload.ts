@@ -102,6 +102,30 @@ contextBridge.exposeInMainWorld('api', {
       ipcRenderer.invoke(IPC.FACTORY_STOP, projectId),
   },
 
+  factoryTasks: {
+    list: (projectId: string) =>
+      ipcRenderer.invoke(IPC.FACTORY_TASK_LIST, projectId),
+    get: (projectId: string, taskId: string) =>
+      ipcRenderer.invoke(IPC.FACTORY_TASK_GET, projectId, taskId),
+    add: (projectId: string, title: string, description: string) =>
+      ipcRenderer.invoke(IPC.FACTORY_TASK_ADD, projectId, title, description),
+    move: (projectId: string, taskId: string, toColumn: string) =>
+      ipcRenderer.invoke(IPC.FACTORY_TASK_MOVE, projectId, taskId, toColumn),
+    remove: (projectId: string, taskId: string) =>
+      ipcRenderer.invoke(IPC.FACTORY_TASK_REMOVE, projectId, taskId),
+    update: (projectId: string, taskId: string, updates: unknown) =>
+      ipcRenderer.invoke(IPC.FACTORY_TASK_UPDATE, projectId, taskId, updates),
+    sync: (projectId: string) =>
+      ipcRenderer.invoke(IPC.FACTORY_TASK_SYNC, projectId),
+    onChanged: (callback: (projectId: string, tasks: unknown[]) => void) => {
+      const listener = (_event: unknown, projectId: string, tasks: unknown[]) =>
+        callback(projectId, tasks);
+      ipcRenderer.on(IPC.FACTORY_TASK_CHANGED, listener);
+      // Return cleanup function
+      return () => ipcRenderer.removeListener(IPC.FACTORY_TASK_CHANGED, listener);
+    },
+  },
+
   logs: {
     export: (projectId: string, format?: 'text' | 'json') =>
       ipcRenderer.invoke(IPC.LOGS_EXPORT, projectId, format),

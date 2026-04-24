@@ -126,11 +126,13 @@ describe('ConfigManager', () => {
     });
 
     it('returns null for any read error', () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
       const err = Object.assign(new Error('Permission denied'), { code: 'EACCES' });
       mockReadFileSync.mockImplementation(() => { throw err; });
       const cm = new ConfigManager(TEST_DIR);
       const result = cm.loadJson('protected.json');
       expect(result).toBeNull();
+      warnSpy.mockRestore();
     });
 
     it('preserves type parameter — returns typed object', () => {
