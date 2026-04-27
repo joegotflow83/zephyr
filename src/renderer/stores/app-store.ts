@@ -18,6 +18,7 @@ import { getLoopKey } from '../../shared/loop-types';
 import type { RuntimeInfo } from '../../services/container-runtime';
 import type { VMInfo } from '../../services/vm-manager';
 import type { FactoryTask } from '../../shared/factory-types';
+import type { Pipeline } from '../../shared/pipeline-types';
 
 /**
  * Complete application state shape
@@ -98,6 +99,13 @@ export interface AppState {
   factoryTasksLoading: boolean;
   setFactoryTasks: (projectId: string, tasks: FactoryTask[]) => void;
   refreshFactoryTasks: (projectId: string) => Promise<void>;
+
+  // Pipelines
+  pipelines: Pipeline[];
+  pipelinesLoading: boolean;
+  setPipelines: (pipelines: Pipeline[]) => void;
+  refreshPipelines: () => Promise<void>;
+  pipelineById: (id: string) => Pipeline | undefined;
 }
 
 /**
@@ -132,6 +140,9 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   factoryTasks: {},
   factoryTasksLoading: false,
+
+  pipelines: [],
+  pipelinesLoading: false,
 
   // Project actions
   setProjects: (projects) => set({ projects, projectsError: null }),
@@ -347,6 +358,21 @@ export const useAppStore = create<AppState>((set, get) => ({
       set({ factoryTasksLoading: false });
     }
   },
+
+  // Pipeline actions
+  setPipelines: (pipelines) => set({ pipelines }),
+
+  refreshPipelines: async () => {
+    set({ pipelinesLoading: true });
+    try {
+      const pipelines = await window.api.pipelines.list();
+      set({ pipelines, pipelinesLoading: false });
+    } catch {
+      set({ pipelinesLoading: false });
+    }
+  },
+
+  pipelineById: (id) => get().pipelines.find((p) => p.id === id),
 }));
 
 /**
@@ -392,6 +418,11 @@ export function initializeStoreListeners() {
     useAppStore.getState().setFactoryTasks(projectId, tasks);
   });
 
+  // Pipeline changes (mutations from builder or external edits)
+  window.api.pipelines.onChanged((pipelines) => {
+    useAppStore.getState().setPipelines(pipelines);
+  });
+
   // Initial data load
   useAppStore.getState().refreshProjects();
   useAppStore.getState().refreshLoops();
@@ -399,6 +430,7 @@ export function initializeStoreListeners() {
   useAppStore.getState().refreshImages();
   useAppStore.getState().refreshVMStatus();
   useAppStore.getState().refreshVMInfos();
+  useAppStore.getState().refreshPipelines();
 
   // Initial Docker status
   window.api.docker

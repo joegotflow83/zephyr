@@ -11,8 +11,8 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { ProjectConfig, VMConfig, createProjectConfig, FACTORY_ROLES, FACTORY_ROLE_LABELS } from '../../../shared/models';
-import type { FactoryRole, FactoryConfig } from '../../../shared/models';
+import { ProjectConfig, VMConfig, createProjectConfig } from '../../../shared/models';
+import type { FactoryConfig } from '../../../shared/models';
 import type { ZephyrImage } from '../../../shared/models';
 import { PromptEditor } from './PromptEditor';
 import { SpecFilesSection } from './SpecFilesSection';
@@ -23,6 +23,8 @@ import { ClaudeSettingsSection } from './ClaudeSettingsSection';
 import { KiroHooksSection } from './KiroHooksSection';
 import { useImages } from '../../hooks/useImages';
 import { ImageBuilderDialog } from '../ImageBuilderDialog/ImageBuilderDialog';
+import PipelineBuilderDialog from '../PipelineBuilderDialog/PipelineBuilderDialog';
+import type { Pipeline } from '../../../shared/pipeline-types';
 import { useAppStore } from '../../stores/app-store';
 
 interface ProjectDialogProps {
@@ -41,6 +43,8 @@ type ImageMode = 'library' | 'custom';
 export const ProjectDialog: React.FC<ProjectDialogProps> = ({ mode, project, onSave, onClose }) => {
   const { images, refresh: refreshImages } = useImages();
   const multipassAvailable = useAppStore((state) => state.multipassAvailable);
+  const pipelines = useAppStore((state) => state.pipelines);
+  const refreshPipelines = useAppStore((state) => state.refreshPipelines);
 
   // Form fields
   const [name, setName] = useState('');
@@ -59,6 +63,10 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({ mode, project, onS
   const [imageMode, setImageMode] = useState<ImageMode>('custom');
   const [imageId, setImageId] = useState<string | undefined>(undefined);
   const [showImageBuilder, setShowImageBuilder] = useState(false);
+
+  // Pipeline builder state
+  const [showPipelineBuilder, setShowPipelineBuilder] = useState(false);
+  const [pipelineBuilderTarget, setPipelineBuilderTarget] = useState<Pipeline | null>(null);
 
   // GitHub SSH Access state
   const [githubPat, setGithubPat] = useState('');
@@ -92,7 +100,7 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({ mode, project, onS
 
   // Factory state
   const [factoryEnabled, setFactoryEnabled] = useState(false);
-  const [factoryRoles, setFactoryRoles] = useState<FactoryRole[]>([...FACTORY_ROLES]);
+  const [selectedPipelineId, setSelectedPipelineId] = useState<string | undefined>(undefined);
   const [featureRequestsContent, setFeatureRequestsContent] = useState('');
 
   // Validation state
@@ -135,7 +143,7 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({ mode, project, onS
       setVmCloudInit(project.vm_config?.cloud_init ?? '');
       // Factory config
       setFactoryEnabled(project.factory_config?.enabled ?? false);
-      setFactoryRoles(project.factory_config?.roles ?? [...FACTORY_ROLES]);
+      setSelectedPipelineId(project.pipelineId);
       setFeatureRequestsContent(project.feature_requests_content ?? '');
       // Git identity
       setGitUserName(project.git_user_name ?? '');
@@ -161,7 +169,7 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({ mode, project, onS
       setVmCloudInit('');
       // Factory defaults
       setFactoryEnabled(false);
-      setFactoryRoles([...FACTORY_ROLES]);
+      setSelectedPipelineId(undefined);
       setFeatureRequestsContent('');
     }
     setGithubPat('');
@@ -227,6 +235,10 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({ mode, project, onS
       newErrors.localPath = 'Must be an absolute path (starting with /)';
     }
 
+    if (factoryEnabled && !selectedPipelineId) {
+      newErrors.pipeline = 'Please select a pipeline for the coding factory';
+    }
+
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
       return;
@@ -253,7 +265,7 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({ mode, project, onS
     // Build factory config
     const effectiveFactoryConfig: FactoryConfig | undefined =
       factoryEnabled
-        ? { enabled: true, roles: factoryRoles }
+        ? { enabled: true }
         : undefined;
 
     const effectiveFeatureRequestsContent = featureRequestsContent.trim() || undefined;
@@ -278,6 +290,7 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({ mode, project, onS
             sandbox_type: sandboxType,
             vm_config: effectiveVmConfig,
             factory_config: effectiveFactoryConfig,
+            pipelineId: factoryEnabled ? selectedPipelineId : undefined,
             feature_requests_content: effectiveFeatureRequestsContent,
             kiro_hooks: kiroHooks,
             git_user_name: gitUserName.trim() || undefined,
@@ -299,6 +312,7 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({ mode, project, onS
             sandbox_type: sandboxType,
             vm_config: effectiveVmConfig,
             factory_config: effectiveFactoryConfig,
+            pipelineId: factoryEnabled ? selectedPipelineId : undefined,
             feature_requests_content: effectiveFeatureRequestsContent,
             kiro_hooks: kiroHooks,
             git_user_name: gitUserName.trim() || undefined,
@@ -324,6 +338,19 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({ mode, project, onS
     if (e.target === e.currentTarget) {
       onClose();
     }
+  };
+
+  // Open the Pipeline Builder pre-populated with the currently selected pipeline
+  const handleOpenPipelineBuilder = () => {
+    const target = pipelines.find((p) => p.id === selectedPipelineId) ?? null;
+    setPipelineBuilderTarget(target);
+    setShowPipelineBuilder(true);
+  };
+
+  const handlePipelineBuilderClose = () => {
+    setShowPipelineBuilder(false);
+    setPipelineBuilderTarget(null);
+    void refreshPipelines();
   };
 
   // When a new image is successfully built, auto-select it in library mode
@@ -807,11 +834,12 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({ mode, project, onS
             {/* Coding Factory section */}
             <div className="mb-4">
               <div className="flex items-center gap-3 mb-2">
-                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                <label htmlFor="factory-enabled" className="text-sm font-medium text-gray-700 dark:text-gray-300">
                   Coding Factory
                 </label>
                 <label className="relative inline-flex items-center cursor-pointer">
                   <input
+                    id="factory-enabled"
                     type="checkbox"
                     checked={factoryEnabled}
                     onChange={(e) => setFactoryEnabled(e.target.checked)}
@@ -826,35 +854,99 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({ mode, project, onS
 
               {factoryEnabled && (
                 <div className="border border-gray-200 dark:border-gray-600 rounded p-4 space-y-3">
-                  <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2">
-                    Active Roles
-                  </div>
-                  <div className="space-y-2">
-                    {FACTORY_ROLES.map((role) => (
-                      <label
-                        key={role}
-                        className="flex items-center gap-3 cursor-pointer text-sm text-gray-700 dark:text-gray-300"
+                  {/* Pipeline selector */}
+                  <div>
+                    <label
+                      htmlFor="factory-pipeline"
+                      className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1"
+                    >
+                      Pipeline
+                    </label>
+                    {pipelines.length === 0 ? (
+                      <p className="text-xs text-amber-600 dark:text-amber-400">
+                        No pipelines available. Create one in Settings → Pipelines.
+                      </p>
+                    ) : (
+                      <select
+                        id="factory-pipeline"
+                        value={selectedPipelineId ?? ''}
+                        onChange={(e) => setSelectedPipelineId(e.target.value || undefined)}
+                        className="w-full px-2 py-1.5 text-sm bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500"
                       >
-                        <input
-                          type="checkbox"
-                          checked={factoryRoles.includes(role)}
-                          onChange={(e) => {
-                            if (e.target.checked) {
-                              setFactoryRoles((prev) => [...prev, role]);
-                            } else {
-                              setFactoryRoles((prev) => prev.filter((r) => r !== role));
-                            }
-                          }}
-                          className="accent-blue-600"
-                        />
-                        <span className="font-medium">{FACTORY_ROLE_LABELS[role]}</span>
-                        <span className="text-xs text-gray-400">
-                          — uses PROMPT_{role}.md if present
-                        </span>
-                      </label>
-                    ))}
+                        <option value="">— select a pipeline —</option>
+                        {pipelines.filter((p) => p.builtIn).length > 0 && (
+                          <optgroup label="Built-in">
+                            {pipelines.filter((p) => p.builtIn).map((p) => (
+                              <option key={p.id} value={p.id}>{p.name}</option>
+                            ))}
+                          </optgroup>
+                        )}
+                        {pipelines.filter((p) => !p.builtIn).length > 0 && (
+                          <optgroup label="Your Pipelines">
+                            {pipelines.filter((p) => !p.builtIn).map((p) => (
+                              <option key={p.id} value={p.id}>{p.name}</option>
+                            ))}
+                          </optgroup>
+                        )}
+                      </select>
+                    )}
+                    {selectedPipelineId && (
+                      <button
+                        type="button"
+                        onClick={handleOpenPipelineBuilder}
+                        className="mt-2 text-sm text-blue-400 hover:text-blue-300 transition-colors"
+                      >
+                        {pipelines.find((p) => p.id === selectedPipelineId)?.builtIn
+                          ? 'View Pipeline →'
+                          : 'Edit Pipeline →'}
+                      </button>
+                    )}
+                    {errors.pipeline && (
+                      <p className="mt-1 text-xs text-red-500">{errors.pipeline}</p>
+                    )}
                   </div>
-                  <div className="mt-3">
+
+                  {/* Stage preview */}
+                  {(() => {
+                    const selectedPipeline = pipelines.find((p) => p.id === selectedPipelineId);
+                    return selectedPipeline ? (
+                      <div>
+                        <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2">
+                          Pipeline Stages
+                        </div>
+                        <div className="flex flex-wrap gap-1.5 items-center">
+                          <span className="px-2 py-0.5 text-xs rounded bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-600">
+                            Backlog
+                          </span>
+                          {selectedPipeline.stages.map((stage) => (
+                            <React.Fragment key={stage.id}>
+                              <span className="text-gray-400 dark:text-gray-500 text-xs" aria-hidden="true">→</span>
+                              <span
+                                className="px-2 py-0.5 text-xs rounded border border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-300"
+                                style={stage.color ? { borderColor: stage.color, backgroundColor: `${stage.color}22` } : undefined}
+                              >
+                                {stage.icon && <span aria-hidden="true" className="mr-1">{stage.icon}</span>}
+                                {stage.name}
+                                {stage.instances > 1 && (
+                                  <span className="ml-1 text-gray-400 dark:text-gray-500">×{stage.instances}</span>
+                                )}
+                              </span>
+                            </React.Fragment>
+                          ))}
+                          <span className="text-gray-400 dark:text-gray-500 text-xs" aria-hidden="true">→</span>
+                          <span className="px-2 py-0.5 text-xs rounded bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-600">
+                            Done
+                          </span>
+                        </div>
+                        {selectedPipeline.description && (
+                          <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">{selectedPipeline.description}</p>
+                        )}
+                      </div>
+                    ) : null;
+                  })()}
+
+                  {/* Feature requests content */}
+                  <div>
                     <label htmlFor="feature-requests-content" className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
                       @feature_requests.md content (optional)
                     </label>
@@ -1156,6 +1248,13 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({ mode, project, onS
         isOpen={showImageBuilder}
         onClose={() => setShowImageBuilder(false)}
         onBuilt={handleImageBuilt}
+      />
+
+      {/* PipelineBuilderDialog is a sibling so its clicks don't bubble to our backdrop */}
+      <PipelineBuilderDialog
+        isOpen={showPipelineBuilder}
+        onClose={handlePipelineBuilderClose}
+        pipeline={pipelineBuilderTarget}
       />
     </>
   );

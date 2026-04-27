@@ -57,6 +57,7 @@ export const IPC = {
   // Factory (multi-container coding factory)
   FACTORY_START: 'factory:start',
   FACTORY_STOP: 'factory:stop',
+  FACTORY_RESTART_CONTAINER: 'factory:restart-container',
 
   // Factory task kanban
   FACTORY_TASK_LIST: 'factory:task:list',
@@ -67,6 +68,14 @@ export const IPC = {
   FACTORY_TASK_GET: 'factory:task:get',
   FACTORY_TASK_UPDATE: 'factory:task:update',
   FACTORY_TASK_CHANGED: 'factory:task:changed',
+
+  // Pipeline library (data-driven factory stages)
+  PIPELINE_LIST: 'pipeline:list',
+  PIPELINE_GET: 'pipeline:get',
+  PIPELINE_ADD: 'pipeline:add',
+  PIPELINE_UPDATE: 'pipeline:update',
+  PIPELINE_REMOVE: 'pipeline:remove',
+  PIPELINE_CHANGED: 'pipeline:changed',
 
   // Log export
   LOGS_EXPORT: 'logs:export',

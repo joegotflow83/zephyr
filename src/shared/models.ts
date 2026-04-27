@@ -80,35 +80,12 @@ export interface ZephyrImage {
 }
 
 /**
- * Predefined roles for a coding factory.
- * Each role maps to a separate container running a dedicated AI agent.
- */
-export type FactoryRole = 'pm' | 'coder' | 'security' | 'qa';
-
-/**
- * All available factory roles, in pipeline order.
- */
-export const FACTORY_ROLES: FactoryRole[] = ['pm', 'coder', 'security', 'qa'];
-
-/**
- * Human-readable labels for factory roles.
- */
-export const FACTORY_ROLE_LABELS: Record<FactoryRole, string> = {
-  pm: 'Project Manager',
-  coder: 'Coder',
-  security: 'Security',
-  qa: 'QA',
-};
-
-/**
  * Configuration for running a project as a coding factory.
- * When enabled, the project runs multiple containers — one per role.
+ * When enabled, the project runs multiple containers — one per pipeline stage.
  */
 export interface FactoryConfig {
   /** Whether factory mode is enabled for this project */
   enabled: boolean;
-  /** Which roles to start when the factory launches */
-  roles: FactoryRole[];
 }
 
 /**
@@ -191,10 +168,15 @@ export interface ProjectConfig {
   vm_config?: VMConfig;
   /**
    * Coding factory configuration.
-   * When enabled, the project runs multiple containers — one per role —
+   * When enabled, the project runs multiple containers — one per pipeline stage —
    * with shared team coordination files in /workspace.
    */
   factory_config?: FactoryConfig;
+  /**
+   * ID of the `Pipeline` (see `src/shared/pipeline-types.ts`) that drives this
+   * project's coding factory. Required for `FACTORY_START`.
+   */
+  pipelineId?: string;
   /**
    * Initial content to write to @feature_requests.md when scaffolding the
    * coding factory workspace. If omitted, the default template is used.
@@ -327,6 +309,7 @@ export function createProjectConfig(partial: Partial<ProjectConfig> = {}): Proje
     sandbox_type: partial.sandbox_type,
     vm_config: partial.vm_config,
     factory_config: partial.factory_config,
+    pipelineId: partial.pipelineId,
     feature_requests_content: partial.feature_requests_content,
     kiro_config: partial.kiro_config,
     spec_files: partial.spec_files,

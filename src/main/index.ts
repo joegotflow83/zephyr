@@ -38,11 +38,13 @@ import { KiroHooksStore } from '../services/kiro-hooks-store';
 import { AuthInjector } from '../services/auth-injector';
 import { DeployKeyStore } from '../services/deploy-key-store';
 import { FactoryTaskStore } from '../services/factory-task-store';
+import { PipelineStore } from '../services/pipeline-store';
 import { SSHKeyManager } from '../services/ssh-key-manager';
 import { buildApplicationMenu } from './menu';
 import { IPC } from '../shared/ipc-channels';
 import { registerDeployKeyHandlers } from './ipc-handlers/deploy-key-handlers';
 import { registerFactoryTaskHandlers } from './ipc-handlers/factory-task-handlers';
+import { registerPipelineHandlers } from './ipc-handlers/pipeline-handlers';
 import { registerVMHandlers } from './ipc-handlers/vm-handlers';
 import { VMManager } from '../services/vm-manager';
 import os from 'node:os';
@@ -104,7 +106,21 @@ const claudeSettingsStore = new ClaudeSettingsStore(configManager);
 const kiroHooksStore = new KiroHooksStore(configManager);
 const authInjector = new AuthInjector(configManager, credentialManager);
 const deployKeyStore = new DeployKeyStore(path.join(os.homedir(), '.zephyr'));
-const factoryTaskStore = new FactoryTaskStore(path.join(os.homedir(), '.zephyr', 'factory-tasks'));
+const pipelineStore = new PipelineStore(path.join(os.homedir(), '.zephyr'));
+// FactoryTaskStore.moveTask validates transitions against the project's active
+// pipeline (Phase 2.3). The lookup is injected as a callback so the store
+// remains decoupled from ProjectStore / PipelineStore — tests stub it inline
+// without bootstrapping the full service graph.
+const factoryTaskStore = new FactoryTaskStore(
+  path.join(os.homedir(), '.zephyr', 'factory-tasks'),
+  {
+    getPipelineForProject: (projectId: string) => {
+      const project = projectStore.getProject(projectId);
+      if (!project?.pipelineId) return null;
+      return pipelineStore.getPipeline(project.pipelineId);
+    },
+  },
+);
 const sshKeyManager = new SSHKeyManager(runtime);
 
 // Register all IPC handlers before the window is created.
@@ -128,6 +144,7 @@ registerLoopHandlers({
   loopScriptsStore,
   configManager,
   factoryTaskStore,
+  pipelineStore,
 });
 registerLogHandlers({ logExporter, loopRunner });
 registerTerminalHandlers({ terminalManager, vmManager });
@@ -136,6 +153,7 @@ registerAutoUpdateHandlers({ autoUpdater });
 registerImageHandlers({ imageStore, imageBuilder });
 registerDeployKeyHandlers({ deployKeyStore });
 registerFactoryTaskHandlers({ factoryTaskStore, projectStore });
+registerPipelineHandlers({ pipelineStore, projectStore });
 registerVMHandlers({ vmManager, loopRunner });
 
 // Legacy ping handler kept for backwards compatibility with existing tests.

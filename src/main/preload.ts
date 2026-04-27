@@ -100,6 +100,8 @@ contextBridge.exposeInMainWorld('api', {
       ipcRenderer.invoke(IPC.FACTORY_START, projectId, baseOpts),
     stop: (projectId: string) =>
       ipcRenderer.invoke(IPC.FACTORY_STOP, projectId),
+    restartContainer: (projectId: string, role: string) =>
+      ipcRenderer.invoke(IPC.FACTORY_RESTART_CONTAINER, projectId, role),
   },
 
   factoryTasks: {
@@ -123,6 +125,21 @@ contextBridge.exposeInMainWorld('api', {
       ipcRenderer.on(IPC.FACTORY_TASK_CHANGED, listener);
       // Return cleanup function
       return () => ipcRenderer.removeListener(IPC.FACTORY_TASK_CHANGED, listener);
+    },
+  },
+
+  pipelines: {
+    list: () => ipcRenderer.invoke(IPC.PIPELINE_LIST),
+    get: (id: string) => ipcRenderer.invoke(IPC.PIPELINE_GET, id),
+    add: (input: unknown) => ipcRenderer.invoke(IPC.PIPELINE_ADD, input),
+    update: (id: string, patch: unknown) =>
+      ipcRenderer.invoke(IPC.PIPELINE_UPDATE, id, patch),
+    remove: (id: string) => ipcRenderer.invoke(IPC.PIPELINE_REMOVE, id),
+    onChanged: (callback: (pipelines: unknown[]) => void) => {
+      const listener = (_event: unknown, pipelines: unknown[]) => callback(pipelines);
+      ipcRenderer.on(IPC.PIPELINE_CHANGED, listener);
+      // Return cleanup function
+      return () => ipcRenderer.removeListener(IPC.PIPELINE_CHANGED, listener);
     },
   },
 

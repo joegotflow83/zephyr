@@ -66,6 +66,14 @@ const mockApi = {
     sync: vi.fn(),
     onChanged: vi.fn(() => vi.fn()),
   },
+  pipelines: {
+    list: vi.fn(),
+    get: vi.fn(),
+    add: vi.fn(),
+    update: vi.fn(),
+    remove: vi.fn(),
+    onChanged: vi.fn(() => vi.fn()),
+  },
 };
 
 (global as any).window = { api: mockApi };
@@ -92,6 +100,8 @@ describe('useAppStore', () => {
       imageBuildActive: false,
       vmInfos: [],
       multipassAvailable: false,
+      pipelines: [],
+      pipelinesLoading: false,
     });
     vi.clearAllMocks();
   });
@@ -467,6 +477,8 @@ describe('useAppStore', () => {
       });
       mockApi.images.onBuildProgress.mockImplementation(() => vi.fn());
       mockApi.vm.onStatusChanged.mockImplementation(() => vi.fn());
+      mockApi.factoryTasks.onChanged.mockImplementation(() => vi.fn());
+      mockApi.pipelines.onChanged.mockImplementation(() => vi.fn());
       mockApi.docker.status.mockResolvedValue({ available: false });
       mockApi.projects.list.mockResolvedValue([]);
       mockApi.loops.list.mockResolvedValue([]);
@@ -479,6 +491,7 @@ describe('useAppStore', () => {
       mockApi.images.list.mockResolvedValue([]);
       mockApi.vm.status.mockResolvedValue({ available: false });
       mockApi.vm.list.mockResolvedValue([]);
+      mockApi.pipelines.list.mockResolvedValue([]);
     });
 
     it('should register Docker status listener', async () => {
@@ -536,6 +549,36 @@ describe('useAppStore', () => {
       expect(mockApi.loops.list).toHaveBeenCalled();
       expect(mockApi.settings.load).toHaveBeenCalled();
       expect(mockApi.docker.status).toHaveBeenCalled();
+      expect(mockApi.pipelines.list).toHaveBeenCalled();
+    });
+
+    it('should register pipelines onChanged listener', () => {
+      initializeStoreListeners();
+      expect(mockApi.pipelines.onChanged).toHaveBeenCalled();
+    });
+
+    it('should update store pipelines when onChanged fires', () => {
+      let pipelinesChangedCallback: (pipelines: any[]) => void;
+      mockApi.pipelines.onChanged.mockImplementation((cb) => {
+        pipelinesChangedCallback = cb;
+        return vi.fn();
+      });
+
+      initializeStoreListeners();
+
+      const fakePipeline = {
+        id: 'pipe-1',
+        name: 'Test Pipeline',
+        stages: [],
+        bounceLimit: 3,
+        builtIn: false,
+        createdAt: '2024-01-01T00:00:00Z',
+        updatedAt: '2024-01-01T00:00:00Z',
+      };
+      pipelinesChangedCallback!([fakePipeline]);
+
+      expect(useAppStore.getState().pipelines).toHaveLength(1);
+      expect(useAppStore.getState().pipelines[0].id).toBe('pipe-1');
     });
   });
 
@@ -633,6 +676,67 @@ describe('useAppStore', () => {
     });
   });
 
+  describe('pipelines', () => {
+    it('should initialize with empty pipelines list', () => {
+      const state = useAppStore.getState();
+      expect(state.pipelines).toEqual([]);
+      expect(state.pipelinesLoading).toBe(false);
+    });
+
+    it('should set pipelines via setPipelines', () => {
+      const pipeline = {
+        id: 'p-1',
+        name: 'My Pipeline',
+        stages: [],
+        bounceLimit: 3,
+        builtIn: false,
+        createdAt: '2024-01-01T00:00:00Z',
+        updatedAt: '2024-01-01T00:00:00Z',
+      };
+      useAppStore.getState().setPipelines([pipeline]);
+      expect(useAppStore.getState().pipelines).toHaveLength(1);
+      expect(useAppStore.getState().pipelines[0].id).toBe('p-1');
+    });
+
+    it('should refresh pipelines from API', async () => {
+      const pipeline = {
+        id: 'p-2',
+        name: 'Loaded Pipeline',
+        stages: [],
+        bounceLimit: 3,
+        builtIn: true,
+        createdAt: '2024-01-01T00:00:00Z',
+        updatedAt: '2024-01-01T00:00:00Z',
+      };
+      mockApi.pipelines.list.mockResolvedValue([pipeline]);
+
+      await useAppStore.getState().refreshPipelines();
+
+      expect(mockApi.pipelines.list).toHaveBeenCalled();
+      expect(useAppStore.getState().pipelines).toEqual([pipeline]);
+      expect(useAppStore.getState().pipelinesLoading).toBe(false);
+    });
+
+    it('should handle refreshPipelines error gracefully', async () => {
+      mockApi.pipelines.list.mockRejectedValue(new Error('fetch failed'));
+
+      await useAppStore.getState().refreshPipelines();
+
+      expect(useAppStore.getState().pipelines).toEqual([]);
+      expect(useAppStore.getState().pipelinesLoading).toBe(false);
+    });
+
+    it('should find pipeline by id via pipelineById', () => {
+      const p1 = { id: 'x-1', name: 'A', stages: [], bounceLimit: 3, builtIn: false, createdAt: '', updatedAt: '' };
+      const p2 = { id: 'x-2', name: 'B', stages: [], bounceLimit: 3, builtIn: false, createdAt: '', updatedAt: '' };
+      useAppStore.getState().setPipelines([p1, p2]);
+
+      expect(useAppStore.getState().pipelineById('x-1')).toEqual(p1);
+      expect(useAppStore.getState().pipelineById('x-2')).toEqual(p2);
+      expect(useAppStore.getState().pipelineById('x-99')).toBeUndefined();
+    });
+  });
+
   describe('initializeStoreListeners — image build progress', () => {
     let buildProgressCallback: (line: string) => void;
 
@@ -644,6 +748,8 @@ describe('useAppStore', () => {
         return vi.fn();
       });
       mockApi.vm.onStatusChanged.mockImplementation(() => vi.fn());
+      mockApi.factoryTasks.onChanged.mockImplementation(() => vi.fn());
+      mockApi.pipelines.onChanged.mockImplementation(() => vi.fn());
       mockApi.docker.status.mockResolvedValue({ available: false });
       mockApi.projects.list.mockResolvedValue([]);
       mockApi.loops.list.mockResolvedValue([]);
@@ -656,6 +762,7 @@ describe('useAppStore', () => {
       mockApi.images.list.mockResolvedValue([]);
       mockApi.vm.status.mockResolvedValue({ available: false });
       mockApi.vm.list.mockResolvedValue([]);
+      mockApi.pipelines.list.mockResolvedValue([]);
     });
 
     it('should register build progress listener and update imageBuildProgress', () => {

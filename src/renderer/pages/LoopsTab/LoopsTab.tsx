@@ -329,6 +329,9 @@ export const LoopsTab: React.FC = () => {
                     loops={factoryLoops}
                     selectedLoopKey={selectedLoopId}
                     onSelectLoop={(l) => setSelectedLoopId(getLoopKey(l))}
+                    onRestartLoop={(l) => {
+                      window.api.factory.restartContainer(l.projectId, l.role ?? '').catch(() => {});
+                    }}
                   />
                 </div>
               );

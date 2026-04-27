@@ -379,4 +379,112 @@ describe('ProjectStore', () => {
       expect(store.removeProject('any-id')).toBe(false);
     });
   });
+
+  // -------------------------------------------------------------------------
+  // clearDanglingPipelineId
+  //
+  // Why these tests matter: when a pipeline is deleted, projects referencing it
+  // must have their pipelineId cleared so projects.json stays consistent and the
+  // renderer can correctly gate the Factory button using the live pipeline list.
+  // -------------------------------------------------------------------------
+
+  describe('clearDanglingPipelineId', () => {
+    it('returns 0 when no project references the given pipeline id', () => {
+      const projects = [
+        makeProject({ id: 'a', pipelineId: 'other-pipeline' }),
+        makeProject({ id: 'b' }),
+      ];
+      const cm = makeMockConfigManager(projects);
+      const store = new ProjectStore(cm);
+      expect(store.clearDanglingPipelineId('deleted-pipeline')).toBe(0);
+    });
+
+    it('does not write when no project is affected', () => {
+      const cm = makeMockConfigManager([makeProject({ id: 'a' })]);
+      const store = new ProjectStore(cm);
+      store.clearDanglingPipelineId('gone');
+      expect(cm.saveJson).not.toHaveBeenCalled();
+    });
+
+    it('returns the count of affected projects', () => {
+      const projects = [
+        makeProject({ id: 'a', pipelineId: 'target' }),
+        makeProject({ id: 'b', pipelineId: 'target' }),
+        makeProject({ id: 'c', pipelineId: 'keep' }),
+      ];
+      const cm = makeMockConfigManager(projects);
+      const store = new ProjectStore(cm);
+      expect(store.clearDanglingPipelineId('target')).toBe(2);
+    });
+
+    it('clears pipelineId from affected projects in the saved list', () => {
+      const projects = [
+        makeProject({ id: 'a', pipelineId: 'del' }),
+        makeProject({ id: 'b', pipelineId: 'keep' }),
+      ];
+      const cm = makeMockConfigManager(projects);
+      const store = new ProjectStore(cm);
+
+      store.clearDanglingPipelineId('del');
+
+      const saved = (cm.saveJson as ReturnType<typeof vi.fn>).mock.calls[0][1] as ProjectConfig[];
+      expect(saved.find((p) => p.id === 'a')?.pipelineId).toBeUndefined();
+      expect(saved.find((p) => p.id === 'b')?.pipelineId).toBe('keep');
+    });
+
+    it('preserves all other fields on cleared projects', () => {
+      const project = makeProject({
+        id: 'a',
+        name: 'My Project',
+        pipelineId: 'del',
+        factory_config: { enabled: true, roles: [] },
+      });
+      const cm = makeMockConfigManager([project]);
+      const store = new ProjectStore(cm);
+
+      store.clearDanglingPipelineId('del');
+
+      const saved = (cm.saveJson as ReturnType<typeof vi.fn>).mock.calls[0][1] as ProjectConfig[];
+      const result = saved[0];
+      expect(result.name).toBe('My Project');
+      expect(result.factory_config?.enabled).toBe(true);
+      expect(result.pipelineId).toBeUndefined();
+    });
+
+    it('updates updated_at on cleared projects', () => {
+      const project = makeProject({
+        id: 'a',
+        pipelineId: 'del',
+        updated_at: '2020-01-01T00:00:00.000Z',
+      });
+      const cm = makeMockConfigManager([project]);
+      const store = new ProjectStore(cm);
+
+      store.clearDanglingPipelineId('del');
+
+      const saved = (cm.saveJson as ReturnType<typeof vi.fn>).mock.calls[0][1] as ProjectConfig[];
+      expect(saved[0].updated_at).not.toBe('2020-01-01T00:00:00.000Z');
+    });
+
+    it('is a no-op when the store has no file', () => {
+      const cm = makeMockConfigManager(null);
+      const store = new ProjectStore(cm);
+      expect(store.clearDanglingPipelineId('any')).toBe(0);
+      expect(cm.saveJson).not.toHaveBeenCalled();
+    });
+
+    it('performs a single batched write even when multiple projects are affected', () => {
+      const projects = [
+        makeProject({ id: 'a', pipelineId: 'del' }),
+        makeProject({ id: 'b', pipelineId: 'del' }),
+        makeProject({ id: 'c', pipelineId: 'del' }),
+      ];
+      const cm = makeMockConfigManager(projects);
+      const store = new ProjectStore(cm);
+
+      store.clearDanglingPipelineId('del');
+
+      expect(cm.saveJson).toHaveBeenCalledTimes(1);
+    });
+  });
 });

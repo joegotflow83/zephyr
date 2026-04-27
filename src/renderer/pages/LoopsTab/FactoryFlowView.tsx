@@ -1,8 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import type { LoopState } from '../../../shared/loop-types';
 import { LoopStatus, getLoopKey } from '../../../shared/loop-types';
-import type { FactoryRole } from '../../../shared/models';
-import { FACTORY_ROLES, FACTORY_ROLE_LABELS } from '../../../shared/models';
 
 interface FactoryFlowViewProps {
   /** All loops belonging to this factory project */
@@ -11,6 +9,8 @@ interface FactoryFlowViewProps {
   selectedLoopKey: string | null;
   /** Called when user clicks a node to select that agent's logs */
   onSelectLoop: (loop: LoopState) => void;
+  /** Optional: called when user clicks the restart button on a node. */
+  onRestartLoop?: (loop: LoopState) => void;
 }
 
 /** How recently (ms) a log line must have arrived to consider the agent "active" */
@@ -19,15 +19,28 @@ const ACTIVE_THRESHOLD_MS = 5000;
 /** Tick interval for re-evaluating activity pulse */
 const TICK_MS = 1000;
 
+/** Extract the stage id from a composite role key (e.g. "coder-0" → "coder", "coder" → "coder"). */
+export function stageIdFromRole(role: string): string {
+  return role.replace(/-\d+$/, '');
+}
+
+/** Extract instance index from composite role key (e.g. "coder-0" → 0, "coder" → null). */
+export function instanceIndexFromRole(role: string): number | null {
+  const m = role.match(/-(\d+)$/);
+  return m ? parseInt(m[1], 10) : null;
+}
+
 /**
  * Renders a horizontal pipeline diagram for a coding factory.
  * Each agent role is a node showing status, activity pulse, iteration, and commit count.
- * Nodes are connected by directional arrows following the FACTORY_ROLES pipeline order.
+ * Nodes are connected by directional arrows in the order they were spawned (pipeline stage order).
+ * Supports composite role keys (e.g. "coder-0", "coder-1") produced by Phase 2.5 multi-instance spawning.
  */
 export const FactoryFlowView: React.FC<FactoryFlowViewProps> = ({
   loops,
   selectedLoopKey,
   onSelectLoop,
+  onRestartLoop,
 }) => {
   // Force re-render every TICK_MS so the activity pulse stays up-to-date
   const [, setTick] = useState(0);
@@ -36,7 +49,7 @@ export const FactoryFlowView: React.FC<FactoryFlowViewProps> = ({
     return () => clearInterval(id);
   }, []);
 
-  // Build a map from role → loop for quick lookup
+  // Build a map from role → loop; Map preserves insertion order which equals pipeline spawn order.
   const loopByRole = new Map<string, LoopState>();
   for (const loop of loops) {
     if (loop.role) {
@@ -44,14 +57,14 @@ export const FactoryFlowView: React.FC<FactoryFlowViewProps> = ({
     }
   }
 
-  // Order nodes by the canonical pipeline order, filtering to roles that actually have loops
-  const orderedRoles = FACTORY_ROLES.filter((r) => loopByRole.has(r));
+  // Ordered roles in pipeline stage order (Map iteration order = insertion order).
+  const orderedRoles = [...loopByRole.keys()];
 
-  // Also include any non-standard roles that aren't in FACTORY_ROLES
-  for (const loop of loops) {
-    if (loop.role && !orderedRoles.includes(loop.role as FactoryRole)) {
-      orderedRoles.push(loop.role as FactoryRole);
-    }
+  // Count how many instances exist per stageId so multi-instance stages get numbered labels.
+  const stageCounts = new Map<string, number>();
+  for (const role of orderedRoles) {
+    const sid = stageIdFromRole(role);
+    stageCounts.set(sid, (stageCounts.get(sid) ?? 0) + 1);
   }
 
   if (orderedRoles.length === 0) return null;
@@ -74,10 +87,12 @@ export const FactoryFlowView: React.FC<FactoryFlowViewProps> = ({
               <FlowNode
                 role={role}
                 loop={loop}
+                stageCounts={stageCounts}
                 isSelected={isSelected}
                 isActive={isActive}
                 isRunning={isRunning}
                 onClick={() => onSelectLoop(loop)}
+                onRestart={onRestartLoop ? () => onRestartLoop(loop) : undefined}
               />
             </React.Fragment>
           );
@@ -99,21 +114,35 @@ const Arrow: React.FC = () => (
 interface FlowNodeProps {
   role: string;
   loop: LoopState;
+  /** Instance counts per stageId — used to decide whether to append an instance number to the label. */
+  stageCounts: Map<string, number>;
   isSelected: boolean;
   isActive: boolean;
   isRunning: boolean;
   onClick: () => void;
+  /** Optional: called when user clicks the restart button. */
+  onRestart?: () => void;
 }
 
 const FlowNode: React.FC<FlowNodeProps> = ({
   role,
   loop,
+  stageCounts,
   isSelected,
   isActive,
   isRunning,
   onClick,
+  onRestart,
 }) => {
-  const label = FACTORY_ROLE_LABELS[role as FactoryRole] ?? role;
+  const stageId = stageIdFromRole(role);
+  const instanceIndex = instanceIndexFromRole(role);
+  const baseLabel = stageId;
+  // Only append an instance number when multiple containers share the same stage.
+  const hasMultipleInstances = (stageCounts.get(stageId) ?? 0) > 1;
+  const label =
+    instanceIndex !== null && hasMultipleInstances
+      ? `${baseLabel} ${instanceIndex + 1}`
+      : baseLabel;
   const { borderColor, statusLabel, statusColor } = getStatusStyles(loop.status);
 
   return (
@@ -172,6 +201,20 @@ const FlowNode: React.FC<FlowNodeProps> = ({
           </span>
         )}
       </div>
+
+      {/* Restart button — only shown when a restart callback is provided */}
+      {onRestart && (
+        <button
+          title="Restart container"
+          onClick={(e) => {
+            e.stopPropagation();
+            onRestart();
+          }}
+          className="mt-2 px-2 py-0.5 rounded text-[10px] bg-gray-700 hover:bg-gray-600 text-gray-300 hover:text-white transition-colors"
+        >
+          ↺ restart
+        </button>
+      )}
     </button>
   );
 };

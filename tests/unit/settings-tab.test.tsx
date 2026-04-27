@@ -311,8 +311,8 @@ describe('SettingsTab', () => {
       const sectionButtons = screen.getAllByRole('button').filter(
         (btn) => btn.getAttribute('aria-expanded') !== null
       );
-      // We have 5 section headers
-      expect(sectionButtons).toHaveLength(5);
+      // We have 6 section headers (Credentials, Container Runtime, General, Pipelines, Updates, Orphaned Deploy Keys)
+      expect(sectionButtons).toHaveLength(6);
       sectionButtons.forEach((button) => {
         const svg = button.querySelector('svg');
         expect(svg).toBeInTheDocument();

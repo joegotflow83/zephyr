@@ -34,6 +34,7 @@ export const ProjectsTab: React.FC<ProjectsTabProps> = ({ onRunProject, toast })
   const updateLoop = useAppStore((state) => state.updateLoop);
   const vmInfos = useAppStore((state) => state.vmInfos);
   const multipassAvailable = useAppStore((state) => state.multipassAvailable);
+  const pipelines = useAppStore((state) => state.pipelines);
 
   // Dialog state
   const [dialogMode, setDialogMode] = useState<'add' | 'edit' | null>(null);
@@ -367,8 +368,11 @@ export const ProjectsTab: React.FC<ProjectsTabProps> = ({ onRunProject, toast })
         <RunModeDialog
           projectName={runModeProject.name}
           promptFiles={Object.keys(runModeProject.custom_prompts)}
-          factoryRoles={runModeProject.factory_config?.roles ?? []}
-          factoryEnabled={!!runModeProject.factory_config?.enabled}
+          factoryEnabled={
+            !!runModeProject.factory_config?.enabled &&
+            !!runModeProject.pipelineId &&
+            pipelines.some((p) => p.id === runModeProject.pipelineId)
+          }
           onConfirm={handleRunModeConfirm}
           onCancel={() => setRunModeProject(null)}
         />

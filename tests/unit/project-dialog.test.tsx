@@ -18,6 +18,7 @@ import userEvent from '@testing-library/user-event';
 import { ProjectDialog } from '../../src/renderer/components/ProjectDialog/ProjectDialog';
 import { createProjectConfig } from '../../src/shared/models';
 import type { ZephyrImage } from '../../src/shared/models';
+import type { Pipeline } from '../../src/shared/pipeline-types';
 import { useAppStore } from '../../src/renderer/stores/app-store';
 
 // --- Mock useImages hook ---
@@ -126,8 +127,8 @@ describe('ProjectDialog', () => {
       writable: true,
       configurable: true,
     });
-    // Reset store: multipassAvailable defaults to false
-    useAppStore.setState({ multipassAvailable: false });
+    // Reset store: multipassAvailable defaults to false, no pipelines by default
+    useAppStore.setState({ multipassAvailable: false, pipelines: [] });
   });
 
   describe('Add Mode', () => {
@@ -985,6 +986,193 @@ describe('ProjectDialog', () => {
       );
 
       expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    });
+  });
+
+  describe('Coding Factory', () => {
+    const mockPipeline: Pipeline = {
+      id: 'pipe-1',
+      name: 'Classic Factory',
+      description: 'PM, coder, QA',
+      stages: [
+        { id: 'coder', name: 'Coder', agentPrompt: '', instances: 1, icon: '💻', color: '#3b82f6' },
+        { id: 'qa', name: 'QA', agentPrompt: '', instances: 2 },
+      ],
+      bounceLimit: 3,
+      builtIn: true,
+      createdAt: '2026-01-01T00:00:00Z',
+      updatedAt: '2026-01-01T00:00:00Z',
+    };
+
+    const mockUserPipeline: Pipeline = {
+      id: 'pipe-2',
+      name: 'My Pipeline',
+      stages: [{ id: 'dev', name: 'Dev', agentPrompt: '', instances: 1 }],
+      bounceLimit: 3,
+      builtIn: false,
+      createdAt: '2026-01-01T00:00:00Z',
+      updatedAt: '2026-01-01T00:00:00Z',
+    };
+
+    it('does not show factory section body when toggle is off', () => {
+      render(<ProjectDialog mode="add" onSave={mockOnSave} onClose={mockOnClose} />);
+      expect(screen.queryByLabelText('Pipeline')).not.toBeInTheDocument();
+    });
+
+    it('shows factory section when Coding Factory toggle is enabled', async () => {
+      const user = userEvent.setup();
+      render(<ProjectDialog mode="add" onSave={mockOnSave} onClose={mockOnClose} />);
+
+      await user.click(screen.getByRole('checkbox', { name: /Coding Factory/i }));
+      expect(screen.getByText(/No pipelines available/i)).toBeInTheDocument();
+    });
+
+    it('shows pipeline select when pipelines exist', async () => {
+      const user = userEvent.setup();
+      useAppStore.setState({ pipelines: [mockPipeline] });
+      render(<ProjectDialog mode="add" onSave={mockOnSave} onClose={mockOnClose} />);
+
+      await user.click(screen.getByRole('checkbox', { name: /Coding Factory/i }));
+      expect(screen.getByRole('combobox', { name: /Pipeline/i })).toBeInTheDocument();
+      expect(screen.getByText('Classic Factory')).toBeInTheDocument();
+    });
+
+    it('groups built-in and user pipelines in select', async () => {
+      const user = userEvent.setup();
+      useAppStore.setState({ pipelines: [mockPipeline, mockUserPipeline] });
+      render(<ProjectDialog mode="add" onSave={mockOnSave} onClose={mockOnClose} />);
+
+      await user.click(screen.getByRole('checkbox', { name: /Coding Factory/i }));
+      const select = screen.getByRole('combobox', { name: /Pipeline/i });
+      const optgroups = select.querySelectorAll('optgroup');
+      expect(optgroups).toHaveLength(2);
+      expect(optgroups[0].label).toBe('Built-in');
+      expect(optgroups[1].label).toBe('Your Pipelines');
+    });
+
+    it('shows validation error when factory enabled but no pipeline selected', async () => {
+      const user = userEvent.setup();
+      useAppStore.setState({ pipelines: [mockPipeline] });
+      render(<ProjectDialog mode="add" onSave={mockOnSave} onClose={mockOnClose} />);
+
+      await user.type(screen.getByLabelText(/Project Name/i), 'Test Project');
+      await user.click(screen.getByRole('checkbox', { name: /Coding Factory/i }));
+      await user.click(screen.getByText('Create Project'));
+
+      expect(await screen.findByText('Please select a pipeline for the coding factory')).toBeInTheDocument();
+      expect(mockOnSave).not.toHaveBeenCalled();
+    });
+
+    it('saves pipelineId when a pipeline is selected', async () => {
+      const user = userEvent.setup();
+      useAppStore.setState({ pipelines: [mockPipeline] });
+      render(<ProjectDialog mode="add" onSave={mockOnSave} onClose={mockOnClose} />);
+
+      await user.type(screen.getByLabelText(/Project Name/i), 'Factory Project');
+      await user.click(screen.getByRole('checkbox', { name: /Coding Factory/i }));
+      await user.selectOptions(screen.getByRole('combobox', { name: /Pipeline/i }), 'pipe-1');
+      await user.click(screen.getByText('Create Project'));
+
+      await waitFor(() => {
+        expect(mockOnSave).toHaveBeenCalledWith(
+          expect.objectContaining({
+            pipelineId: 'pipe-1',
+            factory_config: expect.objectContaining({ enabled: true }),
+          })
+        );
+      });
+    });
+
+    it('shows stage chips preview when a pipeline is selected', async () => {
+      const user = userEvent.setup();
+      useAppStore.setState({ pipelines: [mockPipeline] });
+      render(<ProjectDialog mode="add" onSave={mockOnSave} onClose={mockOnClose} />);
+
+      await user.click(screen.getByRole('checkbox', { name: /Coding Factory/i }));
+      await user.selectOptions(screen.getByRole('combobox', { name: /Pipeline/i }), 'pipe-1');
+
+      expect(screen.getByText('Pipeline Stages')).toBeInTheDocument();
+      expect(screen.getByText('Backlog')).toBeInTheDocument();
+      expect(screen.getByText('Coder')).toBeInTheDocument();
+      expect(screen.getByText('QA')).toBeInTheDocument();
+      expect(screen.getByText('Done')).toBeInTheDocument();
+    });
+
+    it('shows instance count badge for multi-instance stages', async () => {
+      const user = userEvent.setup();
+      useAppStore.setState({ pipelines: [mockPipeline] });
+      render(<ProjectDialog mode="add" onSave={mockOnSave} onClose={mockOnClose} />);
+
+      await user.click(screen.getByRole('checkbox', { name: /Coding Factory/i }));
+      await user.selectOptions(screen.getByRole('combobox', { name: /Pipeline/i }), 'pipe-1');
+
+      expect(screen.getByText('×2')).toBeInTheDocument();
+    });
+
+    it('shows pipeline description below stage chips', async () => {
+      const user = userEvent.setup();
+      useAppStore.setState({ pipelines: [mockPipeline] });
+      render(<ProjectDialog mode="add" onSave={mockOnSave} onClose={mockOnClose} />);
+
+      await user.click(screen.getByRole('checkbox', { name: /Coding Factory/i }));
+      await user.selectOptions(screen.getByRole('combobox', { name: /Pipeline/i }), 'pipe-1');
+
+      expect(screen.getByText('PM, coder, QA')).toBeInTheDocument();
+    });
+
+    it('loads existing pipelineId in edit mode', async () => {
+      useAppStore.setState({ pipelines: [mockPipeline] });
+      const projectWithPipeline = createProjectConfig({
+        name: 'Factory Project',
+        factory_config: { enabled: true, roles: [] },
+        pipelineId: 'pipe-1',
+      });
+
+      render(
+        <ProjectDialog
+          mode="edit"
+          project={projectWithPipeline}
+          onSave={mockOnSave}
+          onClose={mockOnClose}
+        />
+      );
+
+      await waitFor(() => {
+        const select = screen.getByRole('combobox', { name: /Pipeline/i }) as HTMLSelectElement;
+        expect(select.value).toBe('pipe-1');
+      });
+    });
+
+    it('clears pipelineId when factory is disabled on save', async () => {
+      const user = userEvent.setup();
+      useAppStore.setState({ pipelines: [mockPipeline] });
+      const projectWithPipeline = createProjectConfig({
+        name: 'Factory Project',
+        factory_config: { enabled: true, roles: [] },
+        pipelineId: 'pipe-1',
+      });
+
+      render(
+        <ProjectDialog
+          mode="edit"
+          project={projectWithPipeline}
+          onSave={mockOnSave}
+          onClose={mockOnClose}
+        />
+      );
+
+      // Toggle factory off
+      await user.click(screen.getByRole('checkbox', { name: /Coding Factory/i }));
+      await user.click(screen.getByText('Save Changes'));
+
+      await waitFor(() => {
+        expect(mockOnSave).toHaveBeenCalledWith(
+          expect.objectContaining({
+            pipelineId: undefined,
+            factory_config: undefined,
+          })
+        );
+      });
     });
   });
 

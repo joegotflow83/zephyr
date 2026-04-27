@@ -12,6 +12,7 @@ You are building Zephyr Desktop — an Electron + React + TypeScript desktop app
 ## Key Commands
 - Build check: `node_modules/.bin/tsc --noEmit` (run `npm install` first if node_modules is missing)
 - Unit tests: `npm run test:unit`
+- Targeted tests (Vitest): `npm run test:unit -- tests/unit/<test-file>.test.tsx`
 - If unit tests fail with `@rollup/rollup-linux-x64-gnu` missing: run `npm install @rollup/rollup-linux-x64-gnu` once
 - Lint: `npm run lint`
 - Validate: `bash validate.sh` (runs lint + unit tests after Phase 1.8)

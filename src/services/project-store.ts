@@ -107,6 +107,43 @@ export class ProjectStore {
     return true;
   }
 
+  /**
+   * Clears `pipelineId` from every project that references the given pipeline.
+   *
+   * Called by the PIPELINE_REMOVE IPC handler immediately after a pipeline is
+   * deleted so projects no longer reference a non-existent pipeline. The
+   * renderer disables the Factory button for affected projects the moment
+   * PIPELINE_CHANGED broadcasts the updated pipeline list — the `pipelineId`
+   * check against the live pipeline list returns false even before the renderer
+   * re-fetches the project list.
+   *
+   * Performs a single batched write regardless of how many projects are
+   * affected. Skips the write entirely when no project references the id.
+   *
+   * @returns the number of projects whose pipelineId was cleared
+   */
+  clearDanglingPipelineId(pipelineId: string): number {
+    const projects = this.load();
+    let clearedCount = 0;
+
+    for (let i = 0; i < projects.length; i++) {
+      if (projects[i].pipelineId === pipelineId) {
+        projects[i] = {
+          ...projects[i],
+          pipelineId: undefined,
+          updated_at: new Date().toISOString(),
+        };
+        clearedCount++;
+      }
+    }
+
+    if (clearedCount > 0) {
+      this.save(projects);
+    }
+
+    return clearedCount;
+  }
+
   // ---------------------------------------------------------------------------
   // Private helpers
   // ---------------------------------------------------------------------------

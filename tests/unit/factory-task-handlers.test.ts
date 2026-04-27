@@ -48,6 +48,7 @@ function makeTask(overrides: Partial<FactoryTask> = {}): FactoryTask {
     description: 'A description',
     column: 'backlog',
     projectId: 'proj-1',
+    bounceCount: 0,
     createdAt: '2024-01-01T00:00:00.000Z',
     updatedAt: '2024-01-01T00:00:00.000Z',
     ...overrides,

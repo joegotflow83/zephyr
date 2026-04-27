@@ -5,6 +5,7 @@ import { ContainerRuntimeSection } from './ContainerRuntimeSection';
 import { GeneralSection } from './GeneralSection';
 import { UpdatesSection } from './UpdatesSection';
 import { OrphanedKeysSection } from './OrphanedKeysSection';
+import { PipelineLibrarySection } from './PipelineLibrarySection';
 
 interface SettingsSectionProps {
   title: string;
@@ -130,6 +131,14 @@ export const SettingsTab: React.FC = () => {
           description="Application preferences and appearance"
         >
           <GeneralSection />
+        </SettingsSection>
+
+        {/* Pipeline Library Section */}
+        <SettingsSection
+          title="Pipelines"
+          description="Manage pipeline templates for the coding factory"
+        >
+          <PipelineLibrarySection />
         </SettingsSection>
 
         {/* Updates Section */}

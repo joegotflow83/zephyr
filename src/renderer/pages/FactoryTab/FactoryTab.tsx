@@ -5,7 +5,7 @@ import { AddTaskForm } from './AddTaskForm';
 import { FactoryFlowView } from '../LoopsTab/FactoryFlowView';
 import { useFactoryTasks } from '../../hooks/useFactoryTasks';
 import { useAppStore } from '../../stores/app-store';
-import type { FactoryTask, FactoryColumn } from '../../../shared/factory-types';
+import type { FactoryTask } from '../../../shared/factory-types';
 import type { LoopState } from '../../../shared/loop-types';
 import { getLoopKey } from '../../../shared/loop-types';
 
@@ -36,8 +36,11 @@ export const FactoryTab: React.FC = () => {
     }
   }, [factoryProjects, selectedProjectId]);
 
-  const { tasks, loading, addTask, moveTask, removeTask, syncFromSpecs } =
-    useFactoryTasks(selectedProjectId);
+  const pipelineId =
+    factoryProjects.find((p) => p.id === selectedProjectId)?.pipelineId ?? null;
+
+  const { tasks, loading, pipeline, addTask, moveTask, removeTask, syncFromSpecs } =
+    useFactoryTasks(selectedProjectId, pipelineId);
 
   // On mount and project change, load tasks
   useEffect(() => {
@@ -65,7 +68,7 @@ export const FactoryTab: React.FC = () => {
     : [];
 
   const handleMoveTask = useCallback(
-    async (taskId: string, targetColumn: FactoryColumn) => {
+    async (taskId: string, targetColumn: string) => {
       const updated = await moveTask(taskId, targetColumn);
       // If the detail panel is open for this task, update it
       setSelectedTask((prev) => (prev?.id === taskId ? updated : prev));
@@ -156,6 +159,9 @@ export const FactoryTab: React.FC = () => {
             loops={projectLoops}
             selectedLoopKey={selectedLoopKey}
             onSelectLoop={(loop) => setSelectedLoopKey(getLoopKey(loop))}
+            onRestartLoop={(loop) => {
+              window.api.factory.restartContainer(loop.projectId, loop.role ?? '').catch(() => {});
+            }}
           />
         </div>
       )}
@@ -165,6 +171,7 @@ export const FactoryTab: React.FC = () => {
         {selectedProjectId ? (
           <KanbanBoard
             tasks={tasks}
+            pipeline={pipeline}
             onMoveTask={handleMoveTask}
             onRemoveTask={handleRemoveTask}
             onSelectTask={setSelectedTask}
@@ -191,6 +198,8 @@ export const FactoryTab: React.FC = () => {
       {selectedTask && (
         <TaskDetailPanel
           task={selectedTask}
+          pipeline={pipeline}
+          tasks={tasks}
           onClose={() => setSelectedTask(null)}
           onMove={async (taskId, targetColumn) => {
             await handleMoveTask(taskId, targetColumn);

@@ -25,8 +25,10 @@ import type { CredentialManager } from '../../services/credential-manager';
 import type { SSHKeyManager } from '../../services/ssh-key-manager';
 import type { DeployKeyStore } from '../../services/deploy-key-store';
 import type { LoopScriptsStore } from '../../services/loop-scripts-store';
+import type { FactoryTask } from '../../shared/factory-types';
 import type { FactoryTaskStore } from '../../services/factory-task-store';
-import { FORWARD_TRANSITIONS } from '../../shared/factory-types';
+import type { PipelineStore } from '../../services/pipeline-store';
+import { deriveTransitions } from '../../lib/pipeline/transitions';
 import { getLogger } from '../../services/logging';
 
 /**
@@ -64,42 +66,127 @@ exit 0
 `;
 
 /**
+ * Bash hook script injected into containers for factory mode loops.
+ * Runs as a PostToolUse hook: when the PM agent writes @task-decomposition.json,
+ * it writes a timestamp to @task-decomposition.requested so the host-side
+ * file watcher can create sub-tasks atomically without false-positives from
+ * unrelated writes.
+ */
+const TASK_DECOMPOSITION_HOOK_SCRIPT = `#!/bin/bash
+# Description: Signal host when agent writes @task-decomposition.json
+INPUT=$(cat)
+FILE_PATH=$(echo "$INPUT" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('tool_input',{}).get('file_path',''))" 2>/dev/null || echo "")
+if [[ "$FILE_PATH" == *"@task-decomposition.json"* ]]; then
+  date -u +"%Y-%m-%dT%H:%M:%SZ" > /workspace/@task-decomposition.requested
+fi
+exit 0
+`;
+
+/**
  * Instructions scaffolded into each factory workspace so agents know how to
  * signal task completion. Written as @TASK_STATUS_INSTRUCTIONS.md so it
  * appears alongside the other @ control files agents are already aware of.
  */
 const TASK_STATUS_INSTRUCTIONS = `# Task Status Instructions
 
-When you complete your assigned phase for a task, write the following JSON to
-\`/workspace/@task-status.json\`:
+Write \`/workspace/@task-status.json\` to signal task lifecycle events. The
+host detects every write via a PostToolUse hook; do not delete or rename
+the file.
+
+The \`taskId\` field is required and must match \`FactoryTask.id\` — title
+matching is no longer supported (two tasks can share a title).
+
+## Status values
+
+### \`forward\` — your stage is complete, advance to the next stage
+\`\`\`json
+{
+  "taskId": "<task id>",
+  "status": "forward",
+  "fromStage": "<your stage id>",
+  "timestamp": "<ISO 8601>"
+}
+\`\`\`
+The host derives the destination from the pipeline definition and clears
+\`lockedBy\` for you.
+
+### \`rejected\` — send the task back to an earlier stage
+\`\`\`json
+{
+  "taskId": "<task id>",
+  "status": "rejected",
+  "fromStage": "<your stage id>",
+  "toStage": "<earlier stage id>",
+  "timestamp": "<ISO 8601>"
+}
+\`\`\`
+\`toStage\` must be an earlier stage in the pipeline. The host increments
+\`bounceCount\`; once it reaches \`bounceLimit\` the task is escalated to
+Blocked instead. Always write a handover note at
+\`team/handovers/<taskId>-<fromStage>-to-<toStage>.md\` before signalling
+rejection so the receiving agent has context.
+
+### \`locked\` — claim a task before doing work
+\`\`\`json
+{
+  "taskId": "<task id>",
+  "status": "locked",
+  "lockId": "<stageId>-<instanceIndex>",
+  "timestamp": "<ISO 8601>"
+}
+\`\`\`
+\`lockId\` is your container identity (e.g. \`coder-0\`, \`qa-1\`). The host
+rejects the lock if another instance is already holding the task.
+
+### \`unlocked\` — release a claimed task without status change
+\`\`\`json
+{
+  "taskId": "<task id>",
+  "status": "unlocked",
+  "timestamp": "<ISO 8601>"
+}
+\`\`\`
+Use this when you abandon a task you previously locked but did not finish
+(e.g. you decided it belongs in a different stage). \`forward\` and
+\`rejected\` already release the lock automatically.
+`;
+
+/**
+ * Instructions scaffolded into each factory workspace so the PM agent knows
+ * how to break an epic into atomic sub-tasks. Written as
+ * @TASK_DECOMPOSITION_INSTRUCTIONS.md so it sits next to the other @ control
+ * files. The host watcher (Phase 2.8) reads any agent write to
+ * @task-decomposition.json, creates the sub-tasks atomically, and deletes the
+ * source file — so PM should treat each write as a fire-and-forget request.
+ */
+const TASK_DECOMPOSITION_INSTRUCTIONS = `# Task Decomposition Instructions
+
+Write \`/workspace/@task-decomposition.json\` to break a Backlog epic into
+atomic sub-tasks. The host detects every write via a PostToolUse hook,
+creates the sub-tasks in the first pipeline stage, marks the parent as an
+epic, and deletes this file. Treat each write as fire-and-forget — once the
+host processes it, the file disappears.
+
+## Schema
 
 \`\`\`json
 {
-  "task": "<exact task title>",
-  "status": "complete",
-  "role": "<your-role>",
-  "timestamp": "<current ISO 8601 timestamp>"
+  "action": "decompose",
+  "parentTaskId": "<epic task id>",
+  "tasks": [
+    { "title": "Atomic step 1", "description": "Detailed description" },
+    { "title": "Atomic step 2", "description": "Detailed description" }
+  ]
 }
 \`\`\`
 
-## Pipeline stages and roles
-
-Each factory role owns one stage. Writing this file advances the task to the next stage:
-
-| Your role    | Task advances from  | To             |
-|--------------|---------------------|----------------|
-| pm           | Ready (start)       | In Progress    |
-| coder        | In Progress         | Security Review|
-| security     | Security Review     | QA             |
-| qa           | QA                  | Documentation  |
-| documentation| Documentation       | Done           |
-
-## Important
-
-- Use the **exact task title** as it appears in the kanban board.
-- The \`role\` field must match your container role name (e.g. \`coder\`, \`qa\`).
-- Only signal completion when your phase work is fully done and committed.
-- The host detects this file via a PostToolUse hook — do not delete or rename it.
+- \`parentTaskId\` must reference an existing FactoryTask in Backlog. The host
+  flags it with \`isEpic: true\` so the kanban renders the epic progress
+  tracker; the parent stays in Backlog.
+- \`tasks\` must be a non-empty array. Each entry needs a non-empty title;
+  description may be empty.
+- The host rejects malformed payloads silently and leaves the file in place
+  for the next trigger to retry — fix the payload and re-write.
 `;
 
 /**
@@ -163,6 +250,580 @@ export function mergeTaskStatusHook(settingsContent: string): string {
   return JSON.stringify(settings, null, 2);
 }
 
+/**
+ * Merges the task-decomposition PostToolUse hook registration into a Claude
+ * settings.json string, returning the merged JSON. Safe to call on an
+ * empty string or invalid JSON (falls back to a minimal object).
+ * Idempotent — skips insertion if the hook command is already present.
+ */
+export function mergeTaskDecompositionHook(settingsContent: string): string {
+  let settings: Record<string, unknown> = {};
+  try {
+    settings = JSON.parse(settingsContent);
+  } catch { /* start from empty */ }
+
+  const hooks = (settings.hooks as Record<string, unknown[]> | undefined) ?? {};
+  const postToolUse = ((hooks.PostToolUse as unknown[]) ?? []) as Array<Record<string, unknown>>;
+
+  const hookCmd = 'bash ~/.claude/hooks/task-decomposition-notify.sh';
+  const alreadyPresent = postToolUse.some((entry) =>
+    (entry.hooks as Array<Record<string, unknown>>)?.some((h) => h.command === hookCmd)
+  );
+
+  if (!alreadyPresent) {
+    postToolUse.push({
+      matcher: 'Write|Edit|MultiEdit',
+      hooks: [{ type: 'command', command: hookCmd }],
+    });
+  }
+
+  settings.hooks = { ...hooks, PostToolUse: postToolUse };
+  return JSON.stringify(settings, null, 2);
+}
+
+/**
+ * Bash hook script injected into containers for factory mode loops.
+ * Runs as a PostToolUse hook: when any agent writes @supervisor-action.json,
+ * it writes a timestamp to @supervisor-action.requested so the host-side
+ * file watcher can process the action without false-positives from
+ * unrelated writes.
+ */
+const SUPERVISOR_ACTION_HOOK_SCRIPT = `#!/bin/bash
+# Description: Signal host when agent writes @supervisor-action.json
+INPUT=$(cat)
+FILE_PATH=$(echo "$INPUT" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('tool_input',{}).get('file_path',''))" 2>/dev/null || echo "")
+if [[ "$FILE_PATH" == *"@supervisor-action.json"* ]]; then
+  date -u +"%Y-%m-%dT%H:%M:%SZ" > /workspace/@supervisor-action.requested
+fi
+exit 0
+`;
+
+/**
+ * Merges the supervisor-action PostToolUse hook registration into a Claude
+ * settings.json string, returning the merged JSON. Safe to call on an
+ * empty string or invalid JSON (falls back to a minimal object).
+ * Idempotent — skips insertion if the hook command is already present.
+ */
+export function mergeSupervisorActionHook(settingsContent: string): string {
+  let settings: Record<string, unknown> = {};
+  try {
+    settings = JSON.parse(settingsContent);
+  } catch { /* start from empty */ }
+
+  const hooks = (settings.hooks as Record<string, unknown[]> | undefined) ?? {};
+  const postToolUse = ((hooks.PostToolUse as unknown[]) ?? []) as Array<Record<string, unknown>>;
+
+  const hookCmd = 'bash ~/.claude/hooks/supervisor-action-notify.sh';
+  const alreadyPresent = postToolUse.some((entry) =>
+    (entry.hooks as Array<Record<string, unknown>>)?.some((h) => h.command === hookCmd)
+  );
+
+  if (!alreadyPresent) {
+    postToolUse.push({
+      matcher: 'Write|Edit|MultiEdit',
+      hooks: [{ type: 'command', command: hookCmd }],
+    });
+  }
+
+  settings.hooks = { ...hooks, PostToolUse: postToolUse };
+  return JSON.stringify(settings, null, 2);
+}
+
+/**
+ * Schema for the contents of `/workspace/@task-status.json` — the file that
+ * agents write to signal task lifecycle events to the host. Each write fires
+ * the PostToolUse hook (which timestamps `@task-status.requested`); the host
+ * watcher then reads this file and dispatches via `processTaskStatusUpdate`.
+ *
+ * Design note: `taskId` (not title) is the canonical lookup key. Title-based
+ * lookup was the legacy path and is brittle when two tasks share a title
+ * (cross-cutting risk #2 in IMPLEMENTATION_PLAN.md). The schema break is
+ * intentional — agents write the new format starting in Phase 2.7.
+ */
+export interface TaskStatusUpdate {
+  /** FactoryTask.id — required for lookup. */
+  taskId: string;
+  /** Lifecycle event:
+   *  - 'forward'  — agent finished its stage; host advances to `forward[col]`.
+   *  - 'rejected' — agent sends task back; `toStage` required (earlier stage).
+   *  - 'locked'   — agent claims the task; `lockId` required.
+   *  - 'unlocked' — agent releases the task without a status change.
+   */
+  status: 'forward' | 'rejected' | 'locked' | 'unlocked';
+  /** Agent's current stage. Informational only — host derives target from
+   *  task.column to avoid trusting agent-supplied origin claims. */
+  fromStage?: string;
+  /** Required for `rejected`. Must be an earlier stage; the actual transition
+   *  validity is enforced by `FactoryTaskStore.moveTask`. */
+  toStage?: string;
+  /** Required for `locked`. Format: `<stageId>-<instanceIndex>` (e.g.
+   *  `coder-0`). Same string the host writes into `task.lockedBy`. */
+  lockId?: string;
+}
+
+/**
+ * Dependencies for `processTaskStatusUpdate`. Kept narrow so unit tests can
+ * pass plain stubs without booting the full service graph.
+ */
+export interface TaskStatusUpdateDeps {
+  factoryTaskStore: FactoryTaskStore;
+  /** Required to resolve the project's pipeline for `forward` advances. */
+  projectStore?: { getProject: (id: string) => ProjectConfig | null };
+  /** Required to resolve the pipeline definition for `forward` advances. */
+  pipelineStore?: PipelineStore;
+}
+
+/**
+ * Write a PM-addressed handover file when the host redirects a task to the
+ * Blocked column after the pipeline bounce limit is exhausted.
+ *
+ * Why host-written (not agent-written): the host overrides the agent's
+ * requested destination, so the agent never learns the task went to Blocked —
+ * it needs an out-of-band signal. Writing to `team/handovers/<taskId>-host-to-pm.md`
+ * puts the context directly in the PM's workspace so it can escalate via
+ * `@human_clarification.md` without any additional IPC round-trips.
+ *
+ * Errors are caught and logged; a failed handover write must not prevent the
+ * task move from being acknowledged (the task IS in Blocked even if the file
+ * wasn't written — the move already succeeded before this is called).
+ */
+function writeBlockedEscalationHandover(
+  projectId: string,
+  task: FactoryTask,
+  requestedStage: string,
+  deps: TaskStatusUpdateDeps,
+  logger: ReturnType<typeof getLogger>,
+): void {
+  if (!deps.projectStore || !deps.pipelineStore) {
+    logger.warn('task-status: blocked escalation handover skipped — missing projectStore/pipelineStore', {
+      projectId,
+      taskId: task.id,
+    });
+    return;
+  }
+
+  const project = deps.projectStore.getProject(projectId);
+  if (!project?.local_path) {
+    logger.warn('task-status: blocked escalation handover skipped — project has no local_path', {
+      projectId,
+      taskId: task.id,
+    });
+    return;
+  }
+
+  const pipeline = project.pipelineId
+    ? deps.pipelineStore.getPipeline(project.pipelineId)
+    : null;
+  const bounceLimit = pipeline?.bounceLimit ?? 3;
+  const requestedStageName =
+    pipeline?.stages.find((s) => s.id === requestedStage)?.name ?? requestedStage;
+
+  const handoverDir = path.join(project.local_path, 'team', 'handovers');
+  const handoverPath = path.join(handoverDir, `${task.id}-host-to-pm.md`);
+
+  const content = [
+    `# Blocked Escalation: ${task.title}`,
+    '',
+    '## Summary',
+    '',
+    `Task **${task.title}** has been automatically moved to the **Blocked** column`,
+    `after reaching the pipeline bounce limit of **${bounceLimit}** rejection(s).`,
+    '',
+    '## Details',
+    '',
+    `- **Task ID:** ${task.id}`,
+    `- **Bounce Count:** ${task.bounceCount}`,
+    `- **Bounce Limit:** ${bounceLimit}`,
+    `- **Last Requested Stage:** ${requestedStageName}`,
+    '',
+    '## Action Required',
+    '',
+    'As the PM, please take one of the following actions:',
+    '',
+    '1. **Escalate to human:** Add a clear question to `@human_clarification.md`',
+    '   describing the ambiguity or conflict causing repeated rejections.',
+    '',
+    '2. **Revise the task:** If the task description is incomplete or contradictory,',
+    '   update it and move the task back to the appropriate pipeline stage.',
+    '',
+    '3. **Decompose the task:** If the task is too complex, break it into smaller',
+    '   sub-tasks using `@task-decomposition.json`.',
+    '',
+    `_Generated by the host on ${new Date().toISOString()}._`,
+  ].join('\n');
+
+  try {
+    fsSync.mkdirSync(handoverDir, { recursive: true });
+    fsSync.writeFileSync(handoverPath, content, { encoding: 'utf8', mode: 0o777 });
+    logger.info('task-status: blocked escalation handover written', {
+      projectId,
+      taskId: task.id,
+      path: handoverPath,
+    });
+  } catch (err) {
+    logger.warn('task-status: failed to write blocked escalation handover', {
+      projectId,
+      taskId: task.id,
+      err,
+    });
+  }
+}
+
+/**
+ * Parse-and-dispatch entry point for `@task-status.json` watcher updates.
+ *
+ * Returns `true` when the queue was mutated, so the watcher knows to broadcast
+ * `FACTORY_TASK_CHANGED`. All error paths log and return `false` rather than
+ * throwing — agents may legitimately write malformed JSON, an unknown taskId,
+ * or an invalid transition; none of these should crash the host or stop the
+ * watcher. The next legitimate write triggers a fresh dispatch.
+ */
+export function processTaskStatusUpdate(
+  projectId: string,
+  raw: unknown,
+  deps: TaskStatusUpdateDeps,
+): boolean {
+  const logger = getLogger('loop');
+
+  if (!raw || typeof raw !== 'object') {
+    logger.warn('task-status: payload is not an object', { projectId });
+    return false;
+  }
+  const data = raw as Partial<TaskStatusUpdate>;
+
+  if (!data.taskId || typeof data.taskId !== 'string') {
+    logger.warn('task-status: missing or invalid taskId', { projectId });
+    return false;
+  }
+  if (!data.status) {
+    logger.warn('task-status: missing status', { projectId, taskId: data.taskId });
+    return false;
+  }
+
+  const task = deps.factoryTaskStore.getTask(projectId, data.taskId);
+  if (!task) {
+    logger.warn('task-status: unknown taskId', { projectId, taskId: data.taskId });
+    return false;
+  }
+
+  try {
+    switch (data.status) {
+      case 'forward': {
+        if (!deps.projectStore || !deps.pipelineStore) {
+          logger.warn('task-status: forward dispatch requires projectStore + pipelineStore', {
+            projectId,
+            taskId: task.id,
+          });
+          return false;
+        }
+        const project = deps.projectStore.getProject(projectId);
+        if (!project?.pipelineId) {
+          logger.warn('task-status: forward but project has no pipelineId', { projectId });
+          return false;
+        }
+        const pipeline = deps.pipelineStore.getPipeline(project.pipelineId);
+        if (!pipeline) {
+          logger.warn('task-status: forward but pipeline not found', {
+            projectId,
+            pipelineId: project.pipelineId,
+          });
+          return false;
+        }
+        const next = deriveTransitions(pipeline).forward[task.column];
+        if (!next) {
+          // Already at terminal column ('done' or 'blocked'). Not an error —
+          // PM may legitimately re-signal a completed task.
+          return false;
+        }
+        deps.factoryTaskStore.moveTask(projectId, task.id, next);
+        return true;
+      }
+
+      case 'rejected': {
+        if (!data.toStage || typeof data.toStage !== 'string') {
+          logger.warn('task-status: rejected requires toStage', {
+            projectId,
+            taskId: task.id,
+          });
+          return false;
+        }
+        // Spec §Rejection: "toStage can be any earlier stage ID" — agents may
+        // skip intermediate stages (e.g. qa → pm) to avoid accumulating extra
+        // bounces on stages that would just forward the task anyway. Pass
+        // agentRejection:true to bypass the kanban adjacency constraint while
+        // still enforcing bounce counting and Blocked escalation.
+        const movedTask = deps.factoryTaskStore.moveTask(projectId, task.id, data.toStage, { agentRejection: true });
+        // Phase 2.10: when the host overrode the destination to 'blocked'
+        // (bounce limit exceeded), write a PM-addressed handover. The guard
+        // `data.toStage !== 'blocked'` distinguishes a host redirect (agent
+        // asked for an earlier stage but was overridden) from an explicit
+        // agent escalation — only the host redirect warrants the handover.
+        if (movedTask?.column === 'blocked' && data.toStage !== 'blocked') {
+          writeBlockedEscalationHandover(projectId, movedTask, data.toStage, deps, logger);
+        }
+        return true;
+      }
+
+      case 'locked': {
+        if (!data.lockId || typeof data.lockId !== 'string') {
+          logger.warn('task-status: locked requires lockId', {
+            projectId,
+            taskId: task.id,
+          });
+          return false;
+        }
+        deps.factoryTaskStore.lockTask(projectId, task.id, data.lockId);
+        return true;
+      }
+
+      case 'unlocked': {
+        deps.factoryTaskStore.unlockTask(projectId, task.id);
+        return true;
+      }
+
+      default: {
+        logger.warn('task-status: unknown status value', {
+          projectId,
+          taskId: task.id,
+          status: (data as { status: unknown }).status,
+        });
+        return false;
+      }
+    }
+  } catch (err) {
+    logger.warn('task-status: store rejected update', {
+      projectId,
+      taskId: task.id,
+      status: data.status,
+      err,
+    });
+    return false;
+  }
+}
+
+/**
+ * Schema for the contents of `/workspace/@task-decomposition.json` — the file
+ * the PM agent writes to break an epic into atomic sub-tasks. Each write fires
+ * the PostToolUse hook (Phase 2.13) which timestamps
+ * `@task-decomposition.requested`; the host watcher then reads this file,
+ * dispatches via `processTaskDecomposition`, and on success deletes the file
+ * (its presence on disk is the canonical "decomposition pending" signal —
+ * deletion guarantees idempotency without a separate processed-id ledger).
+ */
+export interface TaskDecomposition {
+  /** Required discriminator. Future actions may extend the schema; current
+   *  dispatcher only accepts `'decompose'`. */
+  action: 'decompose';
+  /** FactoryTask.id of the epic being decomposed. */
+  parentTaskId: string;
+  /** Atomic sub-tasks. Each must have a non-empty title; description may be
+   *  empty. The dispatcher rejects empty arrays — a no-op decomposition has
+   *  no useful semantics and would only flag the parent as epic without
+   *  giving it any children to track. */
+  tasks: Array<{ title: string; description: string }>;
+}
+
+/**
+ * Dependencies for `processTaskDecomposition`. The pipeline lookup is
+ * required (children land in the first pipeline stage column, which is only
+ * resolvable via the project's pipelineId), so unlike `TaskStatusUpdateDeps`
+ * none of these are optional — passing an incomplete deps object is a
+ * configuration bug, not a runtime case.
+ */
+export interface TaskDecompositionDeps {
+  factoryTaskStore: FactoryTaskStore;
+  projectStore: { getProject: (id: string) => ProjectConfig | null };
+  pipelineStore: PipelineStore;
+}
+
+/**
+ * Parse-and-dispatch entry point for `@task-decomposition.json` watcher
+ * updates.
+ *
+ * Returns `true` only when the queue was mutated (sub-tasks created + parent
+ * flagged as epic), so the watcher knows to delete the source file and
+ * broadcast `FACTORY_TASK_CHANGED`. All error paths log and return `false`
+ * rather than throwing — the PM agent may legitimately write malformed JSON,
+ * an unknown parentTaskId, or a payload before the project's pipeline is
+ * configured; none should crash the host or stop the watcher. Returning
+ * `false` keeps the file on disk so the next legitimate trigger retries.
+ *
+ * Validation order is cheap-first: payload shape → pipeline resolution →
+ * parent existence. The expensive parent lookup runs last so a steady stream
+ * of malformed payloads doesn't thrash the task store.
+ */
+export function processTaskDecomposition(
+  projectId: string,
+  raw: unknown,
+  deps: TaskDecompositionDeps,
+): boolean {
+  const logger = getLogger('loop');
+
+  if (!raw || typeof raw !== 'object') {
+    logger.warn('task-decomposition: payload is not an object', { projectId });
+    return false;
+  }
+  const data = raw as Partial<TaskDecomposition>;
+
+  if (data.action !== 'decompose') {
+    logger.warn('task-decomposition: action must be "decompose"', {
+      projectId,
+      action: (data as { action?: unknown }).action,
+    });
+    return false;
+  }
+  if (!data.parentTaskId || typeof data.parentTaskId !== 'string') {
+    logger.warn('task-decomposition: missing or invalid parentTaskId', { projectId });
+    return false;
+  }
+  if (!Array.isArray(data.tasks) || data.tasks.length === 0) {
+    logger.warn('task-decomposition: tasks must be a non-empty array', {
+      projectId,
+      parentTaskId: data.parentTaskId,
+    });
+    return false;
+  }
+  for (const child of data.tasks) {
+    if (
+      !child ||
+      typeof child !== 'object' ||
+      typeof (child as { title?: unknown }).title !== 'string' ||
+      !(child as { title: string }).title.trim() ||
+      typeof (child as { description?: unknown }).description !== 'string'
+    ) {
+      logger.warn('task-decomposition: each task must have a non-empty title and string description', {
+        projectId,
+        parentTaskId: data.parentTaskId,
+      });
+      return false;
+    }
+  }
+
+  const project = deps.projectStore.getProject(projectId);
+  if (!project?.pipelineId) {
+    logger.warn('task-decomposition: project has no pipelineId', { projectId });
+    return false;
+  }
+  const pipeline = deps.pipelineStore.getPipeline(project.pipelineId);
+  if (!pipeline) {
+    logger.warn('task-decomposition: pipeline not found', {
+      projectId,
+      pipelineId: project.pipelineId,
+    });
+    return false;
+  }
+  if (pipeline.stages.length === 0) {
+    logger.warn('task-decomposition: pipeline has no stages', {
+      projectId,
+      pipelineId: pipeline.id,
+    });
+    return false;
+  }
+  const firstStageColumn = pipeline.stages[0].id;
+
+  const parent = deps.factoryTaskStore.getTask(projectId, data.parentTaskId);
+  if (!parent) {
+    logger.warn('task-decomposition: unknown parentTaskId', {
+      projectId,
+      parentTaskId: data.parentTaskId,
+    });
+    return false;
+  }
+
+  try {
+    deps.factoryTaskStore.decomposeTask(
+      projectId,
+      data.parentTaskId,
+      firstStageColumn,
+      data.tasks,
+    );
+    return true;
+  } catch (err) {
+    logger.warn('task-decomposition: store rejected decomposition', {
+      projectId,
+      parentTaskId: data.parentTaskId,
+      err,
+    });
+    return false;
+  }
+}
+
+/**
+ * Dependencies for `processSupervisorAction`. Kept narrow for unit testability.
+ */
+export interface SupervisorActionDeps {
+  loopRunner: LoopRunner;
+  /** Map of loopKey → original LoopStartOpts, populated by startLoopCore. */
+  loopOptsMap: Map<string, LoopStartOpts>;
+  /**
+   * Callback that stops then restarts a container with the given opts.
+   * In production this is bound to startLoopCore; in tests it is a mock.
+   */
+  restartLoop: (opts: LoopStartOpts) => Promise<LoopState>;
+}
+
+/**
+ * Parse-and-dispatch entry point for `@supervisor-action.json` watcher updates.
+ *
+ * Currently supports a single action — `restart` — which stops the target
+ * container and restarts it with the same opts that were used to launch it.
+ * Stored opts are keyed by `getLoopKey(projectId, targetRole)` and populated
+ * whenever `startLoopCore` is called.
+ *
+ * Returns `true` when a container restart was initiated.
+ */
+export async function processSupervisorAction(
+  projectId: string,
+  data: unknown,
+  deps: SupervisorActionDeps,
+): Promise<boolean> {
+  const logger = getLogger('loop');
+  if (!data || typeof data !== 'object') {
+    logger.warn('supervisor-action: payload is not an object', { projectId });
+    return false;
+  }
+
+  const d = data as Record<string, unknown>;
+
+  if (d.action !== 'restart') {
+    logger.warn('supervisor-action: unsupported action', { projectId, action: d.action });
+    return false;
+  }
+
+  const targetRole = d.targetRole;
+  if (typeof targetRole !== 'string' || !targetRole) {
+    logger.warn('supervisor-action: missing or invalid targetRole', { projectId });
+    return false;
+  }
+
+  const loopKey = getLoopKey(projectId, targetRole);
+  const opts = deps.loopOptsMap.get(loopKey);
+  if (!opts) {
+    logger.warn('supervisor-action: no stored opts for loop key, cannot restart', {
+      projectId,
+      targetRole,
+    });
+    return false;
+  }
+
+  const reason = typeof d.reason === 'string' ? d.reason : undefined;
+  logger.info('supervisor-action: restarting container', { projectId, targetRole, reason });
+
+  try {
+    await deps.loopRunner.stopLoop(projectId, targetRole);
+  } catch {
+    // Container may already be stopped or failed — proceed to restart anyway.
+  }
+
+  try {
+    await deps.restartLoop(opts);
+    return true;
+  } catch (err) {
+    logger.warn('supervisor-action: failed to restart container', { projectId, targetRole, err });
+    return false;
+  }
+}
+
 export interface LoopServices {
   loopRunner: LoopRunner;
   scheduler: LoopScheduler;
@@ -180,6 +841,7 @@ export interface LoopServices {
   loopScriptsStore?: LoopScriptsStore;
   configManager?: ConfigManager;
   factoryTaskStore?: FactoryTaskStore;
+  pipelineStore?: PipelineStore;
 }
 
 export function registerLoopHandlers(services: LoopServices): void {
@@ -200,6 +862,7 @@ export function registerLoopHandlers(services: LoopServices): void {
     loopScriptsStore,
     configManager,
     factoryTaskStore,
+    pipelineStore,
   } = services;
 
   const logger = getLogger('loop');
@@ -215,6 +878,10 @@ export function registerLoopHandlers(services: LoopServices): void {
   // Maps loopKey -> deploy key info for cleanup on loop termination.
   const activeDeployKeys = new Map<string, { keyId: number; repoUrl: string; pat: string; service: 'github' | 'gitlab' }>();
 
+  // Maps loopKey → raw LoopStartOpts (before auth injection) so FACTORY_RESTART_CONTAINER
+  // and the @supervisor-action.json watcher can restart a container with identical opts.
+  const loopOptsMap = new Map<string, LoopStartOpts>();
+
   // ── Loop lifecycle ────────────────────────────────────────────────────────
 
   /**
@@ -223,6 +890,10 @@ export function registerLoopHandlers(services: LoopServices): void {
    * FACTORY_START handlers.
    */
   async function startLoopCore(rawOpts: LoopStartOpts): Promise<LoopState> {
+      // Store raw opts keyed by loopKey before any mutation so restart can replay them.
+      const startLoopKey = getLoopKey(rawOpts.projectId, rawOpts.role);
+      loopOptsMap.set(startLoopKey, rawOpts);
+
       let opts = rawOpts;
       const project = projectStore?.getProject(opts.projectId) ?? null;
 
@@ -353,6 +1024,32 @@ export function registerLoopHandlers(services: LoopServices): void {
                 await fs.writeFile(path.join(claudeDir, 'hooks', 'task-status-notify.sh'), TASK_STATUS_HOOK_SCRIPT, { mode: 0o755 });
               } catch (err) {
                 logger.warn('Failed to inject task-status notify hook for .claude mount', { err });
+              }
+            }
+
+            // Inject the built-in task-decomposition notify hook for factory-enabled workspace-backed loops.
+            // Only factory projects need this hook — it triggers PM epic decomposition when agents write
+            // @task-decomposition.json.
+            if (project.local_path && project.factory_config?.enabled) {
+              try {
+                const existingSettings = await fs.readFile(path.join(claudeDir, 'settings.json'), 'utf8').catch(() => '{"autoUpdaterStatus":"disabled","hasCompletedOnboarding":true}');
+                await fs.writeFile(path.join(claudeDir, 'settings.json'), mergeTaskDecompositionHook(existingSettings), 'utf8');
+                await fs.writeFile(path.join(claudeDir, 'hooks', 'task-decomposition-notify.sh'), TASK_DECOMPOSITION_HOOK_SCRIPT, { mode: 0o755 });
+              } catch (err) {
+                logger.warn('Failed to inject task-decomposition notify hook for .claude mount', { err });
+              }
+            }
+
+            // Inject the supervisor-action notify hook for factory-enabled workspace-backed loops.
+            // Any container (including a future dedicated supervisor) can write @supervisor-action.json
+            // to trigger host-side container restarts.
+            if (project.local_path && project.factory_config?.enabled) {
+              try {
+                const existingSettings = await fs.readFile(path.join(claudeDir, 'settings.json'), 'utf8').catch(() => '{"autoUpdaterStatus":"disabled","hasCompletedOnboarding":true}');
+                await fs.writeFile(path.join(claudeDir, 'settings.json'), mergeSupervisorActionHook(existingSettings), 'utf8');
+                await fs.writeFile(path.join(claudeDir, 'hooks', 'supervisor-action-notify.sh'), SUPERVISOR_ACTION_HOOK_SCRIPT, { mode: 0o755 });
+              } catch (err) {
+                logger.warn('Failed to inject supervisor-action notify hook for .claude mount', { err });
               }
             }
 
@@ -783,8 +1480,9 @@ export function registerLoopHandlers(services: LoopServices): void {
         }
       }
 
-      // Inject built-in task-status notify hook for factory-enabled workspace-backed continuous loops.
-      // Re-derives baseSettings and applies both hooks so neither is overwritten (both merges are idempotent).
+      // Inject built-in task-status, task-decomposition, and supervisor-action notify hooks
+      // for factory-enabled workspace-backed continuous loops. Re-derives baseSettings and
+      // applies all hooks so none overwrite each other (all merges are idempotent).
       if (project?.local_path && project.factory_config?.enabled && state.containerId && runtime && opts.mode !== LoopMode.SINGLE) {
         try {
           const taskHookEncoded = Buffer.from(TASK_STATUS_HOOK_SCRIPT).toString('base64');
@@ -792,17 +1490,27 @@ export function registerLoopHandlers(services: LoopServices): void {
             'sh', '-c',
             `printf '%s' '${taskHookEncoded}' | base64 -d > ~/.claude/hooks/task-status-notify.sh && chmod +x ~/.claude/hooks/task-status-notify.sh`,
           ]);
-          // Merge both hooks into settings so neither overwrites the other.
+          const decompHookEncoded = Buffer.from(TASK_DECOMPOSITION_HOOK_SCRIPT).toString('base64');
+          await runtime.execCommand(state.containerId, [
+            'sh', '-c',
+            `printf '%s' '${decompHookEncoded}' | base64 -d > ~/.claude/hooks/task-decomposition-notify.sh && chmod +x ~/.claude/hooks/task-decomposition-notify.sh`,
+          ]);
+          const supervisorHookEncoded = Buffer.from(SUPERVISOR_ACTION_HOOK_SCRIPT).toString('base64');
+          await runtime.execCommand(state.containerId, [
+            'sh', '-c',
+            `printf '%s' '${supervisorHookEncoded}' | base64 -d > ~/.claude/hooks/supervisor-action-notify.sh && chmod +x ~/.claude/hooks/supervisor-action-notify.sh`,
+          ]);
+          // Merge all four hooks into settings so none overwrites the others.
           const baseSettings = project.claude_settings_file && claudeSettingsStore
             ? (await claudeSettingsStore.getFile(project.claude_settings_file) ?? '{"autoUpdaterStatus":"disabled","hasCompletedOnboarding":true}')
             : '{"autoUpdaterStatus":"disabled","hasCompletedOnboarding":true}';
-          const settingsEncoded = Buffer.from(mergeTaskStatusHook(mergeClarificationHook(baseSettings))).toString('base64');
+          const settingsEncoded = Buffer.from(mergeSupervisorActionHook(mergeTaskDecompositionHook(mergeTaskStatusHook(mergeClarificationHook(baseSettings))))).toString('base64');
           await runtime.execCommand(state.containerId, [
             'sh', '-c',
             `printf '%s' '${settingsEncoded}' | base64 -d > ~/.claude/settings.json`,
           ]);
         } catch (err) {
-          logger.warn('Failed to inject task-status notify hook into container', { err });
+          logger.warn('Failed to inject task-status/task-decomposition/supervisor-action notify hooks into container', { err });
         }
       }
 
@@ -1027,9 +1735,36 @@ export function registerLoopHandlers(services: LoopServices): void {
       '@task-status.json': '{}',
       '@task-status.requested': '',
       '@TASK_STATUS_INSTRUCTIONS.md': TASK_STATUS_INSTRUCTIONS,
-      'team/handovers/coder_to_security.md': '# Coder to Security Handover\n\nDocument code changes that need security review.\n',
-      'team/handovers/security_to_qa.md': '# Security to QA Handover\n\nDocument security findings and items cleared for QA testing.\n',
-      'team/handovers/qa_feedback.md': '# QA Feedback\n\nDocument test results, bugs found, and items that need rework.\n',
+      // @task-decomposition.json is intentionally NOT pre-created — its
+      // presence on disk signals "decomposition pending" to the host watcher.
+      // Pre-creating it would force the watcher to interpret an empty file as
+      // a malformed decomposition on every factory start.
+      '@task-decomposition.requested': '',
+      '@TASK_DECOMPOSITION_INSTRUCTIONS.md': TASK_DECOMPOSITION_INSTRUCTIONS,
+      // @supervisor-action.json is not pre-created — its presence means "action pending".
+      '@supervisor-action.requested': '',
+      'team/handovers/README.md': [
+        '# Team Handovers',
+        '',
+        'This directory holds dynamic handover files written by agents and the host as tasks move through pipeline stages.',
+        '',
+        '## Naming convention',
+        '',
+        '- Agent-to-agent: `<taskId>-<fromStage>-to-<toStage>.md`',
+        '  Example: `task-abc123-coder-to-security.md`',
+        '- Host-to-PM (bounce escalation): `<taskId>-host-to-pm.md`',
+        '  Example: `task-abc123-host-to-pm.md`',
+        '',
+        '## Protocol',
+        '',
+        '1. When completing a stage, the outgoing agent writes a handover file describing work done,',
+        '   open questions, and any context the next stage needs.',
+        '2. The receiving agent reads the handover file at the start of its turn.',
+        '3. Host-to-PM handovers are written automatically when a task exceeds its bounce limit',
+        '   and is redirected to Blocked. The PM reads it and decides whether to escalate to',
+        '   a human (via `@human_clarification.md`), revise the task spec, or decompose it.',
+        '4. Files are gitignored — they are ephemeral per-run coordination artifacts.',
+      ].join('\n') + '\n',
       'team/handovers/status.log': '',
       'team/complete.flag': '',
       '.gitignore': [
@@ -1043,6 +1778,10 @@ export function registerLoopHandlers(services: LoopServices): void {
         'team/human_*.md',
         '@task-status.json',
         '@task-status.requested',
+        '@task-decomposition.json',
+        '@task-decomposition.requested',
+        '@supervisor-action.json',
+        '@supervisor-action.requested',
       ].join('\n') + '\n',
     };
 
@@ -1070,9 +1809,25 @@ export function registerLoopHandlers(services: LoopServices): void {
         throw new Error(`Project ${projectId} not found`);
       }
 
-      const factoryConfig = project.factory_config;
-      if (!factoryConfig?.enabled || !factoryConfig.roles.length) {
-        throw new Error('Factory mode is not enabled or has no roles configured for this project');
+      if (!project.factory_config?.enabled) {
+        throw new Error('Factory mode is not enabled for this project');
+      }
+
+      // Pipeline-driven factory: every project must reference a pipeline. The
+      // legacy hardcoded-roles fallback is removed; if no pipeline is assigned
+      // we refuse rather than silently doing nothing (Phase 2.6 contract).
+      if (!project.pipelineId) {
+        throw new Error(`No pipeline assigned to project ${projectId}`);
+      }
+      if (!pipelineStore) {
+        throw new Error('PipelineStore unavailable; cannot resolve project pipeline');
+      }
+      const pipeline = pipelineStore.getPipeline(project.pipelineId);
+      if (!pipeline) {
+        throw new Error(`Pipeline ${project.pipelineId} not found for project ${projectId}`);
+      }
+      if (pipeline.stages.length === 0) {
+        throw new Error(`Pipeline ${pipeline.id} has no stages`);
       }
 
       // Scaffold team coordination files in the workspace
@@ -1083,42 +1838,75 @@ export function registerLoopHandlers(services: LoopServices): void {
         } catch (err) {
           logger.warn('Failed to scaffold team files', { err, projectId });
         }
+
+        // Write each stage's agentPrompt to /workspace/PROMPT_<stageId>.md so
+        // the agent CMD (or loop script) can read it at runtime. Pipelines are
+        // the single source of truth for prompts now; the legacy
+        // project.custom_prompts files are no longer authoritative for factory
+        // runs but still get injected by startLoopCore for parity.
+        for (const stage of pipeline.stages) {
+          try {
+            const promptPath = path.join(project.local_path, `PROMPT_${stage.id}.md`);
+            await fs.writeFile(promptPath, stage.agentPrompt, { encoding: 'utf8', mode: 0o644 });
+          } catch (err) {
+            logger.warn(`Failed to write PROMPT_${stage.id}.md to local_path`, { err, projectId });
+          }
+        }
+      } else {
+        logger.warn(
+          'Project has no local_path; pipeline prompts cannot be written to /workspace and agents will fail to read them',
+          { projectId },
+        );
       }
 
-      // Start one loop per configured role.
-      // Each role gets its own prompt if one exists with the naming convention PROMPT_<role>.md.
-      // In SINGLE mode, build a per-role CMD that runs the agent against the role's prompt file
-      // with a MAX_ITERATIONS cap passed via --max-turns.
+      // Spawn one container per (stage, instanceIndex). Default instances=1.
+      // Container role is the composite key "<stageId>-<instanceIndex>" so the
+      // existing LoopRunner naming (`zephyr-<safeName>-<role>`) yields
+      // `zephyr-<safeName>-<stageId>-<instanceIndex>` and getLoopKey distinguishes
+      // parallel instances of the same stage. The agent receives stage id and
+      // instance index as both env vars and (when using a loop script) script
+      // args so it can locate its prompt file and any per-instance state.
       const isSingleFactory = baseOpts.mode === LoopMode.SINGLE;
       const maxIterations = baseOpts.envVars?.MAX_ITERATIONS ?? '10';
       const loopScript = project.loop_script;
 
       const results: LoopState[] = [];
-      for (const role of factoryConfig.roles) {
-        let roleCmd: string[] | undefined;
-        if (isSingleFactory) {
-          const promptFile = `PROMPT_${role}.md`;
-          roleCmd = loopScript
-            ? ['bash', '-c', `${ENSURE_CLAUDE_JSON} && ./${loopScript} ${promptFile} ${maxIterations}`]
-            : ['bash', '-c', `${ENSURE_CLAUDE_JSON} && claude --dangerously-skip-permissions --max-turns ${maxIterations} --output-format json --print "$(cat /workspace/${promptFile})"`];
-        }
+      for (const stage of pipeline.stages) {
+        const instances = Math.max(1, stage.instances ?? 1);
+        const promptFile = `PROMPT_${stage.id}.md`;
+        for (let instanceIndex = 0; instanceIndex < instances; instanceIndex++) {
+          const role = `${stage.id}-${instanceIndex}`;
 
-        const roleOpts: LoopStartOpts = {
-          ...baseOpts,
-          projectId,
-          projectName: project.name,
-          role,
-          ...(roleCmd ? { cmd: roleCmd } : {}),
-        };
+          let roleCmd: string[] | undefined;
+          if (isSingleFactory) {
+            roleCmd = loopScript
+              ? ['bash', '-c', `${ENSURE_CLAUDE_JSON} && ./${loopScript} ${stage.id} ${instanceIndex} ${maxIterations}`]
+              : ['bash', '-c', `${ENSURE_CLAUDE_JSON} && claude --dangerously-skip-permissions --max-turns ${maxIterations} --output-format json --print "$(cat /workspace/${promptFile})"`];
+          }
 
-        try {
-          // Delegate to the shared startLoopCore function which handles all injection
-          // (auth, hooks, prompts, deploy keys) for each individual container
-          const state = await startLoopCore(roleOpts);
-          results.push(state);
-        } catch (err) {
-          logger.warn(`Failed to start factory role ${role} for project ${projectId}`, { err });
-          // Continue starting other roles — partial factory is better than none
+          const roleOpts: LoopStartOpts = {
+            ...baseOpts,
+            projectId,
+            projectName: project.name,
+            role,
+            envVars: {
+              ...(baseOpts.envVars ?? {}),
+              STAGE_ID: stage.id,
+              INSTANCE_INDEX: String(instanceIndex),
+            },
+            ...(roleCmd ? { cmd: roleCmd } : {}),
+          };
+
+          try {
+            const state = await startLoopCore(roleOpts);
+            results.push(state);
+          } catch (err) {
+            logger.warn(
+              `Failed to start factory stage ${stage.id} instance ${instanceIndex} for project ${projectId}`,
+              { err },
+            );
+            // Continue starting other stages — partial factory is better than none
+          }
         }
       }
 
@@ -1142,9 +1930,47 @@ export function registerLoopHandlers(services: LoopServices): void {
         }
       }
 
+      // Containers are gone — clear stale locks so the kanban reflects idle state.
+      // Run even when some containers failed to stop: a partial stop still means
+      // none of those agents are executing, so their locks are no longer valid.
+      if (factoryTaskStore) {
+        const queue = factoryTaskStore.getQueue(projectId);
+        for (const task of queue.tasks) {
+          if (task.lockedBy) {
+            try {
+              factoryTaskStore.unlockTask(projectId, task.id);
+            } catch (err) {
+              logger.warn(`FACTORY_STOP: failed to unlock task ${task.id}`, err);
+            }
+          }
+        }
+      }
+
       if (errors.length > 0) {
         throw new Error(`Failed to stop ${errors.length} factory loop(s): ${errors.map((e) => e.message).join('; ')}`);
       }
+    },
+  );
+
+  ipcMain.handle(
+    IPC.FACTORY_RESTART_CONTAINER,
+    async (_event, projectId: string, role: string): Promise<LoopState> => {
+      const loopKey = getLoopKey(projectId, role);
+      const opts = loopOptsMap.get(loopKey);
+      if (!opts) {
+        throw new Error(
+          `No stored opts for loop ${loopKey}; container was not started in this session`,
+        );
+      }
+
+      // Best-effort stop — container may already be stopped or failed.
+      try {
+        await loopRunner.stopLoop(projectId, role);
+      } catch {
+        // Ignore — proceed to restart
+      }
+
+      return startLoopCore(opts);
     },
   );
 
@@ -1197,6 +2023,18 @@ export function registerLoopHandlers(services: LoopServices): void {
   // @task-status.json, so reads are always fresh agent output.
   const taskStatusWatchers = new Map<string, fsSync.FSWatcher>();
 
+  // Watcher for @task-decomposition.requested per project (shared across all
+  // roles). The PM agent writes @task-decomposition.json to break an epic into
+  // sub-tasks; the host reads it, creates the children atomically, and deletes
+  // the source file so re-triggers don't duplicate.
+  const taskDecompositionWatchers = new Map<string, fsSync.FSWatcher>();
+
+  // Watcher for @supervisor-action.requested per project (shared across all
+  // roles). Any container can write @supervisor-action.json to trigger host-side
+  // container restarts; the host reads it, dispatches the action, and leaves
+  // the source file in place (each restart is a distinct write).
+  const supervisorActionWatchers = new Map<string, fsSync.FSWatcher>();
+
   // Tracks the set of active loop keys per project to know when all loops for
   // a project have terminated and the task status watcher can be torn down.
   const activeLoopKeysByProject = new Map<string, Set<string>>();
@@ -1224,39 +2062,139 @@ export function registerLoopHandlers(services: LoopServices): void {
           const taskStatusTrigger = path.join(workspacePath, '@task-status.requested');
           try {
             const watcher = fsSync.watch(taskStatusTrigger, () => {
+              let statusData: unknown;
               try {
                 const statusRaw = fsSync.readFileSync(
                   path.join(workspacePath, '@task-status.json'),
-                  'utf-8'
+                  'utf-8',
                 );
-                const statusData = JSON.parse(statusRaw) as { task?: string; role?: string };
-                if (!statusData.task) return;
-
-                // Find task by title in the project's queue
-                const queue = factoryTaskStore.getQueue(state.projectId);
-                const task = queue.tasks.find((t) => t.title === statusData.task);
-                if (!task) return;
-
-                // Advance to next pipeline column using forward-only transitions
-                const nextColumn = FORWARD_TRANSITIONS[task.column];
-                if (!nextColumn) return; // Already at terminal column (done)
-
-                factoryTaskStore.moveTask(state.projectId, task.id, nextColumn);
-
-                // Broadcast updated task list to all renderer windows
-                const updatedQueue = factoryTaskStore.getQueue(state.projectId);
-                BrowserWindow.getAllWindows().forEach((win) => {
-                  if (!win.isDestroyed()) {
-                    win.webContents.send(IPC.FACTORY_TASK_CHANGED, state.projectId, updatedQueue.tasks);
-                  }
-                });
+                statusData = JSON.parse(statusRaw);
               } catch {
-                // Silent — @task-status.json may not exist yet or contain invalid JSON
+                // @task-status.json may not exist yet, be partially written, or
+                // contain invalid JSON. Next trigger will retry.
+                return;
               }
+
+              const changed = processTaskStatusUpdate(state.projectId, statusData, {
+                factoryTaskStore,
+                projectStore,
+                pipelineStore,
+              });
+              if (!changed) return;
+
+              const updatedQueue = factoryTaskStore.getQueue(state.projectId);
+              BrowserWindow.getAllWindows().forEach((win) => {
+                if (!win.isDestroyed()) {
+                  win.webContents.send(
+                    IPC.FACTORY_TASK_CHANGED,
+                    state.projectId,
+                    updatedQueue.tasks,
+                  );
+                }
+              });
             });
             taskStatusWatchers.set(state.projectId, watcher);
           } catch {
             // @task-status.requested may not exist yet — ignore
+          }
+        }
+      }
+
+      // Start per-project task decomposition watcher only once (not per role).
+      // Pipeline lookups are required so the dispatcher can resolve the first
+      // stage column; if the deps aren't wired we silently skip rather than
+      // attaching a dead watcher.
+      if (
+        !taskDecompositionWatchers.has(state.projectId) &&
+        factoryTaskStore &&
+        projectStore &&
+        pipelineStore
+      ) {
+        const workspacePath = project?.local_path;
+        if (workspacePath) {
+          const decompTrigger = path.join(workspacePath, '@task-decomposition.requested');
+          const decompFile = path.join(workspacePath, '@task-decomposition.json');
+          try {
+            const watcher = fsSync.watch(decompTrigger, () => {
+              let decompData: unknown;
+              try {
+                const decompRaw = fsSync.readFileSync(decompFile, 'utf-8');
+                decompData = JSON.parse(decompRaw);
+              } catch {
+                // @task-decomposition.json missing, partial, or malformed.
+                // Next trigger will retry; deletion below only happens on
+                // successful processing.
+                return;
+              }
+
+              const changed = processTaskDecomposition(state.projectId, decompData, {
+                factoryTaskStore,
+                projectStore,
+                pipelineStore,
+              });
+              if (!changed) return;
+
+              // Delete the source file *only* after a successful decomposition
+              // so the next watcher trigger doesn't re-create the same
+              // sub-tasks (the file's presence is the canonical "pending"
+              // signal — single source of truth, no separate ledger).
+              try {
+                fsSync.unlinkSync(decompFile);
+              } catch (err) {
+                logger.warn('Failed to delete @task-decomposition.json after processing', {
+                  err,
+                  projectId: state.projectId,
+                });
+              }
+
+              const updatedQueue = factoryTaskStore.getQueue(state.projectId);
+              BrowserWindow.getAllWindows().forEach((win) => {
+                if (!win.isDestroyed()) {
+                  win.webContents.send(
+                    IPC.FACTORY_TASK_CHANGED,
+                    state.projectId,
+                    updatedQueue.tasks,
+                  );
+                }
+              });
+            });
+            taskDecompositionWatchers.set(state.projectId, watcher);
+          } catch {
+            // @task-decomposition.requested may not exist yet — ignore
+          }
+        }
+      }
+
+      // Start per-project supervisor-action watcher only once (not per role).
+      if (!supervisorActionWatchers.has(state.projectId)) {
+        const workspacePath = project?.local_path;
+        if (workspacePath) {
+          const supervisorTrigger = path.join(workspacePath, '@supervisor-action.requested');
+          const supervisorFile = path.join(workspacePath, '@supervisor-action.json');
+          try {
+            const watcher = fsSync.watch(supervisorTrigger, () => {
+              let actionData: unknown;
+              try {
+                const raw = fsSync.readFileSync(supervisorFile, 'utf-8');
+                actionData = JSON.parse(raw);
+              } catch {
+                return;
+              }
+
+              processSupervisorAction(state.projectId, actionData, {
+                loopRunner,
+                loopOptsMap,
+                restartLoop: startLoopCore,
+              }).catch((err) => {
+                logger.warn('supervisor-action watcher: unhandled error', {
+                  err,
+                  projectId: state.projectId,
+                });
+              });
+            });
+            supervisorActionWatchers.set(state.projectId, watcher);
+          } catch {
+            // @supervisor-action.requested may not exist yet — ignore
           }
         }
       }
@@ -1304,6 +2242,16 @@ export function registerLoopHandlers(services: LoopServices): void {
           if (taskWatcher) {
             taskWatcher.close();
             taskStatusWatchers.delete(state.projectId);
+          }
+          const decompWatcher = taskDecompositionWatchers.get(state.projectId);
+          if (decompWatcher) {
+            decompWatcher.close();
+            taskDecompositionWatchers.delete(state.projectId);
+          }
+          const supervisorWatcher = supervisorActionWatchers.get(state.projectId);
+          if (supervisorWatcher) {
+            supervisorWatcher.close();
+            supervisorActionWatchers.delete(state.projectId);
           }
         }
       }

@@ -52,7 +52,7 @@ while true; do
         break
     fi
 
-    cat "$PROMPT_FILE" | claude -p --dangerously-skip-permissions --output-format=stream-json --model opus --verbose
+    cat "$PROMPT_FILE" | claude -p --dangerously-skip-permissions --output-format=stream-json --model sonnet --verbose
 
     # Push changes after each iteration
     git push origin "$CURRENT_BRANCH" || {

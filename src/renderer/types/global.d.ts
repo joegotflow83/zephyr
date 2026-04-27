@@ -2,7 +2,8 @@
 // window.api is exposed by the preload script via contextBridge.
 
 import type { AppSettings, ProjectConfig, VMConfig, ZephyrImage, ImageBuildConfig } from '../../shared/models';
-import type { FactoryTask, FactoryColumn } from '../../shared/factory-types';
+import type { FactoryTask } from '../../shared/factory-types';
+import type { Pipeline } from '../../shared/pipeline-types';
 import type { DeployKeyRecord } from '../../services/deploy-key-store';
 import type { PreValidationScript } from '../../services/pre-validation-store';
 import type { HookFile } from '../../services/hooks-store';
@@ -146,6 +147,8 @@ declare global {
         start: (projectId: string, baseOpts: LoopStartOpts) => Promise<LoopState[]>;
         /** Stop all factory roles for a project */
         stop: (projectId: string) => Promise<void>;
+        /** Restart a single factory container by role (e.g. "pm-0", "coder-1"). */
+        restartContainer: (projectId: string, role: string) => Promise<LoopState>;
       };
 
       factoryTasks: {
@@ -156,7 +159,7 @@ declare global {
         /** Add a new task to the backlog */
         add: (projectId: string, title: string, description: string) => Promise<FactoryTask>;
         /** Move a task to a different column (validates against ALLOWED_TRANSITIONS) */
-        move: (projectId: string, taskId: string, toColumn: FactoryColumn) => Promise<FactoryTask>;
+        move: (projectId: string, taskId: string, toColumn: string) => Promise<FactoryTask>;
         /** Remove a task by ID */
         remove: (projectId: string, taskId: string) => Promise<boolean>;
         /** Update task fields (title, description) */
@@ -165,6 +168,35 @@ declare global {
         sync: (projectId: string) => Promise<FactoryTask[]>;
         /** Listen for task changes broadcast from the main process. Returns cleanup function. */
         onChanged: (callback: (projectId: string, tasks: FactoryTask[]) => void) => () => void;
+      };
+
+      pipelines: {
+        /** List all pipelines (built-in first, then user pipelines in insertion order) */
+        list: () => Promise<Pipeline[]>;
+        /** Get a single pipeline by id, or null if not found */
+        get: (id: string) => Promise<Pipeline | null>;
+        /**
+         * Add a new user pipeline. `id` is generated when omitted; `builtIn` is
+         * always forced to `false`; `createdAt`/`updatedAt` are server-stamped.
+         * Throws on id collision.
+         */
+        add: (
+          input: Omit<Pipeline, 'createdAt' | 'updatedAt'> &
+            Partial<Pick<Pipeline, 'createdAt' | 'updatedAt'>>,
+        ) => Promise<Pipeline>;
+        /**
+         * Patch a user pipeline. `id`, `builtIn`, and `createdAt` are protected.
+         * Throws when the id is unknown or when the pipeline is built-in.
+         */
+        update: (id: string, patch: Partial<Pipeline>) => Promise<Pipeline>;
+        /** Delete a user pipeline. Throws when unknown or built-in. */
+        remove: (id: string) => Promise<void>;
+        /**
+         * Listen for pipeline-library mutations. The payload is the full
+         * reconciled pipeline list, so consumers can replace their cache
+         * without a follow-up `list()` round-trip. Returns cleanup function.
+         */
+        onChanged: (callback: (pipelines: Pipeline[]) => void) => () => void;
       };
 
       logs: {

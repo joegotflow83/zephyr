@@ -11,10 +11,24 @@ import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/re
 import { FactoryTab } from '../../src/renderer/pages/FactoryTab/FactoryTab';
 import { useAppStore } from '../../src/renderer/stores/app-store';
 
+// Minimal pipeline fixture for tests
+const MOCK_PIPELINE = {
+  id: 'pipe-test',
+  name: 'Test Pipeline',
+  stages: [
+    { id: 'coder', name: 'Coder', agentPrompt: 'code', instances: 1 },
+    { id: 'qa', name: 'QA', agentPrompt: 'review', instances: 1 },
+  ],
+  bounceLimit: 3,
+  createdAt: '2024-01-01T00:00:00.000Z',
+  updatedAt: '2024-01-01T00:00:00.000Z',
+};
+
 // Minimal factory-enabled project fixture
 const FACTORY_PROJECT = {
   id: 'proj-factory',
   name: 'My Factory Project',
+  pipelineId: 'pipe-test',
   factory_config: { enabled: true },
   local_path: '/tmp/proj-factory',
   image_id: null,
@@ -44,6 +58,7 @@ function setupApiMocks() {
         description: '',
         column: 'backlog',
         projectId: 'proj-factory',
+        bounceCount: 0,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       }),
@@ -51,6 +66,10 @@ function setupApiMocks() {
       remove: vi.fn().mockResolvedValue(true),
       update: vi.fn().mockResolvedValue({}),
       sync: vi.fn().mockResolvedValue([]),
+      onChanged: vi.fn(() => vi.fn()),
+    },
+    pipelines: {
+      get: vi.fn().mockResolvedValue(MOCK_PIPELINE),
       onChanged: vi.fn(() => vi.fn()),
     },
   } as any;
@@ -85,20 +104,13 @@ describe('FactoryTab', () => {
     });
   });
 
-  // 10.34 — kanban board renders all 7 columns
-  it('renders 7 kanban pipeline columns', async () => {
+  // 10.34 — kanban board renders dynamic pipeline columns
+  it('renders pipeline columns from the active pipeline', async () => {
     useAppStore.setState({ projects: [FACTORY_PROJECT] });
     render(<FactoryTab />);
 
-    const expectedLabels = [
-      'Backlog',
-      'Ready',
-      'In Progress',
-      'Security Review',
-      'QA',
-      'Documentation',
-      'Done',
-    ];
+    // MOCK_PIPELINE has stages [Coder, QA] plus implicit Backlog/Done/Blocked
+    const expectedLabels = ['Backlog', 'Coder', 'QA', 'Done', 'Blocked'];
 
     await waitFor(() => {
       for (const label of expectedLabels) {

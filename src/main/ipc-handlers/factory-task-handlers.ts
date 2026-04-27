@@ -5,7 +5,7 @@
 import { ipcMain, BrowserWindow } from 'electron';
 import { IPC } from '../../shared/ipc-channels';
 import type { FactoryTaskStore } from '../../services/factory-task-store';
-import type { FactoryColumn, FactoryTask } from '../../shared/factory-types';
+import type { FactoryTask } from '../../shared/factory-types';
 import type { ProjectConfig } from '../../shared/models';
 
 export interface FactoryTaskServices {
@@ -62,10 +62,11 @@ export function registerFactoryTaskHandlers(services: FactoryTaskServices): void
     },
   );
 
-  // Move a task to a different column (validates transition)
+  // Move a task to a different column (validates transition against the
+  // project's active pipeline; bounce-counts backward moves; clears lock).
   ipcMain.handle(
     IPC.FACTORY_TASK_MOVE,
-    (_event, projectId: string, taskId: string, toColumn: FactoryColumn): FactoryTask => {
+    (_event, projectId: string, taskId: string, toColumn: string): FactoryTask => {
       const task = factoryTaskStore.moveTask(projectId, taskId, toColumn);
       broadcastTaskChanged(factoryTaskStore, projectId);
       return task;

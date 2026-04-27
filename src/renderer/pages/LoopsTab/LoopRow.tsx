@@ -1,8 +1,7 @@
 import React from 'react';
 import type { LoopState } from '../../../shared/loop-types';
 import { LoopStatus, LoopMode } from '../../../shared/loop-types';
-import type { ProjectConfig, FactoryRole } from '../../../shared/models';
-import { FACTORY_ROLE_LABELS } from '../../../shared/models';
+import type { ProjectConfig } from '../../../shared/models';
 
 interface LoopRowProps {
   loop: LoopState;
@@ -123,7 +122,7 @@ export const LoopRow: React.FC<LoopRowProps> = ({
         <span>{project?.name || loop.projectId}</span>
         {loop.role && (
           <span className="ml-2 inline-flex items-center px-2 py-0.5 text-xs font-medium rounded bg-purple-900 text-purple-300">
-            {FACTORY_ROLE_LABELS[loop.role as FactoryRole] ?? loop.role}
+            {loop.role}
           </span>
         )}
       </td>

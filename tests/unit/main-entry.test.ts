@@ -139,6 +139,7 @@ vi.mock('electron-squirrel-startup', () => ({
 const {
   mockConfigManager,
   mockProjectStore,
+  mockPipelineStore,
   mockImportExport,
   mockDockerRuntime,
   mockRuntimeHealth,
@@ -162,6 +163,7 @@ const {
   mockKiroHooksStore,
   MockConfigManager,
   MockProjectStore,
+  MockPipelineStore,
   MockImportExportService,
   MockDockerRuntime,
   MockPodmanRuntime,
@@ -198,6 +200,14 @@ const {
     addProject: vi.fn(),
     updateProject: vi.fn(),
     removeProject: vi.fn(),
+  };
+
+  const mockPipelineStore = {
+    listPipelines: vi.fn().mockReturnValue([]),
+    getPipeline: vi.fn(),
+    addPipeline: vi.fn(),
+    updatePipeline: vi.fn(),
+    removePipeline: vi.fn(),
   };
 
   const mockImportExport = {
@@ -281,6 +291,7 @@ const {
 
   const MockConfigManager = vi.fn(function() { return mockConfigManager; });
   const MockProjectStore = vi.fn(function() { return mockProjectStore; });
+  const MockPipelineStore = vi.fn(function() { return mockPipelineStore; });
   const MockImportExportService = vi.fn(function() { return mockImportExport; });
   const MockDockerRuntime = vi.fn(function() { return mockDockerRuntime; });
   const MockPodmanRuntime = vi.fn(function() { return ({}); });
@@ -334,6 +345,7 @@ const {
   return {
     mockConfigManager,
     mockProjectStore,
+    mockPipelineStore,
     mockImportExport,
     mockDockerRuntime,
     mockRuntimeHealth,
@@ -357,6 +369,7 @@ const {
     mockKiroHooksStore,
     MockConfigManager,
     MockProjectStore,
+    MockPipelineStore,
     MockImportExportService,
     MockDockerRuntime,
     MockPodmanRuntime,
@@ -388,6 +401,10 @@ vi.mock('../../src/services/config-manager', () => ({
 
 vi.mock('../../src/services/project-store', () => ({
   ProjectStore: MockProjectStore,
+}));
+
+vi.mock('../../src/services/pipeline-store', () => ({
+  PipelineStore: MockPipelineStore,
 }));
 
 vi.mock('../../src/services/import-export', () => ({
