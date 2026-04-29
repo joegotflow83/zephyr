@@ -411,12 +411,43 @@ export class PodmanRuntime implements ContainerRuntime {
 
     if (binds) {
       for (const bind of binds) {
-        // On SELinux-enforcing systems (Fedora, RHEL) the container process is
-        // denied access to bind-mounted host directories unless the mount carries
-        // an SELinux relabeling option.  Append `:z` (shared label) when the
-        // caller has not already specified z, Z, or a label= option.
-        const selinuxLabeled = /(?:^|,)(?:z|Z|label=)/.test(bind.split(':').slice(2).join(':'));
-        args.push('--volume', selinuxLabeled ? bind : `${bind}:z`);
+        const colonIdx = bind.indexOf(':');
+        const hostPath = colonIdx !== -1 ? bind.slice(0, colonIdx) : bind;
+
+        if (hostPath.includes(' ')) {
+          // Paths with spaces cannot be used with --volume because podman's
+          // volume-spec parser treats spaces as delimiters.  Use --mount with
+          // key=value syntax instead, which handles spaces correctly.
+          const rest = bind.slice(colonIdx + 1);
+          const secondColon = rest.indexOf(':');
+          const containerPath = secondColon !== -1 ? rest.slice(0, secondColon) : rest;
+          const optStr = secondColon !== -1 ? rest.slice(secondColon + 1) : '';
+          const opts = optStr ? optStr.split(',') : [];
+          const selinuxLabeled = opts.some((o) => o === 'z' || o === 'Z' || o.startsWith('label='));
+          const readonly = opts.some((o) => o === 'ro' || o === 'readonly');
+
+          let mountSpec = `type=bind,source=${hostPath},destination=${containerPath}`;
+          if (readonly) mountSpec += ',ro';
+          if (!selinuxLabeled) mountSpec += ',z';
+          args.push('--mount', mountSpec);
+        } else {
+          // On SELinux-enforcing systems (Fedora, RHEL) the container process is
+          // denied access to bind-mounted host directories unless the mount carries
+          // an SELinux relabeling option.  Append `,z` (shared label) when the
+          // caller has not already specified z, Z, or a label= option.
+          const parts = bind.split(':');
+          const optsPart = parts.slice(2).join(':');
+          const selinuxLabeled = /(?:^|,)(?:z|Z|label=)/.test(optsPart);
+          if (selinuxLabeled) {
+            args.push('--volume', bind);
+          } else if (optsPart) {
+            // Existing options present (e.g. "ro") — comma-append z
+            const base = parts.slice(0, 2).join(':');
+            args.push('--volume', `${base}:${optsPart},z`);
+          } else {
+            args.push('--volume', `${bind}:z`);
+          }
+        }
       }
     }
 
@@ -467,6 +498,20 @@ export class PodmanRuntime implements ContainerRuntime {
     const { exitCode, stderr } = await runPodman(this.podmanPath, args);
     if (exitCode !== 0) {
       throw new Error(`podman stop ${id} failed: ${stderr}`);
+    }
+  }
+
+  async pauseContainer(id: string): Promise<void> {
+    const { exitCode, stderr } = await runPodman(this.podmanPath, ['pause', id]);
+    if (exitCode !== 0) {
+      throw new Error(`podman pause ${id} failed: ${stderr}`);
+    }
+  }
+
+  async unpauseContainer(id: string): Promise<void> {
+    const { exitCode, stderr } = await runPodman(this.podmanPath, ['unpause', id]);
+    if (exitCode !== 0) {
+      throw new Error(`podman unpause ${id} failed: ${stderr}`);
     }
   }
 

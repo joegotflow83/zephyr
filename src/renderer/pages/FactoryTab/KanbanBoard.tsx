@@ -41,6 +41,7 @@ function buildColumnLabels(pipeline: Pipeline | null): Record<string, string> {
     backlog: 'Backlog',
     done: 'Done',
     blocked: 'Blocked',
+    needs_input: 'Needs Input',
   };
   if (!pipeline) return base;
   for (const stage of pipeline.stages) {
@@ -61,6 +62,8 @@ function buildColumnMeta(pipeline: Pipeline | null): Record<string, ColumnMeta> 
     done: {},
     // Blocked is always rendered with a danger accent regardless of pipeline config.
     blocked: { color: '#ef4444' },
+    // Needs Input uses amber to signal "waiting on human" without implying failure.
+    needs_input: { icon: '✋', color: '#f59e0b' },
   };
   if (!pipeline) return base;
   for (const stage of pipeline.stages) {
@@ -134,8 +137,9 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
   function getDropValidity(col: string): DropValidity | null {
     if (!draggedTask) return null;
     const fromCol = draggedTask.column;
-    // Blocked is always a valid destination — human override, no transition check.
+    // Blocked and Needs Input are always valid destinations — human override.
     if (col === 'blocked') return fromCol === 'blocked' ? null : 'block';
+    if (col === 'needs_input') return fromCol === 'needs_input' ? null : 'block';
     const allowed = transitions.allowed[fromCol] ?? [];
     if (!allowed.includes(col)) return 'invalid';
     return columnIndex[col] > columnIndex[fromCol] ? 'forward' : 'backward';
@@ -188,8 +192,8 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
 
     const fromCol = task.column;
 
-    // Blocked is always reachable from any column as a human escalation.
-    if (col !== 'blocked') {
+    // Blocked and Needs Input are always reachable from any column as a human escalation.
+    if (col !== 'blocked' && col !== 'needs_input') {
       const allowed = transitions.allowed[fromCol] ?? [];
       if (!allowed.includes(col)) {
         const fromLabel = columnLabels[fromCol] ?? fromCol;

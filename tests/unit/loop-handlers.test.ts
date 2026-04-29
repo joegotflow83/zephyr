@@ -644,32 +644,24 @@ describe('factory:start', () => {
     expect(calls[1]).toMatchObject({ EXISTING: 'value', STAGE_ID: 'coder', INSTANCE_INDEX: '1' });
   });
 
-  it('builds a SINGLE-mode CMD that reads PROMPT_<stageId>.md when no loop_script is configured', async () => {
+  it('does not set cmd when no loop_script is configured (uses image default CMD)', async () => {
     mockLoopRunner.startLoop.mockImplementation((opts: { role?: string; projectId: string }) =>
       Promise.resolve(fakeRunningState(opts.projectId, opts.role ?? '')),
     );
 
     await invoke(IPC.FACTORY_START, projectId, {
-      mode: LoopMode.SINGLE,
+      mode: LoopMode.CONTINUOUS,
       dockerImage: 'img',
       projectId,
       projectName: 'Demo Project',
     });
 
     const cmds = mockLoopRunner.startLoop.mock.calls.map((c) => c[0].cmd);
-    expect(cmds[0]).toEqual([
-      'bash',
-      '-c',
-      expect.stringContaining('cat /workspace/PROMPT_pm.md'),
-    ]);
-    expect(cmds[1]).toEqual([
-      'bash',
-      '-c',
-      expect.stringContaining('cat /workspace/PROMPT_coder.md'),
-    ]);
+    expect(cmds[0][2]).toContain('PROMPT_pm.md');
+    expect(cmds[1][2]).toContain('PROMPT_coder.md');
   });
 
-  it('builds a SINGLE-mode CMD that calls the loop_script with stageId + instanceIndex args', async () => {
+  it('builds a CMD that calls the loop_script with stageId + instanceIndex args', async () => {
     mockProjectStore.getProject.mockReturnValue({
       ...mockProjectStore.getProject(projectId),
       loop_script: 'run.sh',
@@ -682,18 +674,18 @@ describe('factory:start', () => {
     );
 
     await invoke(IPC.FACTORY_START, projectId, {
-      mode: LoopMode.SINGLE,
+      mode: LoopMode.CONTINUOUS,
       dockerImage: 'img',
       projectId,
       projectName: 'Demo Project',
     });
 
     const cmds = mockLoopRunner.startLoop.mock.calls.map((c) => c[0].cmd);
-    expect(cmds[0][2]).toContain('./run.sh coder 0 ');
-    expect(cmds[1][2]).toContain('./run.sh coder 1 ');
+    expect(cmds[0][2]).toContain('./run.sh coder 0');
+    expect(cmds[1][2]).toContain('./run.sh coder 1');
   });
 
-  it('does not set cmd in CONTINUOUS mode (the image default CMD runs)', async () => {
+  it('sets a looping agent cmd in CONTINUOUS mode', async () => {
     mockLoopRunner.startLoop.mockImplementation((opts: { role?: string; projectId: string }) =>
       Promise.resolve(fakeRunningState(opts.projectId, opts.role ?? '')),
     );
@@ -706,7 +698,9 @@ describe('factory:start', () => {
     });
 
     for (const call of mockLoopRunner.startLoop.mock.calls) {
-      expect(call[0].cmd).toBeUndefined();
+      expect(call[0].cmd).toBeDefined();
+      expect(call[0].cmd[2]).toContain('while true');
+      expect(call[0].cmd[2]).toContain('claude');
     }
   });
 
@@ -1057,7 +1051,7 @@ describe('processTaskStatusUpdate', () => {
       toStage: 'pm',
     };
     expect(processTaskStatusUpdate(projectId, payload, buildDeps())).toBe(true);
-    expect(mockStore.moveTask).toHaveBeenCalledWith(projectId, 'task-1', 'pm');
+    expect(mockStore.moveTask).toHaveBeenCalledWith(projectId, 'task-1', 'pm', { agentRejection: true });
   });
 
   it('rejected: returns false when toStage is missing', () => {

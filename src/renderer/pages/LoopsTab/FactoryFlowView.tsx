@@ -187,9 +187,6 @@ const FlowNode: React.FC<FlowNodeProps> = ({
 
       {/* Stats row */}
       <div className="flex items-center gap-2 mt-2 text-[10px] text-gray-400">
-        <span title="Iteration">
-          iter {loop.iteration}
-        </span>
         {loop.commits.length > 0 && (
           <span title="Commits" className="text-green-400">
             {loop.commits.length} commit{loop.commits.length !== 1 ? 's' : ''}

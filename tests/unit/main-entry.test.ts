@@ -543,7 +543,7 @@ const {
   const mockRegisterDataHandlers = vi.fn();
   const mockRegisterDockerHandlers = vi.fn();
   const mockRegisterCredentialHandlers = vi.fn();
-  const mockRegisterLoopHandlers = vi.fn();
+  const mockRegisterLoopHandlers = vi.fn().mockReturnValue({ dispatchFactoryStage: vi.fn() });
   const mockRegisterLogHandlers = vi.fn();
   const mockRegisterTerminalHandlers = vi.fn();
   const mockRegisterUpdateHandlers = vi.fn();

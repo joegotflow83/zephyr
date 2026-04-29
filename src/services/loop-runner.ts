@@ -237,6 +237,11 @@ export class LoopRunner {
       // Transition to STOPPING
       this.updateState(key, { status: LoopStatus.STOPPING });
 
+      // Unpause first if the container is frozen — Docker requires it before stop.
+      if (state.status === LoopStatus.PAUSED) {
+        try { await this.docker.unpauseContainer(state.containerId); } catch { /* best-effort */ }
+      }
+
       // Stop log streaming and pending broadcast
       const logStream = this.logStreams.get(key);
       if (logStream) {
@@ -262,6 +267,33 @@ export class LoopRunner {
       });
       throw error;
     }
+  }
+
+  /**
+   * Pause a running loop by freezing its container (cgroups SIGSTOP).
+   * Zero CPU/token usage while paused; log stream stays open.
+   */
+  async pauseLoop(projectId: string, role?: string): Promise<void> {
+    const key = getLoopKey(projectId, role);
+    const state = this.states.get(key);
+    if (!state?.containerId || state.status !== LoopStatus.RUNNING) {
+      throw new Error(`Cannot pause loop ${key}: not running`);
+    }
+    await this.docker.pauseContainer(state.containerId);
+    this.updateState(key, { status: LoopStatus.PAUSED });
+  }
+
+  /**
+   * Resume a previously paused loop.
+   */
+  async resumeLoop(projectId: string, role?: string): Promise<void> {
+    const key = getLoopKey(projectId, role);
+    const state = this.states.get(key);
+    if (!state?.containerId || state.status !== LoopStatus.PAUSED) {
+      throw new Error(`Cannot resume loop ${key}: not paused`);
+    }
+    await this.docker.unpauseContainer(state.containerId);
+    this.updateState(key, { status: LoopStatus.RUNNING });
   }
 
   /**
@@ -651,8 +683,8 @@ export class LoopRunner {
     mode: LoopMode,
   ): Promise<void> {
     const state = this.states.get(loopKey);
-    if (!state || isLoopTerminal(state.status) || state.status === LoopStatus.STOPPING) {
-      // Already handled — manual stop or prior terminal transition.
+    if (!state || isLoopTerminal(state.status) || state.status === LoopStatus.STOPPING || state.status === LoopStatus.PAUSED) {
+      // Already handled — manual stop, paused, or prior terminal transition.
       return;
     }
 
@@ -783,8 +815,8 @@ export class LoopRunner {
         await new Promise((resolve) => setTimeout(resolve, checkInterval));
 
         const state = this.states.get(loopKey);
-        if (!state || isLoopTerminal(state.status) || state.status === LoopStatus.STOPPING) {
-          // Loop was stopped manually or already in terminal state
+        if (!state || isLoopTerminal(state.status) || state.status === LoopStatus.STOPPING || state.status === LoopStatus.PAUSED) {
+          // Loop was stopped manually, paused, or already in terminal state
           return;
         }
 
@@ -1136,8 +1168,8 @@ export class LoopRunner {
     _exitCode: number,
   ): void {
     const state = this.states.get(loopKey);
-    if (!state || isLoopTerminal(state.status) || state.status === LoopStatus.STOPPING) {
-      // Already handled (e.g., stopLoop was called manually)
+    if (!state || isLoopTerminal(state.status) || state.status === LoopStatus.STOPPING || state.status === LoopStatus.PAUSED) {
+      // Already handled (e.g., stopLoop was called manually or loop is paused)
       return;
     }
 

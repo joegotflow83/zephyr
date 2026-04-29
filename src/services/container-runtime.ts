@@ -216,6 +216,18 @@ export interface ContainerRuntime {
 
   stopContainer(id: string, timeout?: number): Promise<void>;
 
+  /**
+   * Freezes all processes in a container via cgroups (SIGSTOP).
+   * Zero CPU usage while paused; instant resume. The container stays
+   * "running" from the daemon's perspective (network, mounts intact).
+   */
+  pauseContainer(id: string): Promise<void>;
+
+  /**
+   * Resumes a previously paused container.
+   */
+  unpauseContainer(id: string): Promise<void>;
+
   removeContainer(id: string, force?: boolean): Promise<void>;
 
   // ── Container introspection ───────────────────────────────────────────────

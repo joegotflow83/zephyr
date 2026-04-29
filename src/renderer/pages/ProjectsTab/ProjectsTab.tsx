@@ -35,6 +35,7 @@ export const ProjectsTab: React.FC<ProjectsTabProps> = ({ onRunProject, toast })
   const vmInfos = useAppStore((state) => state.vmInfos);
   const multipassAvailable = useAppStore((state) => state.multipassAvailable);
   const pipelines = useAppStore((state) => state.pipelines);
+  const kiroDbPath = useAppStore((state) => state.settings?.kiro_db_path);
 
   // Dialog state
   const [dialogMode, setDialogMode] = useState<'add' | 'edit' | null>(null);
@@ -113,10 +114,13 @@ export const ProjectsTab: React.FC<ProjectsTabProps> = ({ onRunProject, toast })
     setActionLoading({ ...actionLoading, [`run-${project.id}`]: true });
 
     try {
-      const extraMounts = (project.additional_mounts ?? []).map((hostPath) => {
-        const basename = hostPath.split('/').filter(Boolean).pop() ?? hostPath;
-        return `${hostPath}:/mnt/${basename}`;
-      });
+      const extraMounts = [
+        ...(project.additional_mounts ?? []).map((hostPath) => {
+          const basename = hostPath.split('/').filter(Boolean).pop() ?? hostPath;
+          return `${hostPath}:/mnt/${basename}`;
+        }),
+        ...(kiroDbPath ? [`${kiroDbPath}:/home/ralph/.local/share/kiro-cli/data.sqlite3:ro`] : []),
+      ];
       const baseOpts = {
         projectId: project.id,
         projectName: project.name,
@@ -141,7 +145,6 @@ export const ProjectsTab: React.FC<ProjectsTabProps> = ({ onRunProject, toast })
         await factoryStart(project.id, {
           ...baseOpts,
           mode: selection.mode,
-          envVars: { MAX_ITERATIONS: String(selection.maxIterations ?? 10) },
         });
         toast.success(`Loop started for "${project.name}"`);
       } else {

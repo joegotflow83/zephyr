@@ -85,7 +85,7 @@ export const RunModeDialog: React.FC<RunModeDialogProps> = ({
 
   const buildSelection = (): RunModeSelection => {
     if (selected === 'factory') {
-      return { mode: LoopMode.SINGLE, factory: true, maxIterations };
+      return { mode: LoopMode.CONTINUOUS, factory: true };
     }
     if (selected === 'continuous') {
       return { mode: LoopMode.CONTINUOUS };

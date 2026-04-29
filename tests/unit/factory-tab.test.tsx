@@ -109,8 +109,8 @@ describe('FactoryTab', () => {
     useAppStore.setState({ projects: [FACTORY_PROJECT] });
     render(<FactoryTab />);
 
-    // MOCK_PIPELINE has stages [Coder, QA] plus implicit Backlog/Done/Blocked
-    const expectedLabels = ['Backlog', 'Coder', 'QA', 'Done', 'Blocked'];
+    // MOCK_PIPELINE has stages [Coder, QA] plus implicit Backlog/Done/Blocked/Needs Input
+    const expectedLabels = ['Backlog', 'Coder', 'QA', 'Done', 'Blocked', 'Needs Input'];
 
     await waitFor(() => {
       for (const label of expectedLabels) {

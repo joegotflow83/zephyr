@@ -9,6 +9,7 @@ import type { RunModeSelection } from '../../components/RunModeDialog/RunModeDia
 import type { LoopState, LoopStartOpts } from '../../../shared/loop-types';
 import { LoopMode, LoopStatus, getLoopKey } from '../../../shared/loop-types';
 import type { ProjectConfig } from '../../../shared/models';
+import { useAppStore } from '../../stores/app-store';
 
 /**
  * Simple log parser to convert raw log strings to ParsedLogLine format.
@@ -77,6 +78,7 @@ function parseLogLine(rawLine: string): ParsedLogLine {
 export const LoopsTab: React.FC = () => {
   const { loops, loading, error, stop, start, factoryStart, schedule } = useLoops();
   const { projects } = useProjects();
+  const kiroDbPath = useAppStore((s) => s.settings?.kiro_db_path);
   const [selectedLoopId, setSelectedLoopId] = useState<string | null>(null);
   const [splitterPosition, setSplitterPosition] = useState(60); // Percentage for upper panel
   const [isDragging, setIsDragging] = useState(false);
@@ -194,10 +196,13 @@ export const LoopsTab: React.FC = () => {
     if (!project) return;
 
     try {
-      const extraMounts = (project.additional_mounts ?? []).map((hostPath) => {
-        const basename = hostPath.split('/').filter(Boolean).pop() ?? hostPath;
-        return `${hostPath}:/mnt/${basename}`;
-      });
+      const extraMounts = [
+        ...(project.additional_mounts ?? []).map((hostPath) => {
+          const basename = hostPath.split('/').filter(Boolean).pop() ?? hostPath;
+          return `${hostPath}:/mnt/${basename}`;
+        }),
+        ...(kiroDbPath ? [`${kiroDbPath}:/home/ralph/.local/share/kiro-cli/data.sqlite3:ro`] : []),
+      ];
       const baseOpts = {
         projectId: project.id,
         projectName: project.name,
@@ -221,7 +226,6 @@ export const LoopsTab: React.FC = () => {
         await factoryStart(project.id, {
           ...baseOpts,
           mode: selection.mode,
-          envVars: { MAX_ITERATIONS: String(selection.maxIterations ?? 10) },
         });
       } else {
         const opts: LoopStartOpts = {
@@ -330,7 +334,7 @@ export const LoopsTab: React.FC = () => {
                     selectedLoopKey={selectedLoopId}
                     onSelectLoop={(l) => setSelectedLoopId(getLoopKey(l))}
                     onRestartLoop={(l) => {
-                      window.api.factory.restartContainer(l.projectId, l.role ?? '').catch(() => {});
+                      window.api.factory.restartContainer(l.projectId, l.role ?? '').catch(() => undefined);
                     }}
                   />
                 </div>

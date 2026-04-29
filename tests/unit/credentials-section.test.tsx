@@ -51,19 +51,19 @@ describe('CredentialsSection', () => {
     mockSettings.save.mockResolvedValue(undefined);
   });
 
-  it('renders Anthropic API Access section heading', async () => {
+  it('renders AI Provider section heading', async () => {
     render(<CredentialsSection />);
     await waitFor(() => {
-      expect(screen.getByText('Anthropic API Access')).toBeInTheDocument();
+      expect(screen.getByText('AI Provider')).toBeInTheDocument();
     });
   });
 
   it('renders all three auth method cards', async () => {
     render(<CredentialsSection />);
     await waitFor(() => {
-      expect(screen.getByText('API Key')).toBeInTheDocument();
-      expect(screen.getByText('Browser Session')).toBeInTheDocument();
-      expect(screen.getByText('AWS Bedrock')).toBeInTheDocument();
+      expect(screen.getByText('Claude — API Key')).toBeInTheDocument();
+      expect(screen.getByText('Claude — Browser Session')).toBeInTheDocument();
+      expect(screen.getByText('Claude — AWS Bedrock')).toBeInTheDocument();
     });
   });
 
@@ -143,7 +143,7 @@ describe('CredentialsSection', () => {
   it('opens CredentialDialog when API Key Configure is clicked', async () => {
     render(<CredentialsSection />);
 
-    await waitFor(() => screen.getByText('API Key'));
+    await waitFor(() => screen.getByText('Claude — API Key'));
 
     // Click the Configure button next to API Key
     const configureButton = screen.getAllByText('Configure')[0];
@@ -157,9 +157,9 @@ describe('CredentialsSection', () => {
   it('opens BedrockDialog when Bedrock Configure is clicked', async () => {
     render(<CredentialsSection />);
 
-    await waitFor(() => screen.getByText('AWS Bedrock'));
+    await waitFor(() => screen.getByText('Claude — AWS Bedrock'));
 
-    // Configure buttons order: [API Key, Bedrock, GitHub] — index 1 is Bedrock
+    // Configure buttons order: [API Key, Bedrock] — index 1 is Bedrock
     const configureButtons = screen.getAllByText('Configure');
     fireEvent.click(configureButtons[1]);
 
@@ -202,9 +202,9 @@ describe('CredentialsSection', () => {
   it('saves auth method to settings when a card is clicked', async () => {
     render(<CredentialsSection />);
 
-    await waitFor(() => screen.getByText('Browser Session'));
+    await waitFor(() => screen.getByText('Claude — Browser Session'));
 
-    const browserCard = screen.getByText('Browser Session').closest('div[class*="bg-gray-900"]');
+    const browserCard = screen.getByText('Claude — Browser Session').closest('div[class*="bg-gray-900"]');
     fireEvent.click(browserCard!);
 
     await waitFor(() => {
@@ -267,9 +267,9 @@ describe('CredentialsSection', () => {
   it('saves Bedrock bearer token via credentials.store', async () => {
     render(<CredentialsSection />);
 
-    await waitFor(() => screen.getByText('AWS Bedrock'));
+    await waitFor(() => screen.getByText('Claude — AWS Bedrock'));
 
-    // Configure buttons order: [API Key, Bedrock, GitHub] — index 1 is Bedrock
+    // Configure buttons order: [API Key, Bedrock] — index 1 is Bedrock
     const configureButtons = screen.getAllByText('Configure');
     fireEvent.click(configureButtons[1]);
 

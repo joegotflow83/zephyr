@@ -226,6 +226,13 @@ export interface AppSettings {
   theme: 'system' | 'light' | 'dark';
   /** Logging verbosity level */
   log_level: 'DEBUG' | 'INFO' | 'WARNING' | 'ERROR';
+  /**
+   * Which LLM provider to use inside containers.
+   * 'claude' uses Anthropic (auth method determined by anthropic_auth_method).
+   * 'kiro' uses the Kiro CLI (auth via kiro_db_path mount).
+   * Defaults to 'claude'.
+   */
+  llm_provider: 'claude' | 'kiro';
   /** Which Anthropic auth method to inject into containers */
   anthropic_auth_method: AnthropicAuthMethod;
   /** AWS region for Bedrock access */
@@ -243,6 +250,12 @@ export interface AppSettings {
   container_runtime: 'docker' | 'podman';
   /** Podman-specific settings stub for future configuration */
   podman_settings?: PodmanSettings;
+  /**
+   * Host path to the Kiro CLI auth database (data.sqlite3).
+   * When set, this file is bind-mounted read-only into every container at
+   * ~/.local/share/kiro-cli/data.sqlite3 so Kiro is authenticated out of the box.
+   */
+  kiro_db_path?: string;
 }
 
 /**
@@ -254,6 +267,7 @@ export function createDefaultSettings(): AppSettings {
     notification_enabled: true,
     theme: 'system',
     log_level: 'INFO',
+    llm_provider: 'claude',
     anthropic_auth_method: 'api_key',
     container_runtime: 'docker',
   };

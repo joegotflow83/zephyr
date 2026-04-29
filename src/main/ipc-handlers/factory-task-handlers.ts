@@ -2,15 +2,50 @@
 // Registered once during app startup via registerFactoryTaskHandlers().
 // All handlers run in the main process and delegate to FactoryTaskStore.
 
+import * as fs from 'fs/promises';
+import * as path from 'path';
 import { ipcMain, BrowserWindow } from 'electron';
 import { IPC } from '../../shared/ipc-channels';
 import type { FactoryTaskStore } from '../../services/factory-task-store';
 import type { FactoryTask } from '../../shared/factory-types';
 import type { ProjectConfig } from '../../shared/models';
 
+/** Columns that are not pipeline stages — dispatch is skipped for these. */
+const IMPLICIT_COLUMNS = new Set(['backlog', 'done', 'blocked']);
+
 export interface FactoryTaskServices {
   factoryTaskStore: FactoryTaskStore;
   projectStore?: { getProject: (id: string) => ProjectConfig | null };
+  /**
+   * Called when a task enters a pipeline stage column (not backlog/done/blocked).
+   * Implementors should restart the idle container for that stage so the agent
+   * picks up the newly available task from @task-queue.json.
+   */
+  onTaskEnteredStage?: (projectId: string, stageId: string) => void;
+}
+
+/**
+ * Write the current task queue to /workspace/@task-queue.json so agents
+ * running inside containers can discover which tasks are in their column.
+ * Silently no-ops when the project has no local_path or the write fails.
+ */
+async function syncQueueToWorkspace(
+  factoryTaskStore: FactoryTaskStore,
+  projectStore: { getProject: (id: string) => ProjectConfig | null } | undefined,
+  projectId: string,
+): Promise<void> {
+  const project = projectStore?.getProject(projectId);
+  if (!project?.local_path) return;
+  try {
+    const tasks = factoryTaskStore.getQueue(projectId).tasks;
+    await fs.writeFile(
+      path.join(project.local_path, '@task-queue.json'),
+      JSON.stringify(tasks, null, 2),
+      'utf-8',
+    );
+  } catch {
+    // non-fatal — workspace may not be mounted or accessible yet
+  }
 }
 
 /**
@@ -32,7 +67,7 @@ function broadcastTaskChanged(
 }
 
 export function registerFactoryTaskHandlers(services: FactoryTaskServices): void {
-  const { factoryTaskStore, projectStore } = services;
+  const { factoryTaskStore, projectStore, onTaskEnteredStage } = services;
 
   // List all tasks for a project
   ipcMain.handle(IPC.FACTORY_TASK_LIST, (_event, projectId: string): FactoryTask[] => {
@@ -50,25 +85,32 @@ export function registerFactoryTaskHandlers(services: FactoryTaskServices): void
   // Add a new task to backlog
   ipcMain.handle(
     IPC.FACTORY_TASK_ADD,
-    (
+    async (
       _event,
       projectId: string,
       title: string,
       description: string,
-    ): FactoryTask => {
+    ): Promise<FactoryTask> => {
       const task = factoryTaskStore.addTask(projectId, { title, description });
       broadcastTaskChanged(factoryTaskStore, projectId);
+      await syncQueueToWorkspace(factoryTaskStore, projectStore, projectId);
       return task;
     },
   );
 
   // Move a task to a different column (validates transition against the
   // project's active pipeline; bounce-counts backward moves; clears lock).
+  // After moving, syncs @task-queue.json to /workspace and (for stage columns)
+  // notifies the loop layer so the idle container can be restarted.
   ipcMain.handle(
     IPC.FACTORY_TASK_MOVE,
-    (_event, projectId: string, taskId: string, toColumn: string): FactoryTask => {
+    async (_event, projectId: string, taskId: string, toColumn: string): Promise<FactoryTask> => {
       const task = factoryTaskStore.moveTask(projectId, taskId, toColumn);
       broadcastTaskChanged(factoryTaskStore, projectId);
+      await syncQueueToWorkspace(factoryTaskStore, projectStore, projectId);
+      if (!IMPLICIT_COLUMNS.has(toColumn)) {
+        onTaskEnteredStage?.(projectId, toColumn);
+      }
       return task;
     },
   );
@@ -76,23 +118,25 @@ export function registerFactoryTaskHandlers(services: FactoryTaskServices): void
   // Remove a task permanently
   ipcMain.handle(
     IPC.FACTORY_TASK_REMOVE,
-    (_event, projectId: string, taskId: string): void => {
+    async (_event, projectId: string, taskId: string): Promise<void> => {
       factoryTaskStore.removeTask(projectId, taskId);
       broadcastTaskChanged(factoryTaskStore, projectId);
+      await syncQueueToWorkspace(factoryTaskStore, projectStore, projectId);
     },
   );
 
   // Update task title or description
   ipcMain.handle(
     IPC.FACTORY_TASK_UPDATE,
-    (
+    async (
       _event,
       projectId: string,
       taskId: string,
       updates: Partial<Pick<FactoryTask, 'title' | 'description'>>,
-    ): FactoryTask => {
+    ): Promise<FactoryTask> => {
       const task = factoryTaskStore.updateTask(projectId, taskId, updates);
       broadcastTaskChanged(factoryTaskStore, projectId);
+      await syncQueueToWorkspace(factoryTaskStore, projectStore, projectId);
       return task;
     },
   );
@@ -100,13 +144,14 @@ export function registerFactoryTaskHandlers(services: FactoryTaskServices): void
   // Sync tasks from project spec files
   ipcMain.handle(
     IPC.FACTORY_TASK_SYNC,
-    (_event, projectId: string): FactoryTask[] => {
+    async (_event, projectId: string): Promise<FactoryTask[]> => {
       const project = projectStore?.getProject(projectId);
       const specFiles = project?.spec_files ?? {};
       const localPath = project?.local_path;
       const newTasks = factoryTaskStore.syncFromSpecs(projectId, specFiles, localPath);
       if (newTasks.length > 0) {
         broadcastTaskChanged(factoryTaskStore, projectId);
+        await syncQueueToWorkspace(factoryTaskStore, projectStore, projectId);
       }
       return newTasks;
     },

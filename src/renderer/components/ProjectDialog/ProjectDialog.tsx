@@ -20,7 +20,6 @@ import { PreValidationSection } from './PreValidationSection';
 import { HooksSection } from './HooksSection';
 import { LoopScriptsSection } from './LoopScriptsSection';
 import { ClaudeSettingsSection } from './ClaudeSettingsSection';
-import { KiroHooksSection } from './KiroHooksSection';
 import { useImages } from '../../hooks/useImages';
 import { ImageBuilderDialog } from '../ImageBuilderDialog/ImageBuilderDialog';
 import PipelineBuilderDialog from '../PipelineBuilderDialog/PipelineBuilderDialog';
@@ -57,7 +56,6 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({ mode, project, onS
   const [hooks, setHooks] = useState<string[]>([]);
   const [loopScript, setLoopScript] = useState<string | undefined>(undefined);
   const [claudeSettingsFile, setClaudeSettingsFile] = useState<string | undefined>(undefined);
-  const [kiroHooks, setKiroHooks] = useState<string[]>([]);
 
   // Image picker state: library = pick from ZephyrImage library, custom = free-text
   const [imageMode, setImageMode] = useState<ImageMode>('custom');
@@ -92,7 +90,6 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({ mode, project, onS
   const [vmCloudInit, setVmCloudInit] = useState('');
   const [showVmAdvanced, setShowVmAdvanced] = useState(false);
   const [showClaudeConfig, setShowClaudeConfig] = useState(false);
-  const [showKiroConfig, setShowKiroConfig] = useState(false);
 
   // Git identity state
   const [gitUserName, setGitUserName] = useState('');
@@ -101,7 +98,6 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({ mode, project, onS
   // Factory state
   const [factoryEnabled, setFactoryEnabled] = useState(false);
   const [selectedPipelineId, setSelectedPipelineId] = useState<string | undefined>(undefined);
-  const [featureRequestsContent, setFeatureRequestsContent] = useState('');
 
   // Validation state
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -126,7 +122,6 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({ mode, project, onS
       setHooks(project.hooks ?? []);
       setLoopScript(project.loop_script);
       setClaudeSettingsFile(project.claude_settings_file);
-      setKiroHooks(project.kiro_hooks ?? []);
       setAdditionalMounts(project.additional_mounts ?? []);
       setImageId(project.image_id);
       setImageMode(project.image_id ? 'library' : images.length > 0 ? 'library' : 'custom');
@@ -144,7 +139,6 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({ mode, project, onS
       // Factory config
       setFactoryEnabled(project.factory_config?.enabled ?? false);
       setSelectedPipelineId(project.pipelineId);
-      setFeatureRequestsContent(project.feature_requests_content ?? '');
       // Git identity
       setGitUserName(project.git_user_name ?? '');
       setGitUserEmail(project.git_user_email ?? '');
@@ -170,7 +164,6 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({ mode, project, onS
       // Factory defaults
       setFactoryEnabled(false);
       setSelectedPipelineId(undefined);
-      setFeatureRequestsContent('');
     }
     setGithubPat('');
     setGitlabPat('');
@@ -268,8 +261,6 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({ mode, project, onS
         ? { enabled: true }
         : undefined;
 
-    const effectiveFeatureRequestsContent = featureRequestsContent.trim() || undefined;
-
     // Build config object
     const config: ProjectConfig =
       mode === 'edit' && project
@@ -291,8 +282,6 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({ mode, project, onS
             vm_config: effectiveVmConfig,
             factory_config: effectiveFactoryConfig,
             pipelineId: factoryEnabled ? selectedPipelineId : undefined,
-            feature_requests_content: effectiveFeatureRequestsContent,
-            kiro_hooks: kiroHooks,
             git_user_name: gitUserName.trim() || undefined,
             git_user_email: gitUserEmail.trim() || undefined,
             spec_files: Object.keys(specFiles).length > 0 ? specFiles : undefined,
@@ -313,8 +302,6 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({ mode, project, onS
             vm_config: effectiveVmConfig,
             factory_config: effectiveFactoryConfig,
             pipelineId: factoryEnabled ? selectedPipelineId : undefined,
-            feature_requests_content: effectiveFeatureRequestsContent,
-            kiro_hooks: kiroHooks,
             git_user_name: gitUserName.trim() || undefined,
             git_user_email: gitUserEmail.trim() || undefined,
             spec_files: Object.keys(specFiles).length > 0 ? specFiles : undefined,
@@ -945,26 +932,8 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({ mode, project, onS
                     ) : null;
                   })()}
 
-                  {/* Feature requests content */}
-                  <div>
-                    <label htmlFor="feature-requests-content" className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
-                      @feature_requests.md content (optional)
-                    </label>
-                    <textarea
-                      id="feature-requests-content"
-                      value={featureRequestsContent}
-                      onChange={(e) => setFeatureRequestsContent(e.target.value)}
-                      rows={5}
-                      placeholder={'# Feature Requests\n\nAdd feature requests here...'}
-                      className="w-full px-2 py-1.5 text-sm bg-gray-100 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded text-gray-900 dark:text-white font-mono focus:outline-none focus:ring-1 focus:ring-blue-500 resize-y"
-                    />
-                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                      Pre-populate <code className="bg-gray-200 dark:bg-gray-600 px-1 rounded">@feature_requests.md</code> with your requirements. Leave blank to use the default template. The file is never overwritten if it already exists on disk.
-                    </p>
-                  </div>
-
                   <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
-                    Team coordination files (@feature_requests.md, @team_plan.md, team/handovers/*, team/tasks/pending/, tasks/pending/)
+                    Team coordination files (@team_plan.md, team/handovers/*, team/tasks/pending/, tasks/pending/)
                     will be created in the workspace automatically.
                   </p>
                 </div>
@@ -1005,31 +974,13 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({ mode, project, onS
                   )}
                 </div>
 
-                {/* Kiro subsection */}
-                <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <div className="text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wide">
-                      Kiro
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setShowKiroConfig(!showKiroConfig)}
-                      className="text-xs text-blue-400 hover:text-blue-300 transition-colors"
-                    >
-                      {showKiroConfig ? '▲ Hide' : '▼ Show'}
-                    </button>
-                  </div>
-                  {showKiroConfig && (
-                    <div className="pl-1 mt-2">
-                      <KiroHooksSection selected={kiroHooks} onChange={setKiroHooks} />
-                    </div>
-                  )}
-                </div>
               </div>
             </div>
 
-            {/* Loop Scripts section */}
-            <LoopScriptsSection selected={loopScript} onChange={setLoopScript} />
+            {/* Loop Scripts section — hidden for coding factory projects */}
+            {!factoryEnabled && (
+              <LoopScriptsSection selected={loopScript} onChange={setLoopScript} />
+            )}
 
             {/* GitHub SSH Access section — only shown when repo URL is a GitHub URL */}
             {isGithubRepo && (
@@ -1166,8 +1117,8 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({ mode, project, onS
               </div>
             )}
 
-            {/* Custom Prompts section */}
-            <div className="mb-6">
+            {/* Custom Prompts section — hidden for coding factory projects */}
+            {!factoryEnabled && <div className="mb-6">
               <div className="flex items-center justify-between mb-2">
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                   Custom Prompts
@@ -1190,7 +1141,7 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({ mode, project, onS
               {showPromptEditor && (
                 <PromptEditor prompts={customPrompts} onChange={setCustomPrompts} />
               )}
-            </div>
+            </div>}
 
             {/* Spec Files section */}
             <div className="mb-6">

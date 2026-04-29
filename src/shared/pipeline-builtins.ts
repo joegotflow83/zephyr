@@ -31,21 +31,31 @@ const DEFAULT_BOUNCE_LIMIT = 3;
 // ─── Shared protocol preamble injected into every stage prompt ────────────────
 
 const PROTOCOL_PREAMBLE = `\
+TASK QUEUE
+  /workspace/@task-queue.json — read this file to discover available tasks.
+  It is a JSON array of task objects. Each object has:
+    id, title, description, column, lockedBy (null when available), bounceCount, updatedAt
+  Find tasks where column === "<your stage ID>" and lockedBy is null/absent.
+  Pick ONE task, lock it immediately, do the work, then signal status.
+  If no tasks are available for your stage, write @task-status.json with
+  status "idle" and exit — do not loop or poll.
+
 SIGNAL FILES (workspace-relative)
-  @task-status.json        — write to advance or reject a task
+  @task-status.json        — write to advance, reject, or signal idle
   @task-decomposition.json — PM only: decompose an epic into sub-tasks
   team/handovers/<taskId>-<from>-to-<to>.md — inter-agent notes
   @human_clarification.md  — PM only: escalate unresolved question to human
 
 LOCK PROTOCOL
-  Before doing any work: set lockedBy to "<stageId>-<INSTANCE_INDEX>".
-  After writing the status signal: clear lockedBy.
-  Read the INSTANCE_INDEX environment variable for your instance suffix.
+  Before doing any work: write @task-status.json with status "locked" and
+  lockedBy set to "<stageId>-<INSTANCE_INDEX>". Read INSTANCE_INDEX from env.
+  After writing the forward/rejected signal: the host clears lockedBy for you.
 
 ROUTING SIGNAL
   Write /workspace/@task-status.json:
   { "taskId": "<id>", "fromStage": "<yours>", "status": "forward" }
   For a rejection: set status to "rejected" and add toStage pointing to the earlier stage.
+  When nothing to do: { "status": "idle" }
 
 QUESTIONS
   Never write to @human_clarification.md — only the PM stage may do that.

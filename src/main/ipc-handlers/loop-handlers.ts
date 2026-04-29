@@ -844,7 +844,17 @@ export interface LoopServices {
   pipelineStore?: PipelineStore;
 }
 
-export function registerLoopHandlers(services: LoopServices): void {
+export interface LoopHandlerContext {
+  /**
+   * Restart the idle SINGLE-mode container(s) for a pipeline stage so the
+   * agent picks up a newly arrived task from /workspace/@task-queue.json.
+   * Safe to call when containers are still running — those are left untouched
+   * and will pick up the task on their next idle poll of the queue file.
+   */
+  dispatchFactoryStage: (projectId: string, stageId: string) => void;
+}
+
+export function registerLoopHandlers(services: LoopServices): LoopHandlerContext {
   const {
     loopRunner,
     scheduler,
@@ -1225,18 +1235,58 @@ export function registerLoopHandlers(services: LoopServices): void {
       // Falls back to claude --print if no loop script is configured.
       if (opts.mode === LoopMode.SINGLE && !opts.cmd && project) {
         const loopScript = project.loop_script;
-        const maxIterations = opts.envVars?.MAX_ITERATIONS ?? '10';
         const role = opts.role;
-        opts = {
-          ...opts,
-          cmd: loopScript
-            ? ['bash', '-c', role
-                ? `${ENSURE_CLAUDE_JSON} && ./${loopScript} ${role} ${maxIterations}`
-                : `${ENSURE_CLAUDE_JSON} && ./${loopScript} ${maxIterations}`]
-            : ['bash', '-c', role
-                ? `${ENSURE_CLAUDE_JSON} && claude --dangerously-skip-permissions --max-turns ${maxIterations} --output-format json --print "$(cat /workspace/PROMPT_${role}.md)"`
-                : `${ENSURE_CLAUDE_JSON} && claude --dangerously-skip-permissions --max-turns ${maxIterations} --output-format json`],
-        };
+        const singleSettings = configManager?.loadJson<AppSettings>('settings.json');
+        const singleUseKiro = singleSettings?.llm_provider === 'kiro';
+        if (loopScript) {
+          opts = {
+            ...opts,
+            cmd: ['bash', '-c', role
+              ? `${ENSURE_CLAUDE_JSON} && ./${loopScript} ${role}`
+              : `${ENSURE_CLAUDE_JSON} && ./${loopScript}`],
+          };
+        } else if (singleUseKiro) {
+          opts = {
+            ...opts,
+            cmd: role
+              ? ['bash', '-c', `kiro-cli chat --trust-all-tools --no-interactive "$(cat /workspace/PROMPT_${role}.md)"`]
+              : ['bash', '-c', `kiro-cli chat --trust-all-tools --no-interactive`],
+          };
+        } else {
+          opts = {
+            ...opts,
+            cmd: ['bash', '-c', role
+              ? `${ENSURE_CLAUDE_JSON} && claude --dangerously-skip-permissions --output-format json --print "$(cat /workspace/PROMPT_${role}.md)"`
+              : `${ENSURE_CLAUDE_JSON} && claude --dangerously-skip-permissions --output-format json`],
+          };
+        }
+      }
+
+      // Stage the Kiro CLI auth database for in-container copy.
+      // The working pattern (from ralph-village) is:
+      //   1. Copy the host DB to a temp file (avoids VirtioFS truncation)
+      //   2. Mount the copy at /tmp/kiro-data.sqlite3:ro
+      //   3. After container start, exec a cp inside the container to the
+      //      final writable path — SQLite needs write access for WAL/journal
+      const kiroDestFile = '/home/ralph/.local/share/kiro-cli/data.sqlite3';
+      let kiroStagedMount = false;
+      if (opts.volumeMounts) {
+        const kiroIdx = opts.volumeMounts.findIndex((m) => m.includes(kiroDestFile));
+        if (kiroIdx !== -1) {
+          const mount = opts.volumeMounts[kiroIdx];
+          const hostPath = mount.split(':')[0];
+          try {
+            const tmpFile = path.join(os.tmpdir(), `zephyr-kiro-db-${opts.projectId}${opts.role ? `-${opts.role}` : ''}.sqlite3`);
+            await fs.copyFile(hostPath, tmpFile);
+            await fs.chmod(tmpFile, 0o644);
+            const updated = [...opts.volumeMounts];
+            updated[kiroIdx] = `${tmpFile}:/tmp/kiro-data.sqlite3:ro`;
+            opts = { ...opts, volumeMounts: updated };
+            kiroStagedMount = true;
+          } catch (err) {
+            logger.warn('Failed to stage Kiro DB, using direct mount', { err });
+          }
+        }
       }
 
       // Remove any stale terminal loops for this project before starting a new one.
@@ -1259,6 +1309,19 @@ export function registerLoopHandlers(services: LoopServices): void {
       // system-wide before the agent starts. Runs as root so pip can write to
       // system site-packages. Failures are non-fatal — the loop continues without them.
       if (state.containerId && runtime) {
+        // Copy staged Kiro DB from /tmp mount to the writable final location.
+        // SQLite requires write access for WAL/journal even on read operations.
+        if (kiroStagedMount) {
+          try {
+            await runtime.execCommand(
+              state.containerId,
+              ['sh', '-c', 'mkdir -p /home/ralph/.local/share/kiro-cli && cp /tmp/kiro-data.sqlite3 /home/ralph/.local/share/kiro-cli/data.sqlite3 && chmod 644 /home/ralph/.local/share/kiro-cli/data.sqlite3'],
+            );
+          } catch (err) {
+            logger.warn('Failed to copy Kiro DB inside container', { err });
+          }
+        }
+
         // Python: install any requirements.txt / requirements-*.txt in /workspace
         try {
           await runtime.execCommand(
@@ -1735,10 +1798,10 @@ export function registerLoopHandlers(services: LoopServices): void {
       '@task-status.json': '{}',
       '@task-status.requested': '',
       '@TASK_STATUS_INSTRUCTIONS.md': TASK_STATUS_INSTRUCTIONS,
-      // @task-decomposition.json is intentionally NOT pre-created — its
-      // presence on disk signals "decomposition pending" to the host watcher.
-      // Pre-creating it would force the watcher to interpret an empty file as
-      // a malformed decomposition on every factory start.
+      // Pre-create with an empty object so fs.watch() can attach at factory
+      // start. The onDecomp handler validates content (returns early for
+      // missing action/parentTaskId/tasks), so {} won't trigger false positives.
+      '@task-decomposition.json': '{}',
       '@task-decomposition.requested': '',
       '@TASK_DECOMPOSITION_INSTRUCTIONS.md': TASK_DECOMPOSITION_INSTRUCTIONS,
       // @supervisor-action.json is not pre-created — its presence means "action pending".
@@ -1866,9 +1929,9 @@ export function registerLoopHandlers(services: LoopServices): void {
       // parallel instances of the same stage. The agent receives stage id and
       // instance index as both env vars and (when using a loop script) script
       // args so it can locate its prompt file and any per-instance state.
-      const isSingleFactory = baseOpts.mode === LoopMode.SINGLE;
-      const maxIterations = baseOpts.envVars?.MAX_ITERATIONS ?? '10';
       const loopScript = project.loop_script;
+      const settings = configManager?.loadJson<AppSettings>('settings.json');
+      const useKiro = settings?.llm_provider === 'kiro';
 
       const results: LoopState[] = [];
       for (const stage of pipeline.stages) {
@@ -1877,11 +1940,22 @@ export function registerLoopHandlers(services: LoopServices): void {
         for (let instanceIndex = 0; instanceIndex < instances; instanceIndex++) {
           const role = `${stage.id}-${instanceIndex}`;
 
-          let roleCmd: string[] | undefined;
-          if (isSingleFactory) {
-            roleCmd = loopScript
-              ? ['bash', '-c', `${ENSURE_CLAUDE_JSON} && ./${loopScript} ${stage.id} ${instanceIndex} ${maxIterations}`]
-              : ['bash', '-c', `${ENSURE_CLAUDE_JSON} && claude --dangerously-skip-permissions --max-turns ${maxIterations} --output-format json --print "$(cat /workspace/${promptFile})"`];
+          // Build the agent command. With a loop script, delegate entirely.
+          // Without one, run the agent CLI in a loop: execute the prompt,
+          // sleep, repeat. The agent protocol tells agents to write
+          // @task-status.json with status "idle" and exit when no tasks are
+          // available; the loop restarts them after a brief pause.
+          let roleCmd: string[];
+          if (loopScript) {
+            roleCmd = ['bash', '-c', `${ENSURE_CLAUDE_JSON} && ./${loopScript} ${stage.id} ${instanceIndex}`];
+          } else {
+            const agentInvocation = useKiro
+              ? `kiro-cli chat --trust-all-tools --no-interactive "$(cat /workspace/${promptFile})"`
+              : `claude --dangerously-skip-permissions --output-format json --print "$(cat /workspace/${promptFile})"`;
+            const setup = useKiro ? '' : `${ENSURE_CLAUDE_JSON}\n`;
+            // Only invoke the LLM when there's an unlocked task in this agent's column.
+            const hasTask = `grep -q '"column"[[:space:]]*:[[:space:]]*"${stage.id}"' /workspace/@task-queue.json`;
+            roleCmd = ['bash', '-c', `${setup}while true; do\n  if ${hasTask}; then\n    ${agentInvocation}\n  fi\n  sleep 10\ndone`];
           }
 
           const roleOpts: LoopStartOpts = {
@@ -1889,12 +1963,12 @@ export function registerLoopHandlers(services: LoopServices): void {
             projectId,
             projectName: project.name,
             role,
+            cmd: roleCmd,
             envVars: {
               ...(baseOpts.envVars ?? {}),
               STAGE_ID: stage.id,
               INSTANCE_INDEX: String(instanceIndex),
             },
-            ...(roleCmd ? { cmd: roleCmd } : {}),
           };
 
           try {
@@ -1907,6 +1981,21 @@ export function registerLoopHandlers(services: LoopServices): void {
             );
             // Continue starting other stages — partial factory is better than none
           }
+        }
+      }
+
+      // Write the current task queue to /workspace/@task-queue.json so agents
+      // starting up right now can immediately find tasks in their column.
+      if (project.local_path && factoryTaskStore) {
+        try {
+          const tasks = factoryTaskStore.getQueue(projectId).tasks;
+          await fs.writeFile(
+            path.join(project.local_path, '@task-queue.json'),
+            JSON.stringify(tasks, null, 2),
+            'utf-8',
+          );
+        } catch (err) {
+          logger.warn('Failed to write @task-queue.json on factory start', { err, projectId });
         }
       }
 
@@ -2018,16 +2107,25 @@ export function registerLoopHandlers(services: LoopServices): void {
   // @human_clarification.md, so no cooldown is needed.
   const clarificationWatchers = new Map<string, fsSync.FSWatcher>();
 
+  // Watchers for human edits to @human_clarification.md (the response path).
+  // Set up when the PM is paused; torn down when the human responds.
+  const clarificationResponseWatchers = new Map<string, fsSync.FSWatcher>();
+
+  // Tracks the taskId that was moved to needs_input per loop key so we can
+  // move it back when the human responds.
+  const clarificationTaskIds = new Map<string, string>();
+
   // Watcher for @task-status.requested per project (shared across all roles).
-  // The trigger file is written only by the injected hook when the agent writes
-  // @task-status.json, so reads are always fresh agent output.
-  const taskStatusWatchers = new Map<string, fsSync.FSWatcher>();
+  // Watcher for @task-status changes per project (shared across all roles).
+  // We watch both the .requested trigger (written by Claude hooks) and the
+  // .json file itself (for kiro-cli or any engine without PostToolUse hooks).
+  const taskStatusWatchers = new Map<string, fsSync.FSWatcher[]>();
 
   // Watcher for @task-decomposition.requested per project (shared across all
   // roles). The PM agent writes @task-decomposition.json to break an epic into
   // sub-tasks; the host reads it, creates the children atomically, and deletes
   // the source file so re-triggers don't duplicate.
-  const taskDecompositionWatchers = new Map<string, fsSync.FSWatcher>();
+  const taskDecompositionWatchers = new Map<string, fsSync.FSWatcher[]>();
 
   // Watcher for @supervisor-action.requested per project (shared across all
   // roles). Any container can write @supervisor-action.json to trigger host-side
@@ -2059,19 +2157,17 @@ export function registerLoopHandlers(services: LoopServices): void {
       if (!taskStatusWatchers.has(state.projectId)) {
         const workspacePath = project?.local_path;
         if (workspacePath && factoryTaskStore) {
+          const statusJsonPath = path.join(workspacePath, '@task-status.json');
           const taskStatusTrigger = path.join(workspacePath, '@task-status.requested');
-          try {
-            const watcher = fsSync.watch(taskStatusTrigger, () => {
+          const onStatusChange = () => {
               let statusData: unknown;
               try {
                 const statusRaw = fsSync.readFileSync(
-                  path.join(workspacePath, '@task-status.json'),
+                  statusJsonPath,
                   'utf-8',
                 );
                 statusData = JSON.parse(statusRaw);
               } catch {
-                // @task-status.json may not exist yet, be partially written, or
-                // contain invalid JSON. Next trigger will retry.
                 return;
               }
 
@@ -2081,6 +2177,14 @@ export function registerLoopHandlers(services: LoopServices): void {
                 pipelineStore,
               });
               if (!changed) return;
+
+              const sd = statusData as { taskId?: string };
+              if (sd.taskId) {
+                const movedTask = factoryTaskStore.getTask(state.projectId, sd.taskId);
+                if (movedTask && !['backlog', 'done', 'blocked'].includes(movedTask.column)) {
+                  dispatchFactoryStage(state.projectId, movedTask.column);
+                }
+              }
 
               const updatedQueue = factoryTaskStore.getQueue(state.projectId);
               BrowserWindow.getAllWindows().forEach((win) => {
@@ -2092,10 +2196,20 @@ export function registerLoopHandlers(services: LoopServices): void {
                   );
                 }
               });
-            });
-            taskStatusWatchers.set(state.projectId, watcher);
-          } catch {
-            // @task-status.requested may not exist yet — ignore
+
+              fs.writeFile(
+                path.join(workspacePath, '@task-queue.json'),
+                JSON.stringify(updatedQueue.tasks, null, 2),
+                'utf-8',
+              ).catch(() => {/* non-fatal */});
+          };
+          const watchers: fsSync.FSWatcher[] = [];
+          // Watch the .requested trigger (Claude PostToolUse hook)
+          try { watchers.push(fsSync.watch(taskStatusTrigger, onStatusChange)); } catch { /* may not exist yet */ }
+          // Watch the .json file directly (kiro-cli / engines without hooks)
+          try { watchers.push(fsSync.watch(statusJsonPath, onStatusChange)); } catch { /* may not exist yet */ }
+          if (watchers.length > 0) {
+            taskStatusWatchers.set(state.projectId, watchers);
           }
         }
       }
@@ -2114,16 +2228,12 @@ export function registerLoopHandlers(services: LoopServices): void {
         if (workspacePath) {
           const decompTrigger = path.join(workspacePath, '@task-decomposition.requested');
           const decompFile = path.join(workspacePath, '@task-decomposition.json');
-          try {
-            const watcher = fsSync.watch(decompTrigger, () => {
+          const onDecomp = () => {
               let decompData: unknown;
               try {
                 const decompRaw = fsSync.readFileSync(decompFile, 'utf-8');
                 decompData = JSON.parse(decompRaw);
               } catch {
-                // @task-decomposition.json missing, partial, or malformed.
-                // Next trigger will retry; deletion below only happens on
-                // successful processing.
                 return;
               }
 
@@ -2134,14 +2244,18 @@ export function registerLoopHandlers(services: LoopServices): void {
               });
               if (!changed) return;
 
-              // Delete the source file *only* after a successful decomposition
-              // so the next watcher trigger doesn't re-create the same
-              // sub-tasks (the file's presence is the canonical "pending"
-              // signal — single source of truth, no separate ledger).
+              const proj = projectStore.getProject(state.projectId);
+              const pl = proj?.pipelineId ? pipelineStore.getPipeline(proj.pipelineId) : null;
+              if (pl && pl.stages.length > 0) {
+                dispatchFactoryStage(state.projectId, pl.stages[0].id);
+              }
+
+              // Reset to empty sentinel so the watcher stays alive for
+              // subsequent decompositions (unlink would invalidate it).
               try {
-                fsSync.unlinkSync(decompFile);
+                fsSync.writeFileSync(decompFile, '{}', 'utf-8');
               } catch (err) {
-                logger.warn('Failed to delete @task-decomposition.json after processing', {
+                logger.warn('Failed to reset @task-decomposition.json after processing', {
                   err,
                   projectId: state.projectId,
                 });
@@ -2157,10 +2271,12 @@ export function registerLoopHandlers(services: LoopServices): void {
                   );
                 }
               });
-            });
-            taskDecompositionWatchers.set(state.projectId, watcher);
-          } catch {
-            // @task-decomposition.requested may not exist yet — ignore
+          };
+          const watchers: fsSync.FSWatcher[] = [];
+          try { watchers.push(fsSync.watch(decompTrigger, onDecomp)); } catch { /* may not exist yet */ }
+          try { watchers.push(fsSync.watch(decompFile, onDecomp)); } catch { /* may not exist yet */ }
+          if (watchers.length > 0) {
+            taskDecompositionWatchers.set(state.projectId, watchers);
           }
         }
       }
@@ -2200,13 +2316,17 @@ export function registerLoopHandlers(services: LoopServices): void {
       }
     }
 
-    // Start watching @human_clarification.md when a loop becomes active
+    // Start watching @human_clarification.requested when a loop becomes active
     if (state.status === LoopStatus.RUNNING && !clarificationWatchers.has(loopKey)) {
       const workspacePath = project?.local_path;
       if (workspacePath) {
-        const clarificationFile = path.join(workspacePath, '@human_clarification.requested');
+        const clarificationTrigger = path.join(workspacePath, '@human_clarification.requested');
+        const clarificationFile = path.join(workspacePath, '@human_clarification.md');
         try {
-          const watcher = fsSync.watch(clarificationFile, () => {
+          const watcher = fsSync.watch(clarificationTrigger, async () => {
+            const logger = getLogger('loop');
+
+            // 1. Send OS notification
             const settings = configManager?.loadJson<AppSettings>('settings.json');
             if (settings?.notification_enabled) {
               const projectName = project?.name ?? state.projectId;
@@ -2214,6 +2334,98 @@ export function registerLoopHandlers(services: LoopServices): void {
                 title: 'Agent needs clarification',
                 body: `"${projectName}" is waiting for your input in @human_clarification.md`,
               }).show();
+            }
+
+            // 2. Pause the PM container to stop burning tokens
+            try {
+              await loopRunner.pauseLoop(state.projectId, state.role);
+            } catch (err) {
+              logger.warn('Failed to pause PM loop on clarification', { loopKey, err });
+            }
+
+            // 3. Read taskId from @human_clarification.md and move to needs_input
+            if (factoryTaskStore) {
+              try {
+                const raw = fsSync.readFileSync(clarificationFile, 'utf-8');
+                const parsed = JSON.parse(raw);
+                const taskId = parsed?.taskId;
+                if (taskId && typeof taskId === 'string') {
+                  const task = factoryTaskStore.getTask(state.projectId, taskId);
+                  if (task && task.column !== 'needs_input') {
+                    factoryTaskStore.moveTask(state.projectId, taskId, 'needs_input');
+                    clarificationTaskIds.set(loopKey, taskId);
+
+                    // Broadcast updated queue to renderer
+                    const updatedQueue = factoryTaskStore.getQueue(state.projectId);
+                    BrowserWindow.getAllWindows().forEach((win) => {
+                      if (!win.isDestroyed()) {
+                        win.webContents.send(IPC.FACTORY_TASK_CHANGED, state.projectId, updatedQueue.tasks);
+                      }
+                    });
+
+                    // Persist to workspace
+                    fs.writeFile(
+                      path.join(workspacePath, '@task-queue.json'),
+                      JSON.stringify(updatedQueue.tasks, null, 2),
+                      'utf-8',
+                    ).catch(() => {/* non-fatal */});
+                  }
+                }
+              } catch {
+                // @human_clarification.md may not be valid JSON — non-fatal
+              }
+            }
+
+            // 4. Watch @human_clarification.md for human edits to resume
+            if (!clarificationResponseWatchers.has(loopKey)) {
+              try {
+                const mTimeBefore = fsSync.statSync(clarificationFile).mtimeMs;
+                const responseWatcher = fsSync.watch(clarificationFile, async () => {
+                  // Only trigger if the file was actually modified (not just accessed)
+                  let mTimeAfter: number;
+                  try { mTimeAfter = fsSync.statSync(clarificationFile).mtimeMs; } catch { return; }
+                  if (mTimeAfter <= mTimeBefore) return;
+
+                  // Tear down this response watcher
+                  responseWatcher.close();
+                  clarificationResponseWatchers.delete(loopKey);
+
+                  // Move task back from needs_input to pm
+                  const savedTaskId = clarificationTaskIds.get(loopKey);
+                  clarificationTaskIds.delete(loopKey);
+                  if (savedTaskId && factoryTaskStore) {
+                    try {
+                      const task = factoryTaskStore.getTask(state.projectId, savedTaskId);
+                      if (task?.column === 'needs_input') {
+                        factoryTaskStore.moveTask(state.projectId, savedTaskId, 'pm');
+                        const updatedQueue = factoryTaskStore.getQueue(state.projectId);
+                        BrowserWindow.getAllWindows().forEach((win) => {
+                          if (!win.isDestroyed()) {
+                            win.webContents.send(IPC.FACTORY_TASK_CHANGED, state.projectId, updatedQueue.tasks);
+                          }
+                        });
+                        fs.writeFile(
+                          path.join(workspacePath, '@task-queue.json'),
+                          JSON.stringify(updatedQueue.tasks, null, 2),
+                          'utf-8',
+                        ).catch(() => {/* non-fatal */});
+                      }
+                    } catch (err) {
+                      logger.warn('Failed to move task back from needs_input', { loopKey, savedTaskId, err });
+                    }
+                  }
+
+                  // Resume the PM container
+                  try {
+                    await loopRunner.resumeLoop(state.projectId, state.role);
+                  } catch (err) {
+                    logger.warn('Failed to resume PM loop after clarification', { loopKey, err });
+                  }
+                });
+                clarificationResponseWatchers.set(loopKey, responseWatcher);
+              } catch {
+                // @human_clarification.md may not exist yet — ignore
+              }
             }
           });
           clarificationWatchers.set(loopKey, watcher);
@@ -2230,6 +2442,12 @@ export function registerLoopHandlers(services: LoopServices): void {
         watcher.close();
         clarificationWatchers.delete(loopKey);
       }
+      const responseWatcher = clarificationResponseWatchers.get(loopKey);
+      if (responseWatcher) {
+        responseWatcher.close();
+        clarificationResponseWatchers.delete(loopKey);
+      }
+      clarificationTaskIds.delete(loopKey);
 
       // Remove this loop from the project's active-key set; tear down task
       // status watcher only when no other loops for this project remain active.
@@ -2240,12 +2458,12 @@ export function registerLoopHandlers(services: LoopServices): void {
           activeLoopKeysByProject.delete(state.projectId);
           const taskWatcher = taskStatusWatchers.get(state.projectId);
           if (taskWatcher) {
-            taskWatcher.close();
+            taskWatcher.forEach((w) => w.close());
             taskStatusWatchers.delete(state.projectId);
           }
           const decompWatcher = taskDecompositionWatchers.get(state.projectId);
           if (decompWatcher) {
-            decompWatcher.close();
+            decompWatcher.forEach((w) => w.close());
             taskDecompositionWatchers.delete(state.projectId);
           }
           const supervisorWatcher = supervisorActionWatchers.get(state.projectId);
@@ -2296,4 +2514,39 @@ export function registerLoopHandlers(services: LoopServices): void {
       }, 250);
     }
   });
+
+  /**
+   * Restart idle SINGLE-mode containers for a pipeline stage so the agent
+   * can process a newly arrived task from /workspace/@task-queue.json.
+   * Iterates over all registered instances of the stage (e.g. stageId-0,
+   * stageId-1, …) and restarts any that have reached a terminal state.
+   * Running containers (CONTINUOUS mode or still executing) are skipped —
+   * they will pick up the task when they next read the queue file.
+   */
+  function dispatchFactoryStage(projectId: string, stageId: string): void {
+    const firstKey = getLoopKey(projectId, `${stageId}-0`);
+    if (!loopOptsMap.has(firstKey)) {
+      logger.warn('dispatchFactoryStage: no registered opts for stage — factory may not be running', { projectId, stageId });
+    }
+    for (let i = 0; i < 16; i++) {
+      const role = `${stageId}-${i}`;
+      const loopKey = getLoopKey(projectId, role);
+      const opts = loopOptsMap.get(loopKey);
+      if (!opts) break; // no more registered instances for this stage
+
+      const loop = loopRunner.getLoopState(projectId, role);
+      if (loop && !isLoopTerminal(loop.status)) {
+        // Still running — let the agent pick up the task on its own
+        continue;
+      }
+
+      // Container is idle/terminal — restart it so it processes the new task
+      logger.info('dispatchFactoryStage: restarting idle container', { projectId, role });
+      startLoopCore(opts).catch((err) => {
+        logger.warn('dispatchFactoryStage: failed to restart container', { projectId, role, err });
+      });
+    }
+  }
+
+  return { dispatchFactoryStage };
 }

@@ -210,6 +210,14 @@ export class DockerRuntime implements ContainerRuntime {
     await this.docker.getContainer(id).stop({ t: timeout ?? 10 });
   }
 
+  async pauseContainer(id: string): Promise<void> {
+    await this.docker.getContainer(id).pause();
+  }
+
+  async unpauseContainer(id: string): Promise<void> {
+    await this.docker.getContainer(id).unpause();
+  }
+
   async removeContainer(id: string, force?: boolean): Promise<void> {
     await this.docker.getContainer(id).remove({ force });
   }

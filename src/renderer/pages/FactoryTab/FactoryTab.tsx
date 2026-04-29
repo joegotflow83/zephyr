@@ -7,10 +7,12 @@ import { useFactoryTasks } from '../../hooks/useFactoryTasks';
 import { useAppStore } from '../../stores/app-store';
 import type { FactoryTask } from '../../../shared/factory-types';
 import type { LoopState } from '../../../shared/loop-types';
-import { getLoopKey } from '../../../shared/loop-types';
+import { getLoopKey, isLoopTerminal, LoopMode } from '../../../shared/loop-types';
+import { useLoops } from '../../hooks/useLoops';
 
 export const FactoryTab: React.FC = () => {
   const projects = useAppStore((s) => s.projects);
+  const projectsLoading = useAppStore((s) => s.projectsLoading);
   const loops = useAppStore((s) => s.loops);
   const refreshFactoryTasks = useAppStore((s) => s.refreshFactoryTasks);
 
@@ -21,6 +23,8 @@ export const FactoryTab: React.FC = () => {
   const [selectedTask, setSelectedTask] = useState<FactoryTask | null>(null);
   const [selectedLoopKey, setSelectedLoopKey] = useState<string | null>(null);
   const [hasSynced, setHasSynced] = useState<Record<string, boolean>>({});
+  const { factoryStart, factoryStop } = useLoops();
+  const [startingFactory, setStartingFactory] = useState(false);
 
   // Auto-select first factory-enabled project
   useEffect(() => {
@@ -100,8 +104,81 @@ export const FactoryTab: React.FC = () => {
     await syncFromSpecs();
   }, [syncFromSpecs]);
 
+  const factoryNotRunning =
+    !!selectedProjectId && projectLoops.every((l) => isLoopTerminal(l.status));
+
+  const handleStartFactory = useCallback(async () => {
+    if (!selectedProjectId) return;
+    const project = factoryProjects.find((p) => p.id === selectedProjectId);
+    if (!project) return;
+    setStartingFactory(true);
+    try {
+      const kiroDbPath = useAppStore.getState().settings?.kiro_db_path;
+      const extraMounts = [
+        ...(project.additional_mounts ?? []).map((hostPath) => {
+          const basename = hostPath.split('/').filter(Boolean).pop() ?? hostPath;
+          return `${hostPath}:/mnt/${basename}`;
+        }),
+        ...(kiroDbPath ? [`${kiroDbPath}:/home/ralph/.local/share/kiro-cli/data.sqlite3:ro`] : []),
+      ];
+      await factoryStart(project.id, {
+        projectId: project.id,
+        projectName: project.name,
+        dockerImage: project.docker_image || '',
+        mode: LoopMode.CONTINUOUS,
+        ...(project.local_path || extraMounts.length > 0
+          ? {
+              volumeMounts: [
+                ...(project.local_path ? [`${project.local_path}:/workspace`] : []),
+                ...extraMounts,
+              ],
+              ...(project.local_path ? { workDir: '/workspace' } : {}),
+            }
+          : {}),
+        ...(project.sandbox_type === 'vm'
+          ? { sandboxType: 'vm' as const, vmConfig: project.vm_config }
+          : {}),
+      });
+    } catch (err) {
+      console.error('Failed to start factory:', err);
+    } finally {
+      setStartingFactory(false);
+    }
+  }, [selectedProjectId, factoryProjects, factoryStart]);
+
+  const handleStopFactory = useCallback(async () => {
+    if (!selectedProjectId) return;
+    try {
+      await factoryStop(selectedProjectId);
+    } catch (err) {
+      console.error('Failed to stop factory:', err);
+    }
+  }, [selectedProjectId, factoryStop]);
+
+  // Loading state while projects load initially
+  if (projectsLoading && projects.length === 0) {
+    return (
+      <div className="flex items-center justify-center h-full text-gray-400">
+        Loading projects…
+      </div>
+    );
+  }
+
+  // Empty state — no projects at all
+  if (projects.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full text-gray-400">
+        <div className="text-5xl mb-4">🏭</div>
+        <h2 className="text-xl font-semibold text-gray-200 mb-2">No Projects</h2>
+        <p className="text-sm text-center max-w-sm">
+          Create a project first, then enable factory mode in its settings.
+        </p>
+      </div>
+    );
+  }
+
   // Empty state — no factory-enabled projects
-  if (projects.length > 0 && factoryProjects.length === 0) {
+  if (factoryProjects.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center h-full text-gray-400">
         <div className="text-5xl mb-4">🏭</div>
@@ -110,15 +187,6 @@ export const FactoryTab: React.FC = () => {
           Enable factory mode on a project by setting{' '}
           <code className="text-blue-400">factory_config.enabled = true</code> in its settings.
         </p>
-      </div>
-    );
-  }
-
-  // Loading state while projects load initially
-  if (projects.length === 0) {
-    return (
-      <div className="flex items-center justify-center h-full text-gray-400">
-        Loading projects…
       </div>
     );
   }
@@ -150,6 +218,15 @@ export const FactoryTab: React.FC = () => {
           <span>⟳</span>
           Sync from Specs
         </button>
+
+        {selectedProjectId && !factoryNotRunning && (
+          <button
+            onClick={handleStopFactory}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-red-700 hover:bg-red-600 text-white rounded transition-colors"
+          >
+            ■ Stop Factory
+          </button>
+        )}
       </div>
 
       {/* Factory flow diagram */}
@@ -160,9 +237,24 @@ export const FactoryTab: React.FC = () => {
             selectedLoopKey={selectedLoopKey}
             onSelectLoop={(loop) => setSelectedLoopKey(getLoopKey(loop))}
             onRestartLoop={(loop) => {
-              window.api.factory.restartContainer(loop.projectId, loop.role ?? '').catch(() => {});
+              window.api.factory.restartContainer(loop.projectId, loop.role ?? '').catch(() => undefined);
             }}
           />
+        </div>
+      )}
+
+      {/* Factory not running banner */}
+      {selectedProjectId && factoryNotRunning && (
+        <div className="flex items-center gap-2 px-4 py-2 bg-yellow-900/40 border-b border-yellow-700/50 text-yellow-300 text-xs">
+          <span>⚠️</span>
+          <span>Factory is not running. Agents cannot pick up tasks until the factory is started.</span>
+          <button
+            onClick={handleStartFactory}
+            disabled={startingFactory}
+            className="ml-auto px-3 py-1 text-xs font-medium bg-green-700 hover:bg-green-600 disabled:opacity-50 text-white rounded transition-colors"
+          >
+            {startingFactory ? 'Starting…' : 'Start Factory'}
+          </button>
         </div>
       )}
 

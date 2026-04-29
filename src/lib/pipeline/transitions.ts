@@ -41,8 +41,8 @@ export interface DerivedTransitions {
  * - `blocked` — awaits manual triage; forward movement is a human decision
  */
 export function deriveTransitions(pipeline: Pipeline): DerivedTransitions {
-  const all = columnsFor(pipeline); // [backlog, ...stages, done, blocked]
-  const flow = all.filter((c) => c !== 'blocked'); // [backlog, ...stages, done]
+  const all = columnsFor(pipeline); // [backlog, ...stages, done, blocked, needs_input]
+  const flow = all.filter((c) => c !== 'blocked' && c !== 'needs_input'); // [backlog, ...stages, done]
 
   const allowed: Record<string, string[]> = {};
   const forward: Record<string, string | null> = {};
@@ -56,6 +56,7 @@ export function deriveTransitions(pipeline: Pipeline): DerivedTransitions {
     if (next) moves.push(next);
     if (prev) moves.push(prev);
     moves.push('blocked');
+    moves.push('needs_input');
 
     allowed[col] = moves;
     forward[col] = next;
@@ -64,6 +65,10 @@ export function deriveTransitions(pipeline: Pipeline): DerivedTransitions {
   // Human override: from Blocked, move the task to any flow column to resume.
   allowed['blocked'] = [...flow];
   forward['blocked'] = null;
+
+  // Needs Input: same semantics — human parks a task here, can return it anywhere.
+  allowed['needs_input'] = [...flow];
+  forward['needs_input'] = null;
 
   return { allowed, forward };
 }

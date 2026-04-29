@@ -127,7 +127,7 @@ const sshKeyManager = new SSHKeyManager(runtime);
 registerDataHandlers({ configManager, projectStore, importExport, preValidationStore, hooksStore, kiroHooksStore, loopScriptsStore, claudeSettingsStore, loopRunner, runtime, credentialManager, sshKeyManager, deployKeyStore });
 registerRuntimeHandlers({ runtime, runtimeHealth });
 registerCredentialHandlers({ credentialManager, loginManager });
-registerLoopHandlers({
+const { dispatchFactoryStage } = registerLoopHandlers({
   loopRunner,
   scheduler,
   cleanupManager,
@@ -152,7 +152,11 @@ registerUpdateHandlers({ selfUpdater });
 registerAutoUpdateHandlers({ autoUpdater });
 registerImageHandlers({ imageStore, imageBuilder });
 registerDeployKeyHandlers({ deployKeyStore });
-registerFactoryTaskHandlers({ factoryTaskStore, projectStore });
+registerFactoryTaskHandlers({
+  factoryTaskStore,
+  projectStore,
+  onTaskEnteredStage: dispatchFactoryStage,
+});
 registerPipelineHandlers({ pipelineStore, projectStore });
 registerVMHandlers({ vmManager, loopRunner });
 

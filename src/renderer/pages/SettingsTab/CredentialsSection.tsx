@@ -24,6 +24,8 @@ export const CredentialsSection: React.FC = () => {
   const [githubMaskedKey, setGithubMaskedKey] = useState<string | null>(null);
   const [gitlabStored, setGitlabStored] = useState(false);
   const [gitlabMaskedKey, setGitlabMaskedKey] = useState<string | null>(null);
+  const [kiroDbPath, setKiroDbPath] = useState('');
+  const [kiroDbSaving, setKiroDbSaving] = useState(false);
   // Dialog visibility
   const [showApiKeyDialog, setShowApiKeyDialog] = useState(false);
   const [showBedrockDialog, setShowBedrockDialog] = useState(false);
@@ -55,6 +57,7 @@ export const CredentialsSection: React.FC = () => {
         ? await window.api.credentials.get('gitlab')
         : null;
       setGitlabMaskedKey(gitlabKey);
+      setKiroDbPath(loadedSettings.kiro_db_path ?? '');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load credentials');
     } finally {
@@ -66,11 +69,23 @@ export const CredentialsSection: React.FC = () => {
     loadAll();
   }, [loadAll]);
 
+  const saveLlmProvider = async (provider: 'claude' | 'kiro') => {
+    if (!settings) return;
+    try {
+      setError(null);
+      const updated = { ...settings, llm_provider: provider };
+      await window.api.settings.save(updated);
+      setSettings(updated);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to save LLM provider');
+    }
+  };
+
   const saveAuthMethod = async (method: AnthropicAuthMethod) => {
     if (!settings) return;
     try {
       setError(null);
-      const updated = { ...settings, anthropic_auth_method: method };
+      const updated = { ...settings, llm_provider: 'claude' as const, anthropic_auth_method: method };
       await window.api.settings.save(updated);
       setSettings(updated);
     } catch (err) {
@@ -196,10 +211,25 @@ export const CredentialsSection: React.FC = () => {
     }
   };
 
+  const handleSaveKiroDbPath = async () => {
+    if (!settings) return;
+    setKiroDbSaving(true);
+    setError(null);
+    try {
+      await window.api.settings.save({ ...settings, kiro_db_path: kiroDbPath.trim() || undefined });
+      await loadAll();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to save Kiro DB path');
+    } finally {
+      setKiroDbSaving(false);
+    }
+  };
+
   if (loading) {
     return <div className="text-gray-500 dark:text-gray-400 text-center py-4">Loading credentials...</div>;
   }
 
+  const activeProvider = settings?.llm_provider ?? 'claude';
   const activeMethod = settings?.anthropic_auth_method ?? 'api_key';
 
   return (
@@ -210,20 +240,20 @@ export const CredentialsSection: React.FC = () => {
         </div>
       )}
 
-      {/* ── Section 1: Anthropic API Access ─────────────────────────────── */}
+      {/* ── Section 1: AI Provider ───────────────────────────────────────── */}
       <div>
-        <h3 className="text-gray-900 dark:text-white font-semibold mb-1">Anthropic API Access</h3>
+        <h3 className="text-gray-900 dark:text-white font-semibold mb-1">AI Provider</h3>
         <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">
-          Choose how Claude Code inside containers authenticates with Anthropic.
-          The selected method is automatically injected at loop start.
+          Choose which AI agent runs inside containers. The selected provider is
+          automatically configured at loop start.
         </p>
 
         <div className="space-y-3">
           {/* API Key card */}
           <AuthMethodCard
-            active={activeMethod === 'api_key'}
+            active={activeProvider === 'claude' && activeMethod === 'api_key'}
             onClick={() => saveAuthMethod('api_key')}
-            title="API Key"
+            title="Claude — API Key"
             description="Use ANTHROPIC_API_KEY injected as an environment variable"
             statusLabel={authStatus.api_key ? 'Key stored' : 'Not configured'}
             statusOk={authStatus.api_key}
@@ -249,9 +279,9 @@ export const CredentialsSection: React.FC = () => {
 
           {/* Browser Session card */}
           <AuthMethodCard
-            active={activeMethod === 'browser_session'}
+            active={activeProvider === 'claude' && activeMethod === 'browser_session'}
             onClick={() => saveAuthMethod('browser_session')}
-            title="Browser Session"
+            title="Claude — Browser Session"
             description="Login via claude.ai; session cookies are written to ~/.claude.json inside the container"
             statusLabel={authStatus.browser_session ? 'Session stored' : 'Not configured'}
             statusOk={authStatus.browser_session}
@@ -278,9 +308,9 @@ export const CredentialsSection: React.FC = () => {
 
           {/* AWS Bedrock card */}
           <AuthMethodCard
-            active={activeMethod === 'aws_bedrock'}
+            active={activeProvider === 'claude' && activeMethod === 'aws_bedrock'}
             onClick={() => saveAuthMethod('aws_bedrock')}
-            title="AWS Bedrock"
+            title="Claude — AWS Bedrock"
             description="Use AWS Bedrock with CLAUDE_CODE_USE_BEDROCK=1 and your AWS credentials"
             statusLabel={
               authStatus.aws_bedrock
@@ -307,6 +337,56 @@ export const CredentialsSection: React.FC = () => {
               </>
             }
           />
+
+          {/* Kiro card */}
+          <AuthMethodCard
+            active={activeProvider === 'kiro'}
+            onClick={() => void saveLlmProvider('kiro')}
+            title="Kiro"
+            description="Use the Kiro CLI agent; auth database is bind-mounted from the host"
+            statusLabel={settings?.kiro_db_path ? 'DB path configured' : 'Not configured'}
+            statusOk={!!settings?.kiro_db_path}
+            action={null}
+          />
+
+          {/* Kiro db path input — shown when Kiro is the active provider */}
+          {activeProvider === 'kiro' && (
+            <div className="ml-7 p-3 rounded-lg bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 space-y-2">
+              <label className="block text-xs font-medium text-gray-500 dark:text-gray-400">
+                Host path to{' '}
+                <code className="bg-gray-200 dark:bg-gray-700 px-1 rounded">data.sqlite3</code>
+              </label>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={kiroDbPath}
+                  onChange={(e) => setKiroDbPath(e.target.value)}
+                  placeholder="/home/you/.local/share/kiro-cli/data.sqlite3"
+                  className="flex-1 px-3 py-1.5 text-sm bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded text-gray-900 dark:text-white font-mono focus:outline-none focus:ring-1 focus:ring-blue-500"
+                />
+                <button
+                  onClick={() => void handleSaveKiroDbPath()}
+                  disabled={kiroDbSaving}
+                  className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-xs rounded transition-colors"
+                >
+                  {kiroDbSaving ? 'Saving…' : 'Save Path'}
+                </button>
+                {settings?.kiro_db_path && (
+                  <button
+                    onClick={() => { setKiroDbPath(''); void handleSaveKiroDbPath(); }}
+                    className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-xs rounded transition-colors"
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
+              {settings?.kiro_db_path && (
+                <p className="text-xs text-green-400">
+                  Configured — containers will mount this file automatically.
+                </p>
+              )}
+            </div>
+          )}
         </div>
       </div>
 

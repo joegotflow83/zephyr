@@ -161,7 +161,7 @@ describe('SettingsTab', () => {
     it('should render Credentials section expanded by default', async () => {
       render(<SettingsTab />);
       await waitFor(() => {
-        expect(screen.getByText('Anthropic API Access')).toBeInTheDocument();
+        expect(screen.getByText('AI Provider')).toBeInTheDocument();
       });
     });
 
@@ -193,14 +193,14 @@ describe('SettingsTab', () => {
       render(<SettingsTab />);
 
       await waitFor(() => {
-        expect(screen.getByText('Anthropic API Access')).toBeInTheDocument();
+        expect(screen.getByText('AI Provider')).toBeInTheDocument();
       });
 
       const credentialsHeader = screen.getByText('Credentials').closest('button');
       expect(credentialsHeader).toBeInTheDocument();
       await user.click(credentialsHeader!);
 
-      expect(screen.queryByText('Anthropic API Access')).not.toBeInTheDocument();
+      expect(screen.queryByText('AI Provider')).not.toBeInTheDocument();
     });
 
     it('should allow multiple sections to be expanded simultaneously', async () => {
@@ -213,7 +213,7 @@ describe('SettingsTab', () => {
       const generalHeader = screen.getByText('General').closest('button');
       await user.click(generalHeader!);
 
-      expect(screen.getByText('Anthropic API Access')).toBeInTheDocument();
+      expect(screen.getByText('AI Provider')).toBeInTheDocument();
       expect(screen.getByText('Connection Status')).toBeInTheDocument();
       expect(screen.getByText('Desktop Notifications')).toBeInTheDocument();
     });

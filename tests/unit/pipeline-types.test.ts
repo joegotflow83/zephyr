@@ -124,7 +124,7 @@ describe('deriveTransitions — backward adjacency', () => {
     const { allowed } = deriveTransitions(pipeline);
 
     // backlog's only non-blocked move is forward to the first stage.
-    expect(allowed['backlog']).toEqual(['coder', 'blocked']);
+    expect(allowed['backlog']).toEqual(['coder', 'blocked', 'needs_input']);
   });
 
   it('does not allow skipping stages (non-adjacent forward)', () => {
@@ -170,8 +170,11 @@ describe('deriveTransitions — Blocked drop from anywhere', () => {
     const { allowed } = deriveTransitions(pipeline);
 
     expect(allowed['backlog']).toContain('blocked');
+    expect(allowed['backlog']).toContain('needs_input');
     expect(allowed['done']).toContain('blocked');
+    expect(allowed['done']).toContain('needs_input');
     expect(allowed['blocked']).toEqual(['backlog', 'done']);
+    expect(allowed['needs_input']).toEqual(['backlog', 'done']);
   });
 });
 
@@ -182,7 +185,7 @@ describe('deriveTransitions — shape contract', () => {
     const pipeline = makePipeline(['pm', 'coder', 'qa']);
     const { allowed, forward } = deriveTransitions(pipeline);
 
-    const expectedKeys = ['backlog', 'pm', 'coder', 'qa', 'done', 'blocked'];
+    const expectedKeys = ['backlog', 'pm', 'coder', 'qa', 'done', 'blocked', 'needs_input'];
     expect(Object.keys(allowed).sort()).toEqual([...expectedKeys].sort());
     expect(Object.keys(forward).sort()).toEqual([...expectedKeys].sort());
   });
@@ -194,11 +197,11 @@ describe('deriveTransitions — shape contract', () => {
     const pipeline = makePipeline(['pm', 'coder', 'qa']);
     const { allowed } = deriveTransitions(pipeline);
 
-    expect(allowed['backlog']).toEqual(['pm', 'blocked']); // no prev
-    expect(allowed['pm']).toEqual(['coder', 'backlog', 'blocked']);
-    expect(allowed['coder']).toEqual(['qa', 'pm', 'blocked']);
-    expect(allowed['qa']).toEqual(['done', 'coder', 'blocked']);
-    expect(allowed['done']).toEqual(['qa', 'blocked']); // no next
+    expect(allowed['backlog']).toEqual(['pm', 'blocked', 'needs_input']); // no prev
+    expect(allowed['pm']).toEqual(['coder', 'backlog', 'blocked', 'needs_input']);
+    expect(allowed['coder']).toEqual(['qa', 'pm', 'blocked', 'needs_input']);
+    expect(allowed['qa']).toEqual(['done', 'coder', 'blocked', 'needs_input']);
+    expect(allowed['done']).toEqual(['qa', 'blocked', 'needs_input']); // no next
   });
 
   it('handles arbitrary user-chosen stage ids without case-mangling', () => {

@@ -217,10 +217,10 @@ export class FactoryTaskStore {
     }
 
     // Backward = both columns are in the flow array (i.e. neither is
-    // 'blocked') AND the target index is earlier than the source. This
-    // distinguishes a rejection (qa → coder) from a Blocked escalation
-    // (qa → blocked) and from a Blocked resumption (blocked → coder); only
-    // the first counts toward the bounce budget.
+    // 'blocked' nor 'needs_input') AND the target index is earlier than the
+    // source. This distinguishes a rejection (qa → coder) from a Blocked
+    // escalation (qa → blocked) and from a Blocked resumption (blocked → coder);
+    // only the first counts toward the bounce budget.
     const flow = ['backlog', ...pipeline.stages.map((s) => s.id), 'done'];
     const fromIdx = flow.indexOf(task.column);
     const toIdx = flow.indexOf(toColumn);

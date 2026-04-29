@@ -67,25 +67,26 @@ export interface Pipeline {
  * - `backlog` — user-created epics/tasks awaiting work (leftmost)
  * - `done` — completed tasks
  * - `blocked` — tasks that exceeded `Pipeline.bounceLimit`, awaiting human triage
+ * - `needs_input` — PM escalated a question to the human; task is parked here
  *
  * Declared `as const` so the array is typed as a readonly tuple and
  * `ImplicitColumn` narrows to the literal union.
  */
-export const IMPLICIT_COLUMNS = ['backlog', 'done', 'blocked'] as const;
+export const IMPLICIT_COLUMNS = ['backlog', 'done', 'blocked', 'needs_input'] as const;
 
-/** Union of the three implicit column ids. */
+/** Union of the implicit column ids. */
 export type ImplicitColumn = (typeof IMPLICIT_COLUMNS)[number];
 
 /**
  * Full left-to-right column order for a pipeline's kanban board:
- * `backlog`, each stage id in `pipeline.stages` order, then `done`, `blocked`.
+ * `backlog`, each stage id in `pipeline.stages` order, then `done`, `blocked`, `needs_input`.
  *
  * The renderer uses this to lay out columns; the transition helper uses it to
  * derive allowed moves. Keeping the implicit bookends here (rather than in
  * component code) ensures main and renderer agree on column identity.
  */
 export function columnsFor(pipeline: Pipeline): string[] {
-  return ['backlog', ...pipeline.stages.map((s) => s.id), 'done', 'blocked'];
+  return ['backlog', ...pipeline.stages.map((s) => s.id), 'done', 'blocked', 'needs_input'];
 }
 
 /**

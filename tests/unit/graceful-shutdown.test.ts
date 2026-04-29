@@ -4,6 +4,11 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { MessageBoxReturnValue } from 'electron';
 
+// Each test dynamically imports the full main process entry point after
+// vi.resetModules(), which is inherently slow. Raise the per-test timeout
+// so CI doesn't flake under load.
+vi.setConfig({ testTimeout: 30_000 });
+
 // Create shared mock instances
 const mockLoopRunnerInstance = {
   listRunning: vi.fn(() => []),
@@ -186,7 +191,7 @@ vi.mock('../../src/main/ipc-handlers/credential-handlers', () => ({
 }));
 
 vi.mock('../../src/main/ipc-handlers/loop-handlers', () => ({
-  registerLoopHandlers: vi.fn(),
+  registerLoopHandlers: vi.fn().mockReturnValue({ dispatchFactoryStage: vi.fn() }),
 }));
 
 vi.mock('../../src/main/ipc-handlers/log-handlers', () => ({
