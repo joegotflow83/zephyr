@@ -39,3 +39,4 @@ IMPLEMENTATION_PLAN.md
 # Playwright
 .playwright
 agents/
+claude-standard-loop.sh
