@@ -543,7 +543,7 @@ const {
   const mockRegisterDataHandlers = vi.fn();
   const mockRegisterDockerHandlers = vi.fn();
   const mockRegisterCredentialHandlers = vi.fn();
-  const mockRegisterLoopHandlers = vi.fn().mockReturnValue({ dispatchFactoryStage: vi.fn() });
+  const mockRegisterLoopHandlers = vi.fn().mockReturnValue({ dispatchFactoryStage: vi.fn(), stopWatchdog: vi.fn() });
   const mockRegisterLogHandlers = vi.fn();
   const mockRegisterTerminalHandlers = vi.fn();
   const mockRegisterUpdateHandlers = vi.fn();
@@ -682,8 +682,8 @@ describe('Main Entry Point', () => {
       expect(MockLogParser).toHaveBeenCalled();
     });
 
-    it('should instantiate LoopRunner with ContainerRuntime, LogParser, max concurrent 3, and VMManager', () => {
-      expect(MockLoopRunner).toHaveBeenCalledWith(mockDockerRuntime, mockLogParser, 3, mockVmManager);
+    it('should instantiate LoopRunner with ContainerRuntime, LogParser, max concurrent 16, and VMManager', () => {
+      expect(MockLoopRunner).toHaveBeenCalledWith(mockDockerRuntime, mockLogParser, 16, mockVmManager);
     });
 
     it('should instantiate LoopScheduler with LoopRunner', () => {

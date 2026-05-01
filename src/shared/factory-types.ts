@@ -24,6 +24,18 @@ export type FactoryColumn =
   | 'documentation'
   | 'done';
 
+/** A single entry in a task's audit trail. */
+export interface TaskHistoryEntry {
+  /** ISO 8601 timestamp */
+  timestamp: string;
+  /** What happened: moved, locked, unlocked, error, etc. */
+  action: string;
+  /** Which agent/container triggered the event (if applicable) */
+  actor?: string;
+  /** Human-readable detail (e.g. rejection reason) */
+  detail?: string;
+}
+
 /**
  * A single task tracked through the factory pipeline.
  *
@@ -77,6 +89,12 @@ export interface FactoryTask {
   createdAt: string;
   /** ISO 8601 last-updated timestamp */
   updatedAt: string;
+  /** Most recent error or rejection reason (cleared on forward move) */
+  lastError?: string;
+  /** ISO 8601 timestamp of the last error */
+  lastErrorAt?: string;
+  /** Audit trail of task lifecycle events */
+  history?: TaskHistoryEntry[];
 }
 
 /**

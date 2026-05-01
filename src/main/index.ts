@@ -90,7 +90,7 @@ const credentialManager = new CredentialManager(
 const loginManager = new LoginManager(credentialManager);
 const logParser = new LogParser();
 const vmManager = new VMManager();
-const loopRunner = new LoopRunner(runtime, logParser, 3, vmManager); // Default max 3 concurrent
+const loopRunner = new LoopRunner(runtime, logParser, 16, vmManager); // Factory pipelines need room for multiple stages × instances
 const scheduler = new LoopScheduler(loopRunner);
 const logExporter = new LogExporter();
 const terminalManager = new TerminalManager(runtime);
@@ -127,7 +127,7 @@ const sshKeyManager = new SSHKeyManager(runtime);
 registerDataHandlers({ configManager, projectStore, importExport, preValidationStore, hooksStore, kiroHooksStore, loopScriptsStore, claudeSettingsStore, loopRunner, runtime, credentialManager, sshKeyManager, deployKeyStore });
 registerRuntimeHandlers({ runtime, runtimeHealth });
 registerCredentialHandlers({ credentialManager, loginManager });
-const { dispatchFactoryStage } = registerLoopHandlers({
+const { dispatchFactoryStage, stopWatchdog } = registerLoopHandlers({
   loopRunner,
   scheduler,
   cleanupManager,
@@ -357,6 +357,7 @@ async function gracefulShutdown(): Promise<void> {
 
   isShuttingDown = true;
   logger.info('Starting graceful shutdown');
+  stopWatchdog();
 
   try {
     // 1. Stop all running loops

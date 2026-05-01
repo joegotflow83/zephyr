@@ -21,6 +21,7 @@ import { randomUUID } from 'crypto';
 import {
   FactoryTask,
   FactoryTaskQueue,
+  TaskHistoryEntry,
 } from '../shared/factory-types';
 import type { Pipeline } from '../shared/pipeline-types';
 import { columnsFor } from '../shared/pipeline-types';
@@ -143,6 +144,7 @@ export class FactoryTaskStore {
       bounceCount: 0,
       createdAt: now,
       updatedAt: now,
+      history: [{ timestamp: now, action: 'created' }],
     };
     queue.tasks.push(newTask);
     this.saveQueue(queue);
@@ -176,7 +178,7 @@ export class FactoryTaskStore {
    *
    * @returns The updated task.
    */
-  moveTask(projectId: string, taskId: string, toColumn: string, opts?: { agentRejection?: boolean }): FactoryTask {
+  moveTask(projectId: string, taskId: string, toColumn: string, opts?: { agentRejection?: boolean; reason?: string }): FactoryTask {
     const queue = this.getQueue(projectId);
     const idx = queue.tasks.findIndex((t) => t.id === taskId);
     if (idx === -1) {
@@ -241,13 +243,35 @@ export class FactoryTaskStore {
       ? 'blocked'
       : toColumn;
 
+    const now = new Date().toISOString();
+    const prevHistory = task.history ?? [];
+    const rejectionReason = opts?.reason ?? `Rejected from ${task.column}`;
+    const entry: TaskHistoryEntry = {
+      timestamp: now,
+      action: isBackward ? 'rejected' : 'moved',
+      actor: task.lockedBy ?? undefined,
+      detail: `${task.column} → ${targetColumn}`,
+    };
+    // Skip recording a history entry when the column doesn't actually change
+    // (e.g. an agent self-rejecting to its own stage as a retry signal).
+    const historyUpdated =
+      task.column !== targetColumn ? [...prevHistory, entry] : prevHistory;
+
     const updated: FactoryTask = {
       ...task,
       column: targetColumn,
       bounceCount: newBounceCount,
       lockedBy: undefined,
-      updatedAt: new Date().toISOString(),
+      updatedAt: now,
+      lastError: isBackward ? rejectionReason : task.lastError,
+      lastErrorAt: isBackward ? now : task.lastErrorAt,
+      history: historyUpdated,
     };
+    // Clear error on forward progress past the first stage
+    if (!isBackward && targetColumn !== task.column) {
+      updated.lastError = undefined;
+      updated.lastErrorAt = undefined;
+    }
     queue.tasks[idx] = updated;
 
     // Phase 2.9 — Epic auto-advance.
@@ -365,10 +389,12 @@ export class FactoryTaskStore {
     if (task.lockedBy === lockId) {
       return task;
     }
+    const now = new Date().toISOString();
     const updated: FactoryTask = {
       ...task,
       lockedBy: lockId,
-      updatedAt: new Date().toISOString(),
+      updatedAt: now,
+      history: [...(task.history ?? []), { timestamp: now, action: 'locked', actor: lockId }],
     };
     queue.tasks[idx] = updated;
     this.saveQueue(queue);
@@ -395,10 +421,12 @@ export class FactoryTaskStore {
     if (!task.lockedBy) {
       return task;
     }
+    const now = new Date().toISOString();
     const updated: FactoryTask = {
       ...task,
       lockedBy: undefined,
-      updatedAt: new Date().toISOString(),
+      updatedAt: now,
+      history: [...(task.history ?? []), { timestamp: now, action: 'unlocked', actor: task.lockedBy }],
     };
     queue.tasks[idx] = updated;
     this.saveQueue(queue);
@@ -459,6 +487,7 @@ export class FactoryTaskStore {
       bounceCount: 0,
       createdAt: now,
       updatedAt: now,
+      history: [{ timestamp: now, action: 'created', detail: `Decomposed from epic` }],
     }));
     queue.tasks.push(...createdChildren);
 
@@ -564,6 +593,7 @@ export class FactoryTaskStore {
           bounceCount: 0,
           createdAt: now,
           updatedAt: now,
+          history: [{ timestamp: now, action: 'created', detail: `Imported from ${specFile}` }],
         };
         queue.tasks.push(task);
         newTasks.push(task);
@@ -607,8 +637,12 @@ function isNodeError(err: unknown): err is NodeJS.ErrnoException {
  * rather than scattering `?? defaults` through every accessor.
  */
 function migrateLegacyTask(task: FactoryTask): FactoryTask {
-  if (typeof task.bounceCount === 'number') {
-    return task;
+  let migrated = task;
+  if (typeof migrated.bounceCount !== 'number') {
+    migrated = { ...migrated, bounceCount: 0 };
   }
-  return { ...task, bounceCount: 0 };
+  if (!Array.isArray(migrated.history)) {
+    migrated = { ...migrated, history: [] };
+  }
+  return migrated;
 }

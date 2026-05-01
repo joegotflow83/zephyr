@@ -102,6 +102,10 @@ contextBridge.exposeInMainWorld('api', {
       ipcRenderer.invoke(IPC.FACTORY_STOP, projectId),
     restartContainer: (projectId: string, role: string) =>
       ipcRenderer.invoke(IPC.FACTORY_RESTART_CONTAINER, projectId, role),
+    scaleUp: (projectId: string, stageId: string) =>
+      ipcRenderer.invoke(IPC.FACTORY_SCALE_UP, projectId, stageId),
+    scaleDown: (projectId: string, stageId: string) =>
+      ipcRenderer.invoke(IPC.FACTORY_SCALE_DOWN, projectId, stageId),
   },
 
   factoryTasks: {
@@ -117,6 +121,8 @@ contextBridge.exposeInMainWorld('api', {
       ipcRenderer.invoke(IPC.FACTORY_TASK_REMOVE, projectId, taskId),
     update: (projectId: string, taskId: string, updates: unknown) =>
       ipcRenderer.invoke(IPC.FACTORY_TASK_UPDATE, projectId, taskId, updates),
+    unlock: (projectId: string, taskId: string) =>
+      ipcRenderer.invoke(IPC.FACTORY_TASK_UNLOCK, projectId, taskId),
     sync: (projectId: string) =>
       ipcRenderer.invoke(IPC.FACTORY_TASK_SYNC, projectId),
     onChanged: (callback: (projectId: string, tasks: unknown[]) => void) => {

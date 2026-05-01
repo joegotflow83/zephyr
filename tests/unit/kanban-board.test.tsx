@@ -418,7 +418,7 @@ describe('KanbanBoard — task card epic badge', () => {
     );
 
     // The parent epic title should appear as breadcrumb text in the sub-task card
-    expect(screen.getByText('📌 Epic: Big Feature')).toBeInTheDocument();
+    expect(screen.getAllByText('📌 Epic: Big Feature').length).toBeGreaterThanOrEqual(1);
   });
 
   it('does not render epic breadcrumb when parentTaskId is not set', () => {
@@ -451,7 +451,7 @@ describe('KanbanBoard — task card epic badge', () => {
 });
 
 describe('KanbanBoard — task card lock indicator', () => {
-  it('renders 🔒 when lockedBy is set', () => {
+  it('renders ⚙ active badge when lockedBy is an agent instance (stageId-N)', () => {
     const task = makeTask('coder', { lockedBy: 'zephyr-proj-coder-0' });
     render(
       <KanbanBoard
@@ -462,10 +462,10 @@ describe('KanbanBoard — task card lock indicator', () => {
         onSelectTask={noop}
       />
     );
-    expect(screen.getByLabelText('locked')).toBeInTheDocument();
+    expect(screen.getByLabelText('actively worked on by zephyr-proj-coder-0')).toBeInTheDocument();
   });
 
-  it('does not render 🔒 when lockedBy is not set', () => {
+  it('does not render lock badge when lockedBy is not set', () => {
     const task = makeTask('coder');
     render(
       <KanbanBoard
@@ -476,7 +476,7 @@ describe('KanbanBoard — task card lock indicator', () => {
         onSelectTask={noop}
       />
     );
-    expect(screen.queryByLabelText('locked')).toBeNull();
+    expect(screen.queryByLabelText(/^actively worked on by/)).toBeNull();
   });
 });
 
@@ -554,9 +554,9 @@ describe('KanbanBoard — epic progress tracker', () => {
         onSelectTask={noop}
       />
     );
-    // The epic title appears in both the tracker header and the task card; verify tracker has it
+    // The epic title appears in the tracker header; verify tracker has it
     const tracker = screen.getByLabelText('Epic progress');
-    expect(within(tracker).getByText('Big Feature Epic')).toBeInTheDocument();
+    expect(within(tracker).getByText(/Big Feature Epic/)).toBeInTheDocument();
   });
 
   it('renders multiple epics in the tracker when several epics are in backlog', () => {
@@ -573,15 +573,15 @@ describe('KanbanBoard — epic progress tracker', () => {
       />
     );
     const tracker = screen.getByLabelText('Epic progress');
-    expect(within(tracker).getByText('Epic One')).toBeInTheDocument();
-    expect(within(tracker).getByText('Epic Two')).toBeInTheDocument();
+    expect(within(tracker).getByText(/Epic One/)).toBeInTheDocument();
+    expect(within(tracker).getByText(/Epic Two/)).toBeInTheDocument();
     // Epic One: 1/1 done; Epic Two: 0/0
     expect(screen.getByLabelText('1 of 1 sub-tasks done')).toBeInTheDocument();
     expect(screen.getByLabelText('0 of 0 sub-tasks done')).toBeInTheDocument();
   });
 
-  it('does not show tracker for epics outside the backlog column', () => {
-    // An isEpic task in the coder column should not trigger the tracker
+  it('shows tracker for epics regardless of which column they are in', () => {
+    // An isEpic task in any column should trigger the tracker (epics are filtered out of card lists)
     const epicElsewhere = makeTask('coder', { id: 'ep-1', title: 'Coder Epic', isEpic: true });
     render(
       <KanbanBoard
@@ -592,7 +592,7 @@ describe('KanbanBoard — epic progress tracker', () => {
         onSelectTask={noop}
       />
     );
-    expect(screen.queryByLabelText('Epic progress')).toBeNull();
+    expect(screen.getByLabelText('Epic progress')).toBeInTheDocument();
   });
 
   it('renders tooltip with full title and progress on each tracker row', () => {

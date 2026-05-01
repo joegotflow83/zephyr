@@ -263,7 +263,7 @@ export interface AppSettings {
  */
 export function createDefaultSettings(): AppSettings {
   return {
-    max_concurrent_containers: 5,
+    max_concurrent_containers: 16,
     notification_enabled: true,
     theme: 'system',
     log_level: 'INFO',

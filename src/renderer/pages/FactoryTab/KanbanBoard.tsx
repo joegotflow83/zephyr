@@ -17,6 +17,12 @@ export interface KanbanBoardProps {
   onMoveTask: (taskId: string, targetColumn: string) => Promise<void>;
   onRemoveTask: (taskId: string) => Promise<void>;
   onSelectTask: (task: FactoryTask) => void;
+  /** Called when user clicks + to add a container instance for a stage. */
+  onScaleUp?: (stageId: string) => void;
+  /** Called when user clicks - to remove a container instance for a stage. */
+  onScaleDown?: (stageId: string) => void;
+  /** Number of running instances per stage (from loop state). */
+  runningInstances?: Record<string, number>;
 }
 
 /** Format an ISO timestamp as a human-readable relative time string. */
@@ -84,6 +90,9 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
   onMoveTask,
   onRemoveTask: _onRemoveTask,
   onSelectTask,
+  onScaleUp,
+  onScaleDown,
+  runningInstances,
 }) => {
   const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null);
   const [dragOverColumn, setDragOverColumn] = useState<string | null>(null);
@@ -113,6 +122,8 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
       columns.map((col) => [col, [] as FactoryTask[]])
     );
     for (const task of tasks) {
+      // Epics are tracked in the separate epic progress section, not as cards
+      if (task.isEpic) continue;
       if (map[task.column] !== undefined) {
         map[task.column].push(task);
       }
@@ -120,17 +131,16 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
     return map;
   }, [tasks, columns]);
 
-  /** For each epic in the backlog, compute sub-task progress. */
+  /** Compute sub-task progress for all epics. */
   const epicProgress = useMemo(() => {
-    const backlogTasks = tasksByColumn['backlog'] ?? [];
-    return backlogTasks
+    return tasks
       .filter((t) => t.isEpic)
       .map((epic) => {
         const subtasks = tasks.filter((t) => t.parentTaskId === epic.id);
         const done = subtasks.filter((t) => t.column === 'done').length;
         return { id: epic.id, title: epic.title, done, total: subtasks.length };
       });
-  }, [tasks, tasksByColumn]);
+  }, [tasks]);
 
   const draggedTask = draggedTaskId ? tasks.find((t) => t.id === draggedTaskId) ?? null : null;
 
@@ -209,6 +219,8 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
     await onMoveTask(taskId, col);
   };
 
+  const IMPLICIT = new Set(['backlog', 'done', 'blocked', 'needs_input']);
+
   if (!pipeline) {
     return (
       <div className="flex items-center justify-center h-full text-gray-500 text-sm">
@@ -218,7 +230,42 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
   }
 
   return (
-    <div className="relative flex overflow-x-auto gap-3 p-4 h-full">
+    <div className="relative flex flex-col h-full">
+      {/* Epic tracker — shown above columns when epics exist */}
+      {epicProgress.length > 0 && (
+        <div
+          className="flex items-center gap-4 px-4 py-2 border-b border-gray-700 bg-gray-800/50 flex-shrink-0 overflow-x-auto"
+          aria-label="Epic progress"
+        >
+          <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide shrink-0">Epics</span>
+          {epicProgress.map((ep) => (
+            <div
+              key={ep.id}
+              className="flex items-center gap-2 text-xs shrink-0"
+              title={`${ep.title}: ${ep.done}/${ep.total} sub-tasks done`}
+            >
+              <span className="text-purple-400 truncate max-w-[200px]">📌 {ep.title}</span>
+              <div className="flex items-center gap-1">
+                <div className="w-16 h-1.5 bg-gray-700 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-purple-500 rounded-full transition-all"
+                    style={{ width: ep.total > 0 ? `${(ep.done / ep.total) * 100}%` : '0%' }}
+                  />
+                </div>
+                <span
+                  className="text-gray-400 font-medium text-[10px]"
+                  aria-label={`${ep.done} of ${ep.total} sub-tasks done`}
+                >
+                  {ep.done}/{ep.total}
+                </span>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Kanban columns */}
+      <div className="relative flex overflow-x-auto gap-3 p-4 flex-1 min-h-0">
       {/* Drop error toast */}
       {dropError && (
         <div className="fixed top-4 right-4 z-50 max-w-sm bg-red-700 text-white text-sm px-4 py-2 rounded shadow-lg">
@@ -254,34 +301,37 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                 )}
                 {label}
               </span>
-              <span className="ml-1 flex-shrink-0 inline-flex items-center justify-center w-5 h-5 text-xs font-medium rounded-full bg-gray-700 text-gray-400">
-                {colTasks.length}
-              </span>
-            </div>
-
-            {/* Epic progress tracker — only shown in the Backlog column when epics exist */}
-            {col === 'backlog' && epicProgress.length > 0 && (
-              <div
-                className="px-3 py-1.5 border-b border-gray-700 flex flex-col gap-1"
-                aria-label="Epic progress"
-              >
-                {epicProgress.map((ep) => (
-                  <div
-                    key={ep.id}
-                    className="flex items-center gap-1 text-[10px]"
-                    title={`${ep.title}: ${ep.done}/${ep.total} sub-tasks done`}
-                  >
-                    <span className="text-purple-400 truncate min-w-0 flex-1">{ep.title}</span>
-                    <span
-                      className="flex-shrink-0 text-gray-400 font-medium"
-                      aria-label={`${ep.done} of ${ep.total} sub-tasks done`}
+              <div className="ml-1 flex items-center gap-1 flex-shrink-0">
+                {/* Instance scale controls for pipeline stages */}
+                {onScaleUp && !IMPLICIT.has(col) && runningInstances && (
+                  <>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); onScaleDown?.(col); }}
+                      disabled={!onScaleDown || (runningInstances[col] ?? 0) <= 1}
+                      className="w-4 h-4 flex items-center justify-center text-[10px] rounded bg-gray-700 text-gray-400 hover:bg-gray-600 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed"
+                      title={`Remove a ${label} container`}
+                      aria-label={`Decrease ${label} instances`}
                     >
-                      {ep.done}/{ep.total}
+                      −
+                    </button>
+                    <span className="text-[10px] text-gray-400 font-mono w-4 text-center" title={`${runningInstances[col] ?? 0} running instance(s)`}>
+                      {runningInstances[col] ?? 0}×
                     </span>
-                  </div>
-                ))}
+                    <button
+                      onClick={(e) => { e.stopPropagation(); onScaleUp(col); }}
+                      className="w-4 h-4 flex items-center justify-center text-[10px] rounded bg-gray-700 text-gray-400 hover:bg-gray-600 hover:text-white"
+                      title={`Add a ${label} container`}
+                      aria-label={`Increase ${label} instances`}
+                    >
+                      +
+                    </button>
+                  </>
+                )}
+                <span className="inline-flex items-center justify-center w-5 h-5 text-xs font-medium rounded-full bg-gray-700 text-gray-400">
+                  {colTasks.length}
+                </span>
               </div>
-            )}
+            </div>
 
             {/* Task list */}
             <div className="flex-1 flex flex-col gap-2 p-2 overflow-y-auto min-h-[120px]">
@@ -318,13 +368,33 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
 
                       {/* Badges row */}
                       <div className="flex items-center gap-1 flex-wrap">
-                        {task.lockedBy && (
+                        {task.lockedBy && (() => {
+                          const active = /^.+-\d+$/.test(task.lockedBy);
+                          return active ? (
+                            <span
+                              className="inline-flex items-center gap-0.5 px-1 py-0.5 text-[10px] font-medium rounded bg-blue-900/70 text-blue-300 animate-pulse"
+                              title={`Actively worked on by ${task.lockedBy}`}
+                              aria-label={`actively worked on by ${task.lockedBy}`}
+                            >
+                              ⚙ {task.lockedBy}
+                            </span>
+                          ) : (
+                            <span
+                              className="inline-flex items-center gap-0.5 px-1 py-0.5 text-[10px] font-medium rounded bg-yellow-900/60 text-yellow-300"
+                              title={`Queued for ${task.lockedBy}`}
+                              aria-label={`queued for ${task.lockedBy}`}
+                            >
+                              🔒 {task.lockedBy}
+                            </span>
+                          );
+                        })()}
+                        {task.lastError && (
                           <span
-                            className="text-[10px] text-yellow-400"
-                            title={`Locked by ${task.lockedBy}`}
-                            aria-label="locked"
+                            className="inline-flex items-center px-1 py-0.5 text-[10px] font-medium rounded bg-red-900 text-red-300"
+                            title={task.lastError}
+                            aria-label="has error"
                           >
-                            🔒
+                            ⚠ error
                           </span>
                         )}
                         {task.sourceFile && (
@@ -353,6 +423,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
           </div>
         );
       })}
+      </div>
     </div>
   );
 };

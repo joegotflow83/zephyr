@@ -105,10 +105,41 @@ export function registerFactoryTaskHandlers(services: FactoryTaskServices): void
   ipcMain.handle(
     IPC.FACTORY_TASK_MOVE,
     async (_event, projectId: string, taskId: string, toColumn: string): Promise<FactoryTask> => {
-      const task = factoryTaskStore.moveTask(projectId, taskId, toColumn);
+      const fromColumn = factoryTaskStore.getTask(projectId, taskId)?.column;
+      let task = factoryTaskStore.moveTask(projectId, taskId, toColumn);
       broadcastTaskChanged(factoryTaskStore, projectId);
       await syncQueueToWorkspace(factoryTaskStore, projectStore, projectId);
+
+      const workspacePath = projectStore?.getProject(projectId)?.local_path;
+
       if (!IMPLICIT_COLUMNS.has(toColumn)) {
+        // Pre-lock with the stage name so the kanban badge shows immediately
+        // while the agent container spins up. The agent can take over the lock
+        // by writing @task-status.json with status "locked" and its instance id.
+        try {
+          task = factoryTaskStore.lockTask(projectId, task.id, toColumn);
+          broadcastTaskChanged(factoryTaskStore, projectId);
+          await syncQueueToWorkspace(factoryTaskStore, projectStore, projectId);
+          // Write the current-task file so the agent's bash guard activates
+          // for this stage. The agent reads this file to know exactly which
+          // single task to work on, then exits — giving each task a fresh
+          // context window.
+          if (workspacePath) {
+            await fs.writeFile(
+              path.join(workspacePath, `@current-task-${toColumn}.json`),
+              JSON.stringify(task, null, 2),
+              'utf-8',
+            ).catch(() => undefined);
+          }
+        } catch {
+          // non-fatal — task may already be locked by an agent
+        }
+        // Clear the source stage's current-task file when moving out of a stage
+        if (fromColumn && !IMPLICIT_COLUMNS.has(fromColumn) && workspacePath) {
+          await fs.unlink(
+            path.join(workspacePath, `@current-task-${fromColumn}.json`),
+          ).catch(() => undefined);
+        }
         onTaskEnteredStage?.(projectId, toColumn);
       }
       return task;
@@ -135,6 +166,17 @@ export function registerFactoryTaskHandlers(services: FactoryTaskServices): void
       updates: Partial<Pick<FactoryTask, 'title' | 'description'>>,
     ): Promise<FactoryTask> => {
       const task = factoryTaskStore.updateTask(projectId, taskId, updates);
+      broadcastTaskChanged(factoryTaskStore, projectId);
+      await syncQueueToWorkspace(factoryTaskStore, projectStore, projectId);
+      return task;
+    },
+  );
+
+  // Force-unlock a task (manual override from UI)
+  ipcMain.handle(
+    IPC.FACTORY_TASK_UNLOCK,
+    async (_event, projectId: string, taskId: string): Promise<FactoryTask> => {
+      const task = factoryTaskStore.unlockTask(projectId, taskId);
       broadcastTaskChanged(factoryTaskStore, projectId);
       await syncQueueToWorkspace(factoryTaskStore, projectStore, projectId);
       return task;

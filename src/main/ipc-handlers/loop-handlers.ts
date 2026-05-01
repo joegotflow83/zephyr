@@ -359,6 +359,9 @@ export interface TaskStatusUpdate {
   /** Required for `locked`. Format: `<stageId>-<instanceIndex>` (e.g.
    *  `coder-0`). Same string the host writes into `task.lockedBy`. */
   lockId?: string;
+  /** Optional human-readable reason for rejection. Stored as `lastError` on
+   *  the task and appended to the task's history trail. */
+  reason?: string;
 }
 
 /**
@@ -552,7 +555,7 @@ export function processTaskStatusUpdate(
         // bounces on stages that would just forward the task anyway. Pass
         // agentRejection:true to bypass the kanban adjacency constraint while
         // still enforcing bounce counting and Blocked escalation.
-        const movedTask = deps.factoryTaskStore.moveTask(projectId, task.id, data.toStage, { agentRejection: true });
+        const movedTask = deps.factoryTaskStore.moveTask(projectId, task.id, data.toStage, { agentRejection: true, reason: data.reason });
         // Phase 2.10: when the host overrode the destination to 'blocked'
         // (bounce limit exceeded), write a PM-addressed handover. The guard
         // `data.toStage !== 'blocked'` distinguishes a host redirect (agent
@@ -571,6 +574,16 @@ export function processTaskStatusUpdate(
             taskId: task.id,
           });
           return false;
+        }
+        // Allow an agent instance (e.g. "coder-0") to take over a host-level
+        // stage pre-lock (e.g. "coder") without being rejected as a different owner.
+        // Strip the trailing "-<index>" from the agent's lockId to get the stage name.
+        if (task.lockedBy && task.lockedBy !== data.lockId) {
+          const stagePrefix = data.lockId.replace(/-\d+$/, '');
+          if (task.lockedBy === stagePrefix) {
+            deps.factoryTaskStore.unlockTask(projectId, task.id);
+          }
+          // If it belongs to a genuinely different owner, lockTask below will throw.
         }
         deps.factoryTaskStore.lockTask(projectId, task.id, data.lockId);
         return true;
@@ -852,6 +865,8 @@ export interface LoopHandlerContext {
    * and will pick up the task on their next idle poll of the queue file.
    */
   dispatchFactoryStage: (projectId: string, stageId: string) => void;
+  /** Stop the stuck-agent watchdog interval (call on app quit). */
+  stopWatchdog: () => void;
 }
 
 export function registerLoopHandlers(services: LoopServices): LoopHandlerContext {
@@ -1953,8 +1968,12 @@ export function registerLoopHandlers(services: LoopServices): LoopHandlerContext
               ? `kiro-cli chat --trust-all-tools --no-interactive "$(cat /workspace/${promptFile})"`
               : `claude --dangerously-skip-permissions --output-format json --print "$(cat /workspace/${promptFile})"`;
             const setup = useKiro ? '' : `${ENSURE_CLAUDE_JSON}\n`;
-            // Only invoke the LLM when there's an unlocked task in this agent's column.
-            const hasTask = `grep -q '"column"[[:space:]]*:[[:space:]]*"${stage.id}"' /workspace/@task-queue.json`;
+            // Only invoke the LLM when the host has queued exactly one task for
+            // this stage by writing @current-task-<stageId>.json. This guarantees
+            // the agent focuses on a single task per invocation and gets a fresh
+            // context window on every new task (claude --print / kiro-cli chat are
+            // both single-shot processes that exit after one response).
+            const hasTask = `[ -f /workspace/@current-task-${stage.id}.json ]`;
             roleCmd = ['bash', '-c', `${setup}while true; do\n  if ${hasTask}; then\n    ${agentInvocation}\n  fi\n  sleep 10\ndone`];
           }
 
@@ -2035,6 +2054,20 @@ export function registerLoopHandlers(services: LoopServices): LoopHandlerContext
         }
       }
 
+      // Delete all @current-task-*.json files so agents don't re-trigger on
+      // stale files if the factory is restarted later.
+      const project = projectStore?.getProject(projectId);
+      if (project?.local_path) {
+        try {
+          const entries = fsSync.readdirSync(project.local_path);
+          for (const entry of entries) {
+            if (entry.startsWith('@current-task-') && entry.endsWith('.json')) {
+              try { fsSync.unlinkSync(path.join(project.local_path, entry)); } catch { /* ignore */ }
+            }
+          }
+        } catch { /* local_path may not be accessible */ }
+      }
+
       if (errors.length > 0) {
         throw new Error(`Failed to stop ${errors.length} factory loop(s): ${errors.map((e) => e.message).join('; ')}`);
       }
@@ -2060,6 +2093,75 @@ export function registerLoopHandlers(services: LoopServices): LoopHandlerContext
       }
 
       return startLoopCore(opts);
+    },
+  );
+
+  // Scale up: spawn a new container instance for a pipeline stage.
+  // Scans loopOptsMap (which persists across loop restarts) to find the
+  // highest registered instance index and clone its opts for the new instance.
+  // This works even when all existing instances are briefly idle/terminal
+  // between tasks.
+  ipcMain.handle(
+    IPC.FACTORY_SCALE_UP,
+    async (_event, projectId: string, stageId: string): Promise<LoopState> => {
+      // Scan loopOptsMap for all registered instances of this stage.
+      // Key format: "${projectId}:${stageId}-${index}"
+      const keyPrefix = getLoopKey(projectId, `${stageId}-`);
+      let maxIdx = -1;
+      let templateOpts: LoopStartOpts | null = null;
+      for (const [key, opts] of loopOptsMap.entries()) {
+        if (!key.startsWith(keyPrefix)) continue;
+        const idx = parseInt(key.slice(keyPrefix.length), 10);
+        if (!isNaN(idx) && idx > maxIdx) {
+          maxIdx = idx;
+          templateOpts = opts;
+        }
+      }
+
+      if (!templateOpts) {
+        throw new Error(`No registered ${stageId} instance found. Start the factory first.`);
+      }
+
+      const newIdx = maxIdx + 1;
+      const newRole = `${stageId}-${newIdx}`;
+      const newOpts: LoopStartOpts = {
+        ...templateOpts,
+        role: newRole,
+        envVars: {
+          ...(templateOpts.envVars ?? {}),
+          INSTANCE_INDEX: String(newIdx),
+        },
+        // Update the CMD to use the new instance index if it's a loop script
+        cmd: templateOpts.cmd?.map((part) =>
+          part.replace(new RegExp(`${stageId} \\d+`), `${stageId} ${newIdx}`),
+        ),
+      };
+
+      return startLoopCore(newOpts);
+    },
+  );
+
+  // Scale down: stop the highest-indexed instance of a pipeline stage.
+  ipcMain.handle(
+    IPC.FACTORY_SCALE_DOWN,
+    async (_event, projectId: string, stageId: string): Promise<void> => {
+      const running = loopRunner.listAll().filter(
+        (l) => l.projectId === projectId && l.role?.startsWith(`${stageId}-`) && !isLoopTerminal(l.status),
+      );
+      if (running.length <= 1) {
+        throw new Error(`Cannot scale below 1 instance for ${stageId}`);
+      }
+      // Find the highest instance index
+      let maxIdx = -1;
+      let maxRole = '';
+      for (const l of running) {
+        const idx = parseInt(l.role?.split('-').pop() ?? '0', 10);
+        if (idx > maxIdx) {
+          maxIdx = idx;
+          maxRole = l.role ?? '';
+        }
+      }
+      await loopRunner.stopLoop(projectId, maxRole);
     },
   );
 
@@ -2120,18 +2222,27 @@ export function registerLoopHandlers(services: LoopServices): LoopHandlerContext
   // We watch both the .requested trigger (written by Claude hooks) and the
   // .json file itself (for kiro-cli or any engine without PostToolUse hooks).
   const taskStatusWatchers = new Map<string, fsSync.FSWatcher[]>();
+  // Polling fallback: fs.watch() is unreliable on Podman/Docker bind mounts
+  // on macOS (events don't propagate through the VM layer). Poll mtime every
+  // 3 seconds as a safety net alongside the native watcher.
+  const taskStatusPollers = new Map<string, NodeJS.Timeout>();
+  const taskStatusLastMtime = new Map<string, number>();
 
   // Watcher for @task-decomposition.requested per project (shared across all
   // roles). The PM agent writes @task-decomposition.json to break an epic into
   // sub-tasks; the host reads it, creates the children atomically, and deletes
   // the source file so re-triggers don't duplicate.
   const taskDecompositionWatchers = new Map<string, fsSync.FSWatcher[]>();
+  const taskDecompositionPollers = new Map<string, NodeJS.Timeout>();
+  const taskDecompositionLastMtime = new Map<string, number>();
 
   // Watcher for @supervisor-action.requested per project (shared across all
   // roles). Any container can write @supervisor-action.json to trigger host-side
   // container restarts; the host reads it, dispatches the action, and leaves
   // the source file in place (each restart is a distinct write).
   const supervisorActionWatchers = new Map<string, fsSync.FSWatcher>();
+  const supervisorActionPollers = new Map<string, NodeJS.Timeout>();
+  const supervisorActionLastMtime = new Map<string, number>();
 
   // Tracks the set of active loop keys per project to know when all loops for
   // a project have terminated and the task status watcher can be torn down.
@@ -2151,7 +2262,7 @@ export function registerLoopHandlers(services: LoopServices): LoopHandlerContext
       if (!activeLoopKeysByProject.has(state.projectId)) {
         activeLoopKeysByProject.set(state.projectId, new Set());
       }
-      activeLoopKeysByProject.get(state.projectId)!.add(loopKey);
+      activeLoopKeysByProject.get(state.projectId)?.add(loopKey);
 
       // Start per-project task status watcher only once (not per role)
       if (!taskStatusWatchers.has(state.projectId)) {
@@ -2171,6 +2282,14 @@ export function registerLoopHandlers(services: LoopServices): LoopHandlerContext
                 return;
               }
 
+              // Capture source stage before the move so we can clean up its
+              // current-task file after a forward or rejected transition.
+              const sdPre = statusData as { taskId?: string; status?: string };
+              const taskBefore = sdPre.taskId
+                ? factoryTaskStore.getTask(state.projectId, sdPre.taskId)
+                : null;
+              const sourceStage = taskBefore?.column;
+
               const changed = processTaskStatusUpdate(state.projectId, statusData, {
                 factoryTaskStore,
                 projectStore,
@@ -2178,10 +2297,45 @@ export function registerLoopHandlers(services: LoopServices): LoopHandlerContext
               });
               if (!changed) return;
 
+              // When a task moves out of a pipeline stage, delete its current-task
+              // file so the agent's bash guard stops firing for that stage.
+              // Guard: only delete if the file still points to THIS task —
+              // another task may have already been written there (e.g. security
+              // rejected task B to coder while coder was finishing task A).
+              if (
+                (sdPre.status === 'forward' || sdPre.status === 'rejected') &&
+                sourceStage &&
+                !['backlog', 'done', 'blocked', 'needs_input'].includes(sourceStage)
+              ) {
+                try {
+                  const currentTaskFile = path.join(workspacePath, `@current-task-${sourceStage}.json`);
+                  const existing = JSON.parse(
+                    fsSync.readFileSync(currentTaskFile, 'utf-8'),
+                  ) as { id?: string };
+                  if (existing.id === sdPre.taskId) {
+                    fsSync.unlinkSync(currentTaskFile);
+                  }
+                  // else: a new task was already assigned to this stage — leave it
+                } catch { /* file may not exist */ }
+              }
+
               const sd = statusData as { taskId?: string };
               if (sd.taskId) {
                 const movedTask = factoryTaskStore.getTask(state.projectId, sd.taskId);
-                if (movedTask && !['backlog', 'done', 'blocked'].includes(movedTask.column)) {
+                if (movedTask && !['backlog', 'done', 'blocked', 'needs_input'].includes(movedTask.column)) {
+                  // Pre-lock with the stage name so the kanban badge reflects the
+                  // new stage immediately while the next agent container wakes up.
+                  try {
+                    factoryTaskStore.lockTask(state.projectId, sd.taskId, movedTask.column);
+                    // Write the current-task file so the target stage's agent guard activates.
+                    const lockedTask = factoryTaskStore.getTask(state.projectId, sd.taskId);
+                    if (lockedTask) {
+                      fsSync.writeFileSync(
+                        path.join(workspacePath, `@current-task-${movedTask.column}.json`),
+                        JSON.stringify(lockedTask, null, 2),
+                      );
+                    }
+                  } catch { /* already locked */ }
                   dispatchFactoryStage(state.projectId, movedTask.column);
                 }
               }
@@ -2211,6 +2365,23 @@ export function registerLoopHandlers(services: LoopServices): LoopHandlerContext
           if (watchers.length > 0) {
             taskStatusWatchers.set(state.projectId, watchers);
           }
+          // Polling fallback: check mtime every 3s for bind-mount environments
+          // where fs.watch events don't propagate (macOS + Podman/Docker).
+          try {
+            const stat = fsSync.statSync(statusJsonPath);
+            taskStatusLastMtime.set(state.projectId, stat.mtimeMs);
+          } catch { /* file may not exist */ }
+          const statusPoller = setInterval(() => {
+            try {
+              const stat = fsSync.statSync(statusJsonPath);
+              const prev = taskStatusLastMtime.get(state.projectId) ?? 0;
+              if (stat.mtimeMs > prev) {
+                taskStatusLastMtime.set(state.projectId, stat.mtimeMs);
+                onStatusChange();
+              }
+            } catch { /* file may not exist */ }
+          }, 3000);
+          taskStatusPollers.set(state.projectId, statusPoller);
         }
       }
 
@@ -2278,6 +2449,22 @@ export function registerLoopHandlers(services: LoopServices): LoopHandlerContext
           if (watchers.length > 0) {
             taskDecompositionWatchers.set(state.projectId, watchers);
           }
+          // Polling fallback for decomposition file
+          try {
+            const stat = fsSync.statSync(decompFile);
+            taskDecompositionLastMtime.set(state.projectId, stat.mtimeMs);
+          } catch { /* file may not exist */ }
+          const decompPoller = setInterval(() => {
+            try {
+              const stat = fsSync.statSync(decompFile);
+              const prev = taskDecompositionLastMtime.get(state.projectId) ?? 0;
+              if (stat.mtimeMs > prev) {
+                taskDecompositionLastMtime.set(state.projectId, stat.mtimeMs);
+                onDecomp();
+              }
+            } catch { /* file may not exist */ }
+          }, 3000);
+          taskDecompositionPollers.set(state.projectId, decompPoller);
         }
       }
 
@@ -2287,8 +2474,7 @@ export function registerLoopHandlers(services: LoopServices): LoopHandlerContext
         if (workspacePath) {
           const supervisorTrigger = path.join(workspacePath, '@supervisor-action.requested');
           const supervisorFile = path.join(workspacePath, '@supervisor-action.json');
-          try {
-            const watcher = fsSync.watch(supervisorTrigger, () => {
+          const onSupervisorAction = () => {
               let actionData: unknown;
               try {
                 const raw = fsSync.readFileSync(supervisorFile, 'utf-8');
@@ -2307,11 +2493,29 @@ export function registerLoopHandlers(services: LoopServices): LoopHandlerContext
                   projectId: state.projectId,
                 });
               });
-            });
+          };
+          try {
+            const watcher = fsSync.watch(supervisorTrigger, onSupervisorAction);
             supervisorActionWatchers.set(state.projectId, watcher);
           } catch {
             // @supervisor-action.requested may not exist yet — ignore
           }
+          // Polling fallback for supervisor action file
+          try {
+            const stat = fsSync.statSync(supervisorFile);
+            supervisorActionLastMtime.set(state.projectId, stat.mtimeMs);
+          } catch { /* file may not exist */ }
+          const supervisorPoller = setInterval(() => {
+            try {
+              const stat = fsSync.statSync(supervisorFile);
+              const prev = supervisorActionLastMtime.get(state.projectId) ?? 0;
+              if (stat.mtimeMs > prev) {
+                supervisorActionLastMtime.set(state.projectId, stat.mtimeMs);
+                onSupervisorAction();
+              }
+            } catch { /* file may not exist */ }
+          }, 3000);
+          supervisorActionPollers.set(state.projectId, supervisorPoller);
         }
       }
     }
@@ -2461,15 +2665,33 @@ export function registerLoopHandlers(services: LoopServices): LoopHandlerContext
             taskWatcher.forEach((w) => w.close());
             taskStatusWatchers.delete(state.projectId);
           }
+          const statusPoller = taskStatusPollers.get(state.projectId);
+          if (statusPoller) {
+            clearInterval(statusPoller);
+            taskStatusPollers.delete(state.projectId);
+            taskStatusLastMtime.delete(state.projectId);
+          }
           const decompWatcher = taskDecompositionWatchers.get(state.projectId);
           if (decompWatcher) {
             decompWatcher.forEach((w) => w.close());
             taskDecompositionWatchers.delete(state.projectId);
           }
+          const decompPoller = taskDecompositionPollers.get(state.projectId);
+          if (decompPoller) {
+            clearInterval(decompPoller);
+            taskDecompositionPollers.delete(state.projectId);
+            taskDecompositionLastMtime.delete(state.projectId);
+          }
           const supervisorWatcher = supervisorActionWatchers.get(state.projectId);
           if (supervisorWatcher) {
             supervisorWatcher.close();
             supervisorActionWatchers.delete(state.projectId);
+          }
+          const supervisorPoller = supervisorActionPollers.get(state.projectId);
+          if (supervisorPoller) {
+            clearInterval(supervisorPoller);
+            supervisorActionPollers.delete(state.projectId);
+            supervisorActionLastMtime.delete(state.projectId);
           }
         }
       }
@@ -2536,17 +2758,103 @@ export function registerLoopHandlers(services: LoopServices): LoopHandlerContext
 
       const loop = loopRunner.getLoopState(projectId, role);
       if (loop && !isLoopTerminal(loop.status)) {
-        // Still running — let the agent pick up the task on its own
+        // Still running — let the agent pick up the task on its own.
+        // Upgrade pre-lock to instance-level if the task file exists and
+        // the task is still at the stage-level pre-lock (e.g. "coder" → "coder-0").
+        upgradeStagePreLock(projectId, stageId, role);
         continue;
       }
 
       // Container is idle/terminal — restart it so it processes the new task
       logger.info('dispatchFactoryStage: restarting idle container', { projectId, role });
-      startLoopCore(opts).catch((err) => {
-        logger.warn('dispatchFactoryStage: failed to restart container', { projectId, role, err });
-      });
+      startLoopCore(opts)
+        .then(() => upgradeStagePreLock(projectId, stageId, role))
+        .catch((err) => {
+          logger.warn('dispatchFactoryStage: failed to restart container', { projectId, role, err });
+        });
     }
   }
 
-  return { dispatchFactoryStage };
+  /**
+   * Upgrades a stage-level pre-lock (e.g. "coder") to an instance-level lock
+   * (e.g. "coder-0") so the kanban shows the blue ⚙ active badge as soon as
+   * the container starts rather than waiting for the agent to send a locked status.
+   */
+  function upgradeStagePreLock(projectId: string, stageId: string, role: string): void {
+    const project = projectStore?.getProject(projectId);
+    const workspacePath = project?.local_path;
+    if (!workspacePath || !factoryTaskStore) return;
+    try {
+      const taskFile = path.join(workspacePath, `@current-task-${stageId}.json`);
+      const taskData = JSON.parse(fsSync.readFileSync(taskFile, 'utf-8')) as { id?: string };
+      if (!taskData.id) return;
+      const task = factoryTaskStore.getTask(projectId, taskData.id);
+      if (!task) return;
+      // Only upgrade if still at stage pre-lock; skip if already instance-locked or unlocked
+      const stagePrefix = role.replace(/-\d+$/, '');
+      if (task.lockedBy !== stagePrefix) return;
+      factoryTaskStore.unlockTask(projectId, taskData.id);
+      const upgraded = factoryTaskStore.lockTask(projectId, taskData.id, role);
+      fsSync.writeFileSync(taskFile, JSON.stringify(upgraded, null, 2));
+      const queue = factoryTaskStore.getQueue(projectId);
+      BrowserWindow.getAllWindows().forEach((win) => {
+        if (!win.isDestroyed()) {
+          win.webContents.send(IPC.FACTORY_TASK_CHANGED, projectId, queue.tasks);
+        }
+      });
+    } catch {
+      // Non-fatal: agent will send its own locked status message shortly
+    }
+  }
+
+  // ── Stuck-agent watchdog ────────────────────────────────────────────────────
+  // Every 5 minutes, scan all active factory tasks. Any task locked by an agent
+  // instance (e.g. "coder-0") whose updatedAt is older than STUCK_THRESHOLD_MS
+  // is considered stuck. We force-restart that container so it picks the task up
+  // again with a fresh context. The threshold is intentionally conservative (30 min)
+  // to avoid false-positives on legitimately long-running tasks.
+  const STUCK_THRESHOLD_MS = 30 * 60 * 1000; // 30 minutes
+  const WATCHDOG_INTERVAL_MS = 5 * 60 * 1000; // check every 5 minutes
+  const AGENT_INSTANCE_RE = /^.+-\d+$/;
+
+  const stuckWatchdogTimer = setInterval(() => {
+    if (!factoryTaskStore || !projectStore) return;
+    const now = Date.now();
+    for (const [_loopKey, opts] of loopOptsMap.entries()) {
+      const { projectId } = opts;
+      if (!projectId) continue;
+      const queue = factoryTaskStore.getQueue(projectId);
+      for (const task of queue.tasks) {
+        if (!task.lockedBy || !AGENT_INSTANCE_RE.test(task.lockedBy)) continue;
+        const updatedMs = new Date(task.updatedAt).getTime();
+        if (now - updatedMs < STUCK_THRESHOLD_MS) continue;
+
+        // Task has been agent-locked without any update for > STUCK_THRESHOLD_MS
+        const stuckRole = task.lockedBy; // e.g. "coder-0"
+        const stageId = stuckRole.replace(/-\d+$/, '');
+        logger.warn('stuck-watchdog: agent appears stuck — force-restarting container', {
+          projectId,
+          taskId: task.id,
+          lockedBy: stuckRole,
+          staleMinutes: Math.floor((now - updatedMs) / 60000),
+        });
+
+        // Stop the stuck container (it may still be running — dispatchFactoryStage
+        // only restarts terminal containers, so we must kill it explicitly first).
+        loopRunner.stopLoop(projectId, stuckRole).catch(() => { /* already stopped */ });
+
+        // Unlock so the restarted container can acquire a fresh instance-level lock
+        try { factoryTaskStore.unlockTask(projectId, task.id); } catch { /* ignore */ }
+
+        // Small delay to let stopLoop settle before restarting
+        setTimeout(() => { dispatchFactoryStage(projectId, stageId); }, 2000);
+        break; // one restart per project per tick to avoid thundering herd
+      }
+    }
+  }, WATCHDOG_INTERVAL_MS);
+
+  // Expose cleanup so tests / app shutdown can clear the interval
+  const stopWatchdog = () => clearInterval(stuckWatchdogTimer);
+
+  return { dispatchFactoryStage, stopWatchdog };
 }

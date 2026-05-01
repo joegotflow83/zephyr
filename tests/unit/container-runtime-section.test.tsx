@@ -208,7 +208,7 @@ describe('ContainerRuntimeSection', () => {
       expect(screen.getByTestId('max-containers-input')).toBeInTheDocument();
     });
 
-    it('hides max containers input when Podman is selected', () => {
+    it('shows max containers input when Podman is selected', () => {
       mockUseSettings.mockReturnValue({
         settings: {
           max_concurrent_containers: 3,
@@ -223,7 +223,7 @@ describe('ContainerRuntimeSection', () => {
 
       render(<ContainerRuntimeSection />);
 
-      expect(screen.queryByTestId('max-containers-input')).not.toBeInTheDocument();
+      expect(screen.getByTestId('max-containers-input')).toBeInTheDocument();
     });
 
     it('displays current max containers value', () => {
@@ -274,10 +274,10 @@ describe('ContainerRuntimeSection', () => {
       expect(decrementButton).toBeDisabled();
     });
 
-    it('does not increment above 20', () => {
+    it('does not increment above 32', () => {
       mockUseSettings.mockReturnValue({
         settings: {
-          max_concurrent_containers: 20,
+          max_concurrent_containers: 32,
           notification_enabled: true,
           theme: 'system' as const,
           log_level: 'INFO' as const,

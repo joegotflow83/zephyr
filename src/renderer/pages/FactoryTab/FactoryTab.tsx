@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { KanbanBoard } from './KanbanBoard';
 import { TaskDetailPanel } from './TaskDetailPanel';
 import { AddTaskForm } from './AddTaskForm';
@@ -66,10 +66,34 @@ export const FactoryTab: React.FC = () => {
     }
   }, [selectedProjectId, tasks.length, loading, hasSynced, syncFromSpecs]);
 
+  // Keep selectedTask in sync with live task data (e.g. lockedBy updates from FACTORY_TASK_CHANGED)
+  useEffect(() => {
+    if (!selectedTask) return;
+    const live = tasks.find((t) => t.id === selectedTask.id);
+    if (live && live !== selectedTask) {
+      setSelectedTask(live);
+    }
+  }, [tasks, selectedTask]);
+
   // Loops for the selected project
-  const projectLoops: LoopState[] = selectedProjectId
-    ? loops.filter((l) => l.projectId === selectedProjectId)
-    : [];
+  const projectLoops = useMemo<LoopState[]>(
+    () => selectedProjectId ? loops.filter((l) => l.projectId === selectedProjectId) : [],
+    [loops, selectedProjectId],
+  );
+
+  // Count running instances per stage from live loop state
+  const runningInstances = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const loop of projectLoops) {
+      if (isLoopTerminal(loop.status) || !loop.role) continue;
+      const dashIdx = loop.role.lastIndexOf('-');
+      if (dashIdx > 0) {
+        const stageId = loop.role.substring(0, dashIdx);
+        counts[stageId] = (counts[stageId] ?? 0) + 1;
+      }
+    }
+    return counts;
+  }, [projectLoops]);
 
   const handleMoveTask = useCallback(
     async (taskId: string, targetColumn: string) => {
@@ -90,8 +114,9 @@ export const FactoryTab: React.FC = () => {
 
   const handleUpdateTask = useCallback(
     async (taskId: string, updates: Partial<FactoryTask>) => {
+      if (!selectedProjectId) return;
       const updated = await window.api.factoryTasks.update(
-        selectedProjectId!,
+        selectedProjectId,
         taskId,
         updates
       );
@@ -139,8 +164,8 @@ export const FactoryTab: React.FC = () => {
           ? { sandboxType: 'vm' as const, vmConfig: project.vm_config }
           : {}),
       });
-    } catch (err) {
-      console.error('Failed to start factory:', err);
+    } catch {
+      // start failure is non-fatal — UI already shows factory-not-running banner
     } finally {
       setStartingFactory(false);
     }
@@ -150,8 +175,8 @@ export const FactoryTab: React.FC = () => {
     if (!selectedProjectId) return;
     try {
       await factoryStop(selectedProjectId);
-    } catch (err) {
-      console.error('Failed to stop factory:', err);
+    } catch {
+      // stop failure is non-fatal
     }
   }, [selectedProjectId, factoryStop]);
 
@@ -267,6 +292,17 @@ export const FactoryTab: React.FC = () => {
             onMoveTask={handleMoveTask}
             onRemoveTask={handleRemoveTask}
             onSelectTask={setSelectedTask}
+            onScaleUp={selectedProjectId && !factoryNotRunning ? (stageId) => {
+              window.api.factory.scaleUp(selectedProjectId, stageId).catch((err: unknown) => {
+                console.error('Scale up failed:', err);
+              });
+            } : undefined}
+            onScaleDown={selectedProjectId && !factoryNotRunning ? (stageId) => {
+              window.api.factory.scaleDown(selectedProjectId, stageId).catch((err: unknown) => {
+                console.error('Scale down failed:', err);
+              });
+            } : undefined}
+            runningInstances={runningInstances}
           />
         ) : (
           <div className="flex items-center justify-center h-full text-gray-500 text-sm">
@@ -301,6 +337,10 @@ export const FactoryTab: React.FC = () => {
           }}
           onRemove={async (taskId) => {
             await handleRemoveTask(taskId);
+          }}
+          onUnlock={async (taskId) => {
+            const updated = await window.api.factoryTasks.unlock(selectedProjectId ?? '', taskId);
+            setSelectedTask((prev) => (prev?.id === taskId ? updated : prev));
           }}
         />
       )}

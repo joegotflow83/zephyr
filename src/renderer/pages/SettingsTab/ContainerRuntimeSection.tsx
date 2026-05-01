@@ -18,7 +18,7 @@ import { ConfirmDialog } from '../../components/ConfirmDialog/ConfirmDialog';
 export const ContainerRuntimeSection: React.FC = () => {
   const { available, info } = useRuntimeStatus();
   const { settings, update } = useSettings();
-  const [maxContainers, setMaxContainers] = useState(settings?.max_concurrent_containers ?? 3);
+  const [maxContainers, setMaxContainers] = useState(settings?.max_concurrent_containers ?? 16);
   const [isSaving, setIsSaving] = useState(false);
   const [pendingRuntime, setPendingRuntime] = useState<'docker' | 'podman' | null>(null);
   const [restartNeeded, setRestartNeeded] = useState(false);
@@ -110,58 +110,56 @@ export const ContainerRuntimeSection: React.FC = () => {
         </div>
       </div>
 
-      {/* Docker-specific: max concurrent containers */}
-      {currentRuntime === 'docker' && (
-        <div>
-          <label
-            htmlFor="max-containers"
-            className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
-          >
-            Max Concurrent Containers
-          </label>
-          <div className="flex items-center">
-            <div className="relative inline-flex items-center">
-              <button
-                type="button"
-                onClick={() => setMaxContainers((v) => Math.max(1, v - 1))}
-                disabled={maxContainers <= 1}
-                className="px-3 py-2 bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-l border border-gray-200 dark:border-gray-600 hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
-                aria-label="Decrease max containers"
-              >
-                -
-              </button>
-              <input
-                id="max-containers"
-                type="number"
-                min="1"
-                max="20"
-                value={maxContainers}
-                onChange={(e) => {
-                  const val = parseInt(e.target.value, 10);
-                  if (!isNaN(val) && val >= 1 && val <= 20) setMaxContainers(val);
-                }}
-                className="w-20 px-3 py-2 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 border-t border-b border-gray-200 dark:border-gray-600 text-center focus:outline-none focus:ring-2 focus:ring-blue-500"
-                data-testid="max-containers-input"
-              />
-              <button
-                type="button"
-                onClick={() => setMaxContainers((v) => Math.min(20, v + 1))}
-                disabled={maxContainers >= 20}
-                className="px-3 py-2 bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-r border border-gray-200 dark:border-gray-600 hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
-                aria-label="Increase max containers"
-              >
-                +
-              </button>
-            </div>
-            {isSaving && (
-              <span className="ml-3 text-sm text-gray-500 dark:text-gray-400">Saving...</span>
-            )}
+      {/* Max concurrent containers — applies to both Docker and Podman */}
+      <div>
+        <label
+          htmlFor="max-containers"
+          className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
+        >
+          Max Concurrent Containers
+        </label>
+        <div className="flex items-center">
+          <div className="relative inline-flex items-center">
+            <button
+              type="button"
+              onClick={() => setMaxContainers((v) => Math.max(1, v - 1))}
+              disabled={maxContainers <= 1}
+              className="px-3 py-2 bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-l border border-gray-200 dark:border-gray-600 hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
+              aria-label="Decrease max containers"
+            >
+              -
+            </button>
+            <input
+              id="max-containers"
+              type="number"
+              min="1"
+              max="32"
+              value={maxContainers}
+              onChange={(e) => {
+                const val = parseInt(e.target.value, 10);
+                if (!isNaN(val) && val >= 1 && val <= 32) setMaxContainers(val);
+              }}
+              className="w-20 px-3 py-2 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 border-t border-b border-gray-200 dark:border-gray-600 text-center focus:outline-none focus:ring-2 focus:ring-blue-500"
+              data-testid="max-containers-input"
+            />
+            <button
+              type="button"
+              onClick={() => setMaxContainers((v) => Math.min(32, v + 1))}
+              disabled={maxContainers >= 32}
+              className="px-3 py-2 bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-r border border-gray-200 dark:border-gray-600 hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
+              aria-label="Increase max containers"
+            >
+              +
+            </button>
           </div>
-          <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-            Maximum number of containers that can run simultaneously
-          </p>
+          {isSaving && (
+            <span className="ml-3 text-sm text-gray-500 dark:text-gray-400">Saving...</span>
+          )}
         </div>
-      )}
+        <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+          Maximum number of containers that can run simultaneously. Factory pipelines need one per stage plus any scaled-up instances.
+        </p>
+      </div>
 
       {/* Podman-specific: machine note for macOS/Windows */}
       {currentRuntime === 'podman' && (

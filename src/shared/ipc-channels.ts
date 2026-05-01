@@ -58,6 +58,8 @@ export const IPC = {
   FACTORY_START: 'factory:start',
   FACTORY_STOP: 'factory:stop',
   FACTORY_RESTART_CONTAINER: 'factory:restart-container',
+  FACTORY_SCALE_UP: 'factory:scale-up',
+  FACTORY_SCALE_DOWN: 'factory:scale-down',
 
   // Factory task kanban
   FACTORY_TASK_LIST: 'factory:task:list',
@@ -67,6 +69,7 @@ export const IPC = {
   FACTORY_TASK_SYNC: 'factory:task:sync',
   FACTORY_TASK_GET: 'factory:task:get',
   FACTORY_TASK_UPDATE: 'factory:task:update',
+  FACTORY_TASK_UNLOCK: 'factory:task:unlock',
   FACTORY_TASK_CHANGED: 'factory:task:changed',
 
   // Pipeline library (data-driven factory stages)

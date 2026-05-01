@@ -27,9 +27,9 @@ describe('createDefaultSettings', () => {
     expect(typeof settings).toBe('object');
   });
 
-  it('sets max_concurrent_containers to 5', () => {
+  it('sets max_concurrent_containers to 16', () => {
     const settings = createDefaultSettings();
-    expect(settings.max_concurrent_containers).toBe(5);
+    expect(settings.max_concurrent_containers).toBe(16);
   });
 
   it('enables notifications by default', () => {
@@ -51,7 +51,7 @@ describe('createDefaultSettings', () => {
     const a = createDefaultSettings();
     const b = createDefaultSettings();
     a.max_concurrent_containers = 99;
-    expect(b.max_concurrent_containers).toBe(5);
+    expect(b.max_concurrent_containers).toBe(16);
   });
 
   it('satisfies the AppSettings type shape', () => {

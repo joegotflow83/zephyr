@@ -191,7 +191,7 @@ vi.mock('../../src/main/ipc-handlers/credential-handlers', () => ({
 }));
 
 vi.mock('../../src/main/ipc-handlers/loop-handlers', () => ({
-  registerLoopHandlers: vi.fn().mockReturnValue({ dispatchFactoryStage: vi.fn() }),
+  registerLoopHandlers: vi.fn().mockReturnValue({ dispatchFactoryStage: vi.fn(), stopWatchdog: vi.fn() }),
 }));
 
 vi.mock('../../src/main/ipc-handlers/log-handlers', () => ({

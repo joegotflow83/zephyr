@@ -210,15 +210,16 @@ describe('TaskDetailPanel — sub-task list', () => {
 describe('TaskDetailPanel — lock indicator', () => {
   it('shows lock icon and container name when lockedBy is set', () => {
     renderPanel(makeTask({ lockedBy: 'zephyr-myproject-coder-0' }), null);
-    const lockEl = screen.getByLabelText('locked');
+    // Agent instance lock (stageId-N pattern) shows active indicator
+    const lockEl = screen.getByLabelText('actively being worked on');
     expect(lockEl).toBeInTheDocument();
-    expect(lockEl).toHaveTextContent('🔒');
+    expect(lockEl).toHaveTextContent('⚙');
     expect(lockEl).toHaveTextContent('zephyr-myproject-coder-0');
   });
 
   it('does not show lock indicator when lockedBy is absent', () => {
     renderPanel(makeTask({ lockedBy: undefined }), null);
-    expect(screen.queryByLabelText('locked')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('actively being worked on')).not.toBeInTheDocument();
   });
 });
 

@@ -149,6 +149,10 @@ declare global {
         stop: (projectId: string) => Promise<void>;
         /** Restart a single factory container by role (e.g. "pm-0", "coder-1"). */
         restartContainer: (projectId: string, role: string) => Promise<LoopState>;
+        /** Spawn a new container instance for a pipeline stage. */
+        scaleUp: (projectId: string, stageId: string) => Promise<LoopState>;
+        /** Stop the highest-indexed instance of a pipeline stage. */
+        scaleDown: (projectId: string, stageId: string) => Promise<void>;
       };
 
       factoryTasks: {
@@ -164,6 +168,8 @@ declare global {
         remove: (projectId: string, taskId: string) => Promise<boolean>;
         /** Update task fields (title, description) */
         update: (projectId: string, taskId: string, updates: Partial<Pick<FactoryTask, 'title' | 'description'>>) => Promise<FactoryTask>;
+        /** Force-unlock a task (manual override from UI) */
+        unlock: (projectId: string, taskId: string) => Promise<FactoryTask>;
         /** Sync tasks from spec files in the project's specs directory */
         sync: (projectId: string) => Promise<FactoryTask[]>;
         /** Listen for task changes broadcast from the main process. Returns cleanup function. */
