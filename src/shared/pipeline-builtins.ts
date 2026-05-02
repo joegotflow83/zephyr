@@ -32,13 +32,11 @@ const DEFAULT_BOUNCE_LIMIT = 3;
 
 const PROTOCOL_PREAMBLE = `\
 TASK QUEUE
-  /workspace/@task-queue.json — read this file to discover available tasks.
-  It is a JSON array of task objects. Each object has:
-    id, title, description, column, lockedBy (null when available), bounceCount, updatedAt
-  Find tasks where column === "<your stage ID>" and lockedBy is null/absent.
-  Pick ONE task, lock it immediately, do the work, then signal status.
-  If no tasks are available for your stage, write @task-status.json with
-  status "idle" and exit — do not loop or poll.
+  Your assigned task: /workspace/@current-task-<your_stage_id>.json
+  The host writes this file when a task enters your stage. Read it to get
+  your task (id, title, description). If it is absent, write @task-status.json
+  with status "idle" and exit — do not loop or poll.
+  Full queue (reference only): /workspace/@task-queue.json
 
 SIGNAL FILES (workspace-relative)
   @task-status.json        — write to advance, reject, or signal idle
@@ -48,7 +46,7 @@ SIGNAL FILES (workspace-relative)
 
 LOCK PROTOCOL
   Before doing any work: write @task-status.json with status "locked" and
-  lockedBy set to "<stageId>-<INSTANCE_INDEX>". Read INSTANCE_INDEX from env.
+  lockId set to "<stageId>-<INSTANCE_INDEX>". Read INSTANCE_INDEX from env.
   After writing the forward/rejected signal: the host clears lockedBy for you.
 
 ROUTING SIGNAL
@@ -134,8 +132,8 @@ YOUR RESPONSIBILITY
 ${PROTOCOL_PREAMBLE}
 
 WORKFLOW
-  1. Find an unlocked task in the coder column.
-  2. Lock it: lockedBy = "coder-<INSTANCE_INDEX>".
+  1. Read /workspace/@current-task-coder.json for your assigned task.
+  2. Lock it: lockId = "coder-<INSTANCE_INDEX>".
   3. Read handover notes (from PM or from a rejection):
        team/handovers/<taskId>-pm-to-coder.md
        team/handovers/<taskId>-qa-to-coder.md
@@ -169,8 +167,8 @@ YOUR RESPONSIBILITY
 ${PROTOCOL_PREAMBLE}
 
 WORKFLOW
-  1. Find an unlocked task in the security column.
-  2. Lock it: lockedBy = "security-<INSTANCE_INDEX>".
+  1. Read /workspace/@current-task-security.json for your assigned task.
+  2. Lock it: lockId = "security-<INSTANCE_INDEX>".
   3. Read handover: team/handovers/<taskId>-coder-to-security.md
   4. Audit the changed files for:
        - Injection vulnerabilities (SQL, command, XSS, template injection)
@@ -206,8 +204,8 @@ YOUR RESPONSIBILITY
 ${PROTOCOL_PREAMBLE}
 
 WORKFLOW
-  1. Find an unlocked task in the qa column.
-  2. Lock it: lockedBy = "qa-<INSTANCE_INDEX>".
+  1. Read /workspace/@current-task-qa.json for your assigned task.
+  2. Lock it: lockId = "qa-<INSTANCE_INDEX>".
   3. Read handover: team/handovers/<taskId>-security-to-qa.md
      (note any security findings forwarded for awareness).
   4. Test:
@@ -242,8 +240,8 @@ YOUR RESPONSIBILITY
 ${PROTOCOL_PREAMBLE}
 
 WORKFLOW
-  1. Find an unlocked task in the docs column.
-  2. Lock it: lockedBy = "docs-<INSTANCE_INDEX>".
+  1. Read /workspace/@current-task-docs.json for your assigned task.
+  2. Lock it: lockId = "docs-<INSTANCE_INDEX>".
   3. Read handover: team/handovers/<taskId>-qa-to-docs.md
   4. Document:
        - Update README, API docs, or user guides as appropriate.
@@ -279,8 +277,8 @@ YOUR RESPONSIBILITY
 ${PROTOCOL_PREAMBLE}
 
 WORKFLOW
-  1. Find an unlocked task in the coder column.
-  2. Lock it: lockedBy = "coder-<INSTANCE_INDEX>".
+  1. Read /workspace/@current-task-coder.json for your assigned task.
+  2. Lock it: lockId = "coder-<INSTANCE_INDEX>".
   3. Read handover notes:
        team/handovers/<taskId>-pm-to-coder.md  (if present)
        team/handovers/<taskId>-qa-to-coder.md  (if rejection from QA)
@@ -310,8 +308,8 @@ YOUR RESPONSIBILITY
 ${PROTOCOL_PREAMBLE}
 
 WORKFLOW
-  1. Find an unlocked task in the qa column.
-  2. Lock it: lockedBy = "qa-<INSTANCE_INDEX>".
+  1. Read /workspace/@current-task-qa.json for your assigned task.
+  2. Lock it: lockId = "qa-<INSTANCE_INDEX>".
   3. Read handover: team/handovers/<taskId>-coder-to-qa.md
   4. Test:
        - Write unit tests for the acceptance criteria.
@@ -340,8 +338,8 @@ YOUR RESPONSIBILITY
 ${PROTOCOL_PREAMBLE}
 
 WORKFLOW
-  1. Find an unlocked task in the static-analyser column.
-  2. Lock it: lockedBy = "static-analyser-<INSTANCE_INDEX>".
+  1. Read /workspace/@current-task-static-analyser.json for your assigned task.
+  2. Lock it: lockId = "static-analyser-<INSTANCE_INDEX>".
   3. Analyse:
        - Injection flaws (SQL, command, XSS, template, path traversal)
        - Hardcoded secrets or credentials
@@ -375,8 +373,8 @@ YOUR RESPONSIBILITY
 ${PROTOCOL_PREAMBLE}
 
 WORKFLOW
-  1. Find an unlocked task in the pen-tester column.
-  2. Lock it: lockedBy = "pen-tester-<INSTANCE_INDEX>".
+  1. Read /workspace/@current-task-pen-tester.json for your assigned task.
+  2. Lock it: lockId = "pen-tester-<INSTANCE_INDEX>".
   3. Read handover: team/handovers/<taskId>-static-analyser-to-pen-tester.md
   4. Test runtime scenarios:
        - Authentication bypass and session fixation
@@ -409,8 +407,8 @@ YOUR RESPONSIBILITY
 ${PROTOCOL_PREAMBLE}
 
 WORKFLOW
-  1. Find an unlocked task in the remediation-coder column.
-  2. Lock it: lockedBy = "remediation-coder-<INSTANCE_INDEX>".
+  1. Read /workspace/@current-task-remediation-coder.json for your assigned task.
+  2. Lock it: lockId = "remediation-coder-<INSTANCE_INDEX>".
   3. Read handover: team/handovers/<taskId>-pen-tester-to-remediation-coder.md
   4. Fix each Critical and High finding. For Medium/Low findings, document
      the accepted risk or mitigation strategy in the handover note.
@@ -441,8 +439,8 @@ YOUR RESPONSIBILITY
 ${PROTOCOL_PREAMBLE}
 
 WORKFLOW
-  1. Find an unlocked task in the qa column.
-  2. Lock it: lockedBy = "qa-<INSTANCE_INDEX>".
+  1. Read /workspace/@current-task-qa.json for your assigned task.
+  2. Lock it: lockId = "qa-<INSTANCE_INDEX>".
   3. Read handover: team/handovers/<taskId>-remediation-coder-to-qa.md
   4. Regression test:
        - Run the full test suite; confirm no regressions.
@@ -473,8 +471,8 @@ YOUR RESPONSIBILITY
 ${PROTOCOL_PREAMBLE}
 
 WORKFLOW
-  1. Find an unlocked task in the code-analyser column.
-  2. Lock it: lockedBy = "code-analyser-<INSTANCE_INDEX>".
+  1. Read /workspace/@current-task-code-analyser.json for your assigned task.
+  2. Lock it: lockId = "code-analyser-<INSTANCE_INDEX>".
   3. Analyse the codebase scope described in the task:
        - Identify exported functions, classes, interfaces, and types.
        - Note intended behaviour, invariants, and edge-case handling.
@@ -502,8 +500,8 @@ YOUR RESPONSIBILITY
 ${PROTOCOL_PREAMBLE}
 
 WORKFLOW
-  1. Find an unlocked task in the technical-writer column.
-  2. Lock it: lockedBy = "technical-writer-<INSTANCE_INDEX>".
+  1. Read /workspace/@current-task-technical-writer.json for your assigned task.
+  2. Lock it: lockId = "technical-writer-<INSTANCE_INDEX>".
   3. Read handover: team/handovers/<taskId>-code-analyser-to-technical-writer.md
      (and reviewer-to-technical-writer if this is a rejection pass).
   4. Write:
@@ -540,8 +538,8 @@ YOUR RESPONSIBILITY
 ${PROTOCOL_PREAMBLE}
 
 WORKFLOW
-  1. Find an unlocked task in the reviewer column.
-  2. Lock it: lockedBy = "reviewer-<INSTANCE_INDEX>".
+  1. Read /workspace/@current-task-reviewer.json for your assigned task.
+  2. Lock it: lockId = "reviewer-<INSTANCE_INDEX>".
   3. Read the documentation produced by the Technical Writer.
   4. Review for:
        - Technical accuracy: does the documentation match actual code behaviour?
@@ -639,8 +637,8 @@ YOUR RESPONSIBILITY
 ${PROTOCOL_PREAMBLE}
 
 WORKFLOW
-  1. Find an unlocked task in the <your_stage_id> column.
-  2. Lock it: lockedBy = "<your_stage_id>-<INSTANCE_INDEX>".
+  1. Read /workspace/@current-task-<your_stage_id>.json for your assigned task.
+  2. Lock it: lockId = "<your_stage_id>-<INSTANCE_INDEX>".
   3. Read handover notes:
        team/handovers/<taskId>-<prev_stage>-to-<your_stage_id>.md
   4. [Perform your work here.]
@@ -678,8 +676,8 @@ YOUR RESPONSIBILITY
 ${PROTOCOL_PREAMBLE}
 
 WORKFLOW
-  1. Find an unlocked task in the <your_stage_id> column.
-  2. Lock it: lockedBy = "<your_stage_id>-<INSTANCE_INDEX>".
+  1. Read /workspace/@current-task-<your_stage_id>.json for your assigned task.
+  2. Lock it: lockId = "<your_stage_id>-<INSTANCE_INDEX>".
   3. Read handover: team/handovers/<taskId>-<prev_stage>-to-<your_stage_id>.md
   4. Audit the changed files for:
        - Injection vulnerabilities (SQL, command, XSS, template injection)
@@ -724,8 +722,8 @@ YOUR RESPONSIBILITY
 ${PROTOCOL_PREAMBLE}
 
 WORKFLOW
-  1. Find an unlocked task in the <your_stage_id> column.
-  2. Lock it: lockedBy = "<your_stage_id>-<INSTANCE_INDEX>".
+  1. Read /workspace/@current-task-<your_stage_id>.json for your assigned task.
+  2. Lock it: lockId = "<your_stage_id>-<INSTANCE_INDEX>".
   3. Read handover: team/handovers/<taskId>-<prev_stage>-to-<your_stage_id>.md
   4. Document:
        - Update README, API docs, or user guides as appropriate.

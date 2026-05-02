@@ -2016,6 +2016,35 @@ export function registerLoopHandlers(services: LoopServices): LoopHandlerContext
         } catch (err) {
           logger.warn('Failed to write @task-queue.json on factory start', { err, projectId });
         }
+
+        // For each pipeline stage that already has tasks queued (e.g. from a
+        // previous session or manual kanban placement), write the @current-task
+        // file so the agent loop's bash guard fires immediately on startup rather
+        // than waiting for an upstream stage to dispatch a new task.
+        // Only write for the first unlocked, non-epic task per stage to avoid
+        // overwriting a file that may have been set by a concurrent dispatch.
+        const allTasks = factoryTaskStore.getQueue(projectId).tasks;
+        for (const stage of pipeline.stages) {
+          const nextTask = allTasks.find(
+            (t) => t.column === stage.id && !t.lockedBy && !t.isEpic,
+          );
+          if (nextTask) {
+            try {
+              const locked = factoryTaskStore.lockTask(projectId, nextTask.id, stage.id);
+              fsSync.writeFileSync(
+                path.join(project.local_path, `@current-task-${stage.id}.json`),
+                JSON.stringify(locked, null, 2),
+              );
+              logger.info('FACTORY_START: dispatched existing stage task', {
+                projectId,
+                stageId: stage.id,
+                taskId: nextTask.id,
+              });
+            } catch {
+              // Already locked by a concurrent dispatch — leave existing file
+            }
+          }
+        }
       }
 
       return results;
@@ -2270,7 +2299,19 @@ export function registerLoopHandlers(services: LoopServices): LoopHandlerContext
         if (workspacePath && factoryTaskStore) {
           const statusJsonPath = path.join(workspacePath, '@task-status.json');
           const taskStatusTrigger = path.join(workspacePath, '@task-status.requested');
+          // Guard against double-processing the same write. Both the direct
+          // @task-status.json watcher and the @task-status.requested hook
+          // trigger call onStatusChange; without this check the second call
+          // reads the same file after the task has already moved, causing it
+          // to advance one extra stage (e.g. security → qa on a coder forward).
+          let lastProcessedStatusMtime = 0;
           const onStatusChange = () => {
+              try {
+                const stat = fsSync.statSync(statusJsonPath);
+                if (stat.mtimeMs <= lastProcessedStatusMtime) return;
+                lastProcessedStatusMtime = stat.mtimeMs;
+              } catch { return; }
+
               let statusData: unknown;
               try {
                 const statusRaw = fsSync.readFileSync(
@@ -2307,6 +2348,7 @@ export function registerLoopHandlers(services: LoopServices): LoopHandlerContext
                 sourceStage &&
                 !['backlog', 'done', 'blocked', 'needs_input'].includes(sourceStage)
               ) {
+                let sourceFileDeleted = false;
                 try {
                   const currentTaskFile = path.join(workspacePath, `@current-task-${sourceStage}.json`);
                   const existing = JSON.parse(
@@ -2314,9 +2356,35 @@ export function registerLoopHandlers(services: LoopServices): LoopHandlerContext
                   ) as { id?: string };
                   if (existing.id === sdPre.taskId) {
                     fsSync.unlinkSync(currentTaskFile);
+                    sourceFileDeleted = true;
                   }
                   // else: a new task was already assigned to this stage — leave it
                 } catch { /* file may not exist */ }
+
+                // When the current-task file was cleared, dispatch the next queued task
+                // in the source stage so the agent loop immediately picks it up rather
+                // than sitting idle until a new task arrives from upstream.
+                if (sourceFileDeleted) {
+                  const nextSourceTask = factoryTaskStore
+                    .getQueue(state.projectId)
+                    .tasks.find(
+                      (t) => t.column === sourceStage && !t.lockedBy && !t.isEpic,
+                    );
+                  if (nextSourceTask) {
+                    try {
+                      const lockedNext = factoryTaskStore.lockTask(
+                        state.projectId,
+                        nextSourceTask.id,
+                        sourceStage,
+                      );
+                      fsSync.writeFileSync(
+                        path.join(workspacePath, `@current-task-${sourceStage}.json`),
+                        JSON.stringify(lockedNext, null, 2),
+                      );
+                    } catch { /* already locked by another instance — leave it */ }
+                    dispatchFactoryStage(state.projectId, sourceStage);
+                  }
+                }
               }
 
               const sd = statusData as { taskId?: string };
@@ -2793,13 +2861,19 @@ export function registerLoopHandlers(services: LoopServices): LoopHandlerContext
       // Only upgrade if still at stage pre-lock; skip if already instance-locked or unlocked
       const stagePrefix = role.replace(/-\d+$/, '');
       if (task.lockedBy !== stagePrefix) return;
+      // Guard: only one task per agent instance can hold an instance-level lock at a time.
+      // If this role (e.g. "coder-0") is already actively working on another task, leave the
+      // new task at the stage pre-lock ("coder") so the kanban shows it as queued (yellow 🔒)
+      // rather than falsely marking it as actively being worked on (blue ⚙ coder-0).
+      const queue = factoryTaskStore.getQueue(projectId);
+      if (queue.tasks.some((t) => t.lockedBy === role)) return;
       factoryTaskStore.unlockTask(projectId, taskData.id);
       const upgraded = factoryTaskStore.lockTask(projectId, taskData.id, role);
       fsSync.writeFileSync(taskFile, JSON.stringify(upgraded, null, 2));
-      const queue = factoryTaskStore.getQueue(projectId);
+      const updatedQueue = factoryTaskStore.getQueue(projectId);
       BrowserWindow.getAllWindows().forEach((win) => {
         if (!win.isDestroyed()) {
-          win.webContents.send(IPC.FACTORY_TASK_CHANGED, projectId, queue.tasks);
+          win.webContents.send(IPC.FACTORY_TASK_CHANGED, projectId, updatedQueue.tasks);
         }
       });
     } catch {
