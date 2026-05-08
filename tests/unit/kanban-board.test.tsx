@@ -608,7 +608,7 @@ describe('KanbanBoard — epic progress tracker', () => {
       />
     );
     // Find the tracker row div with the title attribute
-    const row = container.querySelector('[title="Feature Epic: 1/1 sub-tasks done"]');
+    const row = container.querySelector('[title="Feature Epic: 1/1 sub-tasks done — click to manage"]');
     expect(row).not.toBeNull();
   });
 });

@@ -1,6 +1,6 @@
 # Zephyr Desktop
 
-A native Electron + React + TypeScript desktop application for managing and orchestrating AI loops via Docker containers.
+A native Electron + React + TypeScript desktop application for running AI coding factories — multiple agents working in parallel on a shared codebase, coordinated through a kanban-style pipeline.
 
 ## Credit
 
@@ -9,48 +9,57 @@ playbook goes to [ClaytonFarr](https://github.com/ClaytonFarr/ralph-playbook?tab
 
 ## What It Does
 
-Zephyr Desktop provides a graphical interface for:
+Zephyr Desktop lets you run a **Coding Factory**: a set of AI agents (PM, coder, reviewer, QA, etc.) that each operate in their own container, share a workspace on disk, and hand tasks off to each other through a pipeline you define. You manage everything — tasks, pipelines, agents, and logs — from a single desktop UI.
 
-- **Project management** -- create, edit, import/export project configurations with Docker container settings, environment variables, and shared assets
-- **Loop execution** -- start, stop, and monitor long-running Docker-based loops with real-time log streaming and parsing
-- **Terminal** -- interactive xterm.js terminal with full PTY sessions via Docker exec
-- **Image builder** -- build and manage custom Docker images from within the app
-- **Scheduling** -- schedule loops with cron expressions for automated execution
-- **Credential management** -- securely store API keys and session cookies via Electron's `safeStorage`; optionally use browser-based login via Playwright
-- **AWS Bedrock auth** -- built-in support for AWS Bedrock authentication
-- **GitHub deploy keys** -- ephemeral SSH deploy key management for private repositories; keys are cleaned up automatically when the container exits
-- **Runtime health monitoring** -- background polling detects Docker/Podman daemon availability changes and warns when disk space is low
-- **Self-update** -- check for and apply updates via `electron-updater`
-- **Desktop notifications** -- get notified when loops complete or fail
-- **Log export** -- export individual or all loop logs to disk
-- **Coding Factory** -- run multiple AI agent roles (coder, reviewer, tester, planner) in parallel on a single project; each role gets its own container with shared workspace; supports role-based single run to trigger one role independently
-- **VM Sandbox** -- run containers inside Multipass VMs for full admin access, nested Docker, and system-level testing; supports persistent VMs (created once, reused) and ephemeral VMs (fresh per loop run)
-- **Podman support** -- use Podman as an alternative container runtime; the runtime is auto-detected at startup with no configuration required
-- **Per-project git identity** -- configure a git user name and email per project, injected into the container environment at run time
-- **Spec files** -- attach specification or requirements documents to a project; they are copied into the container workspace alongside source files
+### Core features
+
+- **Coding Factory** — define a pipeline of agent stages (e.g. PM → Coder → Reviewer → QA); tasks flow automatically between stages as agents complete them; supports multiple parallel instances per stage
+- **Kanban board** — drag tasks between columns, view per-task history, lock/unlock agents, track epic progress, and delete completed tasks
+- **Pipeline builder** — create and edit pipelines with custom stages, agent prompts, icons, colors, and instance counts; built-in pipelines included
+- **Task management** — add tasks manually or sync from spec files; tasks can be decomposed into epics by the PM agent; epic progress tracked automatically
+- **Project management** — create and edit projects with Docker image selection, git identity, spec files, and pipeline assignment
+- **Deployment choice** — run agent containers directly on this machine (Local Containers) or inside an isolated Ubuntu VM via Multipass (VM + Containers)
+- **Terminal** — interactive xterm.js terminal with full PTY sessions via Docker exec
+- **Image builder** — build and manage custom Docker images from within the app
+- **Credential management** — securely store API keys and session cookies via Electron's `safeStorage`
+- **AWS Bedrock auth** — built-in support for AWS Bedrock authentication
+- **GitHub / GitLab deploy keys** — ephemeral SSH deploy key management; keys are created at loop start and cleaned up automatically on exit
+- **Runtime health monitoring** — background polling detects Docker/Podman daemon availability and warns when disk space is low
+- **Self-update** — check for and apply updates via `electron-updater`
+- **Desktop notifications** — get notified when loops complete or fail
+- **Log export** — export individual or all loop logs to disk
+- **Podman support** — use Podman as an alternative container runtime; auto-detected at startup
+- **Kiro CLI support** — use Kiro (Amazon) as the LLM provider inside containers
+- **Per-project git identity** — configure `git user.name` and `user.email` per project, injected into the container at run time
+- **Spec files** — attach specification documents to a project; synced into the task backlog automatically
 
 ## Requirements
 
 - Node.js 18+
-- Docker Desktop or Podman (for loop execution; project management works without either)
-- Multipass (optional; required for VM Sandbox mode)
+- Docker Desktop or Podman (required for running the factory; project management works without either)
+- Multipass (optional; required for VM + Containers deployment mode)
 
 ## Installation
 
 ```bash
-# Clone the repository
 git clone https://github.com/joegotflow83/zephyr.git && cd zephyr
-
-# Install dependencies
 npm install
 ```
 
 ## Running
 
 ```bash
-# Start in development mode
 npm start
 ```
+
+## Quick Start
+
+1. **Build or pick a Docker image** — go to the Images tab and build a Zephyr image, or use any public image (e.g. `ubuntu:24.04`)
+2. **Create a project** — fill in the project name, local path (the repo folder on your machine), and select the image
+3. **Choose deployment** — "Local Containers" runs agents directly on this machine; "VM + Containers" runs them inside an isolated Multipass VM
+4. **Assign a pipeline** — pick a built-in pipeline or create one in Settings → Pipelines; the pipeline defines the agent stages and their prompts
+5. **Add tasks** — type tasks into the Factory tab's add-task form, or attach spec files to the project and click "Sync from Specs"
+6. **Start the factory** — click "Start Factory"; agents will begin picking up tasks from their columns automatically
 
 ## Development
 
@@ -59,49 +68,58 @@ npm start
 ```
 src/
   main/
-    index.ts              # Electron main process entry point
-    preload.ts            # Context bridge / preload script
-    menu.ts               # Application menu
-    ipc-handlers/         # IPC handler modules
+    index.ts                  # Electron main process entry point
+    preload.ts                # Context bridge / preload script
+    ipc-handlers/
+      loop-handlers.ts        # Factory start/stop, container lifecycle, file watchers
+      factory-task-handlers.ts# Kanban task CRUD and workspace sync
+      pipeline-handlers.ts    # Pipeline CRUD
+      data-handlers.ts        # Project, settings, image CRUD
   renderer/
-    App.tsx               # Root React component
-    index.tsx             # Renderer entry point
+    App.tsx                   # Root React component and tab routing
     pages/
-      ProjectsTab/        # Project list and management
-      LoopsTab/           # Running loops display and log viewer
-      TerminalTab/        # Interactive terminal
-      ImagesTab/          # Docker image builder
-      SettingsTab/        # Application settings and updates
-    components/           # Shared UI components (dialogs, log viewer, status bar, etc.)
-    stores/               # Zustand state stores
-    hooks/                # Custom React hooks
+      FactoryTab/             # Kanban board, task detail panel, factory controls
+      ProjectsTab/            # Project list and management
+      TerminalTab/            # Interactive terminal
+      ImagesTab/              # Docker image builder
+      SettingsTab/            # Settings, pipeline library, credential config
+    components/
+      ProjectDialog/          # Add/edit project modal
+      PipelineBuilderDialog/  # Pipeline create/edit modal
+      ImageBuilderDialog/     # Image build modal
+      LogViewer/              # Virtualized log viewer
+    stores/
+      app-store.ts            # Zustand global state
+    hooks/                    # useFactoryTasks, useLoops, useActiveFactories, etc.
+    utils/
+      parseLogLine.ts         # Log line parsing and timestamp stripping
   services/
-    config-manager.ts     # JSON configuration persistence
-    project-store.ts      # Project CRUD operations
-    docker-manager.ts     # Docker container lifecycle and log streaming
-    loop-runner.ts        # Loop execution engine
-    log-parser.ts         # Structured log output parsing
-    scheduler.ts          # Cron-based loop scheduling
-    credential-manager.ts # safeStorage-backed credential storage
-    login-manager.ts      # Playwright browser-based authentication
-    asset-injector.ts     # Shared file injection into containers
-    image-builder.ts      # Docker image build orchestration
-    terminal-manager.ts   # xterm.js PTY session management
-    docker-health.ts      # Background Docker daemon health polling
-    disk-checker.ts       # Pre-launch disk space validation
-    git-manager.ts        # Git repository operations
-    self-updater.ts       # In-app update mechanism
-    ssh-key-manager.ts    # Ephemeral GitHub SSH deploy key management
-    import-export.ts      # Project configuration import/export
-    logging.ts            # Application-wide logging (electron-log)
-    vm-manager.ts         # Multipass VM lifecycle and Docker-in-VM execution
+    container-orchestrator.ts # Container/VM lifecycle, log streaming, state tracking
+    factory-task-store.ts     # Kanban task persistence and transition logic
+    pipeline-store.ts         # Pipeline persistence
+    project-store.ts          # Project CRUD
+    config-manager.ts         # JSON configuration persistence
+    log-parser.ts             # Structured log output parsing
+    credential-manager.ts     # safeStorage-backed credential storage
+    asset-injector.ts         # Hook/prompt file injection into containers
+    image-builder.ts          # Docker image build orchestration
+    terminal-manager.ts       # xterm.js PTY session management
+    vm-manager.ts             # Multipass VM lifecycle and Docker-in-VM execution
+    git-manager.ts            # Git repository operations
+    self-updater.ts           # In-app update mechanism
+    ssh-key-manager.ts        # Ephemeral GitHub/GitLab SSH deploy key management
+    import-export.ts          # Project configuration import/export
   shared/
-    ipc-channels.ts       # IPC channel name constants
-    models.ts             # Shared data models
-    loop-types.ts         # Loop-related type definitions
-scripts/
-  build.sh                # Build wrapper
-  generate-icons.js       # Application icon generation
+    ipc-channels.ts           # IPC channel name constants
+    models.ts                 # Shared data models (ProjectConfig, AppSettings, etc.)
+    factory-types.ts          # FactoryTask, pipeline kanban types
+    pipeline-types.ts         # Pipeline, PipelineStage type definitions
+    pipeline-builtins.ts      # Built-in pipeline definitions
+    loop-types.ts             # LoopState, LoopStatus enums
+  lib/
+    pipeline/
+      transitions.ts          # Derive allowed kanban transitions from a pipeline
+      slugify.ts              # Stage ID normalization
 ```
 
 ### Running Tests
@@ -140,19 +158,29 @@ Builds produce platform-native packages: `.dmg` on macOS, `.deb`/`.rpm` on Linux
 
 GitHub Actions workflows in `.github/workflows/`:
 
-- **ci.yml** -- runs type-check, unit tests, integration tests, linting, and E2E tests on every push
-- **release.yml** -- triggered by `v*` tags; builds for macOS, Linux, and Windows, then publishes a GitHub release with artifacts
+- **ci.yml** — runs type-check, unit tests, integration tests, linting, and E2E tests on every push
+- **release.yml** — triggered by `v*` tags; builds for macOS, Linux, and Windows, then publishes a GitHub release with artifacts
 
 ## Architecture
 
-The application follows Electron's process model with a strict security posture (`contextIsolation: true`, `nodeIntegration: false`). All IPC channel names are defined as constants in `src/shared/ipc-channels.ts`. The React renderer communicates with backend services exclusively via the context bridge.
+The application follows Electron's process model with strict security (`contextIsolation: true`, `nodeIntegration: false`). All IPC channel names are defined as constants in `src/shared/ipc-channels.ts`. The React renderer communicates with backend services exclusively via the context bridge.
+
+### How the factory works
+
+1. On `FACTORY_START`, one container per pipeline stage is launched running a bash polling loop that watches for `@current-task-<stageId>.json` in `/workspace`
+2. When a task enters a stage column (via drag-drop or agent status update), the host writes that file and restarts any idle container for that stage
+3. The agent reads the file, works on the task, writes `@task-status.json` to signal completion or rejection
+4. The host's file watcher picks up the status update, moves the task to the next column, writes the next stage's current-task file, and dispatches that stage
+5. Epics (tasks decomposed by the PM agent into sub-tasks) are tracked in a progress strip above the board; when all sub-tasks reach Done, the epic auto-advances
+6. A stuck-agent watchdog runs every 5 minutes and force-restarts any container whose task hasn't been updated in 30 minutes
 
 Key design decisions:
 
-- **Best-effort resilience** -- Docker unavailability, disk check failures, and git validation errors are caught and logged but never prevent the app from starting or project management from working
-- **Secure credentials** -- all secrets stored via `electron.safeStorage`; never written to plaintext config files
-- **Zustand state** -- renderer state is managed with Zustand stores, keeping UI logic out of components
-- **Virtual log rendering** -- `@tanstack/react-virtual` enables smooth scrolling through large log outputs
+- **Best-effort resilience** — Docker unavailability, disk check failures, and git errors are caught and logged but never prevent the app from starting
+- **Secure credentials** — all secrets stored via `electron.safeStorage`; never written to plaintext config files
+- **Atomic task storage** — task queues are written to `.tmp` then renamed to prevent partial-write corruption
+- **Zustand state** — renderer state is managed with Zustand stores, keeping UI logic out of components
+- **Virtual log rendering** — `@tanstack/react-virtual` enables smooth scrolling through large log outputs
 
 ## License
 
