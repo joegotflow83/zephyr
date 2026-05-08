@@ -2,19 +2,18 @@
  * ProjectDialog — modal for adding or editing a project.
  *
  * Includes:
- * - Name, Repo URL fields with validation
+ * - Name, Repo URL, local path, git identity fields
  * - Docker image picker: toggle between image library and custom text input
  * - "Build New Image" shortcut that opens ImageBuilderDialog inline
- * - Sandbox Type: Container (default) or VM
+ * - Deployment: Local Containers (default) or VM + Containers
  * - VM Configuration: mode, resources (CPUs, Memory, Disk), cloud-init YAML
- * - Custom prompt management via PromptEditor
+ * - Pipeline selector (coding factory is always enabled)
  */
 
 import React, { useState, useEffect } from 'react';
 import { ProjectConfig, VMConfig, createProjectConfig } from '../../../shared/models';
 import type { FactoryConfig } from '../../../shared/models';
 import type { ZephyrImage } from '../../../shared/models';
-import { PromptEditor } from './PromptEditor';
 import { SpecFilesSection } from './SpecFilesSection';
 import { PreValidationSection } from './PreValidationSection';
 import { HooksSection } from './HooksSection';
@@ -93,13 +92,11 @@ const [claudeSettingsFile, setClaudeSettingsFile] = useState<string | undefined>
   const [gitUserName, setGitUserName] = useState('');
   const [gitUserEmail, setGitUserEmail] = useState('');
 
-  // Factory state
-  const [factoryEnabled, setFactoryEnabled] = useState(false);
+  // Factory state — coding factory is always enabled
   const [selectedPipelineId, setSelectedPipelineId] = useState<string | undefined>(undefined);
 
   // Validation state
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [showPromptEditor, setShowPromptEditor] = useState(false);
   const [showSpecFilesEditor, setShowSpecFilesEditor] = useState(false);
 
   // Fetch images when the dialog opens so the library is always up to date.
@@ -134,7 +131,6 @@ const [claudeSettingsFile, setClaudeSettingsFile] = useState<string | undefined>
       setVmDiskGb(project.vm_config?.disk_gb ?? 20);
       setVmCloudInit(project.vm_config?.cloud_init ?? '');
       // Factory config
-      setFactoryEnabled(project.factory_config?.enabled ?? false);
       setSelectedPipelineId(project.pipelineId);
       // Git identity
       setGitUserName(project.git_user_name ?? '');
@@ -158,7 +154,6 @@ const [claudeSettingsFile, setClaudeSettingsFile] = useState<string | undefined>
       setVmDiskGb(20);
       setVmCloudInit('');
       // Factory defaults
-      setFactoryEnabled(false);
       setSelectedPipelineId(undefined);
     }
     setGithubPat('');
@@ -224,7 +219,7 @@ const [claudeSettingsFile, setClaudeSettingsFile] = useState<string | undefined>
       newErrors.localPath = 'Must be an absolute path (starting with /)';
     }
 
-    if (factoryEnabled && !selectedPipelineId) {
+    if (!selectedPipelineId) {
       newErrors.pipeline = 'Please select a pipeline for the coding factory';
     }
 
@@ -251,11 +246,8 @@ const [claudeSettingsFile, setClaudeSettingsFile] = useState<string | undefined>
           }
         : undefined;
 
-    // Build factory config
-    const effectiveFactoryConfig: FactoryConfig | undefined =
-      factoryEnabled
-        ? { enabled: true }
-        : undefined;
+    // Coding factory is always enabled
+    const effectiveFactoryConfig: FactoryConfig = { enabled: true };
 
     // Build config object
     const config: ProjectConfig =
@@ -276,7 +268,7 @@ const [claudeSettingsFile, setClaudeSettingsFile] = useState<string | undefined>
             sandbox_type: sandboxType,
             vm_config: effectiveVmConfig,
             factory_config: effectiveFactoryConfig,
-            pipelineId: factoryEnabled ? selectedPipelineId : undefined,
+            pipelineId: selectedPipelineId,
             git_user_name: gitUserName.trim() || undefined,
             git_user_email: gitUserEmail.trim() || undefined,
             spec_files: Object.keys(specFiles).length > 0 ? specFiles : undefined,
@@ -295,7 +287,7 @@ const [claudeSettingsFile, setClaudeSettingsFile] = useState<string | undefined>
             sandbox_type: sandboxType,
             vm_config: effectiveVmConfig,
             factory_config: effectiveFactoryConfig,
-            pipelineId: factoryEnabled ? selectedPipelineId : undefined,
+            pipelineId: selectedPipelineId,
             git_user_name: gitUserName.trim() || undefined,
             git_user_email: gitUserEmail.trim() || undefined,
             spec_files: Object.keys(specFiles).length > 0 ? specFiles : undefined,
@@ -641,36 +633,51 @@ const [claudeSettingsFile, setClaudeSettingsFile] = useState<string | undefined>
               </button>
             </div>
 
-            {/* Sandbox Type section */}
+            {/* Deployment section */}
             <div className="mb-4">
-              <div className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Sandbox Type</div>
-              <div className="flex gap-6">
-                <label className="flex items-center gap-2 cursor-pointer text-sm text-gray-700 dark:text-gray-300">
+              <div className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Deployment</div>
+              <div className="flex flex-col gap-2">
+                <label className={`flex items-start gap-3 p-3 rounded border cursor-pointer transition-colors ${
+                  sandboxType === 'container'
+                    ? 'border-blue-500 bg-blue-900/20'
+                    : 'border-gray-200 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500'
+                }`}>
                   <input
                     type="radio"
                     name="sandbox-type"
                     value="container"
                     checked={sandboxType === 'container'}
                     onChange={() => setSandboxType('container')}
+                    className="mt-0.5"
                   />
-                  Container
+                  <div>
+                    <div className="text-sm font-medium text-gray-800 dark:text-gray-200">Local Containers</div>
+                    <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                      Agent containers run directly on this machine. Fastest option — no VM overhead.
+                    </div>
+                  </div>
                 </label>
-                <label className="flex items-center gap-2 cursor-pointer text-sm text-gray-700 dark:text-gray-300">
+                <label className={`flex items-start gap-3 p-3 rounded border cursor-pointer transition-colors ${
+                  sandboxType === 'vm'
+                    ? 'border-blue-500 bg-blue-900/20'
+                    : 'border-gray-200 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500'
+                }`}>
                   <input
                     type="radio"
                     name="sandbox-type"
                     value="vm"
                     checked={sandboxType === 'vm'}
                     onChange={() => setSandboxType('vm')}
+                    className="mt-0.5"
                   />
-                  Virtual Machine
+                  <div>
+                    <div className="text-sm font-medium text-gray-800 dark:text-gray-200">VM + Containers</div>
+                    <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                      Spin up an isolated Ubuntu VM and run agent containers inside it. Stronger isolation. Requires Multipass.
+                    </div>
+                  </div>
                 </label>
               </div>
-              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                {sandboxType === 'container'
-                  ? 'Run loops directly in a Docker container (default).'
-                  : 'Run loops inside an isolated Ubuntu VM via Multipass. Requires Multipass installed.'}
-              </p>
             </div>
 
             {/* VM Configuration — only shown when sandbox type is VM */}
@@ -812,37 +819,15 @@ const [claudeSettingsFile, setClaudeSettingsFile] = useState<string | undefined>
               </div>
             )}
 
-            {/* Coding Factory section */}
+            {/* Pipeline section */}
             <div className="mb-4">
-              <div className="flex items-center gap-3 mb-2">
-                <label htmlFor="factory-enabled" className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Coding Factory
-                </label>
-                <label className="relative inline-flex items-center cursor-pointer">
-                  <input
-                    id="factory-enabled"
-                    type="checkbox"
-                    checked={factoryEnabled}
-                    onChange={(e) => setFactoryEnabled(e.target.checked)}
-                    className="sr-only peer"
-                  />
-                  <div className="w-9 h-5 bg-gray-300 dark:bg-gray-600 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-500 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
-                </label>
-              </div>
+              <div className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Pipeline</div>
               <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
-                Run multiple AI agents in parallel — each with a dedicated role and shared workspace.
+                Choose the pipeline that defines how tasks flow between agents.
               </p>
-
-              {factoryEnabled && (
-                <div className="border border-gray-200 dark:border-gray-600 rounded p-4 space-y-3">
+              <div className="border border-gray-200 dark:border-gray-600 rounded p-4 space-y-3">
                   {/* Pipeline selector */}
                   <div>
-                    <label
-                      htmlFor="factory-pipeline"
-                      className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1"
-                    >
-                      Pipeline
-                    </label>
                     {pipelines.length === 0 ? (
                       <p className="text-xs text-amber-600 dark:text-amber-400">
                         No pipelines available. Create one in Settings → Pipelines.
@@ -931,7 +916,6 @@ const [claudeSettingsFile, setClaudeSettingsFile] = useState<string | undefined>
                     will be created in the workspace automatically.
                   </p>
                 </div>
-              )}
             </div>
 
             {/* Pre-Validation Scripts section */}
@@ -1105,32 +1089,6 @@ const [claudeSettingsFile, setClaudeSettingsFile] = useState<string | undefined>
                 )}
               </div>
             )}
-
-            {/* Custom Prompts section — hidden for coding factory projects */}
-            {!factoryEnabled && <div className="mb-6">
-              <div className="flex items-center justify-between mb-2">
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Custom Prompts
-                </label>
-                <button
-                  type="button"
-                  onClick={() => setShowPromptEditor(!showPromptEditor)}
-                  className="text-sm text-blue-400 hover:text-blue-300 transition-colors"
-                >
-                  {showPromptEditor ? 'Hide' : 'Manage Prompts'}
-                </button>
-              </div>
-
-              {Object.keys(customPrompts).length > 0 && (
-                <div className="text-sm text-gray-500 dark:text-gray-400 mb-2">
-                  {Object.keys(customPrompts).length} custom prompt(s) configured
-                </div>
-              )}
-
-              {showPromptEditor && (
-                <PromptEditor prompts={customPrompts} onChange={setCustomPrompts} />
-              )}
-            </div>}
 
             {/* Spec Files section */}
             <div className="mb-6">
