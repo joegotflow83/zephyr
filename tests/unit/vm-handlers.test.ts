@@ -2,7 +2,7 @@
  * Unit tests for src/main/ipc-handlers/vm-handlers.ts
  *
  * Verifies that registerVMHandlers() correctly wires IPC channels to
- * VMManager and LoopRunner methods. Each handler is extracted via the mock
+ * VMManager and ContainerOrchestrator methods. Each handler is extracted via the mock
  * ipcMain.handle registry, then called directly to confirm routing.
  *
  * Why we test routing: the IPC layer is the boundary between renderer and
@@ -79,7 +79,7 @@ const mockVMManager = {
   isZephyrVM: vi.fn(),
 };
 
-const mockLoopRunner = {
+const mockContainerOrchestrator = {
   startProjectVM: vi.fn(),
   stopProjectVM: vi.fn(),
   getProjectVMInfo: vi.fn(),
@@ -105,7 +105,7 @@ describe('registerVMHandlers', () => {
     }
     registerVMHandlers({
       vmManager: mockVMManager as never,
-      loopRunner: mockLoopRunner as never,
+      containerOrchestrator: mockContainerOrchestrator as never,
     });
     // Default: one window available for broadcast tests
     mockBrowserWindow.getAllWindows.mockReturnValue([
@@ -179,10 +179,10 @@ describe('registerVMHandlers', () => {
   // ── vm:start ──────────────────────────────────────────────────────────────────
 
   describe('vm:start', () => {
-    it('delegates to loopRunner.startProjectVM() and broadcasts status', async () => {
-      mockLoopRunner.startProjectVM.mockResolvedValue(sampleVMInfo);
+    it('delegates to containerOrchestrator.startProjectVM() and broadcasts status', async () => {
+      mockContainerOrchestrator.startProjectVM.mockResolvedValue(sampleVMInfo);
       const result = await invoke(IPC.VM_START, 'project-123');
-      expect(mockLoopRunner.startProjectVM).toHaveBeenCalledWith('project-123', undefined);
+      expect(mockContainerOrchestrator.startProjectVM).toHaveBeenCalledWith('project-123', undefined);
       expect(result).toEqual(sampleVMInfo);
       // Verify broadcast to renderer
       expect(mockBrowserWindow.getAllWindows).toHaveBeenCalled();
@@ -190,7 +190,7 @@ describe('registerVMHandlers', () => {
     });
 
     it('propagates errors from startProjectVM', async () => {
-      mockLoopRunner.startProjectVM.mockRejectedValue(new Error('No persistent VM registered'));
+      mockContainerOrchestrator.startProjectVM.mockRejectedValue(new Error('No persistent VM registered'));
       await expect(invoke(IPC.VM_START, 'project-999')).rejects.toThrow('No persistent VM registered');
       expect(mockWebContentsSend).not.toHaveBeenCalled();
     });
@@ -202,7 +202,7 @@ describe('registerVMHandlers', () => {
         { webContents: { send: send1 } },
         { webContents: { send: send2 } },
       ]);
-      mockLoopRunner.startProjectVM.mockResolvedValue(sampleVMInfo);
+      mockContainerOrchestrator.startProjectVM.mockResolvedValue(sampleVMInfo);
       await invoke(IPC.VM_START, 'project-123');
       expect(send1).toHaveBeenCalledWith(IPC.VM_STATUS_CHANGED, sampleVMInfo);
       expect(send2).toHaveBeenCalledWith(IPC.VM_STATUS_CHANGED, sampleVMInfo);
@@ -212,20 +212,20 @@ describe('registerVMHandlers', () => {
   // ── vm:stop ───────────────────────────────────────────────────────────────────
 
   describe('vm:stop', () => {
-    it('delegates to loopRunner.stopProjectVM() and broadcasts updated status', async () => {
-      mockLoopRunner.stopProjectVM.mockResolvedValue(undefined);
+    it('delegates to containerOrchestrator.stopProjectVM() and broadcasts updated status', async () => {
+      mockContainerOrchestrator.stopProjectVM.mockResolvedValue(undefined);
       const stoppedInfo = { ...sampleVMInfo, state: 'Stopped' as const };
-      mockLoopRunner.getProjectVMInfo.mockResolvedValue(stoppedInfo);
+      mockContainerOrchestrator.getProjectVMInfo.mockResolvedValue(stoppedInfo);
 
       const result = await invoke(IPC.VM_STOP, 'project-123');
-      expect(mockLoopRunner.stopProjectVM).toHaveBeenCalledWith('project-123');
+      expect(mockContainerOrchestrator.stopProjectVM).toHaveBeenCalledWith('project-123');
       expect(result).toBeUndefined();
-      expect(mockLoopRunner.getProjectVMInfo).toHaveBeenCalledWith('project-123');
+      expect(mockContainerOrchestrator.getProjectVMInfo).toHaveBeenCalledWith('project-123');
       expect(mockWebContentsSend).toHaveBeenCalledWith(IPC.VM_STATUS_CHANGED, stoppedInfo);
     });
 
     it('propagates errors from stopProjectVM (loop running)', async () => {
-      mockLoopRunner.stopProjectVM.mockRejectedValue(
+      mockContainerOrchestrator.stopProjectVM.mockRejectedValue(
         new Error('Cannot stop VM while a loop is running')
       );
       await expect(invoke(IPC.VM_STOP, 'project-123')).rejects.toThrow(
@@ -234,16 +234,16 @@ describe('registerVMHandlers', () => {
     });
 
     it('handles getProjectVMInfo returning null without broadcasting', async () => {
-      mockLoopRunner.stopProjectVM.mockResolvedValue(undefined);
-      mockLoopRunner.getProjectVMInfo.mockResolvedValue(null);
+      mockContainerOrchestrator.stopProjectVM.mockResolvedValue(undefined);
+      mockContainerOrchestrator.getProjectVMInfo.mockResolvedValue(null);
       await invoke(IPC.VM_STOP, 'project-123');
       // No broadcast if no info available
       expect(mockWebContentsSend).not.toHaveBeenCalled();
     });
 
     it('handles getProjectVMInfo throwing without crashing', async () => {
-      mockLoopRunner.stopProjectVM.mockResolvedValue(undefined);
-      mockLoopRunner.getProjectVMInfo.mockRejectedValue(new Error('VM info unavailable'));
+      mockContainerOrchestrator.stopProjectVM.mockResolvedValue(undefined);
+      mockContainerOrchestrator.getProjectVMInfo.mockRejectedValue(new Error('VM info unavailable'));
       // Should not propagate — error is caught and warned
       await expect(invoke(IPC.VM_STOP, 'project-123')).resolves.toBeUndefined();
     });

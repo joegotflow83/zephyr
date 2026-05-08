@@ -1,7 +1,7 @@
 /**
  * Loop execution orchestration for Zephyr Desktop.
  *
- * LoopRunner manages the lifecycle of Ralph loop executions:
+ * ContainerOrchestrator manages the lifecycle of Ralph loop executions:
  * - Creates and starts Docker containers for projects
  * - Streams and parses container logs in real-time
  * - Tracks loop state (iteration count, commits, errors)
@@ -48,7 +48,7 @@ export type LogLineCallback = (projectId: string, line: ParsedLogLine) => void;
  * - Enforcing concurrency limits (from app settings)
  * - Notifying registered callbacks on state changes and log lines
  */
-export class LoopRunner {
+export class ContainerOrchestrator {
   private docker: ContainerRuntime;
   private parser: LogParser;
   private vm?: VMManager;
@@ -66,7 +66,7 @@ export class LoopRunner {
   private persistentVMNames: Map<string, string> = new Map();
 
   /**
-   * Create a new LoopRunner.
+   * Create a new ContainerOrchestrator.
    *
    * @param docker - ContainerRuntime instance for container operations
    * @param parser - LogParser instance for log classification
@@ -680,7 +680,7 @@ export class LoopRunner {
   private async handleContainerExited(
     loopKey: string,
     containerId: string,
-    mode: LoopMode,
+    _mode: LoopMode,
   ): Promise<void> {
     const state = this.states.get(loopKey);
     if (!state || isLoopTerminal(state.status) || state.status === LoopStatus.STOPPING || state.status === LoopStatus.PAUSED) {
@@ -693,15 +693,11 @@ export class LoopRunner {
     try {
       const status = await this.docker.getContainerStatus(containerId);
       if (status.state === 'exited' || status.state === 'dead') {
-        if (mode === LoopMode.SINGLE) {
-          this.updateState(loopKey, { status: LoopStatus.COMPLETED, stoppedAt });
-        } else {
-          this.updateState(loopKey, {
-            status: LoopStatus.FAILED,
-            error: 'Container exited unexpectedly',
-            stoppedAt,
-          });
-        }
+        this.updateState(loopKey, {
+          status: LoopStatus.FAILED,
+          error: 'Container exited unexpectedly',
+          stoppedAt,
+        });
         this.logStreams.delete(loopKey);
         this.clearLogBroadcastTimer(loopKey);
       }
@@ -804,7 +800,7 @@ export class LoopRunner {
   private async monitorContainerExit(
     loopKey: string,
     containerId: string,
-    mode: LoopMode,
+    _mode: LoopMode,
   ): Promise<void> {
     try {
       // Poll container status until it exits
@@ -827,20 +823,12 @@ export class LoopRunner {
             // Container exited
             const stoppedAt = new Date().toISOString();
 
-            // Determine final status based on mode and exit code
-            if (mode === LoopMode.SINGLE) {
-              this.updateState(loopKey, {
-                status: LoopStatus.COMPLETED,
-                stoppedAt,
-              });
-            } else {
-              // CONTINUOUS or SCHEDULED mode shouldn't exit normally
-              this.updateState(loopKey, {
-                status: LoopStatus.FAILED,
-                error: 'Container exited unexpectedly',
-                stoppedAt,
-              });
-            }
+            // Container should not exit normally — mark as FAILED
+            this.updateState(loopKey, {
+              status: LoopStatus.FAILED,
+              error: 'Container exited unexpectedly',
+              stoppedAt,
+            });
 
             // Clean up
             this.logStreams.delete(loopKey);
@@ -866,18 +854,20 @@ export class LoopRunner {
   }
 
   /**
-   * Remove a stopped/exited container by name, if one exists.
+   * Remove any container with the given name, if one exists.
+   * Handles stopped, exited, and running containers — the latter can occur
+   * after an app restart when the in-memory state is cleared but the previous
+   * factory containers are still running (causing "name already in use" on the
+   * next factory start). Force-removal is safe here because startLoop() already
+   * confirmed there is no in-memory active loop for this key before calling us.
    * Silently ignores errors so a failed removal never blocks a new run.
    */
   private async removeStaleContainer(name: string): Promise<void> {
     try {
       const containers = await this.docker.listContainers();
-      const stale = containers.find(
-        // 'stopped' is Podman's state string for stopped containers; Docker uses 'exited'.
-        (c) => c.name === name && (c.state === 'exited' || c.state === 'stopped' || c.state === 'created' || c.state === 'dead'),
-      );
+      const stale = containers.find((c) => c.name === name);
       if (stale) {
-        await this.docker.removeContainer(stale.id);
+        await this.docker.removeContainer(stale.id, true /* force */);
       }
     } catch {
       // Best-effort — don't block the new container creation
@@ -1175,19 +1165,12 @@ export class LoopRunner {
 
     const stoppedAt = new Date().toISOString();
 
-    if (mode === LoopMode.SINGLE) {
-      this.updateState(loopKey, {
-        status: LoopStatus.COMPLETED,
-        stoppedAt,
-      });
-    } else {
-      // CONTINUOUS or SCHEDULED should not exit on their own
-      this.updateState(loopKey, {
-        status: LoopStatus.FAILED,
-        error: 'Container exited unexpectedly',
-        stoppedAt,
-      });
-    }
+    // Container should not exit normally — mark as FAILED
+    this.updateState(loopKey, {
+      status: LoopStatus.FAILED,
+      error: 'Container exited unexpectedly',
+      stoppedAt,
+    });
 
     this.vmLogAbortControllers.delete(loopKey);
     this.clearLogBroadcastTimer(loopKey);

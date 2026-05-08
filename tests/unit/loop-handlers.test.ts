@@ -2,7 +2,7 @@
  * Unit tests for src/main/ipc-handlers/loop-handlers.ts
  *
  * Verifies that registerLoopHandlers() correctly wires IPC channels to
- * LoopRunner and LoopScheduler methods. Each handler is extracted via the
+ * ContainerOrchestrator methods. Each handler is extracted via the
  * mock ipcMain.handle registry, then called directly to confirm routing.
  *
  * Why we test routing: the IPC layer is the boundary between renderer and
@@ -68,7 +68,7 @@ async function invoke(channel: string, ...args: unknown[]): Promise<unknown> {
 
 // ── Service mocks ─────────────────────────────────────────────────────────────
 
-const mockLoopRunner = {
+const mockContainerOrchestrator = {
   startLoop: vi.fn(),
   stopLoop: vi.fn(),
   listAll: vi.fn(),
@@ -77,12 +77,6 @@ const mockLoopRunner = {
   removeLoop: vi.fn(),
   onStateChange: vi.fn(),
   onLogLine: vi.fn(),
-};
-
-const mockScheduler = {
-  scheduleLoop: vi.fn(),
-  cancelSchedule: vi.fn(),
-  listScheduled: vi.fn(),
 };
 
 const mockCleanupManager = {
@@ -94,133 +88,31 @@ const mockCleanupManager = {
 describe('registerLoopHandlers', () => {
   beforeEach(() => {
     vi.resetAllMocks();
-    mockLoopRunner.listByProject.mockReturnValue([]);
+    mockContainerOrchestrator.listByProject.mockReturnValue([]);
     // Clear registry between test suites
     for (const key of Object.keys(handlerRegistry)) {
       delete handlerRegistry[key];
     }
     registerLoopHandlers({
-      loopRunner: mockLoopRunner as never,
-      scheduler: mockScheduler as never,
+      containerOrchestrator: mockContainerOrchestrator as never,
       cleanupManager: mockCleanupManager as never,
     });
   });
 
   // ── Loop lifecycle tests ────────────────────────────────────────────────────
 
-  describe('loop:start', () => {
-    it('should route to loopRunner.startLoop() and register container with cleanup manager', async () => {
-      const opts = {
-        projectId: 'test-project',
-        dockerImage: 'test-image',
-        mode: LoopMode.SINGLE,
-      };
-      const expectedState = {
-        projectId: 'test-project',
-        containerId: 'abc123',
-        mode: LoopMode.SINGLE,
-        status: LoopStatus.RUNNING,
-        iteration: 0,
-        startedAt: new Date().toISOString(),
-        stoppedAt: null,
-        logs: [],
-        commits: [],
-        errors: 0,
-        error: null,
-      };
-
-      mockLoopRunner.startLoop.mockResolvedValue(expectedState);
-
-      const result = await invoke(IPC.LOOP_START, opts);
-
-      expect(mockLoopRunner.startLoop).toHaveBeenCalledWith(opts);
-      expect(mockCleanupManager.registerContainer).toHaveBeenCalledWith('abc123');
-      expect(result).toEqual(expectedState);
-    });
-
-    it('should not register container if startLoop fails', async () => {
-      const opts = {
-        projectId: 'test-project',
-        dockerImage: 'test-image',
-        mode: LoopMode.SINGLE,
-      };
-      const failedState = {
-        projectId: 'test-project',
-        containerId: null,
-        mode: LoopMode.SINGLE,
-        status: LoopStatus.FAILED,
-        iteration: 0,
-        startedAt: new Date().toISOString(),
-        stoppedAt: new Date().toISOString(),
-        logs: [],
-        commits: [],
-        errors: 0,
-        error: 'Failed to create container',
-      };
-
-      mockLoopRunner.startLoop.mockResolvedValue(failedState);
-
-      const result = await invoke(IPC.LOOP_START, opts);
-
-      expect(mockLoopRunner.startLoop).toHaveBeenCalledWith(opts);
-      expect(mockCleanupManager.registerContainer).not.toHaveBeenCalled();
-      expect(result).toEqual(failedState);
-    });
-
-    it('should handle cleanup manager not being provided', async () => {
-      // Re-register without cleanup manager
-      vi.resetAllMocks();
-      mockLoopRunner.listByProject.mockReturnValue([]);
-      for (const key of Object.keys(handlerRegistry)) {
-        delete handlerRegistry[key];
-      }
-      registerLoopHandlers({
-        loopRunner: mockLoopRunner as never,
-        scheduler: mockScheduler as never,
-        // cleanupManager intentionally omitted
-      });
-
-      const opts = {
-        projectId: 'test-project',
-        dockerImage: 'test-image',
-        mode: LoopMode.SINGLE,
-      };
-      const expectedState = {
-        projectId: 'test-project',
-        containerId: 'abc123',
-        mode: LoopMode.SINGLE,
-        status: LoopStatus.RUNNING,
-        iteration: 0,
-        startedAt: new Date().toISOString(),
-        stoppedAt: null,
-        logs: [],
-        commits: [],
-        errors: 0,
-        error: null,
-      };
-
-      mockLoopRunner.startLoop.mockResolvedValue(expectedState);
-
-      const result = await invoke(IPC.LOOP_START, opts);
-
-      expect(mockLoopRunner.startLoop).toHaveBeenCalledWith(opts);
-      expect(mockCleanupManager.registerContainer).not.toHaveBeenCalled();
-      expect(result).toEqual(expectedState);
-    });
-  });
-
   describe('loop:stop', () => {
-    it('should route to loopRunner.stopLoop()', async () => {
-      mockLoopRunner.stopLoop.mockResolvedValue(undefined);
+    it('should route to containerOrchestrator.stopLoop()', async () => {
+      mockContainerOrchestrator.stopLoop.mockResolvedValue(undefined);
 
       await invoke(IPC.LOOP_STOP, 'test-project');
 
-      expect(mockLoopRunner.stopLoop).toHaveBeenCalledWith('test-project', undefined);
+      expect(mockContainerOrchestrator.stopLoop).toHaveBeenCalledWith('test-project', undefined);
     });
   });
 
   describe('loop:list', () => {
-    it('should route to loopRunner.listAll()', async () => {
+    it('should route to containerOrchestrator.listAll()', async () => {
       const mockStates = [
         {
           projectId: 'proj-1',
@@ -238,7 +130,7 @@ describe('registerLoopHandlers', () => {
         {
           projectId: 'proj-2',
           containerId: null,
-          mode: LoopMode.SINGLE,
+          mode: LoopMode.CONTINUOUS,
           status: LoopStatus.FAILED,
           iteration: 0,
           startedAt: new Date().toISOString(),
@@ -250,21 +142,21 @@ describe('registerLoopHandlers', () => {
         },
       ];
 
-      mockLoopRunner.listAll.mockResolvedValue(mockStates);
+      mockContainerOrchestrator.listAll.mockResolvedValue(mockStates);
 
       const result = await invoke(IPC.LOOP_LIST);
 
-      expect(mockLoopRunner.listAll).toHaveBeenCalledWith();
+      expect(mockContainerOrchestrator.listAll).toHaveBeenCalledWith();
       expect(result).toEqual(mockStates);
     });
   });
 
   describe('loop:get', () => {
-    it('should route to loopRunner.getLoopState() and return state', async () => {
+    it('should route to containerOrchestrator.getLoopState() and return state', async () => {
       const mockState = {
         projectId: 'test-project',
         containerId: 'abc123',
-        mode: LoopMode.SINGLE,
+        mode: LoopMode.CONTINUOUS,
         status: LoopStatus.COMPLETED,
         iteration: 1,
         startedAt: new Date().toISOString(),
@@ -275,91 +167,31 @@ describe('registerLoopHandlers', () => {
         error: null,
       };
 
-      mockLoopRunner.getLoopState.mockReturnValue(mockState);
+      mockContainerOrchestrator.getLoopState.mockReturnValue(mockState);
 
       const result = await invoke(IPC.LOOP_GET, 'test-project');
 
-      expect(mockLoopRunner.getLoopState).toHaveBeenCalledWith('test-project', undefined);
+      expect(mockContainerOrchestrator.getLoopState).toHaveBeenCalledWith('test-project', undefined);
       expect(result).toEqual(mockState);
     });
 
     it('should return null if loop not found', async () => {
-      mockLoopRunner.getLoopState.mockReturnValue(null);
+      mockContainerOrchestrator.getLoopState.mockReturnValue(null);
 
       const result = await invoke(IPC.LOOP_GET, 'nonexistent');
 
-      expect(mockLoopRunner.getLoopState).toHaveBeenCalledWith('nonexistent', undefined);
+      expect(mockContainerOrchestrator.getLoopState).toHaveBeenCalledWith('nonexistent', undefined);
       expect(result).toBeNull();
     });
   });
 
   describe('loop:remove', () => {
-    it('should route to loopRunner.removeLoop()', async () => {
-      mockLoopRunner.removeLoop.mockResolvedValue(undefined);
+    it('should route to containerOrchestrator.removeLoop()', async () => {
+      mockContainerOrchestrator.removeLoop.mockResolvedValue(undefined);
 
       await invoke(IPC.LOOP_REMOVE, 'test-project');
 
-      expect(mockLoopRunner.removeLoop).toHaveBeenCalledWith('test-project', undefined);
-    });
-  });
-
-  // ── Scheduling tests ────────────────────────────────────────────────────────
-
-  describe('loop:schedule', () => {
-    it('should route to scheduler.scheduleLoop()', async () => {
-      const projectId = 'test-project';
-      const schedule = '*/5 minutes';
-      const loopOpts = {
-        projectId,
-        dockerImage: 'test-image',
-      };
-
-      mockScheduler.scheduleLoop.mockReturnValue(undefined);
-
-      await invoke(IPC.LOOP_SCHEDULE, projectId, schedule, loopOpts);
-
-      expect(mockScheduler.scheduleLoop).toHaveBeenCalledWith(
-        projectId,
-        schedule,
-        loopOpts,
-      );
-    });
-  });
-
-  describe('loop:cancel-schedule', () => {
-    it('should route to scheduler.cancelSchedule()', async () => {
-      mockScheduler.cancelSchedule.mockReturnValue(undefined);
-
-      await invoke(IPC.LOOP_CANCEL_SCHEDULE, 'test-project');
-
-      expect(mockScheduler.cancelSchedule).toHaveBeenCalledWith('test-project');
-    });
-  });
-
-  describe('loop:list-scheduled', () => {
-    it('should route to scheduler.listScheduled()', async () => {
-      const mockScheduled = [
-        {
-          projectId: 'proj-1',
-          schedule: {
-            intervalMs: 300000,
-            expression: '*/5 minutes',
-          },
-          loopOpts: {
-            projectId: 'proj-1',
-            dockerImage: 'test-image',
-          },
-          timerId: null,
-          nextRun: new Date().toISOString(),
-        },
-      ];
-
-      mockScheduler.listScheduled.mockReturnValue(mockScheduled);
-
-      const result = await invoke(IPC.LOOP_LIST_SCHEDULED);
-
-      expect(mockScheduler.listScheduled).toHaveBeenCalledWith();
-      expect(result).toEqual(mockScheduled);
+      expect(mockContainerOrchestrator.removeLoop).toHaveBeenCalledWith('test-project', undefined);
     });
   });
 
@@ -368,13 +200,13 @@ describe('registerLoopHandlers', () => {
   describe('event broadcasting', () => {
     it('should register onStateChange callback that broadcasts to all windows', () => {
       // Two onStateChange callbacks are registered: [0] for deploy-key cleanup, [1] for broadcasting
-      expect(mockLoopRunner.onStateChange).toHaveBeenCalledTimes(2);
+      expect(mockContainerOrchestrator.onStateChange).toHaveBeenCalledTimes(2);
 
-      const callback = mockLoopRunner.onStateChange.mock.calls[1][0];
+      const callback = mockContainerOrchestrator.onStateChange.mock.calls[1][0];
       const testState = {
         projectId: 'test-project',
         containerId: 'abc123',
-        mode: LoopMode.SINGLE,
+        mode: LoopMode.CONTINUOUS,
         status: LoopStatus.RUNNING,
         iteration: 1,
         startedAt: new Date().toISOString(),
@@ -396,9 +228,9 @@ describe('registerLoopHandlers', () => {
 
     it('should register onLogLine callback that broadcasts to all windows', async () => {
       vi.useFakeTimers();
-      expect(mockLoopRunner.onLogLine).toHaveBeenCalledTimes(1);
+      expect(mockContainerOrchestrator.onLogLine).toHaveBeenCalledTimes(1);
 
-      const callback = mockLoopRunner.onLogLine.mock.calls[0][0];
+      const callback = mockContainerOrchestrator.onLogLine.mock.calls[0][0];
       const testLine = {
         type: 'commit' as const,
         content: 'commit abc123',
@@ -482,7 +314,7 @@ describe('factory:start', () => {
 
   beforeEach(() => {
     vi.resetAllMocks();
-    mockLoopRunner.listByProject.mockReturnValue([]);
+    mockContainerOrchestrator.listByProject.mockReturnValue([]);
     for (const key of Object.keys(handlerRegistry)) {
       delete handlerRegistry[key];
     }
@@ -497,7 +329,6 @@ describe('factory:start', () => {
         repo_url: '',
         docker_image: 'img',
         max_iterations: 10,
-        loop_script: '',
         pre_validation_scripts: [],
         hooks: [],
         kiro_hooks: [],
@@ -514,8 +345,7 @@ describe('factory:start', () => {
     };
 
     registerLoopHandlers({
-      loopRunner: mockLoopRunner as never,
-      scheduler: mockScheduler as never,
+      containerOrchestrator: mockContainerOrchestrator as never,
       cleanupManager: mockCleanupManager as never,
       projectStore: mockProjectStore as never,
       pipelineStore: mockPipelineStore as never,
@@ -531,7 +361,7 @@ describe('factory:start', () => {
     await expect(
       invoke(IPC.FACTORY_START, projectId, { mode: LoopMode.CONTINUOUS, dockerImage: 'img', projectId, projectName: 'p' }),
     ).rejects.toThrow(/not found/);
-    expect(mockLoopRunner.startLoop).not.toHaveBeenCalled();
+    expect(mockContainerOrchestrator.startLoop).not.toHaveBeenCalled();
   });
 
   it('rejects when factory_config is not enabled', async () => {
@@ -542,7 +372,7 @@ describe('factory:start', () => {
     await expect(
       invoke(IPC.FACTORY_START, projectId, { mode: LoopMode.CONTINUOUS, dockerImage: 'img', projectId, projectName: 'p' }),
     ).rejects.toThrow(/Factory mode is not enabled/);
-    expect(mockLoopRunner.startLoop).not.toHaveBeenCalled();
+    expect(mockContainerOrchestrator.startLoop).not.toHaveBeenCalled();
   });
 
   it('rejects when the project has no pipelineId (Phase 2.6 contract)', async () => {
@@ -553,7 +383,7 @@ describe('factory:start', () => {
     await expect(
       invoke(IPC.FACTORY_START, projectId, { mode: LoopMode.CONTINUOUS, dockerImage: 'img', projectId, projectName: 'p' }),
     ).rejects.toThrow(/No pipeline assigned/);
-    expect(mockLoopRunner.startLoop).not.toHaveBeenCalled();
+    expect(mockContainerOrchestrator.startLoop).not.toHaveBeenCalled();
   });
 
   it('rejects when the referenced pipeline cannot be found', async () => {
@@ -561,7 +391,7 @@ describe('factory:start', () => {
     await expect(
       invoke(IPC.FACTORY_START, projectId, { mode: LoopMode.CONTINUOUS, dockerImage: 'img', projectId, projectName: 'p' }),
     ).rejects.toThrow(/Pipeline pl-1 not found/);
-    expect(mockLoopRunner.startLoop).not.toHaveBeenCalled();
+    expect(mockContainerOrchestrator.startLoop).not.toHaveBeenCalled();
   });
 
   it('rejects when the pipeline has no stages', async () => {
@@ -569,11 +399,11 @@ describe('factory:start', () => {
     await expect(
       invoke(IPC.FACTORY_START, projectId, { mode: LoopMode.CONTINUOUS, dockerImage: 'img', projectId, projectName: 'p' }),
     ).rejects.toThrow(/has no stages/);
-    expect(mockLoopRunner.startLoop).not.toHaveBeenCalled();
+    expect(mockContainerOrchestrator.startLoop).not.toHaveBeenCalled();
   });
 
   it('writes PROMPT_<stageId>.md to local_path for every stage', async () => {
-    mockLoopRunner.startLoop.mockImplementation((opts: { role?: string; projectId: string }) =>
+    mockContainerOrchestrator.startLoop.mockImplementation((opts: { role?: string; projectId: string }) =>
       Promise.resolve(fakeRunningState(opts.projectId, opts.role ?? '')),
     );
 
@@ -586,7 +416,7 @@ describe('factory:start', () => {
   });
 
   it('spawns one container per stage with role "<stageId>-0" when instances=1', async () => {
-    mockLoopRunner.startLoop.mockImplementation((opts: { role?: string; projectId: string }) =>
+    mockContainerOrchestrator.startLoop.mockImplementation((opts: { role?: string; projectId: string }) =>
       Promise.resolve(fakeRunningState(opts.projectId, opts.role ?? '')),
     );
 
@@ -597,8 +427,8 @@ describe('factory:start', () => {
       projectName: 'Demo Project',
     }) as Array<{ role?: string }>;
 
-    expect(mockLoopRunner.startLoop).toHaveBeenCalledTimes(2);
-    const roles = mockLoopRunner.startLoop.mock.calls.map((c) => c[0].role);
+    expect(mockContainerOrchestrator.startLoop).toHaveBeenCalledTimes(2);
+    const roles = mockContainerOrchestrator.startLoop.mock.calls.map((c) => c[0].role);
     expect(roles).toEqual(['pm-0', 'coder-0']);
     expect(result.map((r) => r.role)).toEqual(['pm-0', 'coder-0']);
   });
@@ -607,7 +437,7 @@ describe('factory:start', () => {
     mockPipelineStore.getPipeline.mockReturnValueOnce(
       samplePipeline({ stages: [sampleStage('pm'), sampleStage('coder', 3)] }),
     );
-    mockLoopRunner.startLoop.mockImplementation((opts: { role?: string; projectId: string }) =>
+    mockContainerOrchestrator.startLoop.mockImplementation((opts: { role?: string; projectId: string }) =>
       Promise.resolve(fakeRunningState(opts.projectId, opts.role ?? '')),
     );
 
@@ -618,7 +448,7 @@ describe('factory:start', () => {
       projectName: 'Demo Project',
     });
 
-    const roles = mockLoopRunner.startLoop.mock.calls.map((c) => c[0].role);
+    const roles = mockContainerOrchestrator.startLoop.mock.calls.map((c) => c[0].role);
     expect(roles).toEqual(['pm-0', 'coder-0', 'coder-1', 'coder-2']);
   });
 
@@ -626,7 +456,7 @@ describe('factory:start', () => {
     mockPipelineStore.getPipeline.mockReturnValueOnce(
       samplePipeline({ stages: [sampleStage('coder', 2)] }),
     );
-    mockLoopRunner.startLoop.mockImplementation((opts: { role?: string; projectId: string }) =>
+    mockContainerOrchestrator.startLoop.mockImplementation((opts: { role?: string; projectId: string }) =>
       Promise.resolve(fakeRunningState(opts.projectId, opts.role ?? '')),
     );
 
@@ -638,14 +468,14 @@ describe('factory:start', () => {
       envVars: { EXISTING: 'value' },
     });
 
-    const calls = mockLoopRunner.startLoop.mock.calls.map((c) => c[0].envVars);
+    const calls = mockContainerOrchestrator.startLoop.mock.calls.map((c) => c[0].envVars);
     // existing env vars are preserved alongside the per-stage additions
     expect(calls[0]).toMatchObject({ EXISTING: 'value', STAGE_ID: 'coder', INSTANCE_INDEX: '0' });
     expect(calls[1]).toMatchObject({ EXISTING: 'value', STAGE_ID: 'coder', INSTANCE_INDEX: '1' });
   });
 
-  it('does not set cmd when no loop_script is configured (uses image default CMD)', async () => {
-    mockLoopRunner.startLoop.mockImplementation((opts: { role?: string; projectId: string }) =>
+  it('sets agent polling loop cmd on factory containers', async () => {
+    mockContainerOrchestrator.startLoop.mockImplementation((opts: { role?: string; projectId: string }) =>
       Promise.resolve(fakeRunningState(opts.projectId, opts.role ?? '')),
     );
 
@@ -656,57 +486,20 @@ describe('factory:start', () => {
       projectName: 'Demo Project',
     });
 
-    const cmds = mockLoopRunner.startLoop.mock.calls.map((c) => c[0].cmd);
-    expect(cmds[0][2]).toContain('PROMPT_pm.md');
-    expect(cmds[1][2]).toContain('PROMPT_coder.md');
-  });
-
-  it('builds a CMD that calls the loop_script with stageId + instanceIndex args', async () => {
-    mockProjectStore.getProject.mockReturnValue({
-      ...mockProjectStore.getProject(projectId),
-      loop_script: 'run.sh',
-    });
-    mockPipelineStore.getPipeline.mockReturnValueOnce(
-      samplePipeline({ stages: [sampleStage('coder', 2)] }),
-    );
-    mockLoopRunner.startLoop.mockImplementation((opts: { role?: string; projectId: string }) =>
-      Promise.resolve(fakeRunningState(opts.projectId, opts.role ?? '')),
-    );
-
-    await invoke(IPC.FACTORY_START, projectId, {
-      mode: LoopMode.CONTINUOUS,
-      dockerImage: 'img',
-      projectId,
-      projectName: 'Demo Project',
-    });
-
-    const cmds = mockLoopRunner.startLoop.mock.calls.map((c) => c[0].cmd);
-    expect(cmds[0][2]).toContain('./run.sh coder 0');
-    expect(cmds[1][2]).toContain('./run.sh coder 1');
-  });
-
-  it('sets a looping agent cmd in CONTINUOUS mode', async () => {
-    mockLoopRunner.startLoop.mockImplementation((opts: { role?: string; projectId: string }) =>
-      Promise.resolve(fakeRunningState(opts.projectId, opts.role ?? '')),
-    );
-
-    await invoke(IPC.FACTORY_START, projectId, {
-      mode: LoopMode.CONTINUOUS,
-      dockerImage: 'img',
-      projectId,
-      projectName: 'Demo Project',
-    });
-
-    for (const call of mockLoopRunner.startLoop.mock.calls) {
-      expect(call[0].cmd).toBeDefined();
-      expect(call[0].cmd[2]).toContain('while true');
-      expect(call[0].cmd[2]).toContain('claude');
-    }
+    // Factory containers receive a bash polling loop as their CMD so the agent
+    // wakes up when @current-task-${STAGE_ID}.json appears in /workspace.
+    const cmds = mockContainerOrchestrator.startLoop.mock.calls.map((c) => c[0].cmd);
+    expect(cmds[0]).toBeDefined();
+    expect(cmds[0]![0]).toBe('bash');
+    expect(cmds[0]![1]).toBe('-c');
+    expect(cmds[0]![2]).toContain('@current-task-${STAGE_ID}.json');
+    expect(cmds[1]).toBeDefined();
+    expect(cmds[1]![2]).toContain('@current-task-${STAGE_ID}.json');
   });
 
   it('continues spawning remaining stages when one stage start fails', async () => {
     let callCount = 0;
-    mockLoopRunner.startLoop.mockImplementation((opts: { role?: string; projectId: string }) => {
+    mockContainerOrchestrator.startLoop.mockImplementation((opts: { role?: string; projectId: string }) => {
       callCount += 1;
       if (callCount === 1) {
         throw new Error('boom');
@@ -721,7 +514,7 @@ describe('factory:start', () => {
       projectName: 'Demo Project',
     }) as unknown[];
 
-    expect(mockLoopRunner.startLoop).toHaveBeenCalledTimes(2);
+    expect(mockContainerOrchestrator.startLoop).toHaveBeenCalledTimes(2);
     expect(result).toHaveLength(1); // first failed; second succeeded
   });
 });
@@ -735,7 +528,7 @@ describe('factory:start', () => {
 // cleanup path.
 //
 // Why test lock-clearing separately: the container-stop logic is already
-// exercised by LoopRunner unit tests. These tests pin the NEW invariant —
+// exercised by ContainerOrchestrator unit tests. These tests pin the NEW invariant —
 // that lock state is also cleaned up — which is the entire point of 2.12.
 // Without this, a future refactor that moves or removes the unlock loop
 // would silently leave tasks locked after FACTORY_STOP.
@@ -771,7 +564,7 @@ describe('factory:stop', () => {
 
   beforeEach(() => {
     vi.resetAllMocks();
-    mockLoopRunner.listByProject.mockReturnValue([]);
+    mockContainerOrchestrator.listByProject.mockReturnValue([]);
     for (const key of Object.keys(handlerRegistry)) {
       delete handlerRegistry[key];
     }
@@ -782,15 +575,14 @@ describe('factory:stop', () => {
     };
 
     registerLoopHandlers({
-      loopRunner: mockLoopRunner as never,
-      scheduler: mockScheduler as never,
+      containerOrchestrator: mockContainerOrchestrator as never,
       factoryTaskStore: mockFactoryTaskStore as never,
     });
   });
 
   it('clears lockedBy for all locked tasks after containers stop', async () => {
-    mockLoopRunner.listByProject.mockReturnValue([fakeRunningState(projectId, 'coder-0')]);
-    mockLoopRunner.stopLoop.mockResolvedValue(undefined);
+    mockContainerOrchestrator.listByProject.mockReturnValue([fakeRunningState(projectId, 'coder-0')]);
+    mockContainerOrchestrator.stopLoop.mockResolvedValue(undefined);
     mockFactoryTaskStore.getQueue.mockReturnValue({
       projectId,
       tasks: [makeLockedTask('t-1'), makeLockedTask('t-2')],
@@ -814,8 +606,8 @@ describe('factory:stop', () => {
   });
 
   it('clears locks even when some container stops fail', async () => {
-    mockLoopRunner.listByProject.mockReturnValue([fakeRunningState(projectId, 'coder-0')]);
-    mockLoopRunner.stopLoop.mockRejectedValue(new Error('container timeout'));
+    mockContainerOrchestrator.listByProject.mockReturnValue([fakeRunningState(projectId, 'coder-0')]);
+    mockContainerOrchestrator.stopLoop.mockRejectedValue(new Error('container timeout'));
     mockFactoryTaskStore.getQueue.mockReturnValue({
       projectId,
       tasks: [makeLockedTask('t-1')],
@@ -831,8 +623,7 @@ describe('factory:stop', () => {
       delete handlerRegistry[key];
     }
     registerLoopHandlers({
-      loopRunner: mockLoopRunner as never,
-      scheduler: mockScheduler as never,
+      containerOrchestrator: mockContainerOrchestrator as never,
       // factoryTaskStore intentionally omitted
     });
 
@@ -854,15 +645,15 @@ describe('factory:stop', () => {
   });
 
   it('stops all active loops for the project', async () => {
-    mockLoopRunner.listByProject.mockReturnValue([
+    mockContainerOrchestrator.listByProject.mockReturnValue([
       fakeRunningState(projectId, 'pm-0'),
       fakeRunningState(projectId, 'coder-0'),
     ]);
-    mockLoopRunner.stopLoop.mockResolvedValue(undefined);
+    mockContainerOrchestrator.stopLoop.mockResolvedValue(undefined);
 
     await invoke(IPC.FACTORY_STOP, projectId);
 
-    expect(mockLoopRunner.stopLoop).toHaveBeenCalledTimes(2);
+    expect(mockContainerOrchestrator.stopLoop).toHaveBeenCalledTimes(2);
   });
 });
 
@@ -879,7 +670,7 @@ describe('factory:stop', () => {
 //   unlocked — call unlockTask
 //
 // Why test the function directly: the watcher closure is wrapped inside
-// loopRunner.onStateChange and only fires on fs events, which makes
+// containerOrchestrator.onStateChange and only fires on fs events, which makes
 // integration testing slow and brittle. The function is the seam — pinning
 // it here gives us full coverage of the dispatch logic without spinning up
 // real fs watchers, and the watcher closure is small enough (parse JSON,
@@ -1583,7 +1374,7 @@ describe('processSupervisorAction', () => {
     const loopOptsMap = new Map<string, LoopStartOpts>();
     loopOptsMap.set(`${pid}:${targetRole}`, baseOpts);
     return {
-      loopRunner: { stopLoop: vi.fn().mockResolvedValue(undefined) } as never,
+      containerOrchestrator: { stopLoop: vi.fn().mockResolvedValue(undefined) } as never,
       loopOptsMap,
       restartLoop: vi.fn().mockResolvedValue({ projectId: pid, role: targetRole, status: LoopStatus.RUNNING }),
       ...overrides,
@@ -1624,13 +1415,13 @@ describe('processSupervisorAction', () => {
       deps,
     );
     expect(result).toBe(true);
-    expect(deps.loopRunner.stopLoop).toHaveBeenCalledWith(pid, targetRole);
+    expect(deps.containerOrchestrator.stopLoop).toHaveBeenCalledWith(pid, targetRole);
     expect(deps.restartLoop).toHaveBeenCalledWith(baseOpts);
   });
 
   it('proceeds to restart even if stopLoop throws (container already stopped)', async () => {
     const deps = buildDeps({
-      loopRunner: { stopLoop: vi.fn().mockRejectedValue(new Error('not running')) } as never,
+      containerOrchestrator: { stopLoop: vi.fn().mockRejectedValue(new Error('not running')) } as never,
     });
     const result = await processSupervisorAction(
       pid,
@@ -1674,9 +1465,9 @@ describe('FACTORY_RESTART_CONTAINER handler', () => {
 
   beforeEach(() => {
     Object.keys(handlerRegistry).forEach((k) => delete handlerRegistry[k]);
-    mockLoopRunner.startLoop.mockReset();
-    mockLoopRunner.stopLoop.mockReset();
-    mockLoopRunner.onStateChange.mockReset();
+    mockContainerOrchestrator.startLoop.mockReset();
+    mockContainerOrchestrator.stopLoop.mockReset();
+    mockContainerOrchestrator.onStateChange.mockReset();
   });
 
   function invoke(channel: string, ...args: unknown[]): Promise<unknown> {
@@ -1687,8 +1478,7 @@ describe('FACTORY_RESTART_CONTAINER handler', () => {
 
   it('throws when no opts are stored for the role', async () => {
     registerLoopHandlers({
-      loopRunner: mockLoopRunner as never,
-      scheduler: mockScheduler as never,
+      containerOrchestrator: mockContainerOrchestrator as never,
     });
     await expect(invoke(IPC.FACTORY_RESTART_CONTAINER, projectId, role)).rejects.toThrow(
       'No stored opts for loop',
@@ -1717,12 +1507,11 @@ describe('FACTORY_RESTART_CONTAINER handler', () => {
         custom_prompts: {},
       }),
     };
-    mockLoopRunner.startLoop.mockResolvedValue(fakeRunningState(projectId, role));
-    mockLoopRunner.stopLoop.mockResolvedValue(undefined);
+    mockContainerOrchestrator.startLoop.mockResolvedValue(fakeRunningState(projectId, role));
+    mockContainerOrchestrator.stopLoop.mockResolvedValue(undefined);
 
     registerLoopHandlers({
-      loopRunner: mockLoopRunner as never,
-      scheduler: mockScheduler as never,
+      containerOrchestrator: mockContainerOrchestrator as never,
       projectStore: mockProj as never,
       pipelineStore: mockPs as never,
     });
@@ -1736,10 +1525,10 @@ describe('FACTORY_RESTART_CONTAINER handler', () => {
     });
 
     // Now restart the container
-    mockLoopRunner.startLoop.mockResolvedValue(fakeRunningState(projectId, role));
+    mockContainerOrchestrator.startLoop.mockResolvedValue(fakeRunningState(projectId, role));
     const result = await invoke(IPC.FACTORY_RESTART_CONTAINER, projectId, role);
-    expect(mockLoopRunner.stopLoop).toHaveBeenCalledWith(projectId, role);
-    expect(mockLoopRunner.startLoop).toHaveBeenCalledTimes(2); // once for start, once for restart
+    expect(mockContainerOrchestrator.stopLoop).toHaveBeenCalledWith(projectId, role);
+    expect(mockContainerOrchestrator.startLoop).toHaveBeenCalledTimes(2); // once for start, once for restart
     expect((result as { role: string }).role).toBe(role);
   });
 });

@@ -3,12 +3,13 @@ import { isLoopActive } from '../../shared/loop-types';
 import type { LoopState } from '../../shared/loop-types';
 
 /**
- * React hook for tracking active loops.
- * Fetches loop count via IPC and subscribes to state changes.
+ * React hook for tracking active factory projects.
+ * Counts distinct projects that have at least one active factory container
+ * (containers with a `role` field are factory containers).
  *
- * @returns Number of currently active loops
+ * @returns Number of projects with currently active factory containers
  */
-export function useActiveLoops(): number {
+export function useActiveFactories(): number {
   const [count, setCount] = useState(0);
 
   useEffect(() => {
@@ -18,7 +19,12 @@ export function useActiveLoops(): number {
       try {
         const loops = await window.api.loops.list();
         if (mounted) {
-          setCount(loops.filter((loop: LoopState) => isLoopActive(loop.status)).length);
+          const activeFactoryProjectIds = new Set(
+            loops
+              .filter((loop: LoopState) => loop.role !== undefined && isLoopActive(loop.status))
+              .map((loop: LoopState) => loop.projectId),
+          );
+          setCount(activeFactoryProjectIds.size);
         }
       } catch {
         // keep previous count on error

@@ -1,5 +1,5 @@
 /**
- * Unit tests for LoopRunner VM execution branch.
+ * Unit tests for ContainerOrchestrator VM execution branch.
  *
  * Why these tests exist: the VM execution path wires together VMManager,
  * log streaming, state transitions, and ephemeral-VM cleanup. These tests
@@ -10,7 +10,7 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { LoopRunner } from '../../src/services/loop-runner';
+import { ContainerOrchestrator } from '../../src/services/container-orchestrator';
 import { LogParser } from '../../src/services/log-parser';
 import { LoopMode, LoopStatus } from '../../src/shared/loop-types';
 import type { ContainerRuntime } from '../../src/services/container-runtime';
@@ -90,8 +90,8 @@ function createMockVMManager(): VMManager {
 // Test suites
 // ---------------------------------------------------------------------------
 
-describe('LoopRunner — VM execution branch', () => {
-  let runner: LoopRunner;
+describe('ContainerOrchestrator — VM execution branch', () => {
+  let runner: ContainerOrchestrator;
   let docker: ContainerRuntime;
   let parser: LogParser;
   let vm: VMManager;
@@ -101,7 +101,7 @@ describe('LoopRunner — VM execution branch', () => {
     docker = createMockDockerManager();
     parser = createMockLogParser();
     vm = createMockVMManager();
-    runner = new LoopRunner(docker, parser, 3, vm);
+    runner = new ContainerOrchestrator(docker, parser, 3, vm);
   });
 
   // -------------------------------------------------------------------------
@@ -110,12 +110,12 @@ describe('LoopRunner — VM execution branch', () => {
 
   describe('constructor with VMManager', () => {
     it('accepts a VMManager as 4th argument without affecting existing functionality', () => {
-      const r = new LoopRunner(docker, parser, 3, vm);
+      const r = new ContainerOrchestrator(docker, parser, 3, vm);
       expect(r.getMaxConcurrent()).toBe(3);
     });
 
     it('works without VMManager (backward compat)', () => {
-      const r = new LoopRunner(docker, parser);
+      const r = new ContainerOrchestrator(docker, parser);
       expect(r.getMaxConcurrent()).toBe(3);
     });
   });
@@ -130,7 +130,7 @@ describe('LoopRunner — VM execution branch', () => {
         projectId: 'proj-123',
         projectName: 'Test Project',
         dockerImage: 'ubuntu:22.04',
-        mode: LoopMode.SINGLE,
+        mode: LoopMode.CONTINUOUS,
         sandboxType: 'vm',
         vmConfig: { vm_mode: 'ephemeral', cpus: 2, memory_gb: 4, disk_gb: 20 },
       });
@@ -147,7 +147,7 @@ describe('LoopRunner — VM execution branch', () => {
         projectId: 'proj-123',
         projectName: 'Test Project',
         dockerImage: 'my-image:latest',
-        mode: LoopMode.SINGLE,
+        mode: LoopMode.CONTINUOUS,
         sandboxType: 'vm',
         vmConfig: { vm_mode: 'ephemeral', cpus: 2, memory_gb: 4, disk_gb: 20 },
       });
@@ -166,7 +166,7 @@ describe('LoopRunner — VM execution branch', () => {
         projectId: 'proj-123',
         projectName: 'Test Project',
         dockerImage: 'zephyr-python-dev:latest',
-        mode: LoopMode.SINGLE,
+        mode: LoopMode.CONTINUOUS,
         sandboxType: 'vm',
         vmConfig: { vm_mode: 'ephemeral', cpus: 2, memory_gb: 4, disk_gb: 20 },
       });
@@ -192,7 +192,7 @@ describe('LoopRunner — VM execution branch', () => {
         projectId: 'proj-123',
         projectName: 'My Project',
         dockerImage: 'ubuntu:22.04',
-        mode: LoopMode.SINGLE,
+        mode: LoopMode.CONTINUOUS,
         sandboxType: 'vm',
         vmConfig: { vm_mode: 'ephemeral', cpus: 2, memory_gb: 4, disk_gb: 20 },
       });
@@ -210,7 +210,7 @@ describe('LoopRunner — VM execution branch', () => {
         projectId: 'proj-123',
         projectName: 'Test Project',
         dockerImage: 'ubuntu:22.04',
-        mode: LoopMode.SINGLE,
+        mode: LoopMode.CONTINUOUS,
         sandboxType: 'vm',
         vmConfig: { vm_mode: 'ephemeral', cpus: 2, memory_gb: 4, disk_gb: 20 },
         envVars: { FOO: 'bar', BAZ: 'qux' },
@@ -228,7 +228,7 @@ describe('LoopRunner — VM execution branch', () => {
         projectId: 'proj-123',
         projectName: 'Test Project',
         dockerImage: 'ubuntu:22.04',
-        mode: LoopMode.SINGLE,
+        mode: LoopMode.CONTINUOUS,
         sandboxType: 'vm',
         vmConfig: { vm_mode: 'ephemeral', cpus: 2, memory_gb: 4, disk_gb: 20 },
         volumeMounts: ['/host/path:/container/path'],
@@ -245,7 +245,7 @@ describe('LoopRunner — VM execution branch', () => {
         projectId: 'proj-123',
         projectName: 'Test Project',
         dockerImage: 'ubuntu:22.04',
-        mode: LoopMode.SINGLE,
+        mode: LoopMode.CONTINUOUS,
         sandboxType: 'vm',
         vmConfig: { vm_mode: 'ephemeral', cpus: 2, memory_gb: 4, disk_gb: 20 },
         workDir: '/workspace',
@@ -262,7 +262,7 @@ describe('LoopRunner — VM execution branch', () => {
         projectId: 'proj-123',
         projectName: 'Test Project',
         dockerImage: 'ubuntu:22.04',
-        mode: LoopMode.SINGLE,
+        mode: LoopMode.CONTINUOUS,
         sandboxType: 'vm',
         vmConfig: { vm_mode: 'ephemeral', cpus: 2, memory_gb: 4, disk_gb: 20 },
         user: 'root',
@@ -282,7 +282,7 @@ describe('LoopRunner — VM execution branch', () => {
           projectId: 'proj-123',
           projectName: 'Test Project',
           dockerImage: 'ubuntu:22.04',
-          mode: LoopMode.SINGLE,
+          mode: LoopMode.CONTINUOUS,
           sandboxType: 'vm',
           vmConfig: { vm_mode: 'ephemeral', cpus: 2, memory_gb: 4, disk_gb: 20 },
         }),
@@ -306,7 +306,7 @@ describe('LoopRunner — VM execution branch', () => {
           projectId: 'proj-123',
           projectName: 'Test Project',
           dockerImage: 'bad-image:latest',
-          mode: LoopMode.SINGLE,
+          mode: LoopMode.CONTINUOUS,
           sandboxType: 'vm',
           vmConfig: { vm_mode: 'ephemeral', cpus: 2, memory_gb: 4, disk_gb: 20 },
         }),
@@ -317,14 +317,14 @@ describe('LoopRunner — VM execution branch', () => {
     });
 
     it('throws if VMManager is not configured when sandboxType is vm', async () => {
-      const runnerNoVM = new LoopRunner(docker, parser);
+      const runnerNoVM = new ContainerOrchestrator(docker, parser);
 
       await expect(
         runnerNoVM.startLoop({
           projectId: 'proj-123',
           projectName: 'Test Project',
           dockerImage: 'ubuntu:22.04',
-          mode: LoopMode.SINGLE,
+          mode: LoopMode.CONTINUOUS,
           sandboxType: 'vm',
         }),
       ).rejects.toThrow('VMManager is not configured');
@@ -420,7 +420,7 @@ describe('LoopRunner — VM execution branch', () => {
         projectId: 'proj-123',
         projectName: 'Test Project',
         dockerImage: 'ubuntu:22.04',
-        mode: LoopMode.SINGLE,
+        mode: LoopMode.CONTINUOUS,
         sandboxType: 'vm',
         vmConfig: { vm_mode: 'persistent', cpus: 2, memory_gb: 4, disk_gb: 20 },
       });
@@ -434,7 +434,7 @@ describe('LoopRunner — VM execution branch', () => {
         projectId: 'proj-123',
         projectName: 'Test Project',
         dockerImage: 'ubuntu:22.04',
-        mode: LoopMode.SINGLE,
+        mode: LoopMode.CONTINUOUS,
         sandboxType: 'vm',
         vmConfig: { vm_mode: 'persistent', cpus: 2, memory_gb: 4, disk_gb: 20 },
       });
@@ -449,12 +449,12 @@ describe('LoopRunner — VM execution branch', () => {
   // -------------------------------------------------------------------------
 
   describe('exit detection via onExit callback', () => {
-    it('transitions SINGLE loop to COMPLETED on natural exit', async () => {
+    it('transitions CONTINUOUS loop to FAILED on natural exit', async () => {
       await runner.startLoop({
         projectId: 'proj-123',
         projectName: 'Test Project',
         dockerImage: 'ubuntu:22.04',
-        mode: LoopMode.SINGLE,
+        mode: LoopMode.CONTINUOUS,
         sandboxType: 'vm',
         vmConfig: { vm_mode: 'ephemeral', cpus: 2, memory_gb: 4, disk_gb: 20 },
       });
@@ -463,7 +463,7 @@ describe('LoopRunner — VM execution branch', () => {
       capturedOnExit!(0);
 
       const state = runner.getLoopState('proj-123');
-      expect(state?.status).toBe(LoopStatus.COMPLETED);
+      expect(state?.status).toBe(LoopStatus.FAILED);
       expect(state?.stoppedAt).toBeTruthy();
     });
 
@@ -489,7 +489,7 @@ describe('LoopRunner — VM execution branch', () => {
         projectId: 'proj-123',
         projectName: 'Test Project',
         dockerImage: 'ubuntu:22.04',
-        mode: LoopMode.SINGLE,
+        mode: LoopMode.CONTINUOUS,
         sandboxType: 'vm',
         vmConfig: { vm_mode: 'ephemeral', cpus: 2, memory_gb: 4, disk_gb: 20 },
       });
@@ -510,7 +510,7 @@ describe('LoopRunner — VM execution branch', () => {
         projectId: 'proj-123',
         projectName: 'Test Project',
         dockerImage: 'ubuntu:22.04',
-        mode: LoopMode.SINGLE,
+        mode: LoopMode.CONTINUOUS,
         sandboxType: 'vm',
         vmConfig: { vm_mode: 'persistent', cpus: 2, memory_gb: 4, disk_gb: 20 },
       });
@@ -669,7 +669,7 @@ describe('LoopRunner — VM execution branch', () => {
 
   describe('startProjectVM', () => {
     it('throws if VMManager is not configured', async () => {
-      const runnerNoVM = new LoopRunner(docker, parser);
+      const runnerNoVM = new ContainerOrchestrator(docker, parser);
       await expect(runnerNoVM.startProjectVM('proj-123')).rejects.toThrow(
         'VMManager is not configured',
       );
@@ -706,7 +706,7 @@ describe('LoopRunner — VM execution branch', () => {
         projectId: 'proj-123',
         projectName: 'Test Project',
         dockerImage: 'ubuntu:22.04',
-        mode: LoopMode.SINGLE,
+        mode: LoopMode.CONTINUOUS,
         sandboxType: 'vm',
         vmConfig: { vm_mode: 'persistent', cpus: 2, memory_gb: 4, disk_gb: 20 },
       });
@@ -737,7 +737,7 @@ describe('LoopRunner — VM execution branch', () => {
         projectId: 'proj-123',
         projectName: 'Test Project',
         dockerImage: 'ubuntu:22.04',
-        mode: LoopMode.SINGLE,
+        mode: LoopMode.CONTINUOUS,
         sandboxType: 'vm',
         vmConfig: { vm_mode: 'persistent', cpus: 2, memory_gb: 4, disk_gb: 20 },
       });
@@ -760,7 +760,7 @@ describe('LoopRunner — VM execution branch', () => {
         projectId: 'proj-123',
         projectName: 'Test Project',
         dockerImage: 'ubuntu:22.04',
-        mode: LoopMode.SINGLE,
+        mode: LoopMode.CONTINUOUS,
         sandboxType: 'vm',
         vmConfig: { vm_mode: 'persistent', cpus: 2, memory_gb: 4, disk_gb: 20 },
       });
@@ -774,7 +774,7 @@ describe('LoopRunner — VM execution branch', () => {
 
   describe('stopProjectVM', () => {
     it('throws if VMManager is not configured', async () => {
-      const runnerNoVM = new LoopRunner(docker, parser);
+      const runnerNoVM = new ContainerOrchestrator(docker, parser);
       await expect(runnerNoVM.stopProjectVM('proj-123')).rejects.toThrow(
         'VMManager is not configured',
       );
@@ -793,7 +793,7 @@ describe('LoopRunner — VM execution branch', () => {
         projectId: 'proj-123',
         projectName: 'Test Project',
         dockerImage: 'ubuntu:22.04',
-        mode: LoopMode.SINGLE,
+        mode: LoopMode.CONTINUOUS,
         sandboxType: 'vm',
         vmConfig: { vm_mode: 'persistent', cpus: 2, memory_gb: 4, disk_gb: 20 },
       });
@@ -827,7 +827,7 @@ describe('LoopRunner — VM execution branch', () => {
 
   describe('getProjectVMInfo', () => {
     it('returns null if VMManager is not configured', async () => {
-      const runnerNoVM = new LoopRunner(docker, parser);
+      const runnerNoVM = new ContainerOrchestrator(docker, parser);
       const info = await runnerNoVM.getProjectVMInfo('proj-123');
       expect(info).toBeNull();
     });
@@ -855,7 +855,7 @@ describe('LoopRunner — VM execution branch', () => {
         projectId: 'proj-123',
         projectName: 'Test Project',
         dockerImage: 'ubuntu:22.04',
-        mode: LoopMode.SINGLE,
+        mode: LoopMode.CONTINUOUS,
         sandboxType: 'vm',
         vmConfig: { vm_mode: 'persistent', cpus: 2, memory_gb: 4, disk_gb: 20 },
       });
@@ -908,7 +908,7 @@ describe('LoopRunner — VM execution branch', () => {
         projectId: 'proj-123',
         projectName: 'Test Project',
         dockerImage: 'ubuntu:22.04',
-        mode: LoopMode.SINGLE,
+        mode: LoopMode.CONTINUOUS,
       });
 
       expect(state.status).toBe(LoopStatus.RUNNING);

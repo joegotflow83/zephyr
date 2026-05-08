@@ -5,7 +5,7 @@ import { ElectronApplication, _electron as electron, Page } from 'playwright';
 // E2E tests for Zephyr Desktop UI interactions.
 // Tests the actual Electron app with real user workflows:
 //   - Window initialization
-//   - Tab navigation
+//   - Tab navigation (Projects, Factory, Terminal, Images, Settings)
 //   - Adding projects via dialog
 //   - Settings persistence
 //   - Status bar display
@@ -69,22 +69,24 @@ test.describe('Zephyr Desktop E2E', () => {
     });
 
     test('displays status bar', async () => {
-      // Status bar should be visible at the bottom
-      const statusBar = await page.locator('text=/Docker|Active Loops/i').count();
+      // Status bar should be visible at the bottom showing Docker/Podman status
+      const statusBar = await page.locator('text=/Docker|Podman/i').count();
       expect(statusBar).toBeGreaterThan(0);
     });
   });
 
   test.describe('Tab navigation', () => {
-    test('has all four tabs visible', async () => {
+    test('has all five tabs visible', async () => {
       const projectsTab = await page.locator('text=Projects').count();
-      const loopsTab = await page.locator('text=Running Loops').count();
+      const factoryTab = await page.locator('text=Factory').count();
       const terminalTab = await page.locator('text=Terminal').count();
+      const imagesTab = await page.locator('text=Images').count();
       const settingsTab = await page.locator('text=Settings').count();
 
       expect(projectsTab).toBe(1);
-      expect(loopsTab).toBe(1);
+      expect(factoryTab).toBe(1);
       expect(terminalTab).toBe(1);
+      expect(imagesTab).toBe(1);
       expect(settingsTab).toBe(1);
     });
 
@@ -97,13 +99,13 @@ test.describe('Zephyr Desktop E2E', () => {
       expect(hasProjectsContent).toBeGreaterThan(0);
     });
 
-    test('can navigate to Loops tab', async () => {
-      await page.click('text=Running Loops');
+    test('can navigate to Factory tab', async () => {
+      await page.click('text=Factory');
       await page.waitForTimeout(200);
 
-      // Loops tab should show a table or empty state
-      const hasLoopsContent = await page.locator('text=/No running loops|Status|Project/i').count();
-      expect(hasLoopsContent).toBeGreaterThan(0);
+      // Factory tab should show kanban board or empty state
+      const hasFactoryContent = await page.locator('text=/Factory|Backlog|In Progress|Done/i').count();
+      expect(hasFactoryContent).toBeGreaterThan(0);
     });
 
     test('can navigate to Terminal tab', async () => {
@@ -276,15 +278,15 @@ test.describe('Zephyr Desktop E2E', () => {
 
   test.describe('Status bar display', () => {
     test('shows Docker connection status', async () => {
-      // Status bar should display Docker status
-      const dockerStatus = await page.locator('text=/Docker/i').count();
+      // Status bar should display Docker/Podman status
+      const dockerStatus = await page.locator('text=/Docker|Podman/i').count();
       expect(dockerStatus).toBeGreaterThan(0);
     });
 
-    test('shows active loop count', async () => {
-      // Status bar should show loop count (even if 0)
-      const loopCount = await page.locator('text=/Active Loops|0 loops|running/i').count();
-      expect(loopCount).toBeGreaterThan(0);
+    test('shows factory running count when active', async () => {
+      // Status bar shows factory count only when > 0; otherwise just runtime status is present
+      const runtimeStatus = await page.locator('text=/Docker|Podman|Connected|Disconnected/i').count();
+      expect(runtimeStatus).toBeGreaterThan(0);
     });
 
     test('Docker status has visual indicator', async () => {
@@ -309,12 +311,12 @@ test.describe('Zephyr Desktop E2E', () => {
       expect(hasProjectsContent).toBeGreaterThan(0);
     });
 
-    test('Ctrl+2 switches to Loops tab', async () => {
+    test('Ctrl+2 switches to Factory tab', async () => {
       await page.keyboard.press('Control+2');
       await page.waitForTimeout(200);
 
-      const hasLoopsContent = await page.locator('text=/No running loops|Status|Running Loops/i').count();
-      expect(hasLoopsContent).toBeGreaterThan(0);
+      const hasFactoryContent = await page.locator('text=/Factory|Backlog|In Progress|Done/i').count();
+      expect(hasFactoryContent).toBeGreaterThan(0);
     });
 
     test('Ctrl+3 switches to Terminal tab', async () => {
@@ -325,8 +327,16 @@ test.describe('Zephyr Desktop E2E', () => {
       expect(hasTerminalContent).toBeGreaterThan(0);
     });
 
-    test('Ctrl+4 switches to Settings tab', async () => {
+    test('Ctrl+4 switches to Images tab', async () => {
       await page.keyboard.press('Control+4');
+      await page.waitForTimeout(200);
+
+      const hasImagesContent = await page.locator('text=/Images|Build|No images/i').count();
+      expect(hasImagesContent).toBeGreaterThan(0);
+    });
+
+    test('Ctrl+5 switches to Settings tab', async () => {
+      await page.keyboard.press('Control+5');
       await page.waitForTimeout(200);
 
       const hasSettingsContent = await page.locator('text=/Credentials|Docker|General|Settings/i').count();

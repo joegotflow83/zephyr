@@ -83,7 +83,7 @@ const mockPreValidationStore = {
   removeScript: vi.fn(),
 };
 
-const mockLoopRunner = {
+const mockContainerOrchestrator = {
   listRunning: vi.fn(),
   stopLoop: vi.fn(),
   setMaxConcurrent: vi.fn(),
@@ -107,7 +107,7 @@ describe('registerDataHandlers', () => {
     for (const key of Object.keys(handlerRegistry)) {
       delete handlerRegistry[key];
     }
-    mockLoopRunner.listRunning.mockReturnValue([]);
+    mockContainerOrchestrator.listRunning.mockReturnValue([]);
     mockRuntime.listContainers.mockResolvedValue([]);
     mockCredentialManager.deleteGithubPat.mockResolvedValue(undefined);
     registerDataHandlers({
@@ -115,7 +115,7 @@ describe('registerDataHandlers', () => {
       projectStore: mockProjectStore as never,
       importExport: mockImportExport as never,
       preValidationStore: mockPreValidationStore as never,
-      loopRunner: mockLoopRunner as never,
+      containerOrchestrator: mockContainerOrchestrator as never,
       runtime: mockRuntime as never,
       credentialManager: mockCredentialManager as never,
     });
@@ -193,11 +193,11 @@ describe('registerDataHandlers', () => {
 
     it('stops a running loop before removing the project', async () => {
       const id = 'running-project';
-      mockLoopRunner.listRunning.mockReturnValue([{ projectId: id }]);
-      mockLoopRunner.stopLoop.mockResolvedValue(undefined);
+      mockContainerOrchestrator.listRunning.mockReturnValue([{ projectId: id }]);
+      mockContainerOrchestrator.stopLoop.mockResolvedValue(undefined);
       mockProjectStore.removeProject.mockResolvedValue(true);
       await invoke(IPC.PROJECTS_REMOVE, id);
-      expect(mockLoopRunner.stopLoop).toHaveBeenCalledWith(id);
+      expect(mockContainerOrchestrator.stopLoop).toHaveBeenCalledWith(id);
     });
 
     it('removes all containers associated with the project', async () => {

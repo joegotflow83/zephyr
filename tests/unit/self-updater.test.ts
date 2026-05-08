@@ -1,6 +1,6 @@
 /**
  * Unit tests for SelfUpdater service.
- * Mocks fetch and LoopRunner to avoid real operations.
+ * Mocks fetch and ContainerOrchestrator to avoid real operations.
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
@@ -19,13 +19,13 @@ vi.mock('fs', () => {
 
 // Import after mocks are set up
 import { SelfUpdater, UpdateInfo, SELF_UPDATE_PROJECT_ID } from '../../src/services/self-updater';
-import type { LoopRunner } from '../../src/services/loop-runner';
+import type { ContainerOrchestrator } from '../../src/services/container-orchestrator';
 import { LoopMode } from '../../src/shared/loop-types';
 import { readFileSync } from 'fs';
 
 describe('SelfUpdater', () => {
   let updater: SelfUpdater;
-  let mockLoopRunner: Partial<LoopRunner>;
+  let mockContainerOrchestrator: Partial<ContainerOrchestrator>;
   let mockReadFileSync: any;
   let mockFetch: any;
 
@@ -38,8 +38,8 @@ describe('SelfUpdater', () => {
   beforeEach(() => {
     vi.clearAllMocks();
 
-    // Mock LoopRunner
-    mockLoopRunner = {
+    // Mock ContainerOrchestrator
+    mockContainerOrchestrator = {
       getLoopState: vi.fn(),
       startLoop: vi.fn(),
     };
@@ -56,19 +56,19 @@ describe('SelfUpdater', () => {
   });
 
   describe('constructor', () => {
-    it('should create instance without LoopRunner', () => {
+    it('should create instance without ContainerOrchestrator', () => {
       expect(updater).toBeDefined();
     });
 
-    it('should create instance with LoopRunner', () => {
-      const updaterWithRunner = new SelfUpdater(appDir, mockLoopRunner as LoopRunner);
+    it('should create instance with ContainerOrchestrator', () => {
+      const updaterWithRunner = new SelfUpdater(appDir, mockContainerOrchestrator as ContainerOrchestrator);
       expect(updaterWithRunner).toBeDefined();
     });
   });
 
-  describe('setLoopRunner', () => {
-    it('should set LoopRunner instance', () => {
-      updater.setLoopRunner(mockLoopRunner as LoopRunner);
+  describe('setContainerOrchestrator', () => {
+    it('should set ContainerOrchestrator instance', () => {
+      updater.setContainerOrchestrator(mockContainerOrchestrator as ContainerOrchestrator);
       // No error means success
       expect(true).toBe(true);
     });
@@ -239,26 +239,26 @@ describe('SelfUpdater', () => {
     const envVars = { API_KEY: 'test-key' };
 
     beforeEach(() => {
-      updater.setLoopRunner(mockLoopRunner as LoopRunner);
-      (mockLoopRunner.getLoopState as any).mockReturnValue(null);
-      (mockLoopRunner.startLoop as any).mockResolvedValue({
+      updater.setContainerOrchestrator(mockContainerOrchestrator as ContainerOrchestrator);
+      (mockContainerOrchestrator.getLoopState as any).mockReturnValue(null);
+      (mockContainerOrchestrator.startLoop as any).mockResolvedValue({
         projectId: SELF_UPDATE_PROJECT_ID,
         containerId: 'container123',
-        mode: LoopMode.SINGLE,
+        mode: LoopMode.CONTINUOUS,
         status: 'starting',
       });
     });
 
-    it('should throw error if no LoopRunner configured', async () => {
+    it('should throw error if no ContainerOrchestrator configured', async () => {
       const updaterNoRunner = new SelfUpdater(appDir);
 
       await expect(
         updaterNoRunner.startSelfUpdate(dockerImage)
-      ).rejects.toThrow('LoopRunner not configured');
+      ).rejects.toThrow('ContainerOrchestrator not configured');
     });
 
     it('should throw error if self-update loop already running', async () => {
-      (mockLoopRunner.getLoopState as any).mockReturnValue({
+      (mockContainerOrchestrator.getLoopState as any).mockReturnValue({
         projectId: SELF_UPDATE_PROJECT_ID,
         status: 'running',
       });
@@ -271,14 +271,14 @@ describe('SelfUpdater', () => {
     it('should start self-update loop successfully', async () => {
       await updater.startSelfUpdate(dockerImage);
 
-      expect(mockLoopRunner.getLoopState).toHaveBeenCalledWith(
+      expect(mockContainerOrchestrator.getLoopState).toHaveBeenCalledWith(
         SELF_UPDATE_PROJECT_ID
       );
-      expect(mockLoopRunner.startLoop).toHaveBeenCalledWith({
+      expect(mockContainerOrchestrator.startLoop).toHaveBeenCalledWith({
         projectId: SELF_UPDATE_PROJECT_ID,
         projectName: 'Zephyr Self-Update',
         dockerImage,
-        mode: LoopMode.SINGLE,
+        mode: LoopMode.CONTINUOUS,
         envVars: undefined,
         volumeMounts: [expect.stringContaining('/workspace')],
         workDir: '/workspace',
@@ -288,11 +288,11 @@ describe('SelfUpdater', () => {
     it('should start self-update loop with environment variables', async () => {
       await updater.startSelfUpdate(dockerImage, envVars);
 
-      expect(mockLoopRunner.startLoop).toHaveBeenCalledWith({
+      expect(mockContainerOrchestrator.startLoop).toHaveBeenCalledWith({
         projectId: SELF_UPDATE_PROJECT_ID,
         projectName: 'Zephyr Self-Update',
         dockerImage,
-        mode: LoopMode.SINGLE,
+        mode: LoopMode.CONTINUOUS,
         envVars,
         volumeMounts: [expect.stringContaining('/workspace')],
         workDir: '/workspace',
@@ -302,7 +302,7 @@ describe('SelfUpdater', () => {
     it('should mount app directory as volume', async () => {
       await updater.startSelfUpdate(dockerImage);
 
-      expect(mockLoopRunner.startLoop).toHaveBeenCalledWith(
+      expect(mockContainerOrchestrator.startLoop).toHaveBeenCalledWith(
         expect.objectContaining({
           volumeMounts: [`${appDir}:/workspace`],
           workDir: '/workspace',
@@ -310,12 +310,12 @@ describe('SelfUpdater', () => {
       );
     });
 
-    it('should use SINGLE mode for self-update', async () => {
+    it('should use CONTINUOUS mode for self-update', async () => {
       await updater.startSelfUpdate(dockerImage);
 
-      expect(mockLoopRunner.startLoop).toHaveBeenCalledWith(
+      expect(mockContainerOrchestrator.startLoop).toHaveBeenCalledWith(
         expect.objectContaining({
-          mode: LoopMode.SINGLE,
+          mode: LoopMode.CONTINUOUS,
         })
       );
     });
@@ -323,7 +323,7 @@ describe('SelfUpdater', () => {
     it('should use reserved project ID', async () => {
       await updater.startSelfUpdate(dockerImage);
 
-      expect(mockLoopRunner.startLoop).toHaveBeenCalledWith(
+      expect(mockContainerOrchestrator.startLoop).toHaveBeenCalledWith(
         expect.objectContaining({
           projectId: SELF_UPDATE_PROJECT_ID,
         })

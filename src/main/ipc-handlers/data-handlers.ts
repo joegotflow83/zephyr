@@ -10,9 +10,8 @@ import type { ImportExportService } from '../../services/import-export';
 import type { PreValidationStore } from '../../services/pre-validation-store';
 import type { HooksStore } from '../../services/hooks-store';
 import type { KiroHooksStore } from '../../services/kiro-hooks-store';
-import type { LoopScriptsStore } from '../../services/loop-scripts-store';
 import type { ClaudeSettingsStore } from '../../services/claude-settings-store';
-import type { LoopRunner } from '../../services/loop-runner';
+import type { ContainerOrchestrator } from '../../services/container-orchestrator';
 import type { ContainerRuntime } from '../../services/container-runtime';
 import type { CredentialManager } from '../../services/credential-manager';
 import type { SSHKeyManager } from '../../services/ssh-key-manager';
@@ -39,9 +38,8 @@ export interface DataServices {
   preValidationStore: PreValidationStore;
   hooksStore: HooksStore;
   kiroHooksStore: KiroHooksStore;
-  loopScriptsStore: LoopScriptsStore;
   claudeSettingsStore: ClaudeSettingsStore;
-  loopRunner: LoopRunner;
+  containerOrchestrator: ContainerOrchestrator;
   runtime: ContainerRuntime;
   credentialManager: CredentialManager;
   sshKeyManager?: SSHKeyManager;
@@ -49,7 +47,7 @@ export interface DataServices {
 }
 
 export function registerDataHandlers(services: DataServices): void {
-  const { configManager, projectStore, importExport, preValidationStore, hooksStore, kiroHooksStore, loopScriptsStore, claudeSettingsStore, loopRunner, runtime, credentialManager, sshKeyManager, deployKeyStore } =
+  const { configManager, projectStore, importExport, preValidationStore, hooksStore, kiroHooksStore, claudeSettingsStore, containerOrchestrator, runtime, credentialManager, sshKeyManager, deployKeyStore } =
     services;
   const logger = getLogger('ipc');
 
@@ -126,9 +124,9 @@ export function registerDataHandlers(services: DataServices): void {
 
       // Stop any running loop for this project before removing it
       try {
-        const running = loopRunner.listRunning();
+        const running = containerOrchestrator.listRunning();
         if (running.some((l) => l.projectId === id)) {
-          await loopRunner.stopLoop(id);
+          await containerOrchestrator.stopLoop(id);
         }
       } catch (err) {
         logger.warn('Failed to stop loop for deleted project', { projectId: id, err });
@@ -186,7 +184,7 @@ export function registerDataHandlers(services: DataServices): void {
 
       // Update max concurrent containers if it changed
       if (settings.max_concurrent_containers) {
-        loopRunner.setMaxConcurrent(settings.max_concurrent_containers);
+        containerOrchestrator.setMaxConcurrent(settings.max_concurrent_containers);
         logger.info('Max concurrent containers updated from settings', { max: settings.max_concurrent_containers });
       }
     },
@@ -277,27 +275,6 @@ export function registerDataHandlers(services: DataServices): void {
 
   ipcMain.handle(IPC.KIRO_HOOKS_REMOVE, async (_event, filename: string): Promise<boolean> => {
     return kiroHooksStore.removeHook(filename);
-  });
-
-  // ── Loop scripts ───────────────────────────────────────────────────────────
-
-  ipcMain.handle(IPC.LOOP_SCRIPTS_LIST, async () => {
-    return loopScriptsStore.listScripts();
-  });
-
-  ipcMain.handle(IPC.LOOP_SCRIPTS_GET, async (_event, filename: string) => {
-    return loopScriptsStore.getScript(filename);
-  });
-
-  ipcMain.handle(
-    IPC.LOOP_SCRIPTS_ADD,
-    async (_event, filename: string, content: string): Promise<void> => {
-      await loopScriptsStore.addScript(filename, content);
-    },
-  );
-
-  ipcMain.handle(IPC.LOOP_SCRIPTS_REMOVE, async (_event, filename: string): Promise<boolean> => {
-    return loopScriptsStore.removeScript(filename);
   });
 
   // ── Claude settings files ──────────────────────────────────────────────────

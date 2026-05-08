@@ -5,15 +5,15 @@
 import { ipcMain, dialog } from 'electron';
 import { IPC } from '../../shared/ipc-channels';
 import type { LogExporter } from '../../services/log-exporter';
-import type { LoopRunner } from '../../services/loop-runner';
+import type { ContainerOrchestrator } from '../../services/container-orchestrator';
 
 export interface LogServices {
   logExporter: LogExporter;
-  loopRunner: LoopRunner;
+  containerOrchestrator: ContainerOrchestrator;
 }
 
 export function registerLogHandlers(services: LogServices): void {
-  const { logExporter, loopRunner } = services;
+  const { logExporter, containerOrchestrator } = services;
 
   // ── Export single loop log ────────────────────────────────────────────────
 
@@ -26,7 +26,7 @@ export function registerLogHandlers(services: LogServices): void {
     ): Promise<{ success: boolean; path?: string; error?: string }> => {
       try {
         // Get loop state
-        const loopState = loopRunner.getLoopState(projectId);
+        const loopState = containerOrchestrator.getLoopState(projectId);
         if (!loopState) {
           return { success: false, error: 'Loop not found' };
         }
@@ -75,7 +75,7 @@ export function registerLogHandlers(services: LogServices): void {
     ): Promise<{ success: boolean; path?: string; error?: string }> => {
       try {
         // Get all loop states
-        const loopStates = loopRunner.listAll();
+        const loopStates = containerOrchestrator.listAll();
         if (loopStates.length === 0) {
           return { success: false, error: 'No loops to export' };
         }

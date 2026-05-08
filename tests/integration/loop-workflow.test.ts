@@ -8,14 +8,13 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { mkdtempSync, rmSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
-import { LoopRunner } from '../../src/services/loop-runner';
+import { ContainerOrchestrator } from '../../src/services/container-orchestrator';
 import { LogParser } from '../../src/services/log-parser';
-import { LoopScheduler } from '../../src/services/scheduler';
 import { ConfigManager } from '../../src/services/config-manager';
 import { ProjectStore } from '../../src/services/project-store';
-import { LoopMode, LoopStatus, isLoopActive } from '../../src/shared/loop-types';
+import { LoopMode, LoopStatus } from '../../src/shared/loop-types';
 import type { ContainerRuntime, ContainerStatus, ContainerSummary } from '../../src/services/container-runtime';
-import type { StateChangeCallback, LogLineCallback } from '../../src/services/loop-runner';
+import type { StateChangeCallback, LogLineCallback } from '../../src/services/container-orchestrator';
 
 // -- Mock ContainerRuntime ----------------------------------------------------
 
@@ -78,8 +77,7 @@ describe('Loop Workflow Integration', () => {
   let projectStore: ProjectStore;
   let docker: ContainerRuntime;
   let parser: LogParser;
-  let loopRunner: LoopRunner;
-  let scheduler: LoopScheduler;
+  let containerOrchestrator: ContainerOrchestrator;
 
   beforeEach(() => {
     // Create temp directory for projects
@@ -90,8 +88,7 @@ describe('Loop Workflow Integration', () => {
     // Create mocked ContainerRuntime and real parser/runner
     docker = createMockContainerRuntime();
     parser = new LogParser(); // Real parser, no mocking needed
-    loopRunner = new LoopRunner(docker, parser, 2); // Max 2 concurrent
-    scheduler = new LoopScheduler(loopRunner);
+    containerOrchestrator = new ContainerOrchestrator(docker, parser, 2); // Max 2 concurrent
   });
 
   afterEach(() => {
@@ -111,22 +108,22 @@ describe('Loop Workflow Integration', () => {
 
     // Track state changes
     const stateChanges: string[] = [];
-    loopRunner.onStateChange((state) => {
+    containerOrchestrator.onStateChange((state) => {
       if (state.projectId === project.id) {
         stateChanges.push(state.status);
       }
     });
 
     // Start the loop
-    const initialState = await loopRunner.startLoop({
+    const initialState = await containerOrchestrator.startLoop({
       projectId: project.id,
       projectName: project.name,      dockerImage: 'ubuntu:22.04',
-      mode: LoopMode.SINGLE,
+      mode: LoopMode.CONTINUOUS,
     });
 
     expect(initialState.status).toBe(LoopStatus.RUNNING);
     expect(initialState.projectId).toBe(project.id);
-    expect(initialState.mode).toBe(LoopMode.SINGLE);
+    expect(initialState.mode).toBe(LoopMode.CONTINUOUS);
     expect(initialState.containerId).toBeTruthy();
     expect(initialState.startedAt).toBeTruthy();
 
@@ -140,7 +137,7 @@ describe('Loop Workflow Integration', () => {
     expect(docker.startContainer).toHaveBeenCalled();
 
     // Verify state is tracked
-    const retrievedState = loopRunner.getLoopState(project.id);
+    const retrievedState = containerOrchestrator.getLoopState(project.id);
     expect(retrievedState).not.toBeNull();
     expect(retrievedState!.status).toBe(LoopStatus.RUNNING);
 
@@ -148,9 +145,9 @@ describe('Loop Workflow Integration', () => {
     await new Promise((resolve) => setTimeout(resolve, 50));
 
     // Stop the loop
-    await loopRunner.stopLoop(project.id);
+    await containerOrchestrator.stopLoop(project.id);
 
-    const finalState = loopRunner.getLoopState(project.id);
+    const finalState = containerOrchestrator.getLoopState(project.id);
     expect(finalState!.status).toBe(LoopStatus.STOPPED);
     expect(finalState!.stoppedAt).toBeTruthy();
 
@@ -178,16 +175,16 @@ describe('Loop Workflow Integration', () => {
           logLines.push(parsed.content);
           // Resolve once we have at least 3 log lines (the mock sends 3 lines)
           if (logLines.length >= 3) {
-            loopRunner.removeLogCallback(callback);
+            containerOrchestrator.removeLogCallback(callback);
             resolve();
           }
         }
       };
-      loopRunner.onLogLine(callback);
+      containerOrchestrator.onLogLine(callback);
     });
 
     // Start loop
-    await loopRunner.startLoop({
+    await containerOrchestrator.startLoop({
       projectId: project.id,
       projectName: project.name,      dockerImage: 'ubuntu:22.04',
       mode: LoopMode.CONTINUOUS,
@@ -204,13 +201,13 @@ describe('Loop Workflow Integration', () => {
     expect(logLines.some((line) => line.includes('Starting loop execution'))).toBe(true);
 
     // Verify logs were stored in state
-    const state = loopRunner.getLoopState(project.id);
+    const state = containerOrchestrator.getLoopState(project.id);
     expect(state!.logs.length).toBeGreaterThan(0);
     expect(state!.logs.some((log) => log.includes('Starting loop execution'))).toBe(true);
     expect(state!.logs.some((log) => log.includes('=== Iteration 1 ==='))).toBe(true);
 
     // Clean up
-    await loopRunner.stopLoop(project.id);
+    await containerOrchestrator.stopLoop(project.id);
   });
 
   it('should track commits and errors from parsed logs', async () => {
@@ -222,7 +219,7 @@ describe('Loop Workflow Integration', () => {
     // Create a new mock docker manager with custom log lines
     const customDocker = createMockContainerRuntime();
     const customParser = new LogParser();
-    const customRunner = new LoopRunner(customDocker, customParser, 2);
+    const customRunner = new ContainerOrchestrator(customDocker, customParser, 2);
 
     // Override streamLogs to emit commit and error lines
     (customDocker as any).streamLogs = vi.fn(async (containerId: string, onLine: (line: string) => void) => {
@@ -296,23 +293,23 @@ describe('Loop Workflow Integration', () => {
     const p3 = await projectStore.addProject({ name: 'Project 3', docker_image: 'ubuntu:22.04' });
 
     // Start first two (should succeed, limit is 2)
-    await loopRunner.startLoop({
+    await containerOrchestrator.startLoop({
       projectId: p1.id,
       projectName: p1.name,      dockerImage: 'ubuntu:22.04',
       mode: LoopMode.CONTINUOUS,
     });
 
-    await loopRunner.startLoop({
+    await containerOrchestrator.startLoop({
       projectId: p2.id,
       projectName: p2.name,      dockerImage: 'ubuntu:22.04',
       mode: LoopMode.CONTINUOUS,
     });
 
-    expect(loopRunner.listRunning()).toHaveLength(2);
+    expect(containerOrchestrator.listRunning()).toHaveLength(2);
 
     // Try to start third (should fail due to concurrency limit)
     await expect(
-      loopRunner.startLoop({
+      containerOrchestrator.startLoop({
         projectId: p3.id,
         projectName: p3.name,        dockerImage: 'ubuntu:22.04',
         mode: LoopMode.CONTINUOUS,
@@ -320,19 +317,19 @@ describe('Loop Workflow Integration', () => {
     ).rejects.toThrow(/Concurrency limit reached/);
 
     // Stop one and verify we can start another
-    await loopRunner.stopLoop(p1.id);
+    await containerOrchestrator.stopLoop(p1.id);
 
-    await loopRunner.startLoop({
+    await containerOrchestrator.startLoop({
       projectId: p3.id,
       projectName: p3.name,      dockerImage: 'ubuntu:22.04',
       mode: LoopMode.CONTINUOUS,
     });
 
-    expect(loopRunner.listRunning()).toHaveLength(2);
+    expect(containerOrchestrator.listRunning()).toHaveLength(2);
 
     // Clean up
-    await loopRunner.stopLoop(p2.id);
-    await loopRunner.stopLoop(p3.id);
+    await containerOrchestrator.stopLoop(p2.id);
+    await containerOrchestrator.stopLoop(p3.id);
   });
 
   it('should allow increasing concurrency limit dynamically', async () => {
@@ -342,33 +339,33 @@ describe('Loop Workflow Integration', () => {
     const p3 = await projectStore.addProject({ name: 'Project 3', docker_image: 'ubuntu:22.04' });
 
     // Start two (max is 2)
-    await loopRunner.startLoop({
+    await containerOrchestrator.startLoop({
       projectId: p1.id,
       projectName: p1.name,      dockerImage: 'ubuntu:22.04',
       mode: LoopMode.CONTINUOUS,
     });
-    await loopRunner.startLoop({
+    await containerOrchestrator.startLoop({
       projectId: p2.id,
       projectName: p2.name,      dockerImage: 'ubuntu:22.04',
       mode: LoopMode.CONTINUOUS,
     });
 
     // Increase limit to 3
-    loopRunner.setMaxConcurrent(3);
+    containerOrchestrator.setMaxConcurrent(3);
 
     // Now third should succeed
-    await loopRunner.startLoop({
+    await containerOrchestrator.startLoop({
       projectId: p3.id,
       projectName: p3.name,      dockerImage: 'ubuntu:22.04',
       mode: LoopMode.CONTINUOUS,
     });
 
-    expect(loopRunner.listRunning()).toHaveLength(3);
+    expect(containerOrchestrator.listRunning()).toHaveLength(3);
 
     // Clean up
-    await loopRunner.stopLoop(p1.id);
-    await loopRunner.stopLoop(p2.id);
-    await loopRunner.stopLoop(p3.id);
+    await containerOrchestrator.stopLoop(p1.id);
+    await containerOrchestrator.stopLoop(p2.id);
+    await containerOrchestrator.stopLoop(p3.id);
   });
 
   // -- Recovery Flow ----------------------------------------------------------
@@ -403,12 +400,12 @@ describe('Loop Workflow Integration', () => {
     });
 
     // Recover loops
-    const recovered = await loopRunner.recoverLoops(mockContainers, projectStore);
+    const recovered = await containerOrchestrator.recoverLoops(mockContainers, projectStore);
 
     expect(recovered).toContain(project.id);
-    expect(loopRunner.listRunning()).toHaveLength(1);
+    expect(containerOrchestrator.listRunning()).toHaveLength(1);
 
-    const state = loopRunner.getLoopState(project.id);
+    const state = containerOrchestrator.getLoopState(project.id);
     expect(state).not.toBeNull();
     expect(state!.status).toBe(LoopStatus.RUNNING);
     expect(state!.containerId).toBe('existing-container-123');
@@ -422,7 +419,7 @@ describe('Loop Workflow Integration', () => {
     );
 
     // Clean up
-    await loopRunner.stopLoop(project.id);
+    await containerOrchestrator.stopLoop(project.id);
   });
 
   it('should skip deleted projects during recovery', async () => {
@@ -448,11 +445,11 @@ describe('Loop Workflow Integration', () => {
     ];
 
     // Attempt recovery
-    const recovered = await loopRunner.recoverLoops(mockContainers, projectStore);
+    const recovered = await containerOrchestrator.recoverLoops(mockContainers, projectStore);
 
     // Should skip deleted project
     expect(recovered).not.toContain(deletedProjectId);
-    expect(loopRunner.listRunning()).toHaveLength(0);
+    expect(containerOrchestrator.listRunning()).toHaveLength(0);
   });
 
   it('should respect concurrency limit during recovery', async () => {
@@ -468,109 +465,11 @@ describe('Loop Workflow Integration', () => {
       { id: 'c3', name: 'zephyr-c3', image: 'ubuntu:22.04', state: 'running', status: 'Up', projectId: p3.id, created: new Date().toISOString() },
     ];
 
-    const recovered = await loopRunner.recoverLoops(mockContainers, projectStore);
+    const recovered = await containerOrchestrator.recoverLoops(mockContainers, projectStore);
 
     // Should only recover 2 (concurrency limit)
     expect(recovered).toHaveLength(2);
-    expect(loopRunner.listRunning()).toHaveLength(2);
-  });
-
-  // -- Scheduler Integration --------------------------------------------------
-
-  it('should schedule and trigger loops at intervals', async () => {
-    const project = await projectStore.addProject({
-      name: 'Scheduled Project',
-      docker_image: 'ubuntu:22.04',
-    });
-
-    // Schedule loop to run every 100ms (for testing)
-    const schedule = scheduler.parseSchedule('*/1 minutes'); // Parse format
-    // Override intervalMs for faster testing
-    schedule.intervalMs = 100;
-
-    await scheduler.scheduleLoop(
-      project.id,
-      schedule,
-      {
-        projectId: project.id,
-        projectName: project.name,        dockerImage: 'ubuntu:22.04',
-      },
-    );
-
-    expect(scheduler.isScheduled(project.id)).toBe(true);
-
-    // Wait for at least one trigger (100ms interval + buffer)
-    await new Promise((resolve) => setTimeout(resolve, 150));
-
-    // Verify loop was started
-    const runningLoops = loopRunner.listAll().filter((s) => s.projectId === project.id);
-    expect(runningLoops.length).toBeGreaterThan(0);
-
-    // Clean up
-    scheduler.cancelSchedule(project.id);
-    // Stop any running loops
-    for (const loop of runningLoops) {
-      if (isLoopActive(loop.status)) {
-        await loopRunner.stopLoop(loop.projectId);
-      }
-    }
-  });
-
-  it('should cancel scheduled loops', async () => {
-    const project = await projectStore.addProject({
-      name: 'Cancel Test',
-      docker_image: 'ubuntu:22.04',
-    });
-
-    const schedule = scheduler.parseSchedule('*/5 minutes');
-
-    await scheduler.scheduleLoop(
-      project.id,
-      schedule,
-      {
-        projectId: project.id,
-        projectName: project.name,        dockerImage: 'ubuntu:22.04',
-      },
-    );
-
-    expect(scheduler.isScheduled(project.id)).toBe(true);
-
-    // Cancel
-    scheduler.cancelSchedule(project.id);
-    expect(scheduler.isScheduled(project.id)).toBe(false);
-
-    // Wait a bit to ensure no loops are triggered after cancellation
-    await new Promise((resolve) => setTimeout(resolve, 100));
-
-    const loops = loopRunner.listAll().filter((s) => s.projectId === project.id);
-    expect(loops).toHaveLength(0);
-  });
-
-  it('should list all scheduled loops', async () => {
-    const p1 = await projectStore.addProject({ name: 'Sched 1', docker_image: 'ubuntu:22.04' });
-    const p2 = await projectStore.addProject({ name: 'Sched 2', docker_image: 'ubuntu:22.04' });
-
-    const schedule1 = scheduler.parseSchedule('*/10 minutes');
-    const schedule2 = scheduler.parseSchedule('every 2 hours');
-
-    await scheduler.scheduleLoop(p1.id, schedule1, {
-      projectId: p1.id,
-      projectName: p1.name,      dockerImage: 'ubuntu:22.04',
-    });
-
-    await scheduler.scheduleLoop(p2.id, schedule2, {
-      projectId: p2.id,
-      projectName: p2.name,      dockerImage: 'ubuntu:22.04',
-    });
-
-    const scheduled = scheduler.listScheduled();
-    expect(scheduled).toHaveLength(2);
-    expect(scheduled.map((s) => s.projectId)).toContain(p1.id);
-    expect(scheduled.map((s) => s.projectId)).toContain(p2.id);
-
-    // Clean up
-    scheduler.cancelSchedule(p1.id);
-    scheduler.cancelSchedule(p2.id);
+    expect(containerOrchestrator.listRunning()).toHaveLength(2);
   });
 
   // -- List and Query Methods -------------------------------------------------
@@ -580,30 +479,30 @@ describe('Loop Workflow Integration', () => {
     const p2 = await projectStore.addProject({ name: 'Stopped', docker_image: 'ubuntu:22.04' });
 
     // Start and stop one
-    await loopRunner.startLoop({
+    await containerOrchestrator.startLoop({
       projectId: p1.id,
       projectName: p1.name,      dockerImage: 'ubuntu:22.04',
       mode: LoopMode.CONTINUOUS,
     });
 
-    await loopRunner.startLoop({
+    await containerOrchestrator.startLoop({
       projectId: p2.id,
       projectName: p2.name,      dockerImage: 'ubuntu:22.04',
-      mode: LoopMode.SINGLE,
+      mode: LoopMode.CONTINUOUS,
     });
-    await loopRunner.stopLoop(p2.id);
+    await containerOrchestrator.stopLoop(p2.id);
 
     // listRunning should show only p1
-    const running = loopRunner.listRunning();
+    const running = containerOrchestrator.listRunning();
     expect(running).toHaveLength(1);
     expect(running[0].projectId).toBe(p1.id);
 
     // listAll should show both
-    const all = loopRunner.listAll();
+    const all = containerOrchestrator.listAll();
     expect(all).toHaveLength(2);
 
     // Clean up
-    await loopRunner.stopLoop(p1.id);
+    await containerOrchestrator.stopLoop(p1.id);
   });
 
   it('should remove loops in terminal state', async () => {
@@ -612,22 +511,22 @@ describe('Loop Workflow Integration', () => {
       docker_image: 'ubuntu:22.04',
     });
 
-    await loopRunner.startLoop({
+    await containerOrchestrator.startLoop({
       projectId: project.id,
       projectName: project.name,      dockerImage: 'ubuntu:22.04',
-      mode: LoopMode.SINGLE,
+      mode: LoopMode.CONTINUOUS,
     });
 
-    await loopRunner.stopLoop(project.id);
+    await containerOrchestrator.stopLoop(project.id);
 
     // Should be in terminal state (STOPPED)
-    expect(loopRunner.getLoopState(project.id)!.status).toBe(LoopStatus.STOPPED);
+    expect(containerOrchestrator.getLoopState(project.id)!.status).toBe(LoopStatus.STOPPED);
 
     // Remove it
-    loopRunner.removeLoop(project.id);
+    containerOrchestrator.removeLoop(project.id);
 
     // Should be gone
-    expect(loopRunner.getLoopState(project.id)).toBeNull();
+    expect(containerOrchestrator.getLoopState(project.id)).toBeNull();
   });
 
   it('should prevent removing active loops', async () => {
@@ -636,17 +535,17 @@ describe('Loop Workflow Integration', () => {
       docker_image: 'ubuntu:22.04',
     });
 
-    await loopRunner.startLoop({
+    await containerOrchestrator.startLoop({
       projectId: project.id,
       projectName: project.name,      dockerImage: 'ubuntu:22.04',
       mode: LoopMode.CONTINUOUS,
     });
 
     // Attempt to remove while running
-    expect(() => loopRunner.removeLoop(project.id)).toThrow(/Cannot remove active loop/);
+    expect(() => containerOrchestrator.removeLoop(project.id)).toThrow(/Cannot remove active loop/);
 
     // Clean up
-    await loopRunner.stopLoop(project.id);
+    await containerOrchestrator.stopLoop(project.id);
   });
 
   // -- Error Handling ---------------------------------------------------------
@@ -662,15 +561,15 @@ describe('Loop Workflow Integration', () => {
     mockDocker.createContainer = vi.fn().mockRejectedValue(new Error('Image not found'));
 
     await expect(
-      loopRunner.startLoop({
+      containerOrchestrator.startLoop({
         projectId: project.id,
         projectName: project.name,        dockerImage: 'ubuntu:22.04',
-        mode: LoopMode.SINGLE,
+        mode: LoopMode.CONTINUOUS,
       }),
     ).rejects.toThrow('Image not found');
 
     // Verify state is FAILED
-    const state = loopRunner.getLoopState(project.id);
+    const state = containerOrchestrator.getLoopState(project.id);
     expect(state).not.toBeNull();
     expect(state!.status).toBe(LoopStatus.FAILED);
     expect(state!.error).toContain('Image not found');
@@ -682,27 +581,27 @@ describe('Loop Workflow Integration', () => {
       docker_image: 'ubuntu:22.04',
     });
 
-    await loopRunner.startLoop({
+    await containerOrchestrator.startLoop({
       projectId: project.id,
       projectName: project.name,      dockerImage: 'ubuntu:22.04',
-      mode: LoopMode.SINGLE,
+      mode: LoopMode.CONTINUOUS,
     });
 
     // Try to start again
     await expect(
-      loopRunner.startLoop({
+      containerOrchestrator.startLoop({
         projectId: project.id,
         projectName: project.name,        dockerImage: 'ubuntu:22.04',
-        mode: LoopMode.SINGLE,
+        mode: LoopMode.CONTINUOUS,
       }),
     ).rejects.toThrow(/already running/);
 
     // Clean up
-    await loopRunner.stopLoop(project.id);
+    await containerOrchestrator.stopLoop(project.id);
   });
 
   it('should throw error when stopping non-existent loop', async () => {
-    await expect(loopRunner.stopLoop('non-existent-project')).rejects.toThrow(
+    await expect(containerOrchestrator.stopLoop('non-existent-project')).rejects.toThrow(
       /No loop found for project/,
     );
   });

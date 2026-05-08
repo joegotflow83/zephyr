@@ -8,7 +8,6 @@ import type { DeployKeyRecord } from '../../services/deploy-key-store';
 import type { PreValidationScript } from '../../services/pre-validation-store';
 import type { HookFile } from '../../services/hooks-store';
 import type { KiroHookFile } from '../../services/kiro-hooks-store';
-import type { LoopScript } from '../../services/loop-scripts-store';
 import type { ClaudeSettingsFile } from '../../services/claude-settings-store';
 import type {
   RuntimeInfo,
@@ -21,7 +20,6 @@ import type {
 import type { CredentialService } from '../../services/credential-manager';
 import type { LoginResult } from '../../services/login-manager';
 import type { LoopState, LoopStartOpts } from '../../shared/loop-types';
-import type { ScheduledLoop } from '../../services/scheduler';
 import type { ParsedLogLine } from '../../services/log-parser';
 import type { TerminalSession, TerminalSessionOpts } from '../../services/terminal-manager';
 import type { UpdateInfo } from '../../services/self-updater';
@@ -112,8 +110,6 @@ declare global {
       };
 
       loops: {
-        /** Start a new loop execution */
-        start: (opts: LoopStartOpts) => Promise<LoopState>;
         /** Stop a running loop. Pass role for factory loops. */
         stop: (projectId: string, role?: string) => Promise<void>;
         /** List all loop states (running and terminal) */
@@ -122,16 +118,6 @@ declare global {
         get: (projectId: string, role?: string) => Promise<LoopState | null>;
         /** Remove a loop from tracking (only terminal states). Pass role for factory loops. */
         remove: (projectId: string, role?: string) => Promise<void>;
-        /** Schedule a loop for recurring execution */
-        schedule: (
-          projectId: string,
-          schedule: string,
-          loopOpts: Omit<LoopStartOpts, 'mode'>,
-        ) => Promise<void>;
-        /** Cancel a scheduled loop */
-        cancelSchedule: (projectId: string) => Promise<void>;
-        /** List all scheduled loops */
-        listScheduled: () => Promise<ScheduledLoop[]>;
 
         // Event listeners
         /** Listen for loop state changes. Returns cleanup function. */
@@ -303,17 +289,6 @@ declare global {
         /** Add or overwrite a hook file */
         add: (filename: string, content: string) => Promise<void>;
         /** Remove a hook file. Returns true if deleted, false if not found. */
-        remove: (filename: string) => Promise<boolean>;
-      };
-
-      loopScripts: {
-        /** List all loop scripts in ~/.zephyr/loop_scripts/ */
-        list: () => Promise<LoopScript[]>;
-        /** Get the content of a specific loop script */
-        get: (filename: string) => Promise<string | null>;
-        /** Add or overwrite a loop script */
-        add: (filename: string, content: string) => Promise<void>;
-        /** Remove a loop script. Returns true if deleted, false if not found. */
         remove: (filename: string) => Promise<boolean>;
       };
 

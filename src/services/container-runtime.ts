@@ -2,7 +2,7 @@
  * ContainerRuntime — the abstraction layer over container backends.
  *
  * Why this exists: Zephyr Desktop originally hard-coded Docker (via dockerode).
- * Adding Podman support required decoupling orchestration code (LoopRunner,
+ * Adding Podman support required decoupling orchestration code (ContainerOrchestrator,
  * ImageBuilder, IPC handlers) from the concrete runtime. This interface is
  * that contract — every new runtime must implement it, and every consumer
  * depends only on it.
@@ -156,7 +156,7 @@ export type ProgressCallback = (event: ProgressEvent) => void;
 /**
  * ContainerRuntime is implemented by DockerRuntime and PodmanRuntime.
  *
- * All orchestration code (LoopRunner, ImageBuilder, IPC handlers) depends only
+ * All orchestration code (ContainerOrchestrator, ImageBuilder, IPC handlers) depends only
  * on this interface — never on a concrete class. The active runtime is chosen
  * at startup from AppSettings.container_runtime and injected everywhere.
  */

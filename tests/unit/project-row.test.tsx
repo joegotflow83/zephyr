@@ -3,9 +3,8 @@
  *
  * Validates:
  * - Project data rendering
- * - Status badges for different loop states
  * - Action button callbacks
- * - Button enabled/disabled states based on loop status
+ * - VM Start/Stop button states and callbacks
  */
 
 import React from 'react';
@@ -14,13 +13,11 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { ProjectRow } from '../../src/renderer/pages/ProjectsTab/ProjectRow';
 import { createProjectConfig } from '../../src/shared/models';
-import { createLoopState, LoopStatus, LoopMode } from '../../src/shared/loop-types';
 import type { VMInfo } from '../../src/services/vm-manager';
 
 describe('ProjectRow', () => {
   const mockOnEdit = vi.fn();
   const mockOnDelete = vi.fn();
-  const mockOnRun = vi.fn();
 
   const defaultProject = createProjectConfig({
     name: 'Test Project',
@@ -41,7 +38,6 @@ describe('ProjectRow', () => {
               project={defaultProject}
               onEdit={mockOnEdit}
               onDelete={mockOnDelete}
-              onRun={mockOnRun}
             />
           </tbody>
         </table>
@@ -58,7 +54,6 @@ describe('ProjectRow', () => {
               project={defaultProject}
               onEdit={mockOnEdit}
               onDelete={mockOnDelete}
-              onRun={mockOnRun}
             />
           </tbody>
         </table>
@@ -75,7 +70,6 @@ describe('ProjectRow', () => {
               project={defaultProject}
               onEdit={mockOnEdit}
               onDelete={mockOnDelete}
-              onRun={mockOnRun}
             />
           </tbody>
         </table>
@@ -97,7 +91,6 @@ describe('ProjectRow', () => {
               project={projectWithLongUrl}
               onEdit={mockOnEdit}
               onDelete={mockOnDelete}
-              onRun={mockOnRun}
             />
           </tbody>
         </table>
@@ -108,142 +101,8 @@ describe('ProjectRow', () => {
     });
   });
 
-  describe('Status Badges', () => {
-    it('shows Idle badge when no loop provided', () => {
-      render(
-        <table>
-          <tbody>
-            <ProjectRow
-              project={defaultProject}
-              onEdit={mockOnEdit}
-              onDelete={mockOnDelete}
-              onRun={mockOnRun}
-            />
-          </tbody>
-        </table>
-      );
-
-      expect(screen.getByText('Idle')).toBeInTheDocument();
-    });
-
-    it('shows Idle badge when loop is in terminal state', () => {
-      const loop: LoopState = {
-        ...createLoopState(defaultProject.id, LoopMode.SINGLE),
-        status: LoopStatus.STOPPED,
-      };
-
-      render(
-        <table>
-          <tbody>
-            <ProjectRow
-              project={defaultProject}
-              loop={loop}
-              onEdit={mockOnEdit}
-              onDelete={mockOnDelete}
-              onRun={mockOnRun}
-            />
-          </tbody>
-        </table>
-      );
-
-      expect(screen.getByText('Idle')).toBeInTheDocument();
-    });
-
-    it('shows Starting badge when loop is starting', () => {
-      const loop: LoopState = {
-        ...createLoopState(defaultProject.id, LoopMode.CONTINUOUS),
-        status: LoopStatus.STARTING,
-      };
-
-      render(
-        <table>
-          <tbody>
-            <ProjectRow
-              project={defaultProject}
-              loop={loop}
-              onEdit={mockOnEdit}
-              onDelete={mockOnDelete}
-              onRun={mockOnRun}
-            />
-          </tbody>
-        </table>
-      );
-
-      expect(screen.getByText('Starting')).toBeInTheDocument();
-    });
-
-    it('shows Running badge when loop is running', () => {
-      const loop: LoopState = {
-        ...createLoopState(defaultProject.id, LoopMode.CONTINUOUS),
-        status: LoopStatus.RUNNING,
-      };
-
-      render(
-        <table>
-          <tbody>
-            <ProjectRow
-              project={defaultProject}
-              loop={loop}
-              onEdit={mockOnEdit}
-              onDelete={mockOnDelete}
-              onRun={mockOnRun}
-            />
-          </tbody>
-        </table>
-      );
-
-      expect(screen.getByText('Running')).toBeInTheDocument();
-    });
-
-    it('shows Paused badge when loop is paused', () => {
-      const loop: LoopState = {
-        ...createLoopState(defaultProject.id, LoopMode.CONTINUOUS),
-        status: LoopStatus.PAUSED,
-      };
-
-      render(
-        <table>
-          <tbody>
-            <ProjectRow
-              project={defaultProject}
-              loop={loop}
-              onEdit={mockOnEdit}
-              onDelete={mockOnDelete}
-              onRun={mockOnRun}
-            />
-          </tbody>
-        </table>
-      );
-
-      expect(screen.getByText('Paused')).toBeInTheDocument();
-    });
-
-    it('shows Stopping badge when loop is stopping', () => {
-      const loop: LoopState = {
-        ...createLoopState(defaultProject.id, LoopMode.CONTINUOUS),
-        status: LoopStatus.STOPPING,
-      };
-
-      render(
-        <table>
-          <tbody>
-            <ProjectRow
-              project={defaultProject}
-              loop={loop}
-              onEdit={mockOnEdit}
-              onDelete={mockOnDelete}
-              onRun={mockOnRun}
-            />
-          </tbody>
-        </table>
-      );
-
-      expect(screen.getByText('Stopping')).toBeInTheDocument();
-    });
-  });
-
   describe('Action Buttons', () => {
-    it('renders all action buttons', () => {
+    it('renders Edit and Delete buttons', () => {
       render(
         <table>
           <tbody>
@@ -251,38 +110,13 @@ describe('ProjectRow', () => {
               project={defaultProject}
               onEdit={mockOnEdit}
               onDelete={mockOnDelete}
-              onRun={mockOnRun}
             />
           </tbody>
         </table>
       );
 
-      expect(screen.getByRole('button', { name: /Run/i })).toBeInTheDocument();
       expect(screen.getByRole('button', { name: /Edit/i })).toBeInTheDocument();
       expect(screen.getByRole('button', { name: /Delete/i })).toBeInTheDocument();
-    });
-
-    it('calls onRun when Run button is clicked', async () => {
-      const user = userEvent.setup();
-
-      render(
-        <table>
-          <tbody>
-            <ProjectRow
-              project={defaultProject}
-              onEdit={mockOnEdit}
-              onDelete={mockOnDelete}
-              onRun={mockOnRun}
-            />
-          </tbody>
-        </table>
-      );
-
-      const runButton = screen.getByRole('button', { name: /Run/i });
-      await user.click(runButton);
-
-      expect(mockOnRun).toHaveBeenCalledWith(defaultProject);
-      expect(mockOnRun).toHaveBeenCalledTimes(1);
     });
 
     it('calls onEdit when Edit button is clicked', async () => {
@@ -295,7 +129,6 @@ describe('ProjectRow', () => {
               project={defaultProject}
               onEdit={mockOnEdit}
               onDelete={mockOnDelete}
-              onRun={mockOnRun}
             />
           </tbody>
         </table>
@@ -318,7 +151,6 @@ describe('ProjectRow', () => {
               project={defaultProject}
               onEdit={mockOnEdit}
               onDelete={mockOnDelete}
-              onRun={mockOnRun}
             />
           </tbody>
         </table>
@@ -329,167 +161,6 @@ describe('ProjectRow', () => {
 
       expect(mockOnDelete).toHaveBeenCalledWith(defaultProject);
       expect(mockOnDelete).toHaveBeenCalledTimes(1);
-    });
-
-    it('disables Run button when loop is starting', () => {
-      const loop: LoopState = {
-        ...createLoopState(defaultProject.id, LoopMode.SINGLE),
-        status: LoopStatus.STARTING,
-      };
-
-      render(
-        <table>
-          <tbody>
-            <ProjectRow
-              project={defaultProject}
-              loop={loop}
-              onEdit={mockOnEdit}
-              onDelete={mockOnDelete}
-              onRun={mockOnRun}
-            />
-          </tbody>
-        </table>
-      );
-
-      expect(screen.getByRole('button', { name: /Run/i })).toBeDisabled();
-    });
-
-    it('disables Run button when loop is running', () => {
-      const loop: LoopState = {
-        ...createLoopState(defaultProject.id, LoopMode.CONTINUOUS),
-        status: LoopStatus.RUNNING,
-      };
-
-      render(
-        <table>
-          <tbody>
-            <ProjectRow
-              project={defaultProject}
-              loop={loop}
-              onEdit={mockOnEdit}
-              onDelete={mockOnDelete}
-              onRun={mockOnRun}
-            />
-          </tbody>
-        </table>
-      );
-
-      expect(screen.getByRole('button', { name: /Run/i })).toBeDisabled();
-    });
-
-    it('disables Run button when loop is paused', () => {
-      const loop: LoopState = {
-        ...createLoopState(defaultProject.id, LoopMode.CONTINUOUS),
-        status: LoopStatus.PAUSED,
-      };
-
-      render(
-        <table>
-          <tbody>
-            <ProjectRow
-              project={defaultProject}
-              loop={loop}
-              onEdit={mockOnEdit}
-              onDelete={mockOnDelete}
-              onRun={mockOnRun}
-            />
-          </tbody>
-        </table>
-      );
-
-      expect(screen.getByRole('button', { name: /Run/i })).toBeDisabled();
-    });
-
-    it('disables Run button when loop is stopping', () => {
-      const loop: LoopState = {
-        ...createLoopState(defaultProject.id, LoopMode.CONTINUOUS),
-        status: LoopStatus.STOPPING,
-      };
-
-      render(
-        <table>
-          <tbody>
-            <ProjectRow
-              project={defaultProject}
-              loop={loop}
-              onEdit={mockOnEdit}
-              onDelete={mockOnDelete}
-              onRun={mockOnRun}
-            />
-          </tbody>
-        </table>
-      );
-
-      expect(screen.getByRole('button', { name: /Run/i })).toBeDisabled();
-    });
-
-    it('enables Run button when loop is stopped', () => {
-      const loop: LoopState = {
-        ...createLoopState(defaultProject.id, LoopMode.SINGLE),
-        status: LoopStatus.STOPPED,
-      };
-
-      render(
-        <table>
-          <tbody>
-            <ProjectRow
-              project={defaultProject}
-              loop={loop}
-              onEdit={mockOnEdit}
-              onDelete={mockOnDelete}
-              onRun={mockOnRun}
-            />
-          </tbody>
-        </table>
-      );
-
-      expect(screen.getByRole('button', { name: /Run/i })).not.toBeDisabled();
-    });
-
-    it('enables Run button when loop is completed', () => {
-      const loop: LoopState = {
-        ...createLoopState(defaultProject.id, LoopMode.SINGLE),
-        status: LoopStatus.COMPLETED,
-      };
-
-      render(
-        <table>
-          <tbody>
-            <ProjectRow
-              project={defaultProject}
-              loop={loop}
-              onEdit={mockOnEdit}
-              onDelete={mockOnDelete}
-              onRun={mockOnRun}
-            />
-          </tbody>
-        </table>
-      );
-
-      expect(screen.getByRole('button', { name: /Run/i })).not.toBeDisabled();
-    });
-
-    it('enables Run button when loop is failed', () => {
-      const loop: LoopState = {
-        ...createLoopState(defaultProject.id, LoopMode.SINGLE),
-        status: LoopStatus.FAILED,
-      };
-
-      render(
-        <table>
-          <tbody>
-            <ProjectRow
-              project={defaultProject}
-              loop={loop}
-              onEdit={mockOnEdit}
-              onDelete={mockOnDelete}
-              onRun={mockOnRun}
-            />
-          </tbody>
-        </table>
-      );
-
-      expect(screen.getByRole('button', { name: /Run/i })).not.toBeDisabled();
     });
   });
 
@@ -502,38 +173,13 @@ describe('ProjectRow', () => {
               project={defaultProject}
               onEdit={mockOnEdit}
               onDelete={mockOnDelete}
-              onRun={mockOnRun}
             />
           </tbody>
         </table>
       );
 
-      expect(screen.getByRole('button', { name: /Run/i })).toHaveAttribute('title', 'Run this project');
       expect(screen.getByRole('button', { name: /Edit/i })).toHaveAttribute('title', 'Edit project');
       expect(screen.getByRole('button', { name: /Delete/i })).toHaveAttribute('title', 'Delete project');
-    });
-
-    it('shows disabled tooltip when project is running', () => {
-      const loop: LoopState = {
-        ...createLoopState(defaultProject.id, LoopMode.CONTINUOUS),
-        status: LoopStatus.RUNNING,
-      };
-
-      render(
-        <table>
-          <tbody>
-            <ProjectRow
-              project={defaultProject}
-              loop={loop}
-              onEdit={mockOnEdit}
-              onDelete={mockOnDelete}
-              onRun={mockOnRun}
-            />
-          </tbody>
-        </table>
-      );
-
-      expect(screen.getByRole('button', { name: /Run/i })).toHaveAttribute('title', 'Already running');
     });
   });
 
@@ -576,7 +222,6 @@ describe('ProjectRow', () => {
               project={persistentVMProject}
               onEdit={mockOnEdit}
               onDelete={mockOnDelete}
-              onRun={mockOnRun}
               onStartVM={mockOnStartVM}
               onStopVM={mockOnStopVM}
             />
@@ -596,7 +241,6 @@ describe('ProjectRow', () => {
               project={defaultProject}
               onEdit={mockOnEdit}
               onDelete={mockOnDelete}
-              onRun={mockOnRun}
             />
           </tbody>
         </table>
@@ -604,89 +248,6 @@ describe('ProjectRow', () => {
 
       expect(screen.queryByRole('button', { name: /Start VM/i })).not.toBeInTheDocument();
       expect(screen.queryByRole('button', { name: /Stop VM/i })).not.toBeInTheDocument();
-    });
-
-    it('shows VM Running badge when VM is running', () => {
-      render(
-        <table>
-          <tbody>
-            <ProjectRow
-              project={persistentVMProject}
-              vmInfo={runningVMInfo}
-              onEdit={mockOnEdit}
-              onDelete={mockOnDelete}
-              onRun={mockOnRun}
-              onStartVM={mockOnStartVM}
-              onStopVM={mockOnStopVM}
-            />
-          </tbody>
-        </table>
-      );
-
-      // VM status badge showing "Running"
-      const badges = screen.getAllByText('Running');
-      expect(badges.length).toBeGreaterThan(0);
-    });
-
-    it('shows VM Stopped badge when VM is stopped', () => {
-      render(
-        <table>
-          <tbody>
-            <ProjectRow
-              project={persistentVMProject}
-              vmInfo={stoppedVMInfo}
-              onEdit={mockOnEdit}
-              onDelete={mockOnDelete}
-              onRun={mockOnRun}
-              onStartVM={mockOnStartVM}
-              onStopVM={mockOnStopVM}
-            />
-          </tbody>
-        </table>
-      );
-
-      expect(screen.getByText('Stopped')).toBeInTheDocument();
-    });
-
-    it('disables Run button when VM is stopped', () => {
-      render(
-        <table>
-          <tbody>
-            <ProjectRow
-              project={persistentVMProject}
-              vmInfo={stoppedVMInfo}
-              onEdit={mockOnEdit}
-              onDelete={mockOnDelete}
-              onRun={mockOnRun}
-              onStartVM={mockOnStartVM}
-              onStopVM={mockOnStopVM}
-            />
-          </tbody>
-        </table>
-      );
-
-      expect(screen.getByRole('button', { name: /Run/i })).toBeDisabled();
-      expect(screen.getByRole('button', { name: /Run/i })).toHaveAttribute('title', 'Start the VM first');
-    });
-
-    it('enables Run button when VM is running', () => {
-      render(
-        <table>
-          <tbody>
-            <ProjectRow
-              project={persistentVMProject}
-              vmInfo={runningVMInfo}
-              onEdit={mockOnEdit}
-              onDelete={mockOnDelete}
-              onRun={mockOnRun}
-              onStartVM={mockOnStartVM}
-              onStopVM={mockOnStopVM}
-            />
-          </tbody>
-        </table>
-      );
-
-      expect(screen.getByRole('button', { name: /Run/i })).not.toBeDisabled();
     });
 
     it('disables Start VM button when VM is already running', () => {
@@ -698,7 +259,6 @@ describe('ProjectRow', () => {
               vmInfo={runningVMInfo}
               onEdit={mockOnEdit}
               onDelete={mockOnDelete}
-              onRun={mockOnRun}
               onStartVM={mockOnStartVM}
               onStopVM={mockOnStopVM}
             />
@@ -707,32 +267,6 @@ describe('ProjectRow', () => {
       );
 
       expect(screen.getByRole('button', { name: /Start VM/i })).toBeDisabled();
-    });
-
-    it('disables Stop VM button when loop is actively running', () => {
-      const loop: LoopState = {
-        ...createLoopState(persistentVMProject.id, LoopMode.CONTINUOUS),
-        status: LoopStatus.RUNNING,
-      };
-
-      render(
-        <table>
-          <tbody>
-            <ProjectRow
-              project={persistentVMProject}
-              loop={loop}
-              vmInfo={runningVMInfo}
-              onEdit={mockOnEdit}
-              onDelete={mockOnDelete}
-              onRun={mockOnRun}
-              onStartVM={mockOnStartVM}
-              onStopVM={mockOnStopVM}
-            />
-          </tbody>
-        </table>
-      );
-
-      expect(screen.getByRole('button', { name: /Stop VM/i })).toBeDisabled();
     });
 
     it('calls onStartVM when Start VM button is clicked', async () => {
@@ -746,7 +280,6 @@ describe('ProjectRow', () => {
               vmInfo={stoppedVMInfo}
               onEdit={mockOnEdit}
               onDelete={mockOnDelete}
-              onRun={mockOnRun}
               onStartVM={mockOnStartVM}
               onStopVM={mockOnStopVM}
             />
@@ -772,7 +305,6 @@ describe('ProjectRow', () => {
               vmInfo={runningVMInfo}
               onEdit={mockOnEdit}
               onDelete={mockOnDelete}
-              onRun={mockOnRun}
               onStartVM={mockOnStartVM}
               onStopVM={mockOnStopVM}
             />
@@ -797,7 +329,6 @@ describe('ProjectRow', () => {
               isStartingVM={true}
               onEdit={mockOnEdit}
               onDelete={mockOnDelete}
-              onRun={mockOnRun}
               onStartVM={mockOnStartVM}
               onStopVM={mockOnStopVM}
             />
@@ -819,7 +350,6 @@ describe('ProjectRow', () => {
               isStoppingVM={true}
               onEdit={mockOnEdit}
               onDelete={mockOnDelete}
-              onRun={mockOnRun}
               onStartVM={mockOnStartVM}
               onStopVM={mockOnStopVM}
             />

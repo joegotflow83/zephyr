@@ -3,7 +3,7 @@
  *
  * This store manages:
  * - Projects list (from ProjectStore)
- * - Loop states (from LoopRunner)
+ * - Loop states (from ContainerOrchestrator)
  * - App settings (from ConfigManager)
  * - Container runtime connection status (from RuntimeHealthMonitor)
  *

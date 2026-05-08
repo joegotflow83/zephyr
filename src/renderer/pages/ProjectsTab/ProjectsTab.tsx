@@ -1,15 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { ProjectRow } from './ProjectRow';
 import { useProjects } from '../../hooks/useProjects';
-import { useLoops } from '../../hooks/useLoops';
 import { useAppStore } from '../../stores/app-store';
 import { ProjectDialog } from '../../components/ProjectDialog/ProjectDialog';
 import { ConfirmDialog } from '../../components/ConfirmDialog/ConfirmDialog';
-import { RunModeDialog } from '../../components/RunModeDialog/RunModeDialog';
-import type { RunModeSelection } from '../../components/RunModeDialog/RunModeDialog';
 import type { ProjectConfig } from '../../../shared/models';
-import type { LoopStartOpts } from '../../../shared/loop-types';
-import { LoopMode, LoopStatus, createLoopState } from '../../../shared/loop-types';
 
 interface ToastMethods {
   success: (message: string) => void;
@@ -19,7 +14,6 @@ interface ToastMethods {
 }
 
 interface ProjectsTabProps {
-  onRunProject?: () => void;
   toast: ToastMethods;
 }
 
@@ -27,15 +21,11 @@ interface ProjectsTabProps {
  * Projects tab page component.
  * Displays a table of all configured projects with CRUD actions.
  */
-export const ProjectsTab: React.FC<ProjectsTabProps> = ({ onRunProject, toast }) => {
+export const ProjectsTab: React.FC<ProjectsTabProps> = ({ toast }) => {
   const { projects, loading, error, refresh } = useProjects();
-  const { getForProject: getLoop, factoryStart, schedule } = useLoops();
   const removeLoop = useAppStore((state) => state.removeLoop);
-  const updateLoop = useAppStore((state) => state.updateLoop);
   const vmInfos = useAppStore((state) => state.vmInfos);
   const multipassAvailable = useAppStore((state) => state.multipassAvailable);
-  const pipelines = useAppStore((state) => state.pipelines);
-  const kiroDbPath = useAppStore((state) => state.settings?.kiro_db_path);
 
   // Dialog state
   const [dialogMode, setDialogMode] = useState<'add' | 'edit' | null>(null);
@@ -51,9 +41,6 @@ export const ProjectsTab: React.FC<ProjectsTabProps> = ({ onRunProject, toast })
   const [actionLoading, setActionLoading] = useState<{
     [key: string]: boolean;
   }>({});
-
-  // Run mode dialog state
-  const [runModeProject, setRunModeProject] = useState<ProjectConfig | null>(null);
 
   // Load projects on mount
   useEffect(() => {
@@ -98,81 +85,11 @@ export const ProjectsTab: React.FC<ProjectsTabProps> = ({ onRunProject, toast })
     setConfirmDialog(null);
   };
 
-  const handleRun = (project: ProjectConfig) => {
+  const handleStartVM = async (project: ProjectConfig) => {
     if (project.sandbox_type === 'vm' && !multipassAvailable) {
       toast.error('Multipass is not installed. Visit multipass.run to install.');
       return;
     }
-    setRunModeProject(project);
-  };
-
-  const handleRunModeConfirm = async (selection: RunModeSelection) => {
-    const project = runModeProject;
-    setRunModeProject(null);
-    if (!project) return;
-
-    setActionLoading({ ...actionLoading, [`run-${project.id}`]: true });
-
-    try {
-      const extraMounts = [
-        ...(project.additional_mounts ?? []).map((hostPath) => {
-          const basename = hostPath.split('/').filter(Boolean).pop() ?? hostPath;
-          return `${hostPath}:/mnt/${basename}`;
-        }),
-        ...(kiroDbPath ? [`${kiroDbPath}:/home/ralph/.local/share/kiro-cli/data.sqlite3:ro`] : []),
-      ];
-      const baseOpts = {
-        projectId: project.id,
-        projectName: project.name,
-        dockerImage: project.docker_image || '',
-        ...(project.local_path || extraMounts.length > 0
-          ? {
-              volumeMounts: [
-                ...(project.local_path ? [`${project.local_path}:/workspace`] : []),
-                ...extraMounts,
-              ],
-              ...(project.local_path ? { workDir: '/workspace' } : {}),
-            }
-          : {}),
-        ...(project.sandbox_type === 'vm'
-          ? { sandboxType: 'vm' as const, vmConfig: project.vm_config }
-          : {}),
-      };
-      if (selection.mode === LoopMode.SCHEDULED && selection.scheduleExpression) {
-        await schedule(project.id, selection.scheduleExpression, baseOpts);
-        toast.success(`Loop scheduled for "${project.name}"`);
-      } else if (selection.factory) {
-        await factoryStart(project.id, {
-          ...baseOpts,
-          mode: selection.mode,
-        });
-        toast.success(`Loop started for "${project.name}"`);
-      } else {
-        const opts: LoopStartOpts = {
-          ...baseOpts,
-          mode: selection.mode,
-          ...(selection.role ? { role: selection.role } : {}),
-          ...(selection.maxIterations !== undefined
-            ? { envVars: { MAX_ITERATIONS: String(selection.maxIterations) } }
-            : {}),
-          ...(selection.cmd ? { cmd: selection.cmd } : {}),
-        };
-        updateLoop({ ...createLoopState(project.id, selection.mode, project.name, selection.role), status: LoopStatus.STARTING });
-        await window.api.loops.start(opts);
-        toast.success(`Loop started for "${project.name}"`);
-      }
-      if (onRunProject) {
-        onRunProject();
-      }
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Unknown error';
-      toast.error(`Failed to start loop: ${message}`);
-    } finally {
-      setActionLoading({ ...actionLoading, [`run-${project.id}`]: false });
-    }
-  };
-
-  const handleStartVM = async (project: ProjectConfig) => {
     setActionLoading({ ...actionLoading, [`startvm-${project.id}`]: true });
 
     try {
@@ -301,9 +218,6 @@ export const ProjectsTab: React.FC<ProjectsTabProps> = ({ onRunProject, toast })
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                       Docker Image
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                      Status
-                    </th>
                     <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                       Actions
                     </th>
@@ -322,14 +236,12 @@ export const ProjectsTab: React.FC<ProjectsTabProps> = ({ onRunProject, toast })
                       <ProjectRow
                         key={project.id}
                         project={project}
-                        loop={getLoop(project.id)}
                         vmInfo={projectVMInfo}
                         isDeleting={!!actionLoading[`delete-${project.id}`]}
                         isStartingVM={!!actionLoading[`startvm-${project.id}`]}
                         isStoppingVM={!!actionLoading[`stopvm-${project.id}`]}
                         onEdit={handleEdit}
                         onDelete={handleDelete}
-                        onRun={handleRun}
                         onStartVM={handleStartVM}
                         onStopVM={handleStopVM}
                       />
@@ -363,21 +275,6 @@ export const ProjectsTab: React.FC<ProjectsTabProps> = ({ onRunProject, toast })
           loading={!!actionLoading[`delete-${confirmDialog.project.id}`]}
           onConfirm={handleConfirmDelete}
           onCancel={handleCancelDelete}
-        />
-      )}
-
-      {/* Run Mode Dialog */}
-      {runModeProject && (
-        <RunModeDialog
-          projectName={runModeProject.name}
-          promptFiles={Object.keys(runModeProject.custom_prompts)}
-          factoryEnabled={
-            !!runModeProject.factory_config?.enabled &&
-            !!runModeProject.pipelineId &&
-            pipelines.some((p) => p.id === runModeProject.pipelineId)
-          }
-          onConfirm={handleRunModeConfirm}
-          onCancel={() => setRunModeProject(null)}
         />
       )}
     </div>

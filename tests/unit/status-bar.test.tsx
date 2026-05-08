@@ -120,50 +120,50 @@ describe('StatusBar Component', () => {
     });
   });
 
-  describe('Active Loop Count Display', () => {
-    it('does not display loop count when no loops are active', () => {
-      render(<StatusBar activeLoopCount={0} />);
+  describe('Active Factory Count Display', () => {
+    it('does not display factory count when no factories are active', () => {
+      render(<StatusBar activeFactoryCount={0} />);
 
-      expect(screen.queryByText(/loop/i)).not.toBeInTheDocument();
+      expect(screen.queryByText(/factor/i)).not.toBeInTheDocument();
     });
 
-    it('displays singular "loop" when 1 loop is active', async () => {
-      render(<StatusBar activeLoopCount={1} />);
+    it('displays singular "factory" when 1 factory is active', async () => {
+      render(<StatusBar activeFactoryCount={1} />);
 
       await waitFor(() => {
-        expect(screen.getByText('1 loop running')).toBeInTheDocument();
+        expect(screen.getByText('1 factory running')).toBeInTheDocument();
       });
     });
 
-    it('displays plural "loops" when multiple loops are active', async () => {
-      render(<StatusBar activeLoopCount={3} />);
+    it('displays plural "factories" when multiple factories are active', async () => {
+      render(<StatusBar activeFactoryCount={3} />);
 
       await waitFor(() => {
-        expect(screen.getByText('3 loops running')).toBeInTheDocument();
+        expect(screen.getByText('3 factories running')).toBeInTheDocument();
       });
     });
 
-    it('shows pulsing indicator for active loops', async () => {
-      render(<StatusBar activeLoopCount={2} />);
+    it('shows pulsing indicator for active factories', async () => {
+      render(<StatusBar activeFactoryCount={2} />);
 
       await waitFor(() => {
-        const indicator = screen.getByText('2 loops running')
+        const indicator = screen.getByText('2 factories running')
           .previousSibling as HTMLElement;
         expect(indicator).toHaveClass('bg-blue-500', 'animate-pulse');
       });
     });
 
-    it('updates loop count when prop changes', async () => {
-      const { rerender } = render(<StatusBar activeLoopCount={1} />);
+    it('updates factory count when prop changes', async () => {
+      const { rerender } = render(<StatusBar activeFactoryCount={1} />);
 
       await waitFor(() => {
-        expect(screen.getByText('1 loop running')).toBeInTheDocument();
+        expect(screen.getByText('1 factory running')).toBeInTheDocument();
       });
 
-      rerender(<StatusBar activeLoopCount={5} />);
+      rerender(<StatusBar activeFactoryCount={5} />);
 
       await waitFor(() => {
-        expect(screen.getByText('5 loops running')).toBeInTheDocument();
+        expect(screen.getByText('5 factories running')).toBeInTheDocument();
       });
     });
   });
@@ -245,11 +245,11 @@ describe('StatusBar Component', () => {
     });
 
     it('renders all sections simultaneously when all props provided', async () => {
-      render(<StatusBar activeLoopCount={2} appVersion="1.0.0" />);
+      render(<StatusBar activeFactoryCount={2} appVersion="1.0.0" />);
 
       await waitFor(() => {
         expect(screen.getByText(/Docker Connected/i)).toBeInTheDocument();
-        expect(screen.getByText('2 loops running')).toBeInTheDocument();
+        expect(screen.getByText('2 factories running')).toBeInTheDocument();
         expect(screen.getByText('Zephyr v1.0.0')).toBeInTheDocument();
       });
     });

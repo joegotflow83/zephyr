@@ -147,15 +147,13 @@ const {
   mockCredentialManager,
   mockLoginManager,
   mockLogParser,
-  mockLoopRunner,
-  mockScheduler,
+  mockContainerOrchestrator,
   mockLogExporter,
   mockTerminalManager,
   mockSelfUpdater,
   mockCleanupManager,
   mockPreValidationStore,
   mockHooksStore,
-  mockLoopScriptsStore,
   mockClaudeSettingsStore,
   mockVmManager,
   mockSshKeyManager,
@@ -172,15 +170,13 @@ const {
   MockCredentialManager,
   MockLoginManager,
   MockLogParser,
-  MockLoopRunner,
-  MockLoopScheduler,
+  MockContainerOrchestrator,
   MockLogExporter,
   MockTerminalManager,
   MockSelfUpdater,
   MockCleanupManager,
   MockPreValidationStore,
   MockHooksStore,
-  MockLoopScriptsStore,
   MockClaudeSettingsStore,
   MockVMManager,
   MockSSHKeyManager,
@@ -248,18 +244,12 @@ const {
     parseStream: vi.fn(),
   };
 
-  const mockLoopRunner = {
+  const mockContainerOrchestrator = {
     start: vi.fn(),
     stop: vi.fn(),
     list: vi.fn(),
     get: vi.fn(),
     remove: vi.fn(),
-  };
-
-  const mockScheduler = {
-    schedule: vi.fn(),
-    cancel: vi.fn(),
-    list: vi.fn(),
   };
 
   const mockLogExporter = {
@@ -301,8 +291,7 @@ const {
   const MockCredentialManager = vi.fn(function() { return mockCredentialManager; });
   const MockLoginManager = vi.fn(function() { return mockLoginManager; });
   const MockLogParser = vi.fn(function() { return mockLogParser; });
-  const MockLoopRunner = vi.fn(function() { return mockLoopRunner; });
-  const MockLoopScheduler = vi.fn(function() { return mockScheduler; });
+  const MockContainerOrchestrator = vi.fn(function() { return mockContainerOrchestrator; });
   const MockLogExporter = vi.fn(function() { return mockLogExporter; });
   const MockTerminalManager = vi.fn(function() { return mockTerminalManager; });
   const MockSelfUpdater = vi.fn(function() { return mockSelfUpdater; });
@@ -313,9 +302,6 @@ const {
 
   const mockHooksStore = {};
   const MockHooksStore = vi.fn(function() { return mockHooksStore; });
-
-  const mockLoopScriptsStore = {};
-  const MockLoopScriptsStore = vi.fn(function() { return mockLoopScriptsStore; });
 
   const mockClaudeSettingsStore = {};
   const MockClaudeSettingsStore = vi.fn(function() { return mockClaudeSettingsStore; });
@@ -353,15 +339,13 @@ const {
     mockCredentialManager,
     mockLoginManager,
     mockLogParser,
-    mockLoopRunner,
-    mockScheduler,
+    mockContainerOrchestrator,
     mockLogExporter,
     mockTerminalManager,
     mockSelfUpdater,
     mockCleanupManager,
     mockPreValidationStore,
     mockHooksStore,
-    mockLoopScriptsStore,
     mockClaudeSettingsStore,
     mockVmManager,
     mockSshKeyManager,
@@ -378,15 +362,13 @@ const {
     MockCredentialManager,
     MockLoginManager,
     MockLogParser,
-    MockLoopRunner,
-    MockLoopScheduler,
+    MockContainerOrchestrator,
     MockLogExporter,
     MockTerminalManager,
     MockSelfUpdater,
     MockCleanupManager,
     MockPreValidationStore,
     MockHooksStore,
-    MockLoopScriptsStore,
     MockClaudeSettingsStore,
     MockVMManager,
     MockSSHKeyManager,
@@ -435,12 +417,8 @@ vi.mock('../../src/services/log-parser', () => ({
   LogParser: MockLogParser,
 }));
 
-vi.mock('../../src/services/loop-runner', () => ({
-  LoopRunner: MockLoopRunner,
-}));
-
-vi.mock('../../src/services/scheduler', () => ({
-  LoopScheduler: MockLoopScheduler,
+vi.mock('../../src/services/container-orchestrator', () => ({
+  ContainerOrchestrator: MockContainerOrchestrator,
 }));
 
 vi.mock('../../src/services/log-exporter', () => ({
@@ -465,10 +443,6 @@ vi.mock('../../src/services/pre-validation-store', () => ({
 
 vi.mock('../../src/services/hooks-store', () => ({
   HooksStore: MockHooksStore,
-}));
-
-vi.mock('../../src/services/loop-scripts-store', () => ({
-  LoopScriptsStore: MockLoopScriptsStore,
 }));
 
 vi.mock('../../src/services/claude-settings-store', () => ({
@@ -682,12 +656,8 @@ describe('Main Entry Point', () => {
       expect(MockLogParser).toHaveBeenCalled();
     });
 
-    it('should instantiate LoopRunner with ContainerRuntime, LogParser, max concurrent 16, and VMManager', () => {
-      expect(MockLoopRunner).toHaveBeenCalledWith(mockDockerRuntime, mockLogParser, 16, mockVmManager);
-    });
-
-    it('should instantiate LoopScheduler with LoopRunner', () => {
-      expect(MockLoopScheduler).toHaveBeenCalledWith(mockLoopRunner);
+    it('should instantiate ContainerOrchestrator with ContainerRuntime, LogParser, max concurrent 16, and VMManager', () => {
+      expect(MockContainerOrchestrator).toHaveBeenCalledWith(mockDockerRuntime, mockLogParser, 16, mockVmManager);
     });
 
     it('should instantiate LogExporter', () => {
@@ -698,8 +668,8 @@ describe('Main Entry Point', () => {
       expect(MockTerminalManager).toHaveBeenCalledWith(mockDockerRuntime);
     });
 
-    it('should instantiate SelfUpdater with app path and LoopRunner', () => {
-      expect(MockSelfUpdater).toHaveBeenCalledWith('/mock/app/path', mockLoopRunner);
+    it('should instantiate SelfUpdater with app path and ContainerOrchestrator', () => {
+      expect(MockSelfUpdater).toHaveBeenCalledWith('/mock/app/path', mockContainerOrchestrator);
     });
 
     it('should instantiate CleanupManager with ContainerRuntime', () => {
@@ -708,7 +678,7 @@ describe('Main Entry Point', () => {
   });
 
   describe('IPC Handler Registration', () => {
-    it('should register data handlers with ConfigManager, ProjectStore, ImportExport, PreValidationStore, HooksStore, LoopRunner, ContainerRuntime, CredentialManager, SSHKeyManager, and DeployKeyStore', () => {
+    it('should register data handlers with ConfigManager, ProjectStore, ImportExport, PreValidationStore, HooksStore, ContainerOrchestrator, ContainerRuntime, CredentialManager, SSHKeyManager, and DeployKeyStore', () => {
       expect(mockRegisterDataHandlers).toHaveBeenCalledWith({
         configManager: mockConfigManager,
         projectStore: mockProjectStore,
@@ -716,9 +686,8 @@ describe('Main Entry Point', () => {
         preValidationStore: mockPreValidationStore,
         hooksStore: mockHooksStore,
         kiroHooksStore: mockKiroHooksStore,
-        loopScriptsStore: mockLoopScriptsStore,
         claudeSettingsStore: mockClaudeSettingsStore,
-        loopRunner: mockLoopRunner,
+        containerOrchestrator: mockContainerOrchestrator,
         runtime: mockDockerRuntime,
         credentialManager: mockCredentialManager,
         sshKeyManager: mockSshKeyManager,
@@ -740,11 +709,10 @@ describe('Main Entry Point', () => {
       });
     });
 
-    it('should register loop handlers with LoopRunner, Scheduler, CleanupManager, and injection services', () => {
+    it('should register loop handlers with ContainerOrchestrator, CleanupManager, and injection services', () => {
       expect(mockRegisterLoopHandlers).toHaveBeenCalledWith(
         expect.objectContaining({
-          loopRunner: mockLoopRunner,
-          scheduler: mockScheduler,
+          containerOrchestrator: mockContainerOrchestrator,
           cleanupManager: mockCleanupManager,
           projectStore: mockProjectStore,
           preValidationStore: mockPreValidationStore,
@@ -754,10 +722,10 @@ describe('Main Entry Point', () => {
       );
     });
 
-    it('should register log handlers with LogExporter and LoopRunner', () => {
+    it('should register log handlers with LogExporter and ContainerOrchestrator', () => {
       expect(mockRegisterLogHandlers).toHaveBeenCalledWith({
         logExporter: mockLogExporter,
-        loopRunner: mockLoopRunner,
+        containerOrchestrator: mockContainerOrchestrator,
       });
     });
 
@@ -774,10 +742,10 @@ describe('Main Entry Point', () => {
       });
     });
 
-    it('should register VM handlers with VMManager and LoopRunner', () => {
+    it('should register VM handlers with VMManager and ContainerOrchestrator', () => {
       expect(mockRegisterVMHandlers).toHaveBeenCalledWith({
         vmManager: mockVmManager,
-        loopRunner: mockLoopRunner,
+        containerOrchestrator: mockContainerOrchestrator,
       });
     });
 

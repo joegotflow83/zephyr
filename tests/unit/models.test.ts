@@ -186,7 +186,6 @@ describe('createProjectConfig', () => {
         updated_at: '2024-06-01T00:00:00.000Z',
         local_path: undefined,
         image_id: undefined,
-        loop_script: undefined,
         claude_settings_file: undefined,
         github_pat: undefined,
         gitlab_pat: undefined,

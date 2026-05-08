@@ -18,7 +18,7 @@ interface OpenTerminalSession extends TerminalSession {
   vmName?: string;
 }
 
-/** Derive the Docker container name from a loop state (mirrors LoopRunner.deriveContainerName). */
+/** Derive the Docker container name from a loop state (mirrors ContainerOrchestrator.deriveContainerName). */
 function deriveContainerName(loop: LoopState): string {
   return (
     loop.projectName

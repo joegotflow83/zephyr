@@ -7,7 +7,7 @@
  * project ID "zephyr-self-update".
  */
 
-import type { LoopRunner } from './loop-runner';
+import type { ContainerOrchestrator } from './container-orchestrator';
 import { LoopMode } from '../shared/loop-types';
 import path from 'path';
 import { readFileSync } from 'fs';
@@ -28,7 +28,7 @@ export interface UpdateInfo {
 
 /**
  * Reserved project ID for self-update operations.
- * This ID is used by the LoopRunner when executing self-updates.
+ * This ID is used by the ContainerOrchestrator when executing self-updates.
  */
 export const SELF_UPDATE_PROJECT_ID = 'zephyr-self-update';
 
@@ -55,34 +55,34 @@ const GITHUB_RELEASES_API = 'https://api.github.com/repos/joegotflow83/zephyr/re
  * Manages application self-updates.
  *
  * Checks for new versions via the GitHub releases API and can trigger
- * a self-update loop via LoopRunner using the reserved project ID.
+ * a self-update loop via ContainerOrchestrator using the reserved project ID.
  */
 export class SelfUpdater {
-  private loopRunner: LoopRunner | null;
+  private containerOrchestrator: ContainerOrchestrator | null;
   private appDir: string;
 
   /**
    * Create a new SelfUpdater.
    *
    * @param appDir - Root directory of the application (contains package.json)
-   * @param loopRunner - Optional LoopRunner for triggering self-update loops
+   * @param containerOrchestrator - Optional ContainerOrchestrator for triggering self-update loops
    */
   constructor(
     appDir: string,
-    loopRunner: LoopRunner | null = null
+    containerOrchestrator: ContainerOrchestrator | null = null
   ) {
     this.appDir = appDir;
-    this.loopRunner = loopRunner;
+    this.containerOrchestrator = containerOrchestrator;
   }
 
   /**
-   * Set the LoopRunner instance.
+   * Set the ContainerOrchestrator instance.
    * Useful for dependency injection after construction.
    *
-   * @param loopRunner - LoopRunner instance
+   * @param containerOrchestrator - ContainerOrchestrator instance
    */
-  setLoopRunner(loopRunner: LoopRunner): void {
-    this.loopRunner = loopRunner;
+  setContainerOrchestrator(containerOrchestrator: ContainerOrchestrator): void {
+    this.containerOrchestrator = containerOrchestrator;
   }
 
   /**
@@ -159,19 +159,19 @@ export class SelfUpdater {
    * @param dockerImage - Docker image to use for the update loop
    * @param envVars - Optional environment variables for the update container
    * @returns The loop state after starting
-   * @throws Error if no LoopRunner is configured
+   * @throws Error if no ContainerOrchestrator is configured
    * @throws Error if the self-update loop is already running
    */
   async startSelfUpdate(
     dockerImage: string,
     envVars?: Record<string, string>
   ): Promise<void> {
-    if (!this.loopRunner) {
-      throw new Error('LoopRunner not configured. Cannot start self-update.');
+    if (!this.containerOrchestrator) {
+      throw new Error('ContainerOrchestrator not configured. Cannot start self-update.');
     }
 
     // Check if a self-update loop is already running
-    const existingState = this.loopRunner.getLoopState(SELF_UPDATE_PROJECT_ID);
+    const existingState = this.containerOrchestrator.getLoopState(SELF_UPDATE_PROJECT_ID);
     if (existingState) {
       throw new Error('A self-update loop is already running.');
     }
@@ -180,11 +180,11 @@ export class SelfUpdater {
     const volumeMounts = [`${this.appDir}:/workspace`];
 
     // Start the loop
-    await this.loopRunner.startLoop({
+    await this.containerOrchestrator.startLoop({
       projectId: SELF_UPDATE_PROJECT_ID,
       projectName: 'Zephyr Self-Update',
       dockerImage,
-      mode: LoopMode.SINGLE,
+      mode: LoopMode.CONTINUOUS,
       envVars,
       volumeMounts,
       workDir: '/workspace',

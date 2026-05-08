@@ -11,8 +11,7 @@ import type { ContainerRuntime } from '../services/container-runtime';
 import { CredentialManager } from '../services/credential-manager';
 import { LoginManager } from '../services/login-manager';
 import { LogParser } from '../services/log-parser';
-import { LoopRunner } from '../services/loop-runner';
-import { LoopScheduler } from '../services/scheduler';
+import { ContainerOrchestrator } from '../services/container-orchestrator';
 import { LogExporter } from '../services/log-exporter';
 import { TerminalManager } from '../services/terminal-manager';
 import { SelfUpdater } from '../services/self-updater';
@@ -32,7 +31,6 @@ import { ImageStore } from '../services/image-store';
 import { ImageBuilder } from '../services/image-builder';
 import { PreValidationStore } from '../services/pre-validation-store';
 import { HooksStore } from '../services/hooks-store';
-import { LoopScriptsStore } from '../services/loop-scripts-store';
 import { ClaudeSettingsStore } from '../services/claude-settings-store';
 import { KiroHooksStore } from '../services/kiro-hooks-store';
 import { AuthInjector } from '../services/auth-injector';
@@ -90,18 +88,16 @@ const credentialManager = new CredentialManager(
 const loginManager = new LoginManager(credentialManager);
 const logParser = new LogParser();
 const vmManager = new VMManager();
-const loopRunner = new LoopRunner(runtime, logParser, 16, vmManager); // Factory pipelines need room for multiple stages × instances
-const scheduler = new LoopScheduler(loopRunner);
+const containerOrchestrator = new ContainerOrchestrator(runtime, logParser, 16, vmManager); // Factory pipelines need room for multiple stages × instances
 const logExporter = new LogExporter();
 const terminalManager = new TerminalManager(runtime);
-const selfUpdater = new SelfUpdater(app.getAppPath(), loopRunner);
+const selfUpdater = new SelfUpdater(app.getAppPath(), containerOrchestrator);
 const cleanupManager = new CleanupManager(runtime);
 const autoUpdater = getAutoUpdater();
 const imageStore = new ImageStore(configManager);
 const imageBuilder = new ImageBuilder(runtime, imageStore);
 const preValidationStore = new PreValidationStore(configManager);
 const hooksStore = new HooksStore(configManager);
-const loopScriptsStore = new LoopScriptsStore(configManager);
 const claudeSettingsStore = new ClaudeSettingsStore(configManager);
 const kiroHooksStore = new KiroHooksStore(configManager);
 const authInjector = new AuthInjector(configManager, credentialManager);
@@ -124,12 +120,11 @@ const factoryTaskStore = new FactoryTaskStore(
 const sshKeyManager = new SSHKeyManager(runtime);
 
 // Register all IPC handlers before the window is created.
-registerDataHandlers({ configManager, projectStore, importExport, preValidationStore, hooksStore, kiroHooksStore, loopScriptsStore, claudeSettingsStore, loopRunner, runtime, credentialManager, sshKeyManager, deployKeyStore });
+registerDataHandlers({ configManager, projectStore, importExport, preValidationStore, hooksStore, kiroHooksStore, claudeSettingsStore, containerOrchestrator, runtime, credentialManager, sshKeyManager, deployKeyStore });
 registerRuntimeHandlers({ runtime, runtimeHealth });
 registerCredentialHandlers({ credentialManager, loginManager });
 const { dispatchFactoryStage, stopWatchdog } = registerLoopHandlers({
-  loopRunner,
-  scheduler,
+  containerOrchestrator,
   cleanupManager,
   projectStore,
   preValidationStore,
@@ -141,12 +136,11 @@ const { dispatchFactoryStage, stopWatchdog } = registerLoopHandlers({
   credentialManager,
   sshKeyManager,
   deployKeyStore,
-  loopScriptsStore,
   configManager,
   factoryTaskStore,
   pipelineStore,
 });
-registerLogHandlers({ logExporter, loopRunner });
+registerLogHandlers({ logExporter, containerOrchestrator });
 registerTerminalHandlers({ terminalManager, vmManager });
 registerUpdateHandlers({ selfUpdater });
 registerAutoUpdateHandlers({ autoUpdater });
@@ -158,7 +152,7 @@ registerFactoryTaskHandlers({
   onTaskEnteredStage: dispatchFactoryStage,
 });
 registerPipelineHandlers({ pipelineStore, projectStore });
-registerVMHandlers({ vmManager, loopRunner });
+registerVMHandlers({ vmManager, containerOrchestrator });
 
 // Legacy ping handler kept for backwards compatibility with existing tests.
 ipcMain.handle(IPC.PING, () => 'pong');
@@ -218,12 +212,12 @@ async function recoverLoops(): Promise<void> {
 
     logger.info(`Found ${runningContainers.length} running container(s), attempting recovery`);
 
-    // 3. Recover loops via LoopRunner
-    const recoveredIds = await loopRunner.recoverLoops(runningContainers, projectStore);
+    // 3. Recover loops via ContainerOrchestrator
+    const recoveredIds = await containerOrchestrator.recoverLoops(runningContainers, projectStore);
 
     // 4. Register recovered containers with cleanup manager
     for (const projectId of recoveredIds) {
-      const state = loopRunner.getLoopState(projectId);
+      const state = containerOrchestrator.getLoopState(projectId);
       if (state?.containerId) {
         cleanupManager.registerContainer(state.containerId);
       }
@@ -274,7 +268,7 @@ async function cleanupOrphanedVMs(): Promise<void> {
 
     logger.info(`Found ${zephyrVMs.length} Zephyr-managed VM(s) on startup`);
 
-    const activeProjectIds = new Set(loopRunner.listRunning().map((s) => s.projectId));
+    const activeProjectIds = new Set(containerOrchestrator.listRunning().map((s) => s.projectId));
 
     for (const vm of zephyrVMs) {
       if (isEphemeralVMName(vm.name)) {
@@ -286,7 +280,7 @@ async function cleanupOrphanedVMs(): Promise<void> {
       } else {
         // Persistent VMs: log if no active loop is using them
         const hasActiveLoop = Array.from(activeProjectIds).some(
-          (id) => loopRunner.getLoopState(id)?.vmName === vm.name,
+          (id) => containerOrchestrator.getLoopState(id)?.vmName === vm.name,
         );
         if (!hasActiveLoop) {
           logger.info(`Persistent VM "${vm.name}" has no active loop (state: ${vm.state})`);
@@ -310,7 +304,7 @@ app.on('ready', async () => {
       logger.info('Log level set from settings', { level: mappedLevel });
     }
     if (settings.max_concurrent_containers) {
-      loopRunner.setMaxConcurrent(settings.max_concurrent_containers);
+      containerOrchestrator.setMaxConcurrent(settings.max_concurrent_containers);
       logger.info('Max concurrent containers set from settings', { max: settings.max_concurrent_containers });
     }
   } catch (error) {
@@ -361,13 +355,13 @@ async function gracefulShutdown(): Promise<void> {
 
   try {
     // 1. Stop all running loops
-    const runningLoops = loopRunner.listRunning();
+    const runningLoops = containerOrchestrator.listRunning();
     if (runningLoops.length > 0) {
       logger.info(`Stopping ${runningLoops.length} running loop(s)`);
       await Promise.all(
         runningLoops.map(async (loop) => {
           try {
-            await loopRunner.stopLoop(loop.projectId);
+            await containerOrchestrator.stopLoop(loop.projectId);
           } catch (error) {
             logger.error('Error stopping loop during shutdown', {
               projectId: loop.projectId,
@@ -378,23 +372,7 @@ async function gracefulShutdown(): Promise<void> {
       );
     }
 
-    // 2. Cancel all scheduled loops
-    const scheduled = scheduler.listScheduled();
-    if (scheduled.length > 0) {
-      logger.info(`Cancelling ${scheduled.length} scheduled loop(s)`);
-      scheduled.forEach((scheduledLoop) => {
-        try {
-          scheduler.cancelSchedule(scheduledLoop.projectId);
-        } catch (error) {
-          logger.error('Error cancelling schedule during shutdown', {
-            projectId: scheduledLoop.projectId,
-            error,
-          });
-        }
-      });
-    }
-
-    // 3. Stop container runtime health monitor
+    // 2. Stop container runtime health monitor
     logger.debug('Stopping runtime health monitor');
     runtimeHealth.stop();
 
@@ -440,7 +418,7 @@ async function gracefulShutdown(): Promise<void> {
  * @returns true if app should quit, false to cancel quit
  */
 async function confirmQuitIfNeeded(): Promise<boolean> {
-  const activeLoops = loopRunner
+  const activeLoops = containerOrchestrator
     .listAll()
     .filter((loop) => isLoopActive(loop.status));
 
@@ -458,8 +436,8 @@ async function confirmQuitIfNeeded(): Promise<boolean> {
   const response = await dialog.showMessageBox(mainWindow, {
     type: 'warning',
     title: 'Quit Zephyr Desktop',
-    message: `${activeLoops.length} loop(s) are still running.`,
-    detail: 'Quitting will stop all running loops and clean up containers. Are you sure?',
+    message: `${activeLoops.length} factory container(s) are still running.`,
+    detail: 'Quitting will stop all running containers and clean up. Are you sure?',
     buttons: ['Cancel', 'Quit Anyway'],
     defaultId: 0,
     cancelId: 0,

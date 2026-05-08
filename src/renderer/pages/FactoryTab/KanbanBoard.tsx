@@ -238,29 +238,36 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
           aria-label="Epic progress"
         >
           <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide shrink-0">Epics</span>
-          {epicProgress.map((ep) => (
-            <div
-              key={ep.id}
-              className="flex items-center gap-2 text-xs shrink-0"
-              title={`${ep.title}: ${ep.done}/${ep.total} sub-tasks done`}
-            >
-              <span className="text-purple-400 truncate max-w-[200px]">📌 {ep.title}</span>
-              <div className="flex items-center gap-1">
-                <div className="w-16 h-1.5 bg-gray-700 rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-purple-500 rounded-full transition-all"
-                    style={{ width: ep.total > 0 ? `${(ep.done / ep.total) * 100}%` : '0%' }}
-                  />
+          {epicProgress.map((ep) => {
+            const epicTask = tasks.find((t) => t.id === ep.id) ?? null;
+            return (
+              <div
+                key={ep.id}
+                className="flex items-center gap-2 text-xs shrink-0 cursor-pointer rounded px-1 py-0.5 hover:bg-gray-700/60 transition-colors"
+                title={`${ep.title}: ${ep.done}/${ep.total} sub-tasks done — click to manage`}
+                onClick={() => epicTask && onSelectTask(epicTask)}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => { if ((e.key === 'Enter' || e.key === ' ') && epicTask) onSelectTask(epicTask); }}
+              >
+                <span className="text-purple-400 truncate max-w-[200px]">📌 {ep.title}</span>
+                <div className="flex items-center gap-1">
+                  <div className="w-16 h-1.5 bg-gray-700 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-purple-500 rounded-full transition-all"
+                      style={{ width: ep.total > 0 ? `${(ep.done / ep.total) * 100}%` : '0%' }}
+                    />
+                  </div>
+                  <span
+                    className="text-gray-400 font-medium text-[10px]"
+                    aria-label={`${ep.done} of ${ep.total} sub-tasks done`}
+                  >
+                    {ep.done}/{ep.total}
+                  </span>
                 </div>
-                <span
-                  className="text-gray-400 font-medium text-[10px]"
-                  aria-label={`${ep.done} of ${ep.total} sub-tasks done`}
-                >
-                  {ep.done}/{ep.total}
-                </span>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 

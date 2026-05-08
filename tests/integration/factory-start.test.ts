@@ -4,8 +4,8 @@
  * Integration test for the FACTORY_START IPC handler with a multi-instance pipeline.
  *
  * Why this lives in tests/integration/ rather than tests/unit/:
- *   - Uses a REAL LoopRunner (not just a mock) so the container-naming logic in
- *     LoopRunner.startLoop is actually exercised.
+ *   - Uses a REAL ContainerOrchestrator (not just a mock) so the container-naming logic in
+ *     ContainerOrchestrator.startLoop is actually exercised.
  *   - The unit tests in loop-handlers.test.ts verify routing and opts passing using
  *     a fully-mocked startLoop. This test verifies the end-to-end name derivation:
  *     projectName → safeName → "zephyr-<safeName>-<stageId>-<instanceIndex>".
@@ -23,7 +23,7 @@ import * as path from 'path';
 import type { IpcMainInvokeEvent } from 'electron';
 import { IPC } from '../../src/shared/ipc-channels';
 import { LoopMode } from '../../src/shared/loop-types';
-import { LoopRunner } from '../../src/services/loop-runner';
+import { ContainerOrchestrator } from '../../src/services/container-orchestrator';
 import { LogParser } from '../../src/services/log-parser';
 import type { ContainerRuntime } from '../../src/services/container-runtime';
 import type { Pipeline } from '../../src/shared/pipeline-types';
@@ -90,7 +90,7 @@ function buildMockRuntime(): ContainerRuntime {
     execCommand: vi.fn().mockResolvedValue({ exitCode: 0, stdout: '', stderr: '' }),
     createExecSession: vi.fn().mockResolvedValue({ id: 'exec-1', stream: null }),
     resizeExec: vi.fn().mockResolvedValue(undefined),
-    // streamLogs must resolve (not just return) so LoopRunner can await the stream.
+    // streamLogs must resolve (not just return) so ContainerOrchestrator can await the stream.
     streamLogs: vi.fn().mockResolvedValue({ stop: vi.fn() }),
   } as unknown as ContainerRuntime;
 }
@@ -141,7 +141,7 @@ describe('FACTORY_START — 2-stage pipeline with instances [1, 2]', () => {
     workspacePath = fsSync.mkdtempSync(path.join(os.tmpdir(), 'zephyr-factory-int-'));
     docker = buildMockRuntime();
 
-    const loopRunner = new LoopRunner(docker, new LogParser());
+    const containerOrchestrator = new ContainerOrchestrator(docker, new LogParser());
 
     const mockProjectStore = {
       getProject: vi.fn().mockReturnValue({
@@ -151,7 +151,6 @@ describe('FACTORY_START — 2-stage pipeline with instances [1, 2]', () => {
         repo_url: '',
         docker_image: 'test-image:latest',
         max_iterations: 5,
-        loop_script: '',
         pre_validation_scripts: [],
         hooks: [],
         kiro_hooks: [],
@@ -168,12 +167,7 @@ describe('FACTORY_START — 2-stage pipeline with instances [1, 2]', () => {
     };
 
     registerLoopHandlers({
-      loopRunner,
-      scheduler: {
-        scheduleLoop: vi.fn(),
-        cancelSchedule: vi.fn(),
-        listScheduled: vi.fn(),
-      } as never,
+      containerOrchestrator,
       projectStore: mockProjectStore as never,
       pipelineStore: mockPipelineStore as never,
     });

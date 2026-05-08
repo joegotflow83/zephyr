@@ -10,14 +10,10 @@ import type { VMConfig } from './models';
 /**
  * How a loop should execute.
  *
- * - SINGLE: Runs one iteration then stops automatically
  * - CONTINUOUS: Runs indefinitely until explicitly stopped
- * - SCHEDULED: Runs at cron-like intervals managed by LoopScheduler
  */
 export enum LoopMode {
-  SINGLE = 'single',
   CONTINUOUS = 'continuous',
-  SCHEDULED = 'scheduled',
 }
 
 /**
@@ -55,7 +51,7 @@ export interface LoopState {
   /** Docker container ID, or null if not yet created */
   containerId: string | null;
 
-  /** Execution mode (single, continuous, scheduled) */
+  /** Execution mode */
   mode: LoopMode;
 
   /** Current lifecycle status */
@@ -129,15 +125,15 @@ export interface LoopStartOpts {
   /** VM configuration; only used when sandboxType === 'vm' */
   vmConfig?: VMConfig;
 
-  /**
-   * Command override for the container.
-   * When set, replaces the image's default CMD (e.g. "sleep infinity").
-   * Used for single-mode runs to execute a specific agent task and exit.
-   */
-  cmd?: string[];
-
   /** Factory role when starting a loop as part of a coding factory */
   role?: string;
+
+  /**
+   * Command override for the container (overrides the image's default CMD).
+   * Factory containers use this to set the agent bash loop that runs indefinitely,
+   * polling @current-task-<stageId>.json and invoking the agent when a task appears.
+   */
+  cmd?: string[];
 }
 
 /**
@@ -158,7 +154,7 @@ export function getLoopKey(projectIdOrState: string | { projectId: string; role?
  */
 export function createLoopState(
   projectId: string,
-  mode: LoopMode = LoopMode.SINGLE,
+  mode: LoopMode = LoopMode.CONTINUOUS,
   projectName = '',
   role?: string,
 ): LoopState {

@@ -4,7 +4,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import App from '../../src/renderer/App';
 
 beforeEach(() => {
-  // Mock window.api for StatusBar, useActiveLoops, and useProjects
+  // Mock window.api for StatusBar, useActiveFactories, and useProjects
   global.window.api = {
     docker: {
       status: vi.fn().mockResolvedValue({
@@ -52,7 +52,7 @@ describe('App', () => {
   it('renders the tab navigation', () => {
     render(<App />);
     expect(screen.getByRole('button', { name: /projects/i })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /running loops/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /factory/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /terminal/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /settings/i })).toBeInTheDocument();
   });

@@ -10,15 +10,10 @@ import type { MessageBoxReturnValue } from 'electron';
 vi.setConfig({ testTimeout: 30_000 });
 
 // Create shared mock instances
-const mockLoopRunnerInstance = {
+const mockContainerOrchestratorInstance = {
   listRunning: vi.fn(() => []),
   listAll: vi.fn(() => []),
   stopLoop: vi.fn().mockResolvedValue(undefined),
-};
-
-const mockSchedulerInstance = {
-  listScheduled: vi.fn(() => []),
-  cancelSchedule: vi.fn(),
 };
 
 const mockRuntimeHealthInstance = {
@@ -122,18 +117,10 @@ vi.mock('../../src/services/log-parser', () => ({
   LogParser: class LogParser {},
 }));
 
-vi.mock('../../src/services/loop-runner', () => ({
-  LoopRunner: class LoopRunner {
+vi.mock('../../src/services/container-orchestrator', () => ({
+  ContainerOrchestrator: class ContainerOrchestrator {
     constructor() {
-      return mockLoopRunnerInstance;
-    }
-  },
-}));
-
-vi.mock('../../src/services/scheduler', () => ({
-  LoopScheduler: class LoopScheduler {
-    constructor() {
-      return mockSchedulerInstance;
+      return mockContainerOrchestratorInstance;
     }
   },
 }));
@@ -235,10 +222,9 @@ describe('Graceful Shutdown', () => {
     vi.clearAllMocks();
 
     // Reset mock instance methods
-    mockLoopRunnerInstance.listRunning.mockReturnValue([]);
-    mockLoopRunnerInstance.listAll.mockReturnValue([]);
-    mockLoopRunnerInstance.stopLoop.mockResolvedValue(undefined);
-    mockSchedulerInstance.listScheduled.mockReturnValue([]);
+    mockContainerOrchestratorInstance.listRunning.mockReturnValue([]);
+    mockContainerOrchestratorInstance.listAll.mockReturnValue([]);
+    mockContainerOrchestratorInstance.stopLoop.mockResolvedValue(undefined);
     mockRuntimeHealthInstance.stop.mockReset();
     mockTerminalManagerInstance.closeAllSessions.mockResolvedValue(undefined);
     mockCleanupManagerInstance.cleanupAll.mockResolvedValue(undefined);
@@ -307,8 +293,8 @@ describe('Graceful Shutdown', () => {
       const mockLoop1 = { projectId: 'proj1', status: 'RUNNING' };
       const mockLoop2 = { projectId: 'proj2', status: 'RUNNING' };
 
-      mockLoopRunnerInstance.listRunning.mockReturnValue([mockLoop1, mockLoop2]);
-      mockLoopRunnerInstance.listAll.mockReturnValue([mockLoop1, mockLoop2]);
+      mockContainerOrchestratorInstance.listRunning.mockReturnValue([mockLoop1, mockLoop2]);
+      mockContainerOrchestratorInstance.listAll.mockReturnValue([mockLoop1, mockLoop2]);
 
       await loadMainModule();
 
@@ -323,33 +309,16 @@ describe('Graceful Shutdown', () => {
       await beforeQuitHandler!(mockEvent);
 
       // Should stop both loops
-      expect(mockLoopRunnerInstance.stopLoop).toHaveBeenCalledWith('proj1');
-      expect(mockLoopRunnerInstance.stopLoop).toHaveBeenCalledWith('proj2');
-    });
-
-    it('should cancel all scheduled loops during shutdown', async () => {
-      mockSchedulerInstance.listScheduled.mockReturnValue([
-        { projectId: 'proj1', schedule: null, loopOpts: null, timerId: null, nextRun: null },
-        { projectId: 'proj2', schedule: null, loopOpts: null, timerId: null, nextRun: null },
-      ]);
-
-      await loadMainModule();
-
-      const beforeQuitHandler = appEventHandlers.get('before-quit');
-      const mockEvent = { preventDefault: vi.fn() };
-      await beforeQuitHandler!(mockEvent);
-
-      // Should cancel both schedules
-      expect(mockSchedulerInstance.cancelSchedule).toHaveBeenCalledWith('proj1');
-      expect(mockSchedulerInstance.cancelSchedule).toHaveBeenCalledWith('proj2');
+      expect(mockContainerOrchestratorInstance.stopLoop).toHaveBeenCalledWith('proj1');
+      expect(mockContainerOrchestratorInstance.stopLoop).toHaveBeenCalledWith('proj2');
     });
 
     it('should show confirmation dialog when active loops are running', async () => {
       const mockActiveLoop = { projectId: 'proj1', status: 'RUNNING' };
       const mockIdleLoop = { projectId: 'proj2', status: 'STOPPED' };
 
-      mockLoopRunnerInstance.listRunning.mockReturnValue([]);
-      mockLoopRunnerInstance.listAll.mockReturnValue([mockActiveLoop, mockIdleLoop]);
+      mockContainerOrchestratorInstance.listRunning.mockReturnValue([]);
+      mockContainerOrchestratorInstance.listAll.mockReturnValue([mockActiveLoop, mockIdleLoop]);
 
       await loadMainModule();
 
@@ -370,7 +339,7 @@ describe('Graceful Shutdown', () => {
         expect.objectContaining({
           type: 'warning',
           title: 'Quit Zephyr Desktop',
-          message: expect.stringContaining('1 loop(s) are still running'),
+          message: expect.stringContaining('1 factory container(s) are still running'),
         })
       );
 
@@ -381,8 +350,8 @@ describe('Graceful Shutdown', () => {
     it('should proceed with quit when user confirms in dialog', async () => {
       const mockActiveLoop = { projectId: 'proj1', status: 'RUNNING' };
 
-      mockLoopRunnerInstance.listRunning.mockReturnValue([mockActiveLoop]);
-      mockLoopRunnerInstance.listAll.mockReturnValue([mockActiveLoop]);
+      mockContainerOrchestratorInstance.listRunning.mockReturnValue([mockActiveLoop]);
+      mockContainerOrchestratorInstance.listAll.mockReturnValue([mockActiveLoop]);
 
       await loadMainModule();
 
@@ -404,8 +373,8 @@ describe('Graceful Shutdown', () => {
     it('should not show dialog when no windows are available', async () => {
       const mockActiveLoop = { projectId: 'proj1', status: 'RUNNING' };
 
-      mockLoopRunnerInstance.listRunning.mockReturnValue([mockActiveLoop]);
-      mockLoopRunnerInstance.listAll.mockReturnValue([mockActiveLoop]);
+      mockContainerOrchestratorInstance.listRunning.mockReturnValue([mockActiveLoop]);
+      mockContainerOrchestratorInstance.listAll.mockReturnValue([mockActiveLoop]);
 
       await loadMainModule();
 
@@ -427,9 +396,9 @@ describe('Graceful Shutdown', () => {
       const mockLoop1 = { projectId: 'proj1', status: 'RUNNING' };
       const mockLoop2 = { projectId: 'proj2', status: 'RUNNING' };
 
-      mockLoopRunnerInstance.listRunning.mockReturnValue([mockLoop1, mockLoop2]);
-      mockLoopRunnerInstance.listAll.mockReturnValue([]);
-      mockLoopRunnerInstance.stopLoop
+      mockContainerOrchestratorInstance.listRunning.mockReturnValue([mockLoop1, mockLoop2]);
+      mockContainerOrchestratorInstance.listAll.mockReturnValue([]);
+      mockContainerOrchestratorInstance.stopLoop
         .mockRejectedValueOnce(new Error('Stop failed'))
         .mockResolvedValueOnce(undefined);
 
@@ -442,7 +411,7 @@ describe('Graceful Shutdown', () => {
       await expect(beforeQuitHandler!(mockEvent)).resolves.toBeUndefined();
 
       // Should attempt to stop both loops
-      expect(mockLoopRunnerInstance.stopLoop).toHaveBeenCalledTimes(2);
+      expect(mockContainerOrchestratorInstance.stopLoop).toHaveBeenCalledTimes(2);
     });
 
     it('should prevent double shutdown execution', async () => {

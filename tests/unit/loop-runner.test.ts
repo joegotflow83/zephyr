@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { LoopRunner } from '../../src/services/loop-runner';
+import { ContainerOrchestrator } from '../../src/services/container-orchestrator';
 import { LogParser } from '../../src/services/log-parser';
 import { LoopMode, LoopStatus } from '../../src/shared/loop-types';
 import type { ContainerRuntime, ContainerStatus } from '../../src/services/container-runtime';
@@ -50,27 +50,27 @@ function createMockLogParser(): LogParser {
 
 // -- Tests --------------------------------------------------------------------
 
-describe('LoopRunner', () => {
-  let runner: LoopRunner;
+describe('ContainerOrchestrator', () => {
+  let runner: ContainerOrchestrator;
   let docker: ContainerRuntime;
   let parser: LogParser;
 
   beforeEach(() => {
     docker = createMockDockerManager();
     parser = createMockLogParser();
-    runner = new LoopRunner(docker, parser, 3);
+    runner = new ContainerOrchestrator(docker, parser, 3);
   });
 
   // -- Constructor and configuration ------------------------------------------
 
   describe('constructor', () => {
     it('initializes with default max concurrent', () => {
-      const r = new LoopRunner(docker, parser);
+      const r = new ContainerOrchestrator(docker, parser);
       expect(r.getMaxConcurrent()).toBe(3);
     });
 
     it('initializes with custom max concurrent', () => {
-      const r = new LoopRunner(docker, parser, 5);
+      const r = new ContainerOrchestrator(docker, parser, 5);
       expect(r.getMaxConcurrent()).toBe(5);
     });
   });
@@ -93,12 +93,12 @@ describe('LoopRunner', () => {
       const state = await runner.startLoop({
         projectId: 'proj-123',
         projectName: 'Test Project',        dockerImage: 'ubuntu:22.04',
-        mode: LoopMode.SINGLE,
+        mode: LoopMode.CONTINUOUS,
       });
 
       expect(state.status).toBe(LoopStatus.RUNNING);
       expect(state.containerId).toBe('container-123');
-      expect(state.mode).toBe(LoopMode.SINGLE);
+      expect(state.mode).toBe(LoopMode.CONTINUOUS);
       expect(state.iteration).toBe(0);
       expect(state.startedAt).toBeTruthy();
 
@@ -133,7 +133,7 @@ describe('LoopRunner', () => {
       await runner.startLoop({
         projectId: 'proj-123',
         projectName: 'Test Project',        dockerImage: 'ubuntu:22.04',
-        mode: LoopMode.SINGLE,
+        mode: LoopMode.CONTINUOUS,
         workDir: '/workspace',
         user: 'root',
       });
@@ -150,7 +150,7 @@ describe('LoopRunner', () => {
         runner.startLoop({
           projectId: '',
           dockerImage: 'ubuntu:22.04',
-          mode: LoopMode.SINGLE,
+          mode: LoopMode.CONTINUOUS,
         }),
       ).rejects.toThrow('projectId must be a non-empty string');
     });
@@ -160,7 +160,7 @@ describe('LoopRunner', () => {
         runner.startLoop({
           projectId: 'proj-123',
           projectName: 'Test Project',          dockerImage: '',
-          mode: LoopMode.SINGLE,
+          mode: LoopMode.CONTINUOUS,
         }),
       ).rejects.toThrow('dockerImage must be a non-empty string');
     });
@@ -169,14 +169,14 @@ describe('LoopRunner', () => {
       await runner.startLoop({
         projectId: 'proj-123',
         projectName: 'Test Project',        dockerImage: 'ubuntu:22.04',
-        mode: LoopMode.SINGLE,
+        mode: LoopMode.CONTINUOUS,
       });
 
       await expect(
         runner.startLoop({
           projectId: 'proj-123',
           projectName: 'Test Project',          dockerImage: 'ubuntu:22.04',
-          mode: LoopMode.SINGLE,
+          mode: LoopMode.CONTINUOUS,
         }),
       ).rejects.toThrow('Loop for project proj-123 is already running');
     });
@@ -212,7 +212,7 @@ describe('LoopRunner', () => {
         runner.startLoop({
           projectId: 'proj-123',
           projectName: 'Test Project',          dockerImage: 'ubuntu:22.04',
-          mode: LoopMode.SINGLE,
+          mode: LoopMode.CONTINUOUS,
         }),
       ).rejects.toThrow('Docker unavailable');
 
@@ -229,7 +229,7 @@ describe('LoopRunner', () => {
         runner.startLoop({
           projectId: 'proj-123',
           projectName: 'Test Project',          dockerImage: 'ubuntu:22.04',
-          mode: LoopMode.SINGLE,
+          mode: LoopMode.CONTINUOUS,
         }),
       ).rejects.toThrow('Start failed');
 
@@ -280,7 +280,7 @@ describe('LoopRunner', () => {
       await runner.startLoop({
         projectId: 'proj-123',
         projectName: 'Test Project',        dockerImage: 'ubuntu:22.04',
-        mode: LoopMode.SINGLE,
+        mode: LoopMode.CONTINUOUS,
       });
 
       await runner.stopLoop('proj-123');
@@ -318,7 +318,7 @@ describe('LoopRunner', () => {
       const startPromise = runner.startLoop({
         projectId: 'proj-123',
         projectName: 'Test Project',        dockerImage: 'ubuntu:22.04',
-        mode: LoopMode.SINGLE,
+        mode: LoopMode.CONTINUOUS,
       });
 
       // Wait for state to be set to STARTING
@@ -347,7 +347,7 @@ describe('LoopRunner', () => {
       await runner.startLoop({
         projectId: 'proj-123',
         projectName: 'Test Project',        dockerImage: 'ubuntu:22.04',
-        mode: LoopMode.SINGLE,
+        mode: LoopMode.CONTINUOUS,
       });
 
       const state = runner.getLoopState('proj-123');
@@ -410,7 +410,7 @@ describe('LoopRunner', () => {
       await runner.startLoop({
         projectId: 'proj-123',
         projectName: 'Test Project',        dockerImage: 'ubuntu:22.04',
-        mode: LoopMode.SINGLE,
+        mode: LoopMode.CONTINUOUS,
       });
 
       await runner.stopLoop('proj-123');
@@ -444,7 +444,7 @@ describe('LoopRunner', () => {
       await runner.startLoop({
         projectId: 'proj-123',
         projectName: 'Test Project',        dockerImage: 'ubuntu:22.04',
-        mode: LoopMode.SINGLE,
+        mode: LoopMode.CONTINUOUS,
       });
 
       // Should be called multiple times: STARTING, containerId update, RUNNING
@@ -463,7 +463,7 @@ describe('LoopRunner', () => {
       await runner.startLoop({
         projectId: 'proj-123',
         projectName: 'Test Project',        dockerImage: 'ubuntu:22.04',
-        mode: LoopMode.SINGLE,
+        mode: LoopMode.CONTINUOUS,
       });
 
       expect(callback).not.toHaveBeenCalled();
@@ -483,7 +483,7 @@ describe('LoopRunner', () => {
       await runner.startLoop({
         projectId: 'proj-123',
         projectName: 'Test Project',        dockerImage: 'ubuntu:22.04',
-        mode: LoopMode.SINGLE,
+        mode: LoopMode.CONTINUOUS,
       });
 
       // Good callback should still be called despite bad callback throwing
@@ -528,7 +528,7 @@ describe('LoopRunner', () => {
       await runner.startLoop({
         projectId: 'proj-123',
         projectName: 'Test Project',        dockerImage: 'ubuntu:22.04',
-        mode: LoopMode.SINGLE,
+        mode: LoopMode.CONTINUOUS,
       });
 
       // Wait for async log processing
@@ -553,7 +553,7 @@ describe('LoopRunner', () => {
       await runner.startLoop({
         projectId: 'proj-123',
         projectName: 'Test Project',        dockerImage: 'ubuntu:22.04',
-        mode: LoopMode.SINGLE,
+        mode: LoopMode.CONTINUOUS,
       });
 
       await new Promise((resolve) => setTimeout(resolve, 10));
@@ -588,7 +588,7 @@ describe('LoopRunner', () => {
       await runner.startLoop({
         projectId: 'proj-123',
         projectName: 'Test Project',        dockerImage: 'ubuntu:22.04',
-        mode: LoopMode.SINGLE,
+        mode: LoopMode.CONTINUOUS,
       });
 
       await new Promise((resolve) => setTimeout(resolve, 10));
@@ -615,7 +615,7 @@ describe('LoopRunner', () => {
       await runner.startLoop({
         projectId: 'proj-123',
         projectName: 'Test Project',        dockerImage: 'ubuntu:22.04',
-        mode: LoopMode.SINGLE,
+        mode: LoopMode.CONTINUOUS,
       });
 
       await new Promise((resolve) => setTimeout(resolve, 10));
@@ -663,7 +663,7 @@ describe('LoopRunner', () => {
       await runner.startLoop({
         projectId: 'proj-123',
         projectName: 'Test Project',        dockerImage: 'ubuntu:22.04',
-        mode: LoopMode.SINGLE,
+        mode: LoopMode.CONTINUOUS,
       });
 
       await new Promise((resolve) => setTimeout(resolve, 10));

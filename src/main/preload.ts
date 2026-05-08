@@ -68,16 +68,10 @@ contextBridge.exposeInMainWorld('api', {
   },
 
   loops: {
-    start: (opts: unknown) => ipcRenderer.invoke(IPC.LOOP_START, opts),
     stop: (projectId: string, role?: string) => ipcRenderer.invoke(IPC.LOOP_STOP, projectId, role),
     list: () => ipcRenderer.invoke(IPC.LOOP_LIST),
     get: (projectId: string, role?: string) => ipcRenderer.invoke(IPC.LOOP_GET, projectId, role),
     remove: (projectId: string, role?: string) => ipcRenderer.invoke(IPC.LOOP_REMOVE, projectId, role),
-    schedule: (projectId: string, schedule: string, loopOpts: unknown) =>
-      ipcRenderer.invoke(IPC.LOOP_SCHEDULE, projectId, schedule, loopOpts),
-    cancelSchedule: (projectId: string) =>
-      ipcRenderer.invoke(IPC.LOOP_CANCEL_SCHEDULE, projectId),
-    listScheduled: () => ipcRenderer.invoke(IPC.LOOP_LIST_SCHEDULED),
 
     // Event listeners
     onStateChanged: (callback: (state: unknown) => void) => {
@@ -237,14 +231,6 @@ contextBridge.exposeInMainWorld('api', {
     add: (filename: string, content: string) =>
       ipcRenderer.invoke(IPC.HOOKS_ADD, filename, content),
     remove: (filename: string) => ipcRenderer.invoke(IPC.HOOKS_REMOVE, filename),
-  },
-
-  loopScripts: {
-    list: () => ipcRenderer.invoke(IPC.LOOP_SCRIPTS_LIST),
-    get: (filename: string) => ipcRenderer.invoke(IPC.LOOP_SCRIPTS_GET, filename),
-    add: (filename: string, content: string) =>
-      ipcRenderer.invoke(IPC.LOOP_SCRIPTS_ADD, filename, content),
-    remove: (filename: string) => ipcRenderer.invoke(IPC.LOOP_SCRIPTS_REMOVE, filename),
   },
 
   kiroHooks: {

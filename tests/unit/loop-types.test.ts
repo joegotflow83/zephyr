@@ -15,22 +15,14 @@ import {
 } from '../../src/shared/loop-types';
 
 describe('LoopMode enum', () => {
-  it('should have SINGLE mode', () => {
-    expect(LoopMode.SINGLE).toBe('single');
-  });
-
   it('should have CONTINUOUS mode', () => {
     expect(LoopMode.CONTINUOUS).toBe('continuous');
   });
 
-  it('should have SCHEDULED mode', () => {
-    expect(LoopMode.SCHEDULED).toBe('scheduled');
-  });
-
-  it('should have exactly three modes', () => {
+  it('should have exactly one mode', () => {
     const modes = Object.values(LoopMode);
-    expect(modes).toHaveLength(3);
-    expect(modes).toEqual(['single', 'continuous', 'scheduled']);
+    expect(modes).toHaveLength(1);
+    expect(modes).toEqual(['continuous']);
   });
 });
 
@@ -78,7 +70,7 @@ describe('LoopState interface', () => {
     const state: LoopState = {
       projectId: 'test-id',
       projectName: 'Test Project',      containerId: null,
-      mode: LoopMode.SINGLE,
+      mode: LoopMode.CONTINUOUS,
       status: LoopStatus.IDLE,
       iteration: 0,
       startedAt: null,
@@ -153,7 +145,7 @@ describe('LoopStartOpts interface', () => {
     const opts: LoopStartOpts = {
       projectId: 'test-id',
       projectName: 'Test Project',      dockerImage: 'test:latest',
-      mode: LoopMode.SINGLE,
+      mode: LoopMode.CONTINUOUS,
       envVars: { API_KEY: 'secret', DEBUG: 'true' },
     };
     expect(opts.envVars).toEqual({ API_KEY: 'secret', DEBUG: 'true' });
@@ -163,7 +155,7 @@ describe('LoopStartOpts interface', () => {
     const opts: LoopStartOpts = {
       projectId: 'test-id',
       projectName: 'Test Project',      dockerImage: 'test:latest',
-      mode: LoopMode.SINGLE,
+      mode: LoopMode.CONTINUOUS,
       volumeMounts: ['/host/path:/container/path', '/another:/mount'],
     };
     expect(opts.volumeMounts).toHaveLength(2);
@@ -173,7 +165,7 @@ describe('LoopStartOpts interface', () => {
     const opts: LoopStartOpts = {
       projectId: 'test-id',
       projectName: 'Test Project',      dockerImage: 'test:latest',
-      mode: LoopMode.SINGLE,
+      mode: LoopMode.CONTINUOUS,
       workDir: '/app',
     };
     expect(opts.workDir).toBe('/app');
@@ -183,7 +175,7 @@ describe('LoopStartOpts interface', () => {
     const opts: LoopStartOpts = {
       projectId: 'test-id',
       projectName: 'Test Project',      dockerImage: 'test:latest',
-      mode: LoopMode.SINGLE,
+      mode: LoopMode.CONTINUOUS,
       user: 'root',
     };
     expect(opts.user).toBe('root');
@@ -191,10 +183,10 @@ describe('LoopStartOpts interface', () => {
 });
 
 describe('createLoopState', () => {
-  it('should create state with default mode SINGLE', () => {
+  it('should create state with default mode CONTINUOUS', () => {
     const state = createLoopState('project-123');
     expect(state.projectId).toBe('project-123');
-    expect(state.mode).toBe(LoopMode.SINGLE);
+    expect(state.mode).toBe(LoopMode.CONTINUOUS);
   });
 
   it('should create state with specified mode', () => {
@@ -313,7 +305,7 @@ describe('validateLoopStartOpts', () => {
     const opts: LoopStartOpts = {
       projectId: 'test-id',
       projectName: 'Test Project',      dockerImage: 'test:latest',
-      mode: LoopMode.SINGLE,
+      mode: LoopMode.CONTINUOUS,
     };
     expect(() => validateLoopStartOpts(opts)).not.toThrow();
   });
@@ -322,7 +314,7 @@ describe('validateLoopStartOpts', () => {
     const opts: LoopStartOpts = {
       projectId: '',
       dockerImage: 'test:latest',
-      mode: LoopMode.SINGLE,
+      mode: LoopMode.CONTINUOUS,
     };
     expect(() => validateLoopStartOpts(opts)).toThrow(
       'projectId must be a non-empty string',
@@ -333,7 +325,7 @@ describe('validateLoopStartOpts', () => {
     const opts = {
       projectId: 123,
       dockerImage: 'test:latest',
-      mode: LoopMode.SINGLE,
+      mode: LoopMode.CONTINUOUS,
     } as unknown as LoopStartOpts;
     expect(() => validateLoopStartOpts(opts)).toThrow(
       'projectId must be a non-empty string',
@@ -344,7 +336,7 @@ describe('validateLoopStartOpts', () => {
     const opts: LoopStartOpts = {
       projectId: 'test-id',
       projectName: 'Test Project',      dockerImage: '',
-      mode: LoopMode.SINGLE,
+      mode: LoopMode.CONTINUOUS,
     };
     expect(() => validateLoopStartOpts(opts)).toThrow(
       'dockerImage must be a non-empty string',
@@ -355,7 +347,7 @@ describe('validateLoopStartOpts', () => {
     const opts = {
       projectId: 'test-id',
       projectName: 'Test Project',      dockerImage: null,
-      mode: LoopMode.SINGLE,
+      mode: LoopMode.CONTINUOUS,
     } as unknown as LoopStartOpts;
     expect(() => validateLoopStartOpts(opts)).toThrow(
       'dockerImage must be a non-empty string',
@@ -371,16 +363,14 @@ describe('validateLoopStartOpts', () => {
     expect(() => validateLoopStartOpts(opts)).toThrow('mode must be one of');
   });
 
-  it('should accept all valid modes', () => {
-    const modes = [LoopMode.SINGLE, LoopMode.CONTINUOUS, LoopMode.SCHEDULED];
-    modes.forEach((mode) => {
-      const opts: LoopStartOpts = {
-        projectId: 'test-id',
-        projectName: 'Test Project',        dockerImage: 'test:latest',
-        mode,
-      };
-      expect(() => validateLoopStartOpts(opts)).not.toThrow();
-    });
+  it('should accept the CONTINUOUS mode', () => {
+    const opts: LoopStartOpts = {
+      projectId: 'test-id',
+      projectName: 'Test Project',
+      dockerImage: 'test:latest',
+      mode: LoopMode.CONTINUOUS,
+    };
+    expect(() => validateLoopStartOpts(opts)).not.toThrow();
   });
 
   it('should accept optional fields', () => {
@@ -400,7 +390,7 @@ describe('validateLoopStartOpts', () => {
 describe('Type imports from both main and renderer', () => {
   it('should import LoopMode enum', () => {
     expect(LoopMode).toBeDefined();
-    expect(LoopMode.SINGLE).toBe('single');
+    expect(LoopMode.CONTINUOUS).toBe('continuous');
   });
 
   it('should import LoopStatus enum', () => {

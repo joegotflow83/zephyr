@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { LoopRunner } from '../../src/services/loop-runner';
+import { ContainerOrchestrator } from '../../src/services/container-orchestrator';
 import { LogParser } from '../../src/services/log-parser';
 import { LoopMode, LoopStatus } from '../../src/shared/loop-types';
 import type { ContainerRuntime, ContainerSummary } from '../../src/services/container-runtime';
@@ -73,8 +73,8 @@ function createMockContainer(projectId: string, id: string = 'container-123'): C
 
 // -- Tests --------------------------------------------------------------------
 
-describe('LoopRunner - recoverLoops', () => {
-  let runner: LoopRunner;
+describe('ContainerOrchestrator - recoverLoops', () => {
+  let runner: ContainerOrchestrator;
   let docker: ContainerRuntime;
   let parser: LogParser;
   let projectStore: ReturnType<typeof createMockProjectStore>;
@@ -83,7 +83,7 @@ describe('LoopRunner - recoverLoops', () => {
     docker = createMockDockerManager();
     parser = createMockLogParser();
     projectStore = createMockProjectStore();
-    runner = new LoopRunner(docker, parser, 3);
+    runner = new ContainerOrchestrator(docker, parser, 3);
   });
 
   // -- Happy path -------------------------------------------------------------
@@ -188,7 +188,7 @@ describe('LoopRunner - recoverLoops', () => {
       await runner.startLoop({
         projectId: 'proj-1',
         projectName: 'Test Project',        dockerImage: 'ubuntu:22.04',
-        mode: LoopMode.SINGLE,
+        mode: LoopMode.CONTINUOUS,
       });
 
       // Try to recover the same project
@@ -246,12 +246,12 @@ describe('LoopRunner - recoverLoops', () => {
       await runner.startLoop({
         projectId: 'proj-manual-1',
         projectName: 'Test Project',        dockerImage: 'ubuntu:22.04',
-        mode: LoopMode.SINGLE,
+        mode: LoopMode.CONTINUOUS,
       });
       await runner.startLoop({
         projectId: 'proj-manual-2',
         projectName: 'Test Project',        dockerImage: 'ubuntu:22.04',
-        mode: LoopMode.SINGLE,
+        mode: LoopMode.CONTINUOUS,
       });
 
       // Try to recover 3 more (but only 1 slot available)

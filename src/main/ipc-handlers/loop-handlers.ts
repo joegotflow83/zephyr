@@ -1,4 +1,4 @@
-// IPC handlers for loop execution services (LoopRunner, LoopScheduler).
+// IPC handlers for loop execution services (ContainerOrchestrator).
 // Registered once during app startup via registerLoopHandlers().
 // All handlers run in the main process and delegate to service instances.
 
@@ -8,11 +8,9 @@ import * as os from 'os';
 import * as path from 'path';
 import { ipcMain, BrowserWindow, Notification } from 'electron';
 import { IPC } from '../../shared/ipc-channels';
-import type { LoopRunner } from '../../services/loop-runner';
-import type { LoopScheduler } from '../../services/scheduler';
+import type { ContainerOrchestrator } from '../../services/container-orchestrator';
 import type { LoopState, LoopStartOpts } from '../../shared/loop-types';
-import { isLoopTerminal, LoopMode, LoopStatus, getLoopKey } from '../../shared/loop-types';
-import type { ScheduledLoop } from '../../services/scheduler';
+import { isLoopTerminal, LoopStatus, getLoopKey } from '../../shared/loop-types';
 import type { AppSettings, ProjectConfig } from '../../shared/models';
 import type { ConfigManager } from '../../services/config-manager';
 import type { PreValidationStore } from '../../services/pre-validation-store';
@@ -24,7 +22,6 @@ import type { AuthInjector } from '../../services/auth-injector';
 import type { CredentialManager } from '../../services/credential-manager';
 import type { SSHKeyManager } from '../../services/ssh-key-manager';
 import type { DeployKeyStore } from '../../services/deploy-key-store';
-import type { LoopScriptsStore } from '../../services/loop-scripts-store';
 import type { FactoryTask } from '../../shared/factory-types';
 import type { FactoryTaskStore } from '../../services/factory-task-store';
 import type { PipelineStore } from '../../services/pipeline-store';
@@ -765,7 +762,7 @@ export function processTaskDecomposition(
  * Dependencies for `processSupervisorAction`. Kept narrow for unit testability.
  */
 export interface SupervisorActionDeps {
-  loopRunner: LoopRunner;
+  containerOrchestrator: ContainerOrchestrator;
   /** Map of loopKey → original LoopStartOpts, populated by startLoopCore. */
   loopOptsMap: Map<string, LoopStartOpts>;
   /**
@@ -823,7 +820,7 @@ export async function processSupervisorAction(
   logger.info('supervisor-action: restarting container', { projectId, targetRole, reason });
 
   try {
-    await deps.loopRunner.stopLoop(projectId, targetRole);
+    await deps.containerOrchestrator.stopLoop(projectId, targetRole);
   } catch {
     // Container may already be stopped or failed — proceed to restart anyway.
   }
@@ -838,8 +835,7 @@ export async function processSupervisorAction(
 }
 
 export interface LoopServices {
-  loopRunner: LoopRunner;
-  scheduler: LoopScheduler;
+  containerOrchestrator: ContainerOrchestrator;
   cleanupManager?: { registerContainer: (id: string) => void };
   projectStore?: { getProject: (id: string) => ProjectConfig | null };
   preValidationStore?: PreValidationStore;
@@ -851,7 +847,6 @@ export interface LoopServices {
   credentialManager?: CredentialManager;
   sshKeyManager?: SSHKeyManager;
   deployKeyStore?: DeployKeyStore;
-  loopScriptsStore?: LoopScriptsStore;
   configManager?: ConfigManager;
   factoryTaskStore?: FactoryTaskStore;
   pipelineStore?: PipelineStore;
@@ -859,8 +854,8 @@ export interface LoopServices {
 
 export interface LoopHandlerContext {
   /**
-   * Restart the idle SINGLE-mode container(s) for a pipeline stage so the
-   * agent picks up a newly arrived task from /workspace/@task-queue.json.
+   * Restart idle container(s) for a pipeline stage so the agent picks up a
+   * newly arrived task from /workspace/@task-queue.json.
    * Safe to call when containers are still running — those are left untouched
    * and will pick up the task on their next idle poll of the queue file.
    */
@@ -871,8 +866,7 @@ export interface LoopHandlerContext {
 
 export function registerLoopHandlers(services: LoopServices): LoopHandlerContext {
   const {
-    loopRunner,
-    scheduler,
+    containerOrchestrator,
     cleanupManager,
     projectStore,
     preValidationStore,
@@ -884,7 +878,6 @@ export function registerLoopHandlers(services: LoopServices): LoopHandlerContext
     credentialManager,
     sshKeyManager,
     deployKeyStore,
-    loopScriptsStore,
     configManager,
     factoryTaskStore,
     pipelineStore,
@@ -911,8 +904,7 @@ export function registerLoopHandlers(services: LoopServices): LoopHandlerContext
 
   /**
    * Core loop start logic. Handles pre-validation scripts, auth injection,
-   * hooks/prompts mounting, deploy keys, etc. Called by both LOOP_START and
-   * FACTORY_START handlers.
+   * hooks/prompts mounting, deploy keys, etc. Called by the FACTORY_START handler.
    */
   async function startLoopCore(rawOpts: LoopStartOpts): Promise<LoopState> {
       // Store raw opts keyed by loopKey before any mutation so restart can replay them.
@@ -938,21 +930,6 @@ export function registerLoopHandlers(services: LoopServices): LoopHandlerContext
         }
       }
 
-      // Write the loop script to the project's local_path root so it appears
-      // at /workspace/<script> in the container via volume mount, executable.
-      if (project && project.local_path && project.loop_script && loopScriptsStore) {
-        try {
-          const content = await loopScriptsStore.getScript(project.loop_script);
-          if (content) {
-            const dest = path.join(project.local_path, project.loop_script);
-            await fs.writeFile(dest, content, { mode: 0o755 });
-          } else {
-            logger.warn(`Loop script "${project.loop_script}" not found in store`);
-          }
-        } catch (err) {
-          logger.warn(`Failed to write loop script ${project.loop_script} to local_path`, { err });
-        }
-      }
 
       // Inject auth credentials into container opts before starting
       let authMethod = 'unknown';
@@ -976,12 +953,9 @@ export function registerLoopHandlers(services: LoopServices): LoopHandlerContext
       //   - Single-mode container loops start the agent as their CMD, so exec
       //     injection would race against (or miss) the agent startup
       // Hooks and settings go into a temp dir mounted at /home/ralph/.claude.
-      // Prompt files for single-mode container runs go to /workspace (see below).
       const isVm = opts.sandboxType === 'vm';
-      const isSingleContainer = opts.mode === LoopMode.SINGLE && !isVm;
-      if ((isVm || isSingleContainer) && project) {
+      if (isVm && project) {
         const hasHooks = project.hooks.length > 0 && !!hooksStore;
-        const hasPrompts = Object.keys(project.custom_prompts).length > 0;
         const hasSpecFiles = Object.keys(project.spec_files ?? {}).length > 0;
         const hasClaudeSettings = !!project.claude_settings_file && !!claudeSettingsStore;
         // browser_session credentials must be pre-mounted for VM/SINGLE runs because
@@ -1139,41 +1113,7 @@ export function registerLoopHandlers(services: LoopServices): LoopHandlerContext
           }
         }
 
-        // For single-mode container runs: write prompt files to /workspace so the
-        // claude CMD can read them at /workspace/<filename>. Writing to /home/ralph/.claude
-        // would shadow the mount but prompts belong in /workspace where the agent reads them.
-        // Prefer project.local_path (already volume-mounted as /workspace); fall back
-        // to a temp dir mounted as /workspace when local_path is absent.
-        if (isSingleContainer && hasPrompts) {
-          if (project.local_path) {
-            for (const [filename, content] of Object.entries(project.custom_prompts)) {
-              try {
-                const safe = path.basename(filename);
-                await fs.writeFile(path.join(project.local_path, safe), content, 'utf8');
-              } catch (err) {
-                logger.warn(`Failed to write prompt ${filename} to local_path for single-mode run`, { err });
-              }
-            }
-          } else {
-            const promptsDir = path.join(os.tmpdir(), `zephyr-prompts-${opts.projectId}`);
-            try {
-              await fs.mkdir(promptsDir, { recursive: true });
-              for (const [filename, content] of Object.entries(project.custom_prompts)) {
-                const safe = path.basename(filename);
-                await fs.writeFile(path.join(promptsDir, safe), content, 'utf8');
-              }
-              opts = {
-                ...opts,
-                volumeMounts: [...(opts.volumeMounts ?? []), `${promptsDir}:/workspace`],
-                workDir: opts.workDir ?? '/workspace',
-              };
-            } catch (err) {
-              logger.warn('Failed to prepare prompt files directory for single-mode run', { err });
-            }
-          }
-        }
-
-        // Write spec files to specs/ inside the workspace for single-mode and VM runs.
+        // Write spec files to specs/ inside the workspace for VM runs.
         // When local_path is set it is already volume-mounted as /workspace, so writing
         // to local_path/specs/ makes them available at /workspace/specs/ in the container.
         if (hasSpecFiles) {
@@ -1244,39 +1184,6 @@ export function registerLoopHandlers(services: LoopServices): LoopHandlerContext
         }
       }
 
-      // For single-mode runs with no explicit cmd, build cmd from the project's loop script.
-      // Mirrors factory mode: ./loop-script <role> <maxIterations>
-      // The role (e.g. "plan", "build") comes from the dialog selection; maxIterations from envVars.
-      // Falls back to claude --print if no loop script is configured.
-      if (opts.mode === LoopMode.SINGLE && !opts.cmd && project) {
-        const loopScript = project.loop_script;
-        const role = opts.role;
-        const singleSettings = configManager?.loadJson<AppSettings>('settings.json');
-        const singleUseKiro = singleSettings?.llm_provider === 'kiro';
-        if (loopScript) {
-          opts = {
-            ...opts,
-            cmd: ['bash', '-c', role
-              ? `${ENSURE_CLAUDE_JSON} && ./${loopScript} ${role}`
-              : `${ENSURE_CLAUDE_JSON} && ./${loopScript}`],
-          };
-        } else if (singleUseKiro) {
-          opts = {
-            ...opts,
-            cmd: role
-              ? ['bash', '-c', `kiro-cli chat --trust-all-tools --no-interactive "$(cat /workspace/PROMPT_${role}.md)"`]
-              : ['bash', '-c', `kiro-cli chat --trust-all-tools --no-interactive`],
-          };
-        } else {
-          opts = {
-            ...opts,
-            cmd: ['bash', '-c', role
-              ? `${ENSURE_CLAUDE_JSON} && claude --dangerously-skip-permissions --output-format json --print "$(cat /workspace/PROMPT_${role}.md)"`
-              : `${ENSURE_CLAUDE_JSON} && claude --dangerously-skip-permissions --output-format json`],
-          };
-        }
-      }
-
       // Stage the Kiro CLI auth database for in-container copy.
       // The working pattern (from ralph-village) is:
       //   1. Copy the host DB to a temp file (avoids VirtioFS truncation)
@@ -1307,13 +1214,13 @@ export function registerLoopHandlers(services: LoopServices): LoopHandlerContext
       // Remove any stale terminal loops for this project before starting a new one.
       // This clears leftover factory role loops when switching to a non-factory run
       // (and vice versa), so the UI doesn't show ghost entries from the previous mode.
-      for (const stale of loopRunner.listByProject(opts.projectId)) {
+      for (const stale of containerOrchestrator.listByProject(opts.projectId)) {
         if (isLoopTerminal(stale.status)) {
-          loopRunner.removeLoop(stale.projectId, stale.role);
+          containerOrchestrator.removeLoop(stale.projectId, stale.role);
         }
       }
 
-      const state = await loopRunner.startLoop(opts);
+      const state = await containerOrchestrator.startLoop(opts);
 
       // Register container with cleanup manager for automatic cleanup on shutdown
       if (cleanupManager && state.containerId) {
@@ -1384,8 +1291,7 @@ export function registerLoopHandlers(services: LoopServices): LoopHandlerContext
 
       // Ensure ~/.claude.json exists — safety net for containers running images built
       // before this file was added to generateClaudeCodeConfigBlock().
-      // Only needed for CONTINUOUS mode; SINGLE-mode containers use the CMD preamble above.
-      if (opts.mode !== LoopMode.SINGLE && state.containerId && runtime) {
+      if (state.containerId && runtime) {
         try {
           await runtime.execCommand(state.containerId, [
             'sh', '-c', ENSURE_CLAUDE_JSON,
@@ -1432,9 +1338,7 @@ export function registerLoopHandlers(services: LoopServices): LoopHandlerContext
 
       // Inject hook files into ~/.claude/hooks inside the container.
       // Uses base64 to safely transfer file contents via docker exec.
-      // Skipped for single-mode container runs: those already have hooks pre-mounted
-      // as a volume (handled above), and the agent CMD starts before exec can run.
-      if (project && project.hooks.length > 0 && state.containerId && hooksStore && runtime && opts.mode !== LoopMode.SINGLE) {
+      if (project && project.hooks.length > 0 && state.containerId && hooksStore && runtime) {
         try {
           await runtime.execCommand(state.containerId, [
             'sh', '-c', 'mkdir -p ~/.claude/hooks',
@@ -1463,9 +1367,8 @@ export function registerLoopHandlers(services: LoopServices): LoopHandlerContext
 
       // Inject custom prompt files into ~/.claude/ inside the container.
       // Uses base64 to safely transfer file contents via docker exec.
-      // VM-backed loops and single-mode container loops handle this via volume mount
-      // above; this exec path covers continuous container runs only.
-      if (project && Object.keys(project.custom_prompts).length > 0 && state.containerId && runtime && opts.mode !== LoopMode.SINGLE) {
+      // VM-backed loops handle this via volume mount above.
+      if (project && Object.keys(project.custom_prompts).length > 0 && state.containerId && runtime) {
         try {
           await runtime.execCommand(state.containerId, [
             'sh', '-c', 'mkdir -p ~/.claude',
@@ -1490,8 +1393,8 @@ export function registerLoopHandlers(services: LoopServices): LoopHandlerContext
 
       // Inject spec files into /workspace/specs/ inside the container.
       // Uses base64 to safely transfer file contents via docker exec.
-      // Single-mode container and VM runs handle this via volume mount above.
-      if (project && Object.keys(project.spec_files ?? {}).length > 0 && state.containerId && runtime && opts.mode !== LoopMode.SINGLE) {
+      // VM runs handle this via volume mount above.
+      if (project && Object.keys(project.spec_files ?? {}).length > 0 && state.containerId && runtime) {
         try {
           await runtime.execCommand(state.containerId, [
             'sh', '-c', 'mkdir -p /workspace/specs',
@@ -1516,9 +1419,8 @@ export function registerLoopHandlers(services: LoopServices): LoopHandlerContext
 
       // Inject claude settings.json into ~/.claude/settings.json inside the container.
       // Uses base64 to safely transfer file contents via docker exec.
-      // Skipped for single-mode container and VM runs: those already have the file
-      // pre-mounted as a volume (handled above).
-      if (project && project.claude_settings_file && state.containerId && claudeSettingsStore && runtime && opts.mode !== LoopMode.SINGLE) {
+      // Skipped for VM runs: those already have the file pre-mounted as a volume (handled above).
+      if (project && project.claude_settings_file && state.containerId && claudeSettingsStore && runtime) {
         try {
           const content = await claudeSettingsStore.getFile(project.claude_settings_file);
           if (content) {
@@ -1533,10 +1435,10 @@ export function registerLoopHandlers(services: LoopServices): LoopHandlerContext
         }
       }
 
-      // Inject built-in clarification notify hook for workspace-backed continuous loops.
+      // Inject built-in clarification notify hook for workspace-backed loops.
       // Must run AFTER the user's settings.json injection above so the merge sees the
       // final user settings rather than the image default.
-      if (project?.local_path && state.containerId && runtime && opts.mode !== LoopMode.SINGLE) {
+      if (project?.local_path && state.containerId && runtime) {
         try {
           await runtime.execCommand(state.containerId, ['sh', '-c', 'mkdir -p ~/.claude/hooks']);
           const hookEncoded = Buffer.from(CLARIFICATION_HOOK_SCRIPT).toString('base64');
@@ -1559,9 +1461,9 @@ export function registerLoopHandlers(services: LoopServices): LoopHandlerContext
       }
 
       // Inject built-in task-status, task-decomposition, and supervisor-action notify hooks
-      // for factory-enabled workspace-backed continuous loops. Re-derives baseSettings and
+      // for factory-enabled workspace-backed loops. Re-derives baseSettings and
       // applies all hooks so none overwrite each other (all merges are idempotent).
-      if (project?.local_path && project.factory_config?.enabled && state.containerId && runtime && opts.mode !== LoopMode.SINGLE) {
+      if (project?.local_path && project.factory_config?.enabled && state.containerId && runtime) {
         try {
           const taskHookEncoded = Buffer.from(TASK_STATUS_HOOK_SCRIPT).toString('base64');
           await runtime.execCommand(state.containerId, [
@@ -1594,8 +1496,8 @@ export function registerLoopHandlers(services: LoopServices): LoopHandlerContext
 
       // Inject Kiro config into ~/.kiro/config.json inside the container.
       // Uses base64 to safely transfer the JSON content via docker exec.
-      // Skipped for single-mode and VM runs: those already have the file pre-mounted.
-      if (project && project.kiro_config && state.containerId && runtime && opts.mode !== LoopMode.SINGLE) {
+      // Skipped for VM runs: those already have the file pre-mounted.
+      if (project && project.kiro_config && state.containerId && runtime) {
         try {
           const encoded = Buffer.from(project.kiro_config).toString('base64');
           await runtime.execCommand(state.containerId, [
@@ -1609,8 +1511,8 @@ export function registerLoopHandlers(services: LoopServices): LoopHandlerContext
 
       // Inject Kiro hook files into ~/.kiro/hooks inside the container.
       // Uses base64 to safely transfer file contents via docker exec.
-      // Skipped for single-mode and VM runs: those already have hooks pre-mounted.
-      if (project && (project.kiro_hooks ?? []).length > 0 && state.containerId && kiroHooksStore && runtime && opts.mode !== LoopMode.SINGLE) {
+      // Skipped for VM runs: those already have hooks pre-mounted.
+      if (project && (project.kiro_hooks ?? []).length > 0 && state.containerId && kiroHooksStore && runtime) {
         try {
           await runtime.execCommand(state.containerId, [
             'sh', '-c', 'mkdir -p ~/.kiro/hooks',
@@ -1727,61 +1629,29 @@ export function registerLoopHandlers(services: LoopServices): LoopHandlerContext
   }
 
   ipcMain.handle(
-    IPC.LOOP_START,
-    async (_event, rawOpts: LoopStartOpts): Promise<LoopState> => {
-      return startLoopCore(rawOpts);
-    },
-  );
-
-  ipcMain.handle(
     IPC.LOOP_STOP,
     async (_event, projectId: string, role?: string): Promise<void> => {
-      return loopRunner.stopLoop(projectId, role);
+      return containerOrchestrator.stopLoop(projectId, role);
     },
   );
 
   ipcMain.handle(IPC.LOOP_LIST, async (): Promise<LoopState[]> => {
-    return loopRunner.listAll();
+    return containerOrchestrator.listAll();
   });
 
   ipcMain.handle(
     IPC.LOOP_GET,
     async (_event, projectId: string, role?: string): Promise<LoopState | null> => {
-      return loopRunner.getLoopState(projectId, role);
+      return containerOrchestrator.getLoopState(projectId, role);
     },
   );
 
   ipcMain.handle(
     IPC.LOOP_REMOVE,
     async (_event, projectId: string, role?: string): Promise<void> => {
-      return loopRunner.removeLoop(projectId, role);
+      return containerOrchestrator.removeLoop(projectId, role);
     },
   );
-
-  // ── Scheduling ────────────────────────────────────────────────────────────
-
-  ipcMain.handle(
-    IPC.LOOP_SCHEDULE,
-    async (
-      _event,
-      projectId: string,
-      schedule: string,
-      loopOpts: Omit<LoopStartOpts, 'mode'>,
-    ): Promise<void> => {
-      scheduler.scheduleLoop(projectId, schedule, loopOpts);
-    },
-  );
-
-  ipcMain.handle(
-    IPC.LOOP_CANCEL_SCHEDULE,
-    async (_event, projectId: string): Promise<void> => {
-      scheduler.cancelSchedule(projectId);
-    },
-  );
-
-  ipcMain.handle(IPC.LOOP_LIST_SCHEDULED, async (): Promise<ScheduledLoop[]> => {
-    return scheduler.listScheduled();
-  });
 
   // ── Factory (multi-container coding factory) ────────────────────────────
 
@@ -1939,50 +1809,47 @@ export function registerLoopHandlers(services: LoopServices): LoopHandlerContext
 
       // Spawn one container per (stage, instanceIndex). Default instances=1.
       // Container role is the composite key "<stageId>-<instanceIndex>" so the
-      // existing LoopRunner naming (`zephyr-<safeName>-<role>`) yields
+      // existing ContainerOrchestrator naming (`zephyr-<safeName>-<role>`) yields
       // `zephyr-<safeName>-<stageId>-<instanceIndex>` and getLoopKey distinguishes
       // parallel instances of the same stage. The agent receives stage id and
-      // instance index as both env vars and (when using a loop script) script
-      // args so it can locate its prompt file and any per-instance state.
-      const loopScript = project.loop_script;
-      const settings = configManager?.loadJson<AppSettings>('settings.json');
-      const useKiro = settings?.llm_provider === 'kiro';
+      // instance index as env vars so it can locate its prompt file and any
+      // per-instance state.
+      //
+      // The container CMD is a polling loop that checks for
+      // @current-task-${STAGE_ID}.json every 5 seconds and invokes the LLM agent
+      // when a task is present. The initial sleep gives host setup execs (credential
+      // injection, hook installation, etc.) time to complete before the agent runs.
+      const factorySettings = configManager?.loadJson<AppSettings>('settings.json');
+      const llmProvider = factorySettings?.llm_provider ?? 'claude';
+      const agentInvocation = llmProvider === 'kiro'
+        ? `kiro-cli chat --no-interactive --trust-all-tools "$(cat /workspace/PROMPT_\${STAGE_ID}.md 2>/dev/null)"`
+        : `claude --print "$(cat /workspace/PROMPT_\${STAGE_ID}.md 2>/dev/null)" --output-format stream-json --verbose`;
+      const agentLoopScript = [
+        'export PATH="$HOME/.local/bin:$PATH"',
+        'sleep 5',
+        'while true; do',
+        '  TASK_FILE="/workspace/@current-task-${STAGE_ID}.json"',
+        '  if [ -f "$TASK_FILE" ]; then',
+        `    cd /workspace && ${agentInvocation} || true`,
+        '    rm -f "$TASK_FILE"',
+        '  fi',
+        '  sleep 5',
+        'done',
+      ].join('\n');
+      const agentLoopCmd: string[] = ['bash', '-c', agentLoopScript];
 
       const results: LoopState[] = [];
       for (const stage of pipeline.stages) {
         const instances = Math.max(1, stage.instances ?? 1);
-        const promptFile = `PROMPT_${stage.id}.md`;
         for (let instanceIndex = 0; instanceIndex < instances; instanceIndex++) {
           const role = `${stage.id}-${instanceIndex}`;
-
-          // Build the agent command. With a loop script, delegate entirely.
-          // Without one, run the agent CLI in a loop: execute the prompt,
-          // sleep, repeat. The agent protocol tells agents to write
-          // @task-status.json with status "idle" and exit when no tasks are
-          // available; the loop restarts them after a brief pause.
-          let roleCmd: string[];
-          if (loopScript) {
-            roleCmd = ['bash', '-c', `${ENSURE_CLAUDE_JSON} && ./${loopScript} ${stage.id} ${instanceIndex}`];
-          } else {
-            const agentInvocation = useKiro
-              ? `kiro-cli chat --trust-all-tools --no-interactive "$(cat /workspace/${promptFile})"`
-              : `claude --dangerously-skip-permissions --output-format json --print "$(cat /workspace/${promptFile})"`;
-            const setup = useKiro ? '' : `${ENSURE_CLAUDE_JSON}\n`;
-            // Only invoke the LLM when the host has queued exactly one task for
-            // this stage by writing @current-task-<stageId>.json. This guarantees
-            // the agent focuses on a single task per invocation and gets a fresh
-            // context window on every new task (claude --print / kiro-cli chat are
-            // both single-shot processes that exit after one response).
-            const hasTask = `[ -f /workspace/@current-task-${stage.id}.json ]`;
-            roleCmd = ['bash', '-c', `${setup}while true; do\n  if ${hasTask}; then\n    ${agentInvocation}\n  fi\n  sleep 10\ndone`];
-          }
 
           const roleOpts: LoopStartOpts = {
             ...baseOpts,
             projectId,
             projectName: project.name,
             role,
-            cmd: roleCmd,
+            cmd: agentLoopCmd,
             envVars: {
               ...(baseOpts.envVars ?? {}),
               STAGE_ID: stage.id,
@@ -2055,13 +1922,13 @@ export function registerLoopHandlers(services: LoopServices): LoopHandlerContext
     IPC.FACTORY_STOP,
     async (_event, projectId: string): Promise<void> => {
       // Find all running loops for this project and stop them
-      const projectLoops = loopRunner.listByProject(projectId);
+      const projectLoops = containerOrchestrator.listByProject(projectId);
       const activeLoops = projectLoops.filter((l) => !isLoopTerminal(l.status));
 
       const errors: Error[] = [];
       for (const loop of activeLoops) {
         try {
-          await loopRunner.stopLoop(loop.projectId, loop.role);
+          await containerOrchestrator.stopLoop(loop.projectId, loop.role);
         } catch (err) {
           errors.push(err instanceof Error ? err : new Error(String(err)));
         }
@@ -2116,12 +1983,53 @@ export function registerLoopHandlers(services: LoopServices): LoopHandlerContext
 
       // Best-effort stop — container may already be stopped or failed.
       try {
-        await loopRunner.stopLoop(projectId, role);
+        await containerOrchestrator.stopLoop(projectId, role);
       } catch {
         // Ignore — proceed to restart
       }
 
-      return startLoopCore(opts);
+      const state = await startLoopCore(opts);
+
+      // After restarting, ensure the current-task file exists for any pending
+      // task in this stage. The previous container run may have deleted the file
+      // (end-of-loop `rm -f "$TASK_FILE"`) without the agent successfully
+      // advancing the task, leaving it stranded with no signal for the new
+      // container to pick up.
+      const stageId = role.replace(/-\d+$/, '');
+      const project = projectStore?.getProject(projectId);
+      const workspacePath = project?.local_path;
+      if (workspacePath && factoryTaskStore) {
+        const taskFilePath = path.join(workspacePath, `@current-task-${stageId}.json`);
+        if (!fsSync.existsSync(taskFilePath)) {
+          const queue = factoryTaskStore.getQueue(projectId);
+          const pendingTask = queue.tasks.find((t) => t.column === stageId && !t.isEpic);
+          if (pendingTask) {
+            try {
+              // Clear any stale lock from the previous failed run
+              if (pendingTask.lockedBy) {
+                factoryTaskStore.unlockTask(projectId, pendingTask.id);
+              }
+              const locked = factoryTaskStore.lockTask(projectId, pendingTask.id, stageId);
+              fsSync.writeFileSync(taskFilePath, JSON.stringify(locked, null, 2));
+              logger.info('FACTORY_RESTART_CONTAINER: re-dispatched stranded task', {
+                projectId, stageId, taskId: pendingTask.id,
+              });
+              const updatedQueue = factoryTaskStore.getQueue(projectId);
+              BrowserWindow.getAllWindows().forEach((win) => {
+                if (!win.isDestroyed()) {
+                  win.webContents.send(IPC.FACTORY_TASK_CHANGED, projectId, updatedQueue.tasks);
+                }
+              });
+            } catch (err) {
+              logger.warn('FACTORY_RESTART_CONTAINER: failed to re-dispatch task', {
+                projectId, stageId, err,
+              });
+            }
+          }
+        }
+      }
+
+      return state;
     },
   );
 
@@ -2160,10 +2068,6 @@ export function registerLoopHandlers(services: LoopServices): LoopHandlerContext
           ...(templateOpts.envVars ?? {}),
           INSTANCE_INDEX: String(newIdx),
         },
-        // Update the CMD to use the new instance index if it's a loop script
-        cmd: templateOpts.cmd?.map((part) =>
-          part.replace(new RegExp(`${stageId} \\d+`), `${stageId} ${newIdx}`),
-        ),
       };
 
       return startLoopCore(newOpts);
@@ -2174,7 +2078,7 @@ export function registerLoopHandlers(services: LoopServices): LoopHandlerContext
   ipcMain.handle(
     IPC.FACTORY_SCALE_DOWN,
     async (_event, projectId: string, stageId: string): Promise<void> => {
-      const running = loopRunner.listAll().filter(
+      const running = containerOrchestrator.listAll().filter(
         (l) => l.projectId === projectId && l.role?.startsWith(`${stageId}-`) && !isLoopTerminal(l.status),
       );
       if (running.length <= 1) {
@@ -2190,7 +2094,7 @@ export function registerLoopHandlers(services: LoopServices): LoopHandlerContext
           maxRole = l.role ?? '';
         }
       }
-      await loopRunner.stopLoop(projectId, maxRole);
+      await containerOrchestrator.stopLoop(projectId, maxRole);
     },
   );
 
@@ -2198,7 +2102,7 @@ export function registerLoopHandlers(services: LoopServices): LoopHandlerContext
 
   // Clean up GitHub deploy keys when a loop reaches a terminal state.
   // Uses a separate onStateChange callback so cleanup is decoupled from broadcasting.
-  loopRunner.onStateChange(async (state: LoopState) => {
+  containerOrchestrator.onStateChange(async (state: LoopState) => {
     if (!isLoopTerminal(state.status)) {
       return;
     }
@@ -2277,7 +2181,7 @@ export function registerLoopHandlers(services: LoopServices): LoopHandlerContext
   // a project have terminated and the task status watcher can be torn down.
   const activeLoopKeysByProject = new Map<string, Set<string>>();
 
-  loopRunner.onStateChange((state: LoopState) => {
+  containerOrchestrator.onStateChange((state: LoopState) => {
     const windows = BrowserWindow.getAllWindows();
     windows.forEach((win) => {
       win.webContents.send(IPC.LOOP_STATE_CHANGED, state);
@@ -2552,7 +2456,7 @@ export function registerLoopHandlers(services: LoopServices): LoopHandlerContext
               }
 
               processSupervisorAction(state.projectId, actionData, {
-                loopRunner,
+                containerOrchestrator,
                 loopOptsMap,
                 restartLoop: startLoopCore,
               }).catch((err) => {
@@ -2610,7 +2514,7 @@ export function registerLoopHandlers(services: LoopServices): LoopHandlerContext
 
             // 2. Pause the PM container to stop burning tokens
             try {
-              await loopRunner.pauseLoop(state.projectId, state.role);
+              await containerOrchestrator.pauseLoop(state.projectId, state.role);
             } catch (err) {
               logger.warn('Failed to pause PM loop on clarification', { loopKey, err });
             }
@@ -2689,7 +2593,7 @@ export function registerLoopHandlers(services: LoopServices): LoopHandlerContext
 
                   // Resume the PM container
                   try {
-                    await loopRunner.resumeLoop(state.projectId, state.role);
+                    await containerOrchestrator.resumeLoop(state.projectId, state.role);
                   } catch (err) {
                     logger.warn('Failed to resume PM loop after clarification', { loopKey, err });
                   }
@@ -2786,7 +2690,7 @@ export function registerLoopHandlers(services: LoopServices): LoopHandlerContext
   let logLineBuffer: { projectId: string; line: unknown }[] = [];
   let logLineFlushTimer: NodeJS.Timeout | null = null;
 
-  loopRunner.onLogLine((projectId, line) => {
+  containerOrchestrator.onLogLine((projectId, line) => {
     logLineBuffer.push({ projectId, line });
 
     if (!logLineFlushTimer) {
@@ -2824,9 +2728,9 @@ export function registerLoopHandlers(services: LoopServices): LoopHandlerContext
       const opts = loopOptsMap.get(loopKey);
       if (!opts) break; // no more registered instances for this stage
 
-      const loop = loopRunner.getLoopState(projectId, role);
+      const loop = containerOrchestrator.getLoopState(projectId, role);
       if (loop && !isLoopTerminal(loop.status)) {
-        // Still running — let the agent pick up the task on its own.
+        // Still running — the agent polling loop will pick up the task file on its next check.
         // Upgrade pre-lock to instance-level if the task file exists and
         // the task is still at the stage-level pre-lock (e.g. "coder" → "coder-0").
         upgradeStagePreLock(projectId, stageId, role);
@@ -2915,7 +2819,7 @@ export function registerLoopHandlers(services: LoopServices): LoopHandlerContext
 
         // Stop the stuck container (it may still be running — dispatchFactoryStage
         // only restarts terminal containers, so we must kill it explicitly first).
-        loopRunner.stopLoop(projectId, stuckRole).catch(() => { /* already stopped */ });
+        containerOrchestrator.stopLoop(projectId, stuckRole).catch(() => { /* already stopped */ });
 
         // Unlock so the restarted container can acquire a fresh instance-level lock
         try { factoryTaskStore.unlockTask(projectId, task.id); } catch { /* ignore */ }

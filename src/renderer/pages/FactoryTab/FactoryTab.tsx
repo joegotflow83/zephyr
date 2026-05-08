@@ -2,13 +2,15 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { KanbanBoard } from './KanbanBoard';
 import { TaskDetailPanel } from './TaskDetailPanel';
 import { AddTaskForm } from './AddTaskForm';
-import { FactoryFlowView } from '../LoopsTab/FactoryFlowView';
+import { FactoryFlowView } from './FactoryFlowView';
+import { LogViewer } from '../../components/LogViewer/LogViewer';
 import { useFactoryTasks } from '../../hooks/useFactoryTasks';
 import { useAppStore } from '../../stores/app-store';
 import type { FactoryTask } from '../../../shared/factory-types';
 import type { LoopState } from '../../../shared/loop-types';
 import { getLoopKey, isLoopTerminal, LoopMode } from '../../../shared/loop-types';
 import { useLoops } from '../../hooks/useLoops';
+import { parseLogLine } from '../../utils/parseLogLine';
 
 export const FactoryTab: React.FC = () => {
   const projects = useAppStore((s) => s.projects);
@@ -94,6 +96,18 @@ export const FactoryTab: React.FC = () => {
     }
     return counts;
   }, [projectLoops]);
+
+  // Derive selected loop and its parsed log lines for the drawer
+  const selectedLoop = useMemo<LoopState | undefined>(
+    () => selectedLoopKey ? loops.find((l) => getLoopKey(l) === selectedLoopKey) : undefined,
+    [loops, selectedLoopKey],
+  );
+
+  const parsedLogs = useMemo(
+    () => (selectedLoop?.logs ?? []).map(parseLogLine),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [selectedLoop?.logs],
+  );
 
   const handleMoveTask = useCallback(
     async (taskId: string, targetColumn: string) => {
@@ -310,6 +324,37 @@ export const FactoryTab: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* Agent log drawer */}
+      {selectedLoop && (
+        <div className="flex-shrink-0 border-t border-gray-700" style={{ height: '280px' }}>
+          <div className="flex items-center gap-2 px-3 py-1.5 bg-gray-800 border-b border-gray-700">
+            <span className="text-xs font-medium text-gray-300 truncate">
+              Logs: {selectedLoop.role ?? selectedLoop.projectId}
+            </span>
+            <div className="flex-1" />
+            <button
+              onClick={() => {
+                window.api.logs.export(selectedLoop.projectId, 'text').catch(() => undefined);
+              }}
+              className="px-2 py-0.5 text-xs bg-gray-700 hover:bg-gray-600 text-gray-300 rounded transition-colors"
+              title="Export logs"
+            >
+              Export
+            </button>
+            <button
+              onClick={() => setSelectedLoopKey(null)}
+              className="px-2 py-0.5 text-xs bg-gray-700 hover:bg-gray-600 text-gray-300 rounded transition-colors"
+              title="Close log viewer"
+            >
+              ✕
+            </button>
+          </div>
+          <div className="h-[calc(100%-32px)]">
+            <LogViewer lines={parsedLogs} autoScroll={true} />
+          </div>
+        </div>
+      )}
 
       {/* Add task form */}
       {selectedProjectId && (

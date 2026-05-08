@@ -41,14 +41,10 @@ export const IPC = {
   CREDENTIALS_CHECK_AUTH: 'credentials:check-auth',
 
   // Loop execution
-  LOOP_START: 'loop:start',
   LOOP_STOP: 'loop:stop',
   LOOP_LIST: 'loop:list',
   LOOP_GET: 'loop:get',
   LOOP_REMOVE: 'loop:remove',
-  LOOP_SCHEDULE: 'loop:schedule',
-  LOOP_CANCEL_SCHEDULE: 'loop:cancel-schedule',
-  LOOP_LIST_SCHEDULED: 'loop:list-scheduled',
 
   // Loop events (outbound from main to renderer)
   LOOP_STATE_CHANGED: 'loop:state-changed',
@@ -127,12 +123,6 @@ export const IPC = {
   HOOKS_GET: 'hooks:get',
   HOOKS_ADD: 'hooks:add',
   HOOKS_REMOVE: 'hooks:remove',
-
-  // Loop scripts
-  LOOP_SCRIPTS_LIST: 'loop-scripts:list',
-  LOOP_SCRIPTS_GET: 'loop-scripts:get',
-  LOOP_SCRIPTS_ADD: 'loop-scripts:add',
-  LOOP_SCRIPTS_REMOVE: 'loop-scripts:remove',
 
   // Kiro hooks
   KIRO_HOOKS_LIST: 'kiro-hooks:list',

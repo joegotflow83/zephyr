@@ -3,9 +3,9 @@ import { useRuntimeStatus } from '../../hooks/useRuntimeStatus';
 
 export interface StatusBarProps {
   /**
-   * Number of active loops (RUNNING or STARTING status)
+   * Number of projects with active factory containers (RUNNING or STARTING status)
    */
-  activeLoopCount?: number;
+  activeFactoryCount?: number;
 
   /**
    * Application version to display (optional)
@@ -15,9 +15,9 @@ export interface StatusBarProps {
 
 /**
  * StatusBar component displays real-time system status at the bottom of the application.
- * Shows runtime connection state, active loop count, and optional version information.
+ * Shows runtime connection state, active factory count, and optional version information.
  */
-export function StatusBar({ activeLoopCount = 0, appVersion }: StatusBarProps) {
+export function StatusBar({ activeFactoryCount = 0, appVersion }: StatusBarProps) {
   const { available, info, runtimeType } = useRuntimeStatus();
   const runtimeLabel = runtimeType === 'docker' ? 'Docker' : 'Podman';
 
@@ -44,13 +44,13 @@ export function StatusBar({ activeLoopCount = 0, appVersion }: StatusBarProps) {
         )}
       </div>
 
-      {/* Center section: Active loops */}
+      {/* Center section: Active factories */}
       <div className="flex items-center space-x-2">
-        {activeLoopCount > 0 && (
+        {activeFactoryCount > 0 && (
           <div className="flex items-center space-x-1.5">
             <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
             <span className="text-xs">
-              {activeLoopCount} {activeLoopCount === 1 ? 'loop' : 'loops'} running
+              {activeFactoryCount} {activeFactoryCount === 1 ? 'factory' : 'factories'} running
             </span>
           </div>
         )}

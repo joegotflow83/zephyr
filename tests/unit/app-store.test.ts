@@ -225,7 +225,7 @@ describe('useAppStore', () => {
         {
           projectId: '1',
           containerId: 'container-1',
-          mode: LoopMode.SINGLE,
+          mode: LoopMode.CONTINUOUS,
           status: LoopStatus.RUNNING,
           iteration: 1,
           startedAt: '2024-01-01T00:00:00Z',
@@ -245,7 +245,7 @@ describe('useAppStore', () => {
       const loop: LoopState = {
         projectId: '1',
         containerId: 'container-1',
-        mode: LoopMode.SINGLE,
+        mode: LoopMode.CONTINUOUS,
         status: LoopStatus.STARTING,
         iteration: 0,
         startedAt: '2024-01-01T00:00:00Z',
@@ -272,7 +272,7 @@ describe('useAppStore', () => {
       const loop: LoopState = {
         projectId: '1',
         containerId: 'container-1',
-        mode: LoopMode.SINGLE,
+        mode: LoopMode.CONTINUOUS,
         status: LoopStatus.RUNNING,
         iteration: 1,
         startedAt: '2024-01-01T00:00:00Z',
@@ -291,7 +291,7 @@ describe('useAppStore', () => {
       const loop: LoopState = {
         projectId: '1',
         containerId: 'container-1',
-        mode: LoopMode.SINGLE,
+        mode: LoopMode.CONTINUOUS,
         status: LoopStatus.RUNNING,
         iteration: 1,
         startedAt: '2024-01-01T00:00:00Z',
@@ -311,7 +311,7 @@ describe('useAppStore', () => {
         {
           projectId: '1',
           containerId: 'container-1',
-          mode: LoopMode.SINGLE,
+          mode: LoopMode.CONTINUOUS,
           status: LoopStatus.RUNNING,
           iteration: 1,
           startedAt: '2024-01-01T00:00:00Z',
@@ -521,7 +521,7 @@ describe('useAppStore', () => {
       const loopState: LoopState = {
         projectId: '1',
         containerId: 'container-1',
-        mode: LoopMode.SINGLE,
+        mode: LoopMode.CONTINUOUS,
         status: LoopStatus.RUNNING,
         iteration: 1,
         startedAt: '2024-01-01T00:00:00Z',

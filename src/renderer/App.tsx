@@ -4,18 +4,16 @@ import { TabBar, TabId, Tab } from './components/TabBar/TabBar';
 import { StatusBar } from './components/StatusBar/StatusBar';
 import { Toast } from './components/Toast/Toast';
 import { ProjectsTab } from './pages/ProjectsTab/ProjectsTab';
-import { LoopsTab } from './pages/LoopsTab/LoopsTab';
 import { TerminalTab } from './pages/TerminalTab/TerminalTab';
 import { SettingsTab } from './pages/SettingsTab/SettingsTab';
 import { ImagesTab } from './pages/ImagesTab/ImagesTab';
 import { FactoryTab } from './pages/FactoryTab/FactoryTab';
-import { useActiveLoops } from './hooks/useActiveLoops';
+import { useActiveFactories } from './hooks/useActiveFactories';
 import { useToast } from './hooks/useToast';
 import { useAppStore } from './stores/app-store';
 
 const tabs: Tab[] = [
   { id: 'projects', label: 'Projects', icon: '📁' },
-  { id: 'loops', label: 'Running Loops', icon: '🔄' },
   { id: 'factory', label: 'Factory', icon: '🏭' },
   { id: 'terminal', label: 'Terminal', icon: '💻' },
   { id: 'images', label: 'Images', icon: '🖼️' },
@@ -24,7 +22,7 @@ const tabs: Tab[] = [
 
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabId>('projects');
-  const activeLoopCount = useActiveLoops();
+  const activeFactoryCount = useActiveFactories();
   const { toasts, dismissToast, success, error, warning, info } = useToast();
   const settings = useAppStore((s) => s.settings);
 
@@ -54,7 +52,7 @@ const App: React.FC = () => {
   // Keyboard shortcuts: Ctrl+1/2/3/4/5 for tab switching
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.ctrlKey && e.key >= '1' && e.key <= '6') {
+      if (e.ctrlKey && e.key >= '1' && e.key <= '5') {
         e.preventDefault();
         const tabIndex = parseInt(e.key, 10) - 1;
         const newTab = tabs[tabIndex];
@@ -73,13 +71,10 @@ const App: React.FC = () => {
   return (
     <Layout
       header={<TabBar tabs={tabs} activeTab={activeTab} onTabChange={setActiveTab} />}
-      statusBar={<StatusBar activeLoopCount={activeLoopCount} />}
+      statusBar={<StatusBar activeFactoryCount={activeFactoryCount} />}
     >
       <div style={{ display: activeTab === 'projects' ? undefined : 'none', height: '100%' }}>
-        <ProjectsTab onRunProject={() => setActiveTab('loops')} toast={toastMethods} />
-      </div>
-      <div style={{ display: activeTab === 'loops' ? undefined : 'none', height: '100%' }}>
-        <LoopsTab />
+        <ProjectsTab toast={toastMethods} />
       </div>
       <div style={{ display: activeTab === 'factory' ? undefined : 'none', height: '100%' }}>
         <FactoryTab />

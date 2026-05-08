@@ -19,14 +19,14 @@ import {
   FactoryFlowView,
   stageIdFromRole,
   instanceIndexFromRole,
-} from '../../src/renderer/pages/LoopsTab/FactoryFlowView';
+} from '../../src/renderer/pages/FactoryTab/FactoryFlowView';
 import { createLoopState, LoopStatus, LoopMode } from '../../src/shared/loop-types';
 
 /* ── Helper ──────────────────────────────────────────────────────────────── */
 
 function makeLoop(projectId: string, role: string, status = LoopStatus.RUNNING) {
   return {
-    ...createLoopState(projectId, LoopMode.SINGLE, 'test-project', role),
+    ...createLoopState(projectId, LoopMode.CONTINUOUS, 'test-project', role),
     status,
     iteration: 1,
     lastLogAt: Date.now(),

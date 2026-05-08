@@ -4,9 +4,8 @@
  * Validates:
  * - Projects table rendering with correct data
  * - Empty state display when no projects exist
- * - Action buttons (Add, Edit, Delete, Run) trigger callbacks
+ * - Action buttons (Add, Edit, Delete) trigger callbacks
  * - Loading and error states
- * - Status badges reflect loop state correctly
  */
 
 import React from 'react';
@@ -15,7 +14,6 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { ProjectsTab } from '../../src/renderer/pages/ProjectsTab/ProjectsTab';
 import { createProjectConfig } from '../../src/shared/models';
-import { createLoopState, LoopStatus, LoopMode } from '../../src/shared/loop-types';
 import { useAppStore } from '../../src/renderer/stores/app-store';
 
 // Mock the hooks
@@ -23,12 +21,7 @@ vi.mock('../../src/renderer/hooks/useProjects', () => ({
   useProjects: vi.fn(),
 }));
 
-vi.mock('../../src/renderer/hooks/useLoops', () => ({
-  useLoops: vi.fn(),
-}));
-
 import { useProjects } from '../../src/renderer/hooks/useProjects';
-import { useLoops } from '../../src/renderer/hooks/useLoops';
 
 describe('ProjectsTab', () => {
   const mockRefresh = vi.fn();
@@ -36,7 +29,6 @@ describe('ProjectsTab', () => {
   const mockUpdate = vi.fn();
   const mockRemove = vi.fn();
   const mockGet = vi.fn();
-  const mockLoopGet = vi.fn();
   const mockToast = {
     success: vi.fn(),
     error: vi.fn(),
@@ -52,9 +44,6 @@ describe('ProjectsTab', () => {
 
     // Set up window.api mock (must use global.window.api, never replace global.window)
     global.window.api = {
-      loops: {
-        start: vi.fn().mockResolvedValue({}),
-      },
       projects: {
         remove: vi.fn().mockResolvedValue(undefined),
         add: vi.fn().mockResolvedValue(undefined),
@@ -72,23 +61,6 @@ describe('ProjectsTab', () => {
       update: mockUpdate,
       remove: mockRemove,
       get: mockGet,
-    });
-
-    vi.mocked(useLoops).mockReturnValue({
-      loops: [],
-      loading: false,
-      error: null,
-      refresh: vi.fn(),
-      start: vi.fn(),
-      stop: vi.fn(),
-      remove: vi.fn(),
-      get: mockLoopGet,
-      getForProject: vi.fn().mockReturnValue(undefined),
-      factoryStart: vi.fn(),
-      factoryStop: vi.fn(),
-      schedule: vi.fn(),
-      cancelSchedule: vi.fn(),
-      listScheduled: vi.fn(),
     });
   });
 
@@ -108,8 +80,6 @@ describe('ProjectsTab', () => {
       const addButton = screen.getByRole('button', { name: /Add Your First Project/i });
       await user.click(addButton);
 
-      // Note: Action will be implemented in Task 7.4
-      // For now, just verify button is clickable
       expect(addButton).toBeInTheDocument();
     });
   });
@@ -169,7 +139,6 @@ describe('ProjectsTab', () => {
       expect(screen.getByText('Name')).toBeInTheDocument();
       expect(screen.getByText('Repository')).toBeInTheDocument();
       expect(screen.getByText('Docker Image')).toBeInTheDocument();
-      expect(screen.getByText('Status')).toBeInTheDocument();
       expect(screen.getByText('Actions')).toBeInTheDocument();
     });
 
@@ -233,111 +202,8 @@ describe('ProjectsTab', () => {
     });
   });
 
-  describe('Status Badges', () => {
-    it('shows Idle status when no loop is running', () => {
-      const project = createProjectConfig({ name: 'Test Project' });
-
-      vi.mocked(useProjects).mockReturnValue({
-        projects: [project],
-        loading: false,
-        error: null,
-        refresh: mockRefresh,
-        add: mockAdd,
-        update: mockUpdate,
-        remove: mockRemove,
-        get: mockGet,
-      });
-
-      mockLoopGet.mockReturnValue(undefined);
-
-      render(<ProjectsTab toast={mockToast} />);
-
-      expect(screen.getByText('Idle')).toBeInTheDocument();
-    });
-
-    it('shows Running status when loop is active', () => {
-      const project = createProjectConfig({ name: 'Test Project' });
-      const loop: LoopState = {
-        ...createLoopState(project.id, LoopMode.CONTINUOUS),
-        status: LoopStatus.RUNNING,
-      };
-
-      vi.mocked(useProjects).mockReturnValue({
-        projects: [project],
-        loading: false,
-        error: null,
-        refresh: mockRefresh,
-        add: mockAdd,
-        update: mockUpdate,
-        remove: mockRemove,
-        get: mockGet,
-      });
-
-      vi.mocked(useLoops).mockReturnValue({
-        loops: [loop],
-        loading: false,
-        error: null,
-        refresh: vi.fn(),
-        start: vi.fn(),
-        stop: vi.fn(),
-        remove: vi.fn(),
-        get: (id: string) => (id === project.id ? loop : undefined),
-        getForProject: (id: string) => (id === project.id ? loop : undefined),
-        factoryStart: vi.fn(),
-        factoryStop: vi.fn(),
-        schedule: vi.fn(),
-        cancelSchedule: vi.fn(),
-        listScheduled: vi.fn(),
-      });
-
-      render(<ProjectsTab toast={mockToast} />);
-
-      expect(screen.getByText('Running')).toBeInTheDocument();
-    });
-
-    it('shows Starting status when loop is starting', () => {
-      const project = createProjectConfig({ name: 'Test Project' });
-      const loop: LoopState = {
-        ...createLoopState(project.id, LoopMode.SINGLE),
-        status: LoopStatus.STARTING,
-      };
-
-      vi.mocked(useProjects).mockReturnValue({
-        projects: [project],
-        loading: false,
-        error: null,
-        refresh: mockRefresh,
-        add: mockAdd,
-        update: mockUpdate,
-        remove: mockRemove,
-        get: mockGet,
-      });
-
-      vi.mocked(useLoops).mockReturnValue({
-        loops: [loop],
-        loading: false,
-        error: null,
-        refresh: vi.fn(),
-        start: vi.fn(),
-        stop: vi.fn(),
-        remove: vi.fn(),
-        get: (id: string) => (id === project.id ? loop : undefined),
-        getForProject: (id: string) => (id === project.id ? loop : undefined),
-        factoryStart: vi.fn(),
-        factoryStop: vi.fn(),
-        schedule: vi.fn(),
-        cancelSchedule: vi.fn(),
-        listScheduled: vi.fn(),
-      });
-
-      render(<ProjectsTab toast={mockToast} />);
-
-      expect(screen.getByText('Starting')).toBeInTheDocument();
-    });
-  });
-
   describe('Action Buttons', () => {
-    it('renders action buttons for each project', () => {
+    it('renders Edit and Delete buttons for each project', () => {
       const project = createProjectConfig({ name: 'Test Project' });
 
       vi.mocked(useProjects).mockReturnValue({
@@ -353,81 +219,8 @@ describe('ProjectsTab', () => {
 
       render(<ProjectsTab toast={mockToast} />);
 
-      expect(screen.getByRole('button', { name: /Run/i })).toBeInTheDocument();
       expect(screen.getByRole('button', { name: /Edit/i })).toBeInTheDocument();
       expect(screen.getByRole('button', { name: /Delete/i })).toBeInTheDocument();
-    });
-
-    it('disables Run button when project is already running', () => {
-      const project = createProjectConfig({ name: 'Test Project' });
-      const loop: LoopState = {
-        ...createLoopState(project.id, LoopMode.CONTINUOUS),
-        status: LoopStatus.RUNNING,
-      };
-
-      vi.mocked(useProjects).mockReturnValue({
-        projects: [project],
-        loading: false,
-        error: null,
-        refresh: mockRefresh,
-        add: mockAdd,
-        update: mockUpdate,
-        remove: mockRemove,
-        get: mockGet,
-      });
-
-      vi.mocked(useLoops).mockReturnValue({
-        loops: [loop],
-        loading: false,
-        error: null,
-        refresh: vi.fn(),
-        start: vi.fn(),
-        stop: vi.fn(),
-        remove: vi.fn(),
-        get: (id: string) => (id === project.id ? loop : undefined),
-        getForProject: (id: string) => (id === project.id ? loop : undefined),
-        factoryStart: vi.fn(),
-        factoryStop: vi.fn(),
-        schedule: vi.fn(),
-        cancelSchedule: vi.fn(),
-        listScheduled: vi.fn(),
-      });
-
-      render(<ProjectsTab toast={mockToast} />);
-
-      const runButton = screen.getByRole('button', { name: /Run/i });
-      expect(runButton).toBeDisabled();
-    });
-
-    it('calls onRunProject callback when Run is clicked', async () => {
-      const user = userEvent.setup();
-      const onRunProject = vi.fn();
-      const project = createProjectConfig({ name: 'Test Project' });
-
-      vi.mocked(useProjects).mockReturnValue({
-        projects: [project],
-        loading: false,
-        error: null,
-        refresh: mockRefresh,
-        add: mockAdd,
-        update: mockUpdate,
-        remove: mockRemove,
-        get: mockGet,
-      });
-
-      render(<ProjectsTab toast={mockToast} onRunProject={onRunProject} />);
-
-      // Click Run to open the RunModeDialog, then confirm
-      const runButton = screen.getByRole('button', { name: /^Run$/ });
-      await user.click(runButton);
-
-      // Dialog opens — click the Run button inside it to confirm
-      const dialogRunButton = screen.getAllByRole('button', { name: /^Run$/ }).at(-1)!;
-      await user.click(dialogRunButton);
-
-      await waitFor(() => {
-        expect(onRunProject).toHaveBeenCalled();
-      });
     });
   });
 
@@ -438,81 +231,6 @@ describe('ProjectsTab', () => {
       await waitFor(() => {
         expect(mockRefresh).toHaveBeenCalledTimes(1);
       });
-    });
-  });
-
-  describe('Multipass Unavailable', () => {
-    it('shows toast error when running a VM project and Multipass is not available', async () => {
-      const user = userEvent.setup();
-      // Use ephemeral mode so the Run button is not gated on VM running state
-      const vmProject = createProjectConfig({
-        name: 'VM Project',
-        sandbox_type: 'vm',
-        vm_config: { vm_mode: 'ephemeral', cpus: 2, memory_gb: 4, disk_gb: 20 },
-      });
-
-      useAppStore.setState({ multipassAvailable: false });
-
-      vi.mocked(useProjects).mockReturnValue({
-        projects: [vmProject],
-        loading: false,
-        error: null,
-        refresh: mockRefresh,
-        add: mockAdd,
-        update: mockUpdate,
-        remove: mockRemove,
-        get: mockGet,
-      });
-
-      render(<ProjectsTab toast={mockToast} />);
-
-      const runButton = screen.getByRole('button', { name: /Run/i });
-      await user.click(runButton);
-
-      expect(mockToast.error).toHaveBeenCalledWith(
-        expect.stringContaining('Multipass is not installed')
-      );
-      expect(global.window.api.loops.start).not.toHaveBeenCalled();
-    });
-
-    it('starts loop normally for ephemeral VM project when Multipass is available', async () => {
-      const user = userEvent.setup();
-      // Use ephemeral mode so the Run button is not gated on VM running state
-      const vmProject = createProjectConfig({
-        name: 'VM Project',
-        sandbox_type: 'vm',
-        vm_config: { vm_mode: 'ephemeral', cpus: 2, memory_gb: 4, disk_gb: 20 },
-      });
-
-      useAppStore.setState({ multipassAvailable: true });
-
-      vi.mocked(useProjects).mockReturnValue({
-        projects: [vmProject],
-        loading: false,
-        error: null,
-        refresh: mockRefresh,
-        add: mockAdd,
-        update: mockUpdate,
-        remove: mockRemove,
-        get: mockGet,
-      });
-
-      render(<ProjectsTab toast={mockToast} />);
-
-      // Click Run to open the RunModeDialog, then confirm
-      const runButton = screen.getByRole('button', { name: /^Run$/ });
-      await user.click(runButton);
-
-      // Dialog opens — click the Run button inside it to confirm
-      const dialogRunButton = screen.getAllByRole('button', { name: /^Run$/ }).at(-1)!;
-      await user.click(dialogRunButton);
-
-      await waitFor(() => {
-        expect(global.window.api.loops.start).toHaveBeenCalled();
-      });
-      expect(mockToast.error).not.toHaveBeenCalledWith(
-        expect.stringContaining('Multipass is not installed')
-      );
     });
   });
 });
