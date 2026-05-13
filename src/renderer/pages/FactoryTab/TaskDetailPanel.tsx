@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import type { FactoryTask, TaskHistoryEntry } from '../../../shared/factory-types';
+import type { FactoryTask, TaskHistoryEntry, TaskNote } from '../../../shared/factory-types';
 import type { Pipeline } from '../../../shared/pipeline-types';
 import { deriveTransitions } from '../../../lib/pipeline/transitions';
 
@@ -356,6 +356,35 @@ export const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
               </div>
             )}
           </div>
+
+          {/* Agent Notes */}
+          {(task.notes?.length ?? 0) > 0 && (
+            <div>
+              <label className="block text-xs font-semibold uppercase tracking-wide text-gray-400 mb-1">
+                Agent Notes
+              </label>
+              <div className="space-y-2">
+                {[...(task.notes ?? [])].reverse().map((note: TaskNote, i: number) => (
+                  <div key={i} className="rounded bg-gray-800 border border-gray-700 px-3 py-2">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-[10px] font-semibold text-blue-400 uppercase tracking-wide">
+                        {note.stage}
+                      </span>
+                      {note.actor && (
+                        <span className="text-[10px] text-gray-500 font-mono">{note.actor}</span>
+                      )}
+                      <span className="text-[10px] text-gray-600 ml-auto shrink-0">
+                        {formatTimestamp(note.timestamp)}
+                      </span>
+                    </div>
+                    <pre className="text-xs text-gray-300 whitespace-pre-wrap font-sans leading-relaxed">
+                      {note.content}
+                    </pre>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Timestamps */}
           <div className="space-y-1 text-xs text-gray-500">

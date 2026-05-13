@@ -37,6 +37,21 @@ export interface TaskHistoryEntry {
 }
 
 /**
+ * A summary note written by an agent when it finishes a stage and advances
+ * (or rejects) a task. Provides a human-readable record of what was done.
+ */
+export interface TaskNote {
+  /** ISO 8601 timestamp of when the note was written */
+  timestamp: string;
+  /** The stage that produced this note (e.g. "coder", "qa") */
+  stage: string;
+  /** Container identity that wrote the note (e.g. "coder-0") */
+  actor?: string;
+  /** Markdown summary of the work performed during this stage */
+  content: string;
+}
+
+/**
  * A single task tracked through the factory pipeline.
  *
  * `column` is a free-form string because dynamic pipelines define their own
@@ -95,6 +110,11 @@ export interface FactoryTask {
   lastErrorAt?: string;
   /** Audit trail of task lifecycle events */
   history?: TaskHistoryEntry[];
+  /**
+   * Agent-written summaries produced each time a stage transitions the task.
+   * Appended (never replaced) so each entry represents one stage's work.
+   */
+  notes?: TaskNote[];
 }
 
 /**

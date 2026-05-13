@@ -101,11 +101,13 @@ matching is no longer supported (two tasks can share a title).
   "taskId": "<task id>",
   "status": "forward",
   "fromStage": "<your stage id>",
-  "timestamp": "<ISO 8601>"
+  "timestamp": "<ISO 8601>",
+  "summary": "<Markdown summary of what you did — optional but strongly recommended>"
 }
 \`\`\`
 The host derives the destination from the pipeline definition and clears
-\`lockedBy\` for you.
+\`lockedBy\` for you. If \`summary\` is provided it is appended to the task's
+\`notes\` array so humans can review a per-stage history of work.
 
 ### \`rejected\` — send the task back to an earlier stage
 \`\`\`json
@@ -114,14 +116,16 @@ The host derives the destination from the pipeline definition and clears
   "status": "rejected",
   "fromStage": "<your stage id>",
   "toStage": "<earlier stage id>",
-  "timestamp": "<ISO 8601>"
+  "timestamp": "<ISO 8601>",
+  "summary": "<Markdown summary of what you found and why you are rejecting — optional but strongly recommended>"
 }
 \`\`\`
 \`toStage\` must be an earlier stage in the pipeline. The host increments
 \`bounceCount\`; once it reaches \`bounceLimit\` the task is escalated to
 Blocked instead. Always write a handover note at
 \`team/handovers/<taskId>-<fromStage>-to-<toStage>.md\` before signalling
-rejection so the receiving agent has context.
+rejection so the receiving agent has context. The \`summary\` field is also
+stored on the task so the full rejection rationale is visible in the UI.
 
 ### \`locked\` — claim a task before doing work
 \`\`\`json
@@ -359,6 +363,12 @@ export interface TaskStatusUpdate {
   /** Optional human-readable reason for rejection. Stored as `lastError` on
    *  the task and appended to the task's history trail. */
   reason?: string;
+  /**
+   * Optional Markdown summary of the work performed during this stage.
+   * Appended to `task.notes` on a `forward` or `rejected` transition so
+   * humans can see a per-stage history of what each agent did.
+   */
+  summary?: string;
 }
 
 /**
@@ -535,7 +545,7 @@ export function processTaskStatusUpdate(
           // PM may legitimately re-signal a completed task.
           return false;
         }
-        deps.factoryTaskStore.moveTask(projectId, task.id, next);
+        deps.factoryTaskStore.moveTask(projectId, task.id, next, { note: data.summary });
         return true;
       }
 
@@ -552,7 +562,7 @@ export function processTaskStatusUpdate(
         // bounces on stages that would just forward the task anyway. Pass
         // agentRejection:true to bypass the kanban adjacency constraint while
         // still enforcing bounce counting and Blocked escalation.
-        const movedTask = deps.factoryTaskStore.moveTask(projectId, task.id, data.toStage, { agentRejection: true, reason: data.reason });
+        const movedTask = deps.factoryTaskStore.moveTask(projectId, task.id, data.toStage, { agentRejection: true, reason: data.reason, note: data.summary });
         // Phase 2.10: when the host overrode the destination to 'blocked'
         // (bounce limit exceeded), write a PM-addressed handover. The guard
         // `data.toStage !== 'blocked'` distinguishes a host redirect (agent

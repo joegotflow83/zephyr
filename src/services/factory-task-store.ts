@@ -22,6 +22,7 @@ import {
   FactoryTask,
   FactoryTaskQueue,
   TaskHistoryEntry,
+  TaskNote,
 } from '../shared/factory-types';
 import type { Pipeline } from '../shared/pipeline-types';
 import { columnsFor } from '../shared/pipeline-types';
@@ -178,7 +179,7 @@ export class FactoryTaskStore {
    *
    * @returns The updated task.
    */
-  moveTask(projectId: string, taskId: string, toColumn: string, opts?: { agentRejection?: boolean; reason?: string }): FactoryTask {
+  moveTask(projectId: string, taskId: string, toColumn: string, opts?: { agentRejection?: boolean; reason?: string; note?: string }): FactoryTask {
     const queue = this.getQueue(projectId);
     const idx = queue.tasks.findIndex((t) => t.id === taskId);
     if (idx === -1) {
@@ -257,6 +258,16 @@ export class FactoryTaskStore {
     const historyUpdated =
       task.column !== targetColumn ? [...prevHistory, entry] : prevHistory;
 
+    // Append agent summary note when provided (forward or rejected transitions).
+    const noteEntry: TaskNote | undefined = opts?.note
+      ? {
+          timestamp: now,
+          stage: task.column,
+          actor: task.lockedBy ?? undefined,
+          content: opts.note,
+        }
+      : undefined;
+
     const updated: FactoryTask = {
       ...task,
       column: targetColumn,
@@ -266,6 +277,7 @@ export class FactoryTaskStore {
       lastError: isBackward ? rejectionReason : task.lastError,
       lastErrorAt: isBackward ? now : task.lastErrorAt,
       history: historyUpdated,
+      notes: noteEntry ? [...(task.notes ?? []), noteEntry] : task.notes,
     };
     // Clear error on forward progress past the first stage
     if (!isBackward && targetColumn !== task.column) {
@@ -643,6 +655,9 @@ function migrateLegacyTask(task: FactoryTask): FactoryTask {
   }
   if (!Array.isArray(migrated.history)) {
     migrated = { ...migrated, history: [] };
+  }
+  if (!Array.isArray(migrated.notes)) {
+    migrated = { ...migrated, notes: [] };
   }
   return migrated;
 }
