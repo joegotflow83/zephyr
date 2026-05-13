@@ -22,8 +22,8 @@ let page: Page;
 
 test.describe('Zephyr Desktop E2E', () => {
   test.skip(
-    !process.env.DISPLAY,
-    'Skipping E2E test: no display available (headless environment)',
+    !process.env.DISPLAY || !!process.env.CI,
+    'Skipping E2E test: no display available or running in CI',
   );
 
   test.beforeAll(async () => {

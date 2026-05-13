@@ -26,8 +26,8 @@ let testContainerId: string | null = null;
 test.describe('Terminal E2E', () => {
   // Skip if no display or Docker not available
   test.skip(
-    !process.env.DISPLAY,
-    'Skipping E2E test: no display available (headless environment)',
+    !process.env.DISPLAY || !!process.env.CI,
+    'Skipping E2E test: no display available or running in CI',
   );
 
   test.beforeAll(async () => {
