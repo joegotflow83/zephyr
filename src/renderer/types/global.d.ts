@@ -344,6 +344,8 @@ declare global {
       app: {
         /** Listen for the app-ready event (fires after startup completes). Returns cleanup function. */
         onReady: (callback: () => void) => () => void;
+        /** The operating system platform (e.g. 'linux', 'darwin', 'win32'). */
+        platform: string;
       };
 
       shell: {

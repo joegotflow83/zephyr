@@ -3,6 +3,7 @@ import type { AutoUpdateState } from '../../../services/auto-updater';
 
 export const UpdatesSection: React.FC = () => {
   const [state, setState] = useState<AutoUpdateState>({ status: 'idle' });
+  const isManualInstall = window.api.app.platform !== 'win32';
 
   useEffect(() => {
     // SettingsTab is always mounted, so this listener is set up on app launch
@@ -124,7 +125,7 @@ export const UpdatesSection: React.FC = () => {
             className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-gray-800"
             data-testid="install-button"
           >
-            Install & Restart
+            {isManualInstall ? 'Open Installer' : 'Install & Restart'}
           </button>
         </div>
       )}

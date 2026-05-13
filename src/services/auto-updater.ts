@@ -7,7 +7,7 @@
  */
 
 import { autoUpdater, UpdateInfo } from 'electron-updater';
-import { app, BrowserWindow, dialog } from 'electron';
+import { app, BrowserWindow, dialog, shell } from 'electron';
 import { getLogger } from './logging';
 
 const logger = getLogger('updater');
@@ -39,6 +39,7 @@ export class AutoUpdater {
   private checkOnStartupDelay = 10000; // 10 seconds
   private startupCheckCompleted = false;
   private quitAndInstallPending = false;
+  private downloadedFilePath: string | null = null;
 
   constructor() {
     // Configure auto-updater
@@ -149,7 +150,25 @@ export class AutoUpdater {
   }
 
   /**
-   * Install the downloaded update and restart the app
+   * Install the downloaded update and restart the app.
+   *
+   * On Linux and macOS, electron-updater's built-in quitAndInstall is
+   * unreliable:
+   *
+   *  - Linux (RPM/DEB): uses pkexec which races against the app quitting,
+   *    may fail silently, and the isForceRunAfter relaunch fires before the
+   *    new binary is in place.
+   *
+   *  - macOS (ZIP): Electron Forge's publisher does not emit the
+   *    latest-mac.yml checksum file that electron-updater requires to verify
+   *    and install the ZIP. Without it the install step fails silently.
+   *
+   * For both platforms we open the downloaded file with the OS default handler
+   * (system package manager on Linux; Archive Utility on macOS) and do a
+   * normal graceful quit so the user can finish installation themselves.
+   *
+   * On Windows, Squirrel handles the entire flow reliably, so we keep the
+   * existing electron-updater path.
    */
   quitAndInstall(): void {
     if (this.state.status !== 'downloaded') {
@@ -158,19 +177,33 @@ export class AutoUpdater {
     }
 
     logger.info('Quitting and installing update');
+
+    if (process.platform !== 'win32' && this.downloadedFilePath) {
+      logger.info('Opening downloaded package for native installation', {
+        platform: process.platform,
+        path: this.downloadedFilePath,
+      });
+      shell.openPath(this.downloadedFilePath).then((error) => {
+        if (error) {
+          logger.error('Failed to open downloaded package', { error });
+        }
+      });
+      // Normal quit — before-quit graceful shutdown runs as usual.
+      app.quit();
+      return;
+    }
+
+    // Windows: use electron-updater's built-in Squirrel quit-and-install,
+    // which installs the update and relaunches the app automatically.
     this.quitAndInstallPending = true;
     autoUpdater.quitAndInstall(false, true);
 
-    // Guarantee the app quits even if electron-updater fails to call app.quit()
-    // (e.g. MacUpdater.quitAndInstall() can return without quitting when
-    // squirrelDownloadedUpdate is false, or nativeUpdater.quitAndInstall() may
-    // not trigger app.quit() on all Electron/platform combinations).
-    //
+    // Guarantee the app quits even if Squirrel fails to call app.quit().
     // The before-quit handler returns early when quitAndInstallPending is true,
     // so this won't trigger graceful shutdown and won't interrupt the install.
-    // If install failed synchronously (e.g. RPM pkexec cancelled), the error
-    // listener above resets quitAndInstallPending to false before we reach here,
-    // and we skip the explicit quit so the user can see the error and try again.
+    // If Squirrel failed synchronously the error listener above resets
+    // quitAndInstallPending to false before we reach here, so we skip the
+    // explicit quit and leave the app open so the user can see the error.
     if (this.quitAndInstallPending) {
       app.quit();
     }
@@ -230,6 +263,12 @@ export class AutoUpdater {
       logger.info('Update downloaded', {
         version: info.version,
       });
+      // electron-updater v6 attaches the local file path to the event object.
+      const downloadedFile = (info as UpdateInfo & { downloadedFile?: string }).downloadedFile;
+      if (downloadedFile) {
+        this.downloadedFilePath = downloadedFile;
+        logger.info('Downloaded package path stored', { path: downloadedFile });
+      }
       this.updateState({ status: 'downloaded', updateInfo: info });
       this.notifyUpdateDownloaded(info);
     });
@@ -288,13 +327,21 @@ export class AutoUpdater {
   private notifyUpdateDownloaded(info: UpdateInfo): void {
     if (!this.mainWindow || this.mainWindow.isDestroyed()) return;
 
+    const platformDetail: Record<string, string> = {
+      linux: 'Click "Open Installer" to open the package manager and install the update.\n\nThe app will close — relaunch it once installation is complete.',
+      darwin: 'Click "Open Installer" to extract the update archive. Drag the new app into your Applications folder to replace the old one, then relaunch.\n\nThe app will close now.',
+    };
+    const detail = platformDetail[process.platform]
+      ?? 'The update will be installed when you restart the application.\n\nWould you like to restart now?';
+    const buttons = process.platform !== 'win32' ? ['Open Installer', 'Later'] : ['Restart Now', 'Later'];
+
     dialog
       .showMessageBox(this.mainWindow, {
         type: 'info',
         title: 'Update Ready',
         message: `Version ${info.version} has been downloaded`,
-        detail: 'The update will be installed when you restart the application.\n\nWould you like to restart now?',
-        buttons: ['Restart Now', 'Later'],
+        detail,
+        buttons,
         defaultId: 0,
         cancelId: 1,
       })

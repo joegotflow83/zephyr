@@ -277,6 +277,7 @@ contextBridge.exposeInMainWorld('api', {
       ipcRenderer.once(IPC.APP_READY, listener);
       return () => ipcRenderer.removeListener(IPC.APP_READY, listener);
     },
+    platform: process.platform,
   },
 
   shell: {
