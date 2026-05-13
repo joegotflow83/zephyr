@@ -1,15 +1,10 @@
 # Zephyr Desktop
 
-A native Electron + React + TypeScript desktop application for running AI coding factories — multiple agents working in parallel on a shared codebase, coordinated through a kanban-style pipeline.
-
-## Credit
-
-Credit for creating the ralph philosophy goes to [@GeoffreyHuntley](https://x.com/GeoffreyHuntley) and credit for creating the ralph
-playbook goes to [ClaytonFarr](https://github.com/ClaytonFarr/ralph-playbook?tab=readme-ov-file)
+A native Electron + React + TypeScript desktop application for running AI pipelines — multiple agents working in parallel and coordinated through a kanban-style pipeline.
 
 ## What It Does
 
-Zephyr Desktop lets you run a **Coding Factory**: a set of AI agents (PM, coder, reviewer, QA, etc.) that each operate in their own container, share a workspace on disk, and hand tasks off to each other through a pipeline you define. You manage everything — tasks, pipelines, agents, and logs — from a single desktop UI.
+Zephyr Desktop lets you run your own customized **Agentic Pipelines**: a set of AI agents that each operate in their own container, share a workspace on disk, and hand tasks off to each other through a pipeline. You manage everything — tasks, pipelines, agents, and logs — from a single desktop UI.
 
 ### Core features
 

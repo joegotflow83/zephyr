@@ -355,19 +355,6 @@ describe('ProjectDialog', () => {
       });
     });
 
-    it('shows custom prompts count', () => {
-      render(
-        <ProjectDialog
-          mode="edit"
-          project={existingProject}
-          onSave={mockOnSave}
-          onClose={mockOnClose}
-        />
-      );
-
-      expect(screen.getByText('1 custom prompt(s) configured')).toBeInTheDocument();
-    });
-
     it('pre-selects library mode when project has image_id', () => {
       vi.mocked(useImages).mockReturnValue(makeImagesMock([testImage]));
 
@@ -637,84 +624,34 @@ describe('ProjectDialog', () => {
   });
 
   describe('Custom Prompts', () => {
-    it('shows "Manage Prompts" button', () => {
-      render(
-        <ProjectDialog mode="add" onSave={mockOnSave} onClose={mockOnClose} />
-      );
-
-      expect(screen.getByText('Manage Prompts')).toBeInTheDocument();
-    });
-
-    it('toggles PromptEditor visibility', async () => {
+    it('preserves existing custom_prompts on save in edit mode', async () => {
       const user = userEvent.setup();
-      render(
-        <ProjectDialog mode="add" onSave={mockOnSave} onClose={mockOnClose} />
-      );
-
-      // Initially hidden
-      expect(screen.queryByText('No custom prompts yet')).not.toBeInTheDocument();
-
-      // Click to show
-      await user.click(screen.getByText('Manage Prompts'));
-      expect(screen.getByText('No custom prompts yet')).toBeInTheDocument();
-      expect(screen.getByText('Hide')).toBeInTheDocument();
-
-      // Click to hide
-      await user.click(screen.getByText('Hide'));
-      expect(screen.queryByText('No custom prompts yet')).not.toBeInTheDocument();
-      expect(screen.getByText('Manage Prompts')).toBeInTheDocument();
-    });
-
-    it('includes custom prompts in saved project', async () => {
-      const user = userEvent.setup();
-      render(
-        <ProjectDialog mode="add" onSave={mockOnSave} onClose={mockOnClose} />
-      );
-
-      // Fill in name
-      await user.type(screen.getByLabelText(/Project Name/i), 'Test Project');
-
-      // Open prompt editor
-      await user.click(screen.getByText('Manage Prompts'));
-
-      // Add a custom prompt
-      await user.click(screen.getByText('+ Add New Prompt File'));
-      await user.type(screen.getByPlaceholderText('custom-prompt.md'), 'my-prompt');
-
-      // Click the "Add" button in the prompt editor
-      const addButtons = screen.getAllByText('Add');
-      await user.click(addButtons[addButtons.length - 1]); // Click the last "Add" button (in the prompt editor)
-
-      // Wait for the prompt to be added and enter edit mode
-      await waitFor(() => {
-        expect(screen.getByPlaceholderText('Enter prompt content...')).toBeInTheDocument();
+      const projectWithPrompts = createProjectConfig({
+        name: 'Prompt Project',
+        custom_prompts: { 'my-prompt.md': 'Some content' },
       });
 
-      // Now we're in edit mode, type content and save
-      await user.type(screen.getByPlaceholderText('Enter prompt content...'), 'My custom prompt content');
+      render(
+        <ProjectDialog
+          mode="edit"
+          project={projectWithPrompts}
+          onSave={mockOnSave}
+          onClose={mockOnClose}
+        />
+      );
 
-      // Click the "Save" button in the prompt editor (not the form submit button)
-      const saveButtons = screen.getAllByText('Save');
-      await user.click(saveButtons[0]); // The prompt editor Save button
-
-      // Wait for edit mode to exit
-      await waitFor(() => {
-        expect(screen.queryByPlaceholderText('Enter prompt content...')).not.toBeInTheDocument();
-      });
-
-      // Submit the form
-      await user.click(screen.getByText('Create Project'));
+      await user.clear(screen.getByLabelText(/Project Name/i));
+      await user.type(screen.getByLabelText(/Project Name/i), 'Updated Project');
+      await user.click(screen.getByText('Save Changes'));
 
       await waitFor(() => {
         expect(mockOnSave).toHaveBeenCalledWith(
           expect.objectContaining({
-            custom_prompts: {
-              'my-prompt.md': 'My custom prompt content',
-            },
+            custom_prompts: { 'my-prompt.md': 'Some content' },
           })
         );
       });
-    }, 15000);
+    });
   });
 
   describe('Docker Image Field (Custom Mode)', () => {
@@ -1014,35 +951,23 @@ describe('ProjectDialog', () => {
       updatedAt: '2026-01-01T00:00:00Z',
     };
 
-    it('does not show factory section body when toggle is off', () => {
+    it('always shows the pipeline section (coding factory is always enabled)', () => {
       render(<ProjectDialog mode="add" onSave={mockOnSave} onClose={mockOnClose} />);
-      expect(screen.queryByLabelText('Pipeline')).not.toBeInTheDocument();
-    });
-
-    it('shows factory section when Coding Factory toggle is enabled', async () => {
-      const user = userEvent.setup();
-      render(<ProjectDialog mode="add" onSave={mockOnSave} onClose={mockOnClose} />);
-
-      await user.click(screen.getByRole('checkbox', { name: /Coding Factory/i }));
       expect(screen.getByText(/No pipelines available/i)).toBeInTheDocument();
     });
 
-    it('shows pipeline select when pipelines exist', async () => {
-      const user = userEvent.setup();
+    it('shows pipeline select when pipelines exist', () => {
       useAppStore.setState({ pipelines: [mockPipeline] });
       render(<ProjectDialog mode="add" onSave={mockOnSave} onClose={mockOnClose} />);
 
-      await user.click(screen.getByRole('checkbox', { name: /Coding Factory/i }));
       expect(screen.getByRole('combobox', { name: /Pipeline/i })).toBeInTheDocument();
       expect(screen.getByText('Classic Factory')).toBeInTheDocument();
     });
 
-    it('groups built-in and user pipelines in select', async () => {
-      const user = userEvent.setup();
+    it('groups built-in and user pipelines in select', () => {
       useAppStore.setState({ pipelines: [mockPipeline, mockUserPipeline] });
       render(<ProjectDialog mode="add" onSave={mockOnSave} onClose={mockOnClose} />);
 
-      await user.click(screen.getByRole('checkbox', { name: /Coding Factory/i }));
       const select = screen.getByRole('combobox', { name: /Pipeline/i });
       const optgroups = select.querySelectorAll('optgroup');
       expect(optgroups).toHaveLength(2);
@@ -1056,7 +981,6 @@ describe('ProjectDialog', () => {
       render(<ProjectDialog mode="add" onSave={mockOnSave} onClose={mockOnClose} />);
 
       await user.type(screen.getByLabelText(/Project Name/i), 'Test Project');
-      await user.click(screen.getByRole('checkbox', { name: /Coding Factory/i }));
       await user.click(screen.getByText('Create Project'));
 
       expect(await screen.findByText('Please select a pipeline for the coding factory')).toBeInTheDocument();
@@ -1069,7 +993,6 @@ describe('ProjectDialog', () => {
       render(<ProjectDialog mode="add" onSave={mockOnSave} onClose={mockOnClose} />);
 
       await user.type(screen.getByLabelText(/Project Name/i), 'Factory Project');
-      await user.click(screen.getByRole('checkbox', { name: /Coding Factory/i }));
       await user.selectOptions(screen.getByRole('combobox', { name: /Pipeline/i }), 'pipe-1');
       await user.click(screen.getByText('Create Project'));
 
@@ -1088,7 +1011,6 @@ describe('ProjectDialog', () => {
       useAppStore.setState({ pipelines: [mockPipeline] });
       render(<ProjectDialog mode="add" onSave={mockOnSave} onClose={mockOnClose} />);
 
-      await user.click(screen.getByRole('checkbox', { name: /Coding Factory/i }));
       await user.selectOptions(screen.getByRole('combobox', { name: /Pipeline/i }), 'pipe-1');
 
       expect(screen.getByText('Pipeline Stages')).toBeInTheDocument();
@@ -1103,7 +1025,6 @@ describe('ProjectDialog', () => {
       useAppStore.setState({ pipelines: [mockPipeline] });
       render(<ProjectDialog mode="add" onSave={mockOnSave} onClose={mockOnClose} />);
 
-      await user.click(screen.getByRole('checkbox', { name: /Coding Factory/i }));
       await user.selectOptions(screen.getByRole('combobox', { name: /Pipeline/i }), 'pipe-1');
 
       expect(screen.getByText('×2')).toBeInTheDocument();
@@ -1114,7 +1035,6 @@ describe('ProjectDialog', () => {
       useAppStore.setState({ pipelines: [mockPipeline] });
       render(<ProjectDialog mode="add" onSave={mockOnSave} onClose={mockOnClose} />);
 
-      await user.click(screen.getByRole('checkbox', { name: /Coding Factory/i }));
       await user.selectOptions(screen.getByRole('combobox', { name: /Pipeline/i }), 'pipe-1');
 
       expect(screen.getByText('PM, coder, QA')).toBeInTheDocument();
@@ -1143,37 +1063,6 @@ describe('ProjectDialog', () => {
       });
     });
 
-    it('clears pipelineId when factory is disabled on save', async () => {
-      const user = userEvent.setup();
-      useAppStore.setState({ pipelines: [mockPipeline] });
-      const projectWithPipeline = createProjectConfig({
-        name: 'Factory Project',
-        factory_config: { enabled: true, roles: [] },
-        pipelineId: 'pipe-1',
-      });
-
-      render(
-        <ProjectDialog
-          mode="edit"
-          project={projectWithPipeline}
-          onSave={mockOnSave}
-          onClose={mockOnClose}
-        />
-      );
-
-      // Toggle factory off
-      await user.click(screen.getByRole('checkbox', { name: /Coding Factory/i }));
-      await user.click(screen.getByText('Save Changes'));
-
-      await waitFor(() => {
-        expect(mockOnSave).toHaveBeenCalledWith(
-          expect.objectContaining({
-            pipelineId: undefined,
-            factory_config: undefined,
-          })
-        );
-      });
-    });
   });
 
   describe('Form Validation Clearing', () => {

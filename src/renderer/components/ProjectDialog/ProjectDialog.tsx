@@ -219,7 +219,7 @@ const [claudeSettingsFile, setClaudeSettingsFile] = useState<string | undefined>
       newErrors.localPath = 'Must be an absolute path (starting with /)';
     }
 
-    if (!selectedPipelineId) {
+    if (pipelines.length > 0 && !selectedPipelineId) {
       newErrors.pipeline = 'Please select a pipeline for the coding factory';
     }
 
@@ -835,6 +835,7 @@ const [claudeSettingsFile, setClaudeSettingsFile] = useState<string | undefined>
                     ) : (
                       <select
                         id="factory-pipeline"
+                        aria-label="Pipeline"
                         value={selectedPipelineId ?? ''}
                         onChange={(e) => setSelectedPipelineId(e.target.value || undefined)}
                         className="w-full px-2 py-1.5 text-sm bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500"
