@@ -20,6 +20,7 @@ const mockAutoUpdate = {
 // @ts-expect-error - mocking window.api
 globalThis.window.api = {
   ...globalThis.window.api,
+  app: { platform: 'linux' },
   autoUpdate: mockAutoUpdate,
 };
 
