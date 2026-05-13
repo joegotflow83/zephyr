@@ -545,7 +545,10 @@ export function processTaskStatusUpdate(
           // PM may legitimately re-signal a completed task.
           return false;
         }
-        deps.factoryTaskStore.moveTask(projectId, task.id, next, { note: data.summary });
+        deps.factoryTaskStore.moveTask(
+          projectId, task.id, next,
+          ...(data.summary ? [{ note: data.summary }] : [] as []),
+        );
         return true;
       }
 
@@ -562,7 +565,11 @@ export function processTaskStatusUpdate(
         // bounces on stages that would just forward the task anyway. Pass
         // agentRejection:true to bypass the kanban adjacency constraint while
         // still enforcing bounce counting and Blocked escalation.
-        const movedTask = deps.factoryTaskStore.moveTask(projectId, task.id, data.toStage, { agentRejection: true, reason: data.reason, note: data.summary });
+        const movedTask = deps.factoryTaskStore.moveTask(projectId, task.id, data.toStage, {
+          agentRejection: true,
+          reason: data.reason,
+          ...(data.summary ? { note: data.summary } : {}),
+        });
         // Phase 2.10: when the host overrode the destination to 'blocked'
         // (bounce limit exceeded), write a PM-addressed handover. The guard
         // `data.toStage !== 'blocked'` distinguishes a host redirect (agent
