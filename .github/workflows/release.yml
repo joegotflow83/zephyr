@@ -340,6 +340,10 @@ jobs:
             PRERELEASE_FLAG="--prerelease"
           fi
 
+          # Delete existing release if present (e.g. from a previous run on a
+          # force-pushed tag) so we can recreate it with fresh assets.
+          gh release delete "$TAG" --yes 2>/dev/null || true
+
           gh release create "$TAG" \
             --title "Zephyr Desktop $VERSION" \
             --generate-notes \
