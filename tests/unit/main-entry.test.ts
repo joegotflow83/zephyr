@@ -512,7 +512,9 @@ const {
   mockRegisterUpdateHandlers,
   mockRegisterVMHandlers,
   mockRegisterFactoryTaskHandlers,
+  mockRegisterMailboxHandlers,
   MockFactoryTaskStore,
+  MockMailboxStore,
 } = vi.hoisted(() => {
   const mockRegisterDataHandlers = vi.fn();
   const mockRegisterDockerHandlers = vi.fn();
@@ -523,7 +525,9 @@ const {
   const mockRegisterUpdateHandlers = vi.fn();
   const mockRegisterVMHandlers = vi.fn();
   const mockRegisterFactoryTaskHandlers = vi.fn();
+  const mockRegisterMailboxHandlers = vi.fn();
   const MockFactoryTaskStore = vi.fn(function() { return {}; });
+  const MockMailboxStore = vi.fn(function() { return {}; });
 
   return {
     mockRegisterDataHandlers,
@@ -535,7 +539,9 @@ const {
     mockRegisterUpdateHandlers,
     mockRegisterVMHandlers,
     mockRegisterFactoryTaskHandlers,
+    mockRegisterMailboxHandlers,
     MockFactoryTaskStore,
+    MockMailboxStore,
   };
 });
 
@@ -575,8 +581,17 @@ vi.mock('../../src/main/ipc-handlers/factory-task-handlers', () => ({
   registerFactoryTaskHandlers: mockRegisterFactoryTaskHandlers,
 }));
 
+vi.mock('../../src/main/ipc-handlers/mailbox-handlers', () => ({
+  registerMailboxHandlers: mockRegisterMailboxHandlers,
+  emitMailboxChanged: vi.fn(),
+}));
+
 vi.mock('../../src/services/factory-task-store', () => ({
   FactoryTaskStore: MockFactoryTaskStore,
+}));
+
+vi.mock('../../src/services/mailbox-store', () => ({
+  MailboxStore: MockMailboxStore,
 }));
 
 // ── Mock menu ────────────────────────────────────────────────────────────────

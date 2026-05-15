@@ -19,6 +19,7 @@ import type { RuntimeInfo } from '../../services/container-runtime';
 import type { VMInfo } from '../../services/vm-manager';
 import type { FactoryTask } from '../../shared/factory-types';
 import type { Pipeline } from '../../shared/pipeline-types';
+import type { MailboxMessage } from '../../shared/mailbox-types';
 
 /**
  * Complete application state shape
@@ -106,6 +107,14 @@ export interface AppState {
   setPipelines: (pipelines: Pipeline[]) => void;
   refreshPipelines: () => Promise<void>;
   pipelineById: (id: string) => Pipeline | undefined;
+
+  // Mailbox
+  mailboxMessages: MailboxMessage[];
+  mailboxUnreadCount: number;
+  refreshMailbox: () => Promise<void>;
+  markMailboxRead: (id: string) => Promise<void>;
+  markAllMailboxRead: () => Promise<void>;
+  deleteMailboxMessage: (id: string) => Promise<void>;
 }
 
 /**
@@ -143,6 +152,9 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   pipelines: [],
   pipelinesLoading: false,
+
+  mailboxMessages: [],
+  mailboxUnreadCount: 0,
 
   // Project actions
   setProjects: (projects) => set({ projects, projectsError: null }),
@@ -373,6 +385,45 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   pipelineById: (id) => get().pipelines.find((p) => p.id === id),
+
+  // Mailbox actions
+  refreshMailbox: async () => {
+    try {
+      const messages = await window.api.mailbox.list();
+      set({
+        mailboxMessages: messages,
+        mailboxUnreadCount: messages.filter((m) => !m.read).length,
+      });
+    } catch {
+      // non-fatal: leave state unchanged
+    }
+  },
+
+  markMailboxRead: async (id) => {
+    await window.api.mailbox.markRead(id);
+    set((state) => {
+      const messages = state.mailboxMessages.map((m) =>
+        m.id === id ? { ...m, read: true } : m
+      );
+      return { mailboxMessages: messages, mailboxUnreadCount: messages.filter((m) => !m.read).length };
+    });
+  },
+
+  markAllMailboxRead: async () => {
+    await window.api.mailbox.markAllRead();
+    set((state) => ({
+      mailboxMessages: state.mailboxMessages.map((m) => ({ ...m, read: true })),
+      mailboxUnreadCount: 0,
+    }));
+  },
+
+  deleteMailboxMessage: async (id) => {
+    await window.api.mailbox.delete(id);
+    set((state) => {
+      const messages = state.mailboxMessages.filter((m) => m.id !== id);
+      return { mailboxMessages: messages, mailboxUnreadCount: messages.filter((m) => !m.read).length };
+    });
+  },
 }));
 
 /**
@@ -423,6 +474,11 @@ export function initializeStoreListeners() {
     useAppStore.getState().setPipelines(pipelines);
   });
 
+  // Mailbox push updates from main process
+  window.api.mailbox.onChanged((payload) => {
+    useAppStore.setState({ mailboxMessages: payload.messages, mailboxUnreadCount: payload.unreadCount });
+  });
+
   // Initial data load
   useAppStore.getState().refreshProjects();
   useAppStore.getState().refreshLoops();
@@ -431,6 +487,7 @@ export function initializeStoreListeners() {
   useAppStore.getState().refreshVMStatus();
   useAppStore.getState().refreshVMInfos();
   useAppStore.getState().refreshPipelines();
+  useAppStore.getState().refreshMailbox();
 
   // Initial Docker status
   window.api.docker

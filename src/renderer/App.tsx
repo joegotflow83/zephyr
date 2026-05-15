@@ -8,6 +8,7 @@ import { TerminalTab } from './pages/TerminalTab/TerminalTab';
 import { SettingsTab } from './pages/SettingsTab/SettingsTab';
 import { ImagesTab } from './pages/ImagesTab/ImagesTab';
 import { FactoryTab } from './pages/FactoryTab/FactoryTab';
+import { MailboxPanel } from './components/MailboxPanel/MailboxPanel';
 import { useActiveFactories } from './hooks/useActiveFactories';
 import { useToast } from './hooks/useToast';
 import { useAppStore } from './stores/app-store';
@@ -22,9 +23,12 @@ const tabs: Tab[] = [
 
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabId>('projects');
+  const [mailboxOpen, setMailboxOpen] = useState(false);
+  const [pendingTaskDescription, setPendingTaskDescription] = useState<string | undefined>(undefined);
   const activeFactoryCount = useActiveFactories();
   const { toasts, dismissToast, success, error, warning, info } = useToast();
   const settings = useAppStore((s) => s.settings);
+  const mailboxUnreadCount = useAppStore((s) => s.mailboxUnreadCount);
 
   // Apply theme class to <html> element whenever settings.theme changes
   useEffect(() => {
@@ -70,14 +74,25 @@ const App: React.FC = () => {
 
   return (
     <Layout
-      header={<TabBar tabs={tabs} activeTab={activeTab} onTabChange={setActiveTab} />}
+      header={
+        <TabBar
+          tabs={tabs}
+          activeTab={activeTab}
+          onTabChange={setActiveTab}
+          mailboxUnreadCount={mailboxUnreadCount}
+          onMailboxClick={() => setMailboxOpen(true)}
+        />
+      }
       statusBar={<StatusBar activeFactoryCount={activeFactoryCount} />}
     >
       <div style={{ display: activeTab === 'projects' ? undefined : 'none', height: '100%' }}>
         <ProjectsTab toast={toastMethods} />
       </div>
       <div style={{ display: activeTab === 'factory' ? undefined : 'none', height: '100%' }}>
-        <FactoryTab />
+        <FactoryTab
+          initialTaskDescription={pendingTaskDescription}
+          onInitialTaskConsumed={() => setPendingTaskDescription(undefined)}
+        />
       </div>
       <div style={{ display: activeTab === 'terminal' ? undefined : 'none', height: '100%' }}>
         <TerminalTab isActive={activeTab === 'terminal'} />
@@ -89,6 +104,15 @@ const App: React.FC = () => {
         <SettingsTab />
       </div>
       <Toast toasts={toasts} onDismiss={dismissToast} />
+      <MailboxPanel
+        isOpen={mailboxOpen}
+        onClose={() => setMailboxOpen(false)}
+        onCreateTaskFromSuggestion={(description) => {
+          setPendingTaskDescription(description);
+          setMailboxOpen(false);
+          setActiveTab('factory');
+        }}
+      />
     </Layout>
   );
 };

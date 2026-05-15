@@ -165,6 +165,13 @@ export const IPC = {
   // App lifecycle events (main → renderer)
   APP_READY: 'app:ready',
 
+  // Mailbox
+  MAILBOX_LIST: 'mailbox:list',
+  MAILBOX_MARK_READ: 'mailbox:mark-read',
+  MAILBOX_MARK_ALL_READ: 'mailbox:mark-all-read',
+  MAILBOX_DELETE: 'mailbox:delete',
+  MAILBOX_CHANGED: 'mailbox:changed',
+
   // Misc
   PING: 'ping',
 } as const;

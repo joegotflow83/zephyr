@@ -95,6 +95,6 @@
   },
   "optionalDependencies": {
     "@rolldown/binding-linux-x64-gnu": "^1.0.0-rc.12",
-    "@rollup/rollup-linux-x64-gnu": "^4.59.0"
+    "@rollup/rollup-linux-x64-gnu": "^4.60.3"
   }
 }

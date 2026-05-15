@@ -12,7 +12,12 @@ import { getLoopKey, isLoopTerminal, LoopMode } from '../../../shared/loop-types
 import { useLoops } from '../../hooks/useLoops';
 import { parseLogLine } from '../../utils/parseLogLine';
 
-export const FactoryTab: React.FC = () => {
+interface FactoryTabProps {
+  initialTaskDescription?: string;
+  onInitialTaskConsumed?: () => void;
+}
+
+export const FactoryTab: React.FC<FactoryTabProps> = ({ initialTaskDescription, onInitialTaskConsumed }) => {
   const projects = useAppStore((s) => s.projects);
   const projectsLoading = useAppStore((s) => s.projectsLoading);
   const loops = useAppStore((s) => s.loops);
@@ -363,6 +368,8 @@ export const FactoryTab: React.FC = () => {
             onAdd={async (title, description) => {
               await addTask(title, description);
             }}
+            initialDescription={initialTaskDescription}
+            onInitialDescriptionConsumed={onInitialTaskConsumed}
           />
         </div>
       )}

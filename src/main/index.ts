@@ -45,6 +45,8 @@ import { registerFactoryTaskHandlers } from './ipc-handlers/factory-task-handler
 import { registerPipelineHandlers } from './ipc-handlers/pipeline-handlers';
 import { registerVMHandlers } from './ipc-handlers/vm-handlers';
 import { VMManager } from '../services/vm-manager';
+import { MailboxStore } from '../services/mailbox-store';
+import { registerMailboxHandlers, emitMailboxChanged } from './ipc-handlers/mailbox-handlers';
 import os from 'node:os';
 import type { AppSettings } from '../shared/models';
 import { isLoopActive } from '../shared/loop-types';
@@ -103,6 +105,7 @@ const kiroHooksStore = new KiroHooksStore(configManager);
 const authInjector = new AuthInjector(configManager, credentialManager);
 const deployKeyStore = new DeployKeyStore(path.join(os.homedir(), '.zephyr'));
 const pipelineStore = new PipelineStore(path.join(os.homedir(), '.zephyr'));
+const mailboxStore = new MailboxStore(path.join(os.homedir(), '.zephyr'));
 // FactoryTaskStore.moveTask validates transitions against the project's active
 // pipeline (Phase 2.3). The lookup is injected as a callback so the store
 // remains decoupled from ProjectStore / PipelineStore — tests stub it inline
@@ -115,6 +118,8 @@ const factoryTaskStore = new FactoryTaskStore(
       if (!project?.pipelineId) return null;
       return pipelineStore.getPipeline(project.pipelineId);
     },
+    mailboxStore,
+    onMailboxChanged: () => emitMailboxChanged(mailboxStore),
   },
 );
 const sshKeyManager = new SSHKeyManager(runtime);
@@ -149,10 +154,16 @@ registerDeployKeyHandlers({ deployKeyStore });
 registerFactoryTaskHandlers({
   factoryTaskStore,
   projectStore,
+  getPipelineForProject: (projectId: string) => {
+    const project = projectStore.getProject(projectId);
+    if (!project?.pipelineId) return null;
+    return pipelineStore.getPipeline(project.pipelineId);
+  },
   onTaskEnteredStage: dispatchFactoryStage,
 });
 registerPipelineHandlers({ pipelineStore, projectStore });
 registerVMHandlers({ vmManager, containerOrchestrator });
+registerMailboxHandlers({ mailboxStore });
 
 // Legacy ping handler kept for backwards compatibility with existing tests.
 ipcMain.handle(IPC.PING, () => 'pong');

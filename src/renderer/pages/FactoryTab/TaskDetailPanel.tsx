@@ -266,6 +266,19 @@ export const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
             </div>
           )}
 
+          {/* Debriefing status for epics in debrief stage */}
+          {task.isEpic && pipelineStage?.role === 'debrief' && (
+            <div className="rounded border border-amber-700/50 bg-amber-900/20 px-3 py-2">
+              <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-amber-300">
+                <span aria-hidden="true">📬</span>
+                Debriefing
+              </span>
+              <p className="text-xs text-amber-400/70 mt-0.5">
+                Agent is summarising completed work and generating follow-up suggestions.
+              </p>
+            </div>
+          )}
+
           {/* Editable title */}
           <div>
             <label className="block text-xs font-semibold uppercase tracking-wide text-gray-400 mb-1">

@@ -26,6 +26,8 @@ import {
 } from '../shared/factory-types';
 import type { Pipeline } from '../shared/pipeline-types';
 import { columnsFor } from '../shared/pipeline-types';
+import type { MailboxStore } from './mailbox-store';
+import type { MailboxMessage } from '../shared/mailbox-types';
 import { deriveTransitions } from '../lib/pipeline/transitions';
 
 const DEFAULT_BASE_PATH = path.join(os.homedir(), '.zephyr', 'factory-tasks');
@@ -48,6 +50,24 @@ export interface FactoryTaskStoreDeps {
    * `FACTORY_START` parallel).
    */
   getPipelineForProject?: (projectId: string) => Pipeline | null;
+  /**
+   * Persistent mailbox store. When provided, a `MailboxMessage` is written
+   * whenever an epic completes its pipeline run (including an optional debrief
+   * stage). Optional so existing tests work without bootstrapping the full
+   * service graph.
+   */
+  mailboxStore?: MailboxStore;
+  /**
+   * Invoked after a mailbox message is added so the IPC layer can broadcast
+   * `MAILBOX_CHANGED` to all renderer windows.
+   */
+  onMailboxChanged?: () => void;
+  /**
+   * Resolve a human-readable project name for a given project id. Used to
+   * denormalize the name into the `MailboxMessage` so the panel needs no
+   * project lookup at read time. Falls back to `projectId` when absent.
+   */
+  getProjectName?: (projectId: string) => string;
 }
 
 export class FactoryTaskStore {
@@ -286,16 +306,23 @@ export class FactoryTaskStore {
     }
     queue.tasks[idx] = updated;
 
-    // Phase 2.9 — Epic auto-advance.
-    // When the last sub-task reaches 'done', automatically move the parent epic
-    // to 'done' in the same atomic saveQueue call. Only triggers when:
+    // Phase 2.9 / Phase 3 — Epic auto-advance with optional debrief routing.
+    //
+    // When the last sub-task reaches 'done', automatically advance the parent
+    // epic in the same atomic saveQueue call. Only triggers when:
     //   1. the task just landed in 'done' (not blocked or any other column),
     //   2. the task has a parentTaskId,
     //   3. the parent exists in this queue and has isEpic: true, and
     //   4. every OTHER sibling (same parentTaskId) is already in 'done'.
-    // We skip the transition-validation that moveTask enforces for agent moves:
-    // this is a host-side automatic promotion — the parent may be in any column
-    // (most likely backlog, but could be blocked if the PM escalated the epic).
+    //
+    // Debrief routing (Phase 3.3):
+    //   If the active pipeline has a stage with `role === 'debrief'` and the
+    //   epic is NOT already in that stage, route the epic there instead of
+    //   directly to 'done'. A history entry "Routed to debrief stage" is added.
+    //
+    //   When the epic IS already in the debrief column (e.g. a rejected child
+    //   re-completed), or the pipeline has no debrief stage, the epic moves
+    //   directly to 'done'. A MailboxMessage is compiled and added (Phase 3.4-5).
     if (updated.column === 'done' && updated.parentTaskId) {
       const parentIdx = queue.tasks.findIndex((t) => t.id === updated.parentTaskId);
       if (parentIdx > -1 && queue.tasks[parentIdx].isEpic) {
@@ -303,11 +330,43 @@ export class FactoryTaskStore {
           (t) => t.parentTaskId === updated.parentTaskId && t.id !== taskId,
         );
         if (siblings.every((t) => t.column === 'done')) {
-          queue.tasks[parentIdx] = {
-            ...queue.tasks[parentIdx],
-            column: 'done',
-            updatedAt: new Date().toISOString(),
-          };
+          const epicPipeline = this.deps.getPipelineForProject?.(queue.projectId);
+          const debriefStage = epicPipeline?.stages.find((s) => s.role === 'debrief');
+          const epic = queue.tasks[parentIdx];
+          const nowEpic = new Date().toISOString();
+
+          if (debriefStage && epic.column !== debriefStage.id) {
+            // Route to debrief stage; mailbox message is compiled once the
+            // epic advances from debrief to 'done'.
+            queue.tasks[parentIdx] = {
+              ...epic,
+              column: debriefStage.id,
+              updatedAt: nowEpic,
+              history: [
+                ...(epic.history ?? []),
+                { timestamp: nowEpic, action: 'moved', detail: 'Routed to debrief stage' },
+              ],
+            };
+          } else {
+            // No debrief stage, or epic already in debrief (re-completion after
+            // a child bounce) — advance to 'done' and emit mailbox message.
+            queue.tasks[parentIdx] = {
+              ...epic,
+              column: 'done',
+              updatedAt: nowEpic,
+              history: [
+                ...(epic.history ?? []),
+                { timestamp: nowEpic, action: 'moved', detail: 'All sub-tasks completed' },
+              ],
+            };
+
+            if (epicPipeline && this.deps.mailboxStore) {
+              const children = queue.tasks.filter((t) => t.parentTaskId === epic.id);
+              const msg = this.compileMailboxMessage(epic, children, epicPipeline);
+              this.deps.mailboxStore.add(msg);
+              this.deps.onMailboxChanged?.();
+            }
+          }
         }
       }
     }
@@ -533,6 +592,56 @@ export class FactoryTaskStore {
     queue.tasks[idx] = updated;
     this.saveQueue(queue);
     return updated;
+  }
+
+  /**
+   * Build a {@link MailboxMessage} from a completed epic and its children.
+   *
+   * Notes from the debrief stage (if any) are joined into `suggestions`.
+   * All other child notes populate `summary` verbatim so the panel can group
+   * them by stage/actor. `suggestions` is omitted when no debrief notes exist.
+   *
+   * @param epic     - The parent epic task (isEpic: true).
+   * @param children - All child tasks whose parentTaskId === epic.id.
+   * @param pipeline - The active pipeline (used to identify the debrief stage).
+   */
+  private compileMailboxMessage(
+    epic: FactoryTask,
+    children: FactoryTask[],
+    pipeline: Pipeline,
+  ): MailboxMessage {
+    const debriefStage = pipeline.stages.find((s) => s.role === 'debrief');
+    const allNotes: TaskNote[] = children.flatMap((c) => c.notes ?? []);
+
+    let summary: TaskNote[];
+    let suggestions: string | undefined;
+
+    if (debriefStage) {
+      const debriefNotes = allNotes.filter((n) => n.stage === debriefStage.id);
+      summary = allNotes.filter((n) => n.stage !== debriefStage.id);
+      if (debriefNotes.length > 0) {
+        suggestions = debriefNotes.map((n) => n.content).join('\n\n');
+      }
+    } else {
+      summary = allNotes;
+    }
+
+    const projectName = this.deps.getProjectName?.(epic.projectId) ?? epic.projectId;
+
+    const msg: MailboxMessage = {
+      id: randomUUID(),
+      projectId: epic.projectId,
+      projectName,
+      epicTaskId: epic.id,
+      epicTitle: epic.title,
+      read: false,
+      createdAt: new Date().toISOString(),
+      summary,
+    };
+    if (suggestions !== undefined) {
+      msg.suggestions = suggestions;
+    }
+    return msg;
   }
 
   /**

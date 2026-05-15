@@ -280,6 +280,19 @@ contextBridge.exposeInMainWorld('api', {
     platform: process.platform,
   },
 
+  mailbox: {
+    list: () => ipcRenderer.invoke(IPC.MAILBOX_LIST),
+    markRead: (id: string) => ipcRenderer.invoke(IPC.MAILBOX_MARK_READ, id),
+    markAllRead: () => ipcRenderer.invoke(IPC.MAILBOX_MARK_ALL_READ),
+    delete: (id: string) => ipcRenderer.invoke(IPC.MAILBOX_DELETE, id),
+    onChanged: (callback: (payload: { messages: unknown[]; unreadCount: number }) => void) => {
+      const listener = (_event: unknown, payload: { messages: unknown[]; unreadCount: number }) =>
+        callback(payload);
+      ipcRenderer.on(IPC.MAILBOX_CHANGED, listener);
+      return () => ipcRenderer.removeListener(IPC.MAILBOX_CHANGED, listener);
+    },
+  },
+
   shell: {
     openExternal: (url: string) => shell.openExternal(url),
   },

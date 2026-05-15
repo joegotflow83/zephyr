@@ -13,9 +13,17 @@ export interface TabBarProps {
   tabs: Tab[];
   activeTab: TabId;
   onTabChange: (tabId: TabId) => void;
+  mailboxUnreadCount?: number;
+  onMailboxClick?: () => void;
 }
 
-export const TabBar: React.FC<TabBarProps> = ({ tabs, activeTab, onTabChange }) => {
+export const TabBar: React.FC<TabBarProps> = ({
+  tabs,
+  activeTab,
+  onTabChange,
+  mailboxUnreadCount,
+  onMailboxClick,
+}) => {
   return (
     <div className="flex border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900">
       {tabs.map((tab) => (
@@ -43,6 +51,21 @@ export const TabBar: React.FC<TabBarProps> = ({ tabs, activeTab, onTabChange }) 
           </span>
         </button>
       ))}
+      <div className="ml-auto flex items-center pr-3">
+        <button
+          onClick={onMailboxClick}
+          className="relative p-2 text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 rounded transition-colors"
+          aria-label="Open mailbox"
+          title="Mailbox"
+        >
+          <span className="text-xl">🔔</span>
+          {mailboxUnreadCount !== undefined && mailboxUnreadCount > 0 && (
+            <span className="absolute top-1 right-1 min-w-[16px] h-4 px-1 text-xs bg-red-600 text-white rounded-full flex items-center justify-center leading-none">
+              {mailboxUnreadCount > 99 ? '99+' : mailboxUnreadCount}
+            </span>
+          )}
+        </button>
+      </div>
     </div>
   );
 };

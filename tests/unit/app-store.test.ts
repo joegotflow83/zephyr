@@ -74,6 +74,13 @@ const mockApi = {
     remove: vi.fn(),
     onChanged: vi.fn(() => vi.fn()),
   },
+  mailbox: {
+    list: vi.fn(),
+    markRead: vi.fn(),
+    markAllRead: vi.fn(),
+    delete: vi.fn(),
+    onChanged: vi.fn(() => vi.fn()),
+  },
 };
 
 (global as any).window = { api: mockApi };
@@ -479,6 +486,7 @@ describe('useAppStore', () => {
       mockApi.vm.onStatusChanged.mockImplementation(() => vi.fn());
       mockApi.factoryTasks.onChanged.mockImplementation(() => vi.fn());
       mockApi.pipelines.onChanged.mockImplementation(() => vi.fn());
+      mockApi.mailbox.onChanged.mockImplementation(() => vi.fn());
       mockApi.docker.status.mockResolvedValue({ available: false });
       mockApi.projects.list.mockResolvedValue([]);
       mockApi.loops.list.mockResolvedValue([]);
@@ -492,6 +500,7 @@ describe('useAppStore', () => {
       mockApi.vm.status.mockResolvedValue({ available: false });
       mockApi.vm.list.mockResolvedValue([]);
       mockApi.pipelines.list.mockResolvedValue([]);
+      mockApi.mailbox.list.mockResolvedValue([]);
     });
 
     it('should register Docker status listener', async () => {
@@ -750,6 +759,7 @@ describe('useAppStore', () => {
       mockApi.vm.onStatusChanged.mockImplementation(() => vi.fn());
       mockApi.factoryTasks.onChanged.mockImplementation(() => vi.fn());
       mockApi.pipelines.onChanged.mockImplementation(() => vi.fn());
+      mockApi.mailbox.onChanged.mockImplementation(() => vi.fn());
       mockApi.docker.status.mockResolvedValue({ available: false });
       mockApi.projects.list.mockResolvedValue([]);
       mockApi.loops.list.mockResolvedValue([]);
@@ -763,6 +773,7 @@ describe('useAppStore', () => {
       mockApi.vm.status.mockResolvedValue({ available: false });
       mockApi.vm.list.mockResolvedValue([]);
       mockApi.pipelines.list.mockResolvedValue([]);
+      mockApi.mailbox.list.mockResolvedValue([]);
     });
 
     it('should register build progress listener and update imageBuildProgress', () => {
@@ -777,6 +788,112 @@ describe('useAppStore', () => {
       initializeStoreListeners();
       await new Promise((resolve) => setTimeout(resolve, 10));
       expect(mockApi.images.list).toHaveBeenCalled();
+    });
+  });
+
+  describe('mailbox', () => {
+    const sampleMessage = {
+      id: 'msg-1',
+      projectId: 'proj-1',
+      projectName: 'My Project',
+      epicTaskId: 'task-1',
+      epicTitle: 'Build the thing',
+      read: false,
+      createdAt: '2024-01-01T00:00:00Z',
+      summary: [],
+    };
+
+    it('should initialize with empty mailbox', () => {
+      const state = useAppStore.getState();
+      expect(state.mailboxMessages).toEqual([]);
+      expect(state.mailboxUnreadCount).toBe(0);
+    });
+
+    it('should load messages via refreshMailbox', async () => {
+      mockApi.mailbox.list.mockResolvedValue([sampleMessage]);
+      await useAppStore.getState().refreshMailbox();
+      expect(useAppStore.getState().mailboxMessages).toEqual([sampleMessage]);
+      expect(useAppStore.getState().mailboxUnreadCount).toBe(1);
+    });
+
+    it('should not throw if refreshMailbox API fails', async () => {
+      mockApi.mailbox.list.mockRejectedValue(new Error('network'));
+      await expect(useAppStore.getState().refreshMailbox()).resolves.toBeUndefined();
+    });
+
+    it('should mark a single message read optimistically', async () => {
+      useAppStore.setState({ mailboxMessages: [sampleMessage], mailboxUnreadCount: 1 });
+      mockApi.mailbox.markRead.mockResolvedValue(undefined);
+      await useAppStore.getState().markMailboxRead('msg-1');
+      expect(useAppStore.getState().mailboxMessages[0].read).toBe(true);
+      expect(useAppStore.getState().mailboxUnreadCount).toBe(0);
+    });
+
+    it('should mark all messages read', async () => {
+      const msg2 = { ...sampleMessage, id: 'msg-2' };
+      useAppStore.setState({ mailboxMessages: [sampleMessage, msg2], mailboxUnreadCount: 2 });
+      mockApi.mailbox.markAllRead.mockResolvedValue(undefined);
+      await useAppStore.getState().markAllMailboxRead();
+      expect(useAppStore.getState().mailboxMessages.every((m) => m.read)).toBe(true);
+      expect(useAppStore.getState().mailboxUnreadCount).toBe(0);
+    });
+
+    it('should delete a message and update unread count', async () => {
+      const readMsg = { ...sampleMessage, id: 'msg-2', read: true };
+      useAppStore.setState({ mailboxMessages: [sampleMessage, readMsg], mailboxUnreadCount: 1 });
+      mockApi.mailbox.delete.mockResolvedValue(undefined);
+      await useAppStore.getState().deleteMailboxMessage('msg-1');
+      expect(useAppStore.getState().mailboxMessages).toHaveLength(1);
+      expect(useAppStore.getState().mailboxMessages[0].id).toBe('msg-2');
+      expect(useAppStore.getState().mailboxUnreadCount).toBe(0);
+    });
+  });
+
+  describe('initializeStoreListeners — mailbox updates', () => {
+    beforeEach(() => {
+      mockApi.docker.onStatusChanged.mockImplementation(() => vi.fn());
+      mockApi.loops.onStateChanged.mockImplementation(() => vi.fn());
+      mockApi.images.onBuildProgress.mockImplementation(() => vi.fn());
+      mockApi.vm.onStatusChanged.mockImplementation(() => vi.fn());
+      mockApi.factoryTasks.onChanged.mockImplementation(() => vi.fn());
+      mockApi.pipelines.onChanged.mockImplementation(() => vi.fn());
+      mockApi.mailbox.onChanged.mockImplementation(() => vi.fn());
+      mockApi.docker.status.mockResolvedValue({ available: false });
+      mockApi.projects.list.mockResolvedValue([]);
+      mockApi.loops.list.mockResolvedValue([]);
+      mockApi.settings.load.mockResolvedValue({ max_concurrent_containers: 5, notification_enabled: true, theme: 'system', log_level: 'INFO' });
+      mockApi.images.list.mockResolvedValue([]);
+      mockApi.vm.status.mockResolvedValue({ available: false });
+      mockApi.vm.list.mockResolvedValue([]);
+      mockApi.pipelines.list.mockResolvedValue([]);
+      mockApi.mailbox.list.mockResolvedValue([]);
+    });
+
+    it('should register mailbox onChanged listener', () => {
+      initializeStoreListeners();
+      expect(mockApi.mailbox.onChanged).toHaveBeenCalled();
+    });
+
+    it('should update mailboxMessages and mailboxUnreadCount when onChanged fires', () => {
+      let mailboxChangedCallback: (payload: { messages: any[]; unreadCount: number }) => void;
+      mockApi.mailbox.onChanged.mockImplementation((cb) => {
+        mailboxChangedCallback = cb;
+        return vi.fn();
+      });
+
+      initializeStoreListeners();
+
+      const msg = { id: 'm-1', projectId: 'p1', projectName: 'P', epicTaskId: 't1', epicTitle: 'T', read: false, createdAt: '', summary: [] };
+      mailboxChangedCallback!({ messages: [msg], unreadCount: 1 });
+
+      expect(useAppStore.getState().mailboxMessages).toHaveLength(1);
+      expect(useAppStore.getState().mailboxUnreadCount).toBe(1);
+    });
+
+    it('should call refreshMailbox during initial data load', async () => {
+      initializeStoreListeners();
+      await new Promise((resolve) => setTimeout(resolve, 10));
+      expect(mockApi.mailbox.list).toHaveBeenCalled();
     });
   });
 });

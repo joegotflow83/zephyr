@@ -5,15 +5,26 @@
  * with an "Add to Backlog" submit button. Clears fields on successful submit.
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
 export interface AddTaskFormProps {
   onAdd: (title: string, description: string) => void;
+  /** Pre-fill the description field (e.g. from a mailbox suggestion). */
+  initialDescription?: string;
+  /** Called once after initialDescription has been applied to local state. */
+  onInitialDescriptionConsumed?: () => void;
 }
 
-export function AddTaskForm({ onAdd }: AddTaskFormProps) {
+export function AddTaskForm({ onAdd, initialDescription, onInitialDescriptionConsumed }: AddTaskFormProps) {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
+
+  useEffect(() => {
+    if (initialDescription) {
+      setDescription(initialDescription);
+      onInitialDescriptionConsumed?.();
+    }
+  }, [initialDescription]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();

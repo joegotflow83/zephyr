@@ -24,6 +24,13 @@ function makeStage(name: string, existingIds: string[]): PipelineStage {
   };
 }
 
+/** Strip the debrief role from any stage that is not the last in the array. */
+function normalizeDebrief(stages: PipelineStage[]): PipelineStage[] {
+  return stages.map((s, i) =>
+    s.role === 'debrief' && i !== stages.length - 1 ? { ...s, role: undefined } : s,
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Sub-components
 // ---------------------------------------------------------------------------
@@ -88,6 +95,15 @@ const StageCard: React.FC<StageCardProps> = ({
             aria-label="Stage name"
             className="flex-1 min-w-0 bg-transparent text-white text-sm focus:outline-none border-b border-transparent focus:border-white/30 placeholder:text-white/30 disabled:opacity-50"
           />
+          {stage.role === 'debrief' && (
+            <span
+              aria-label="Debrief stage"
+              title="This is a debrief stage"
+              className="text-amber-400 text-sm leading-none shrink-0"
+            >
+              ✉
+            </span>
+          )}
         </div>
 
         {/* Controls row: icon, color, instances */}
@@ -129,6 +145,25 @@ const StageCard: React.FC<StageCardProps> = ({
             ))}
           </select>
         </div>
+
+        {/* Debrief toggle — only meaningful on the last stage */}
+        {isLast && (
+          <label
+            className="flex items-center gap-1.5 mt-2 cursor-pointer select-none"
+            onClick={(e) => e.stopPropagation()}
+            title="When enabled, completed epics route through this stage for a summary before moving to Done"
+          >
+            <input
+              type="checkbox"
+              checked={stage.role === 'debrief'}
+              onChange={(e) => onChange({ role: e.target.checked ? 'debrief' : undefined })}
+              disabled={isReadOnly}
+              aria-label="Debrief stage"
+              className="accent-amber-400 disabled:opacity-50"
+            />
+            <span className="text-xs text-white/60">Debrief stage</span>
+          </label>
+        )}
 
         {/* Reorder / CRUD actions */}
         {!isReadOnly && (
@@ -336,6 +371,11 @@ const PipelineBuilderDialog: React.FC<PipelineBuilderDialogProps> = ({
           const otherIds = prev.filter((_, j) => j !== index).map((x) => x.id);
           updated.id = slugifyStageId(patch.name ?? '', otherIds);
         }
+        // Auto-populate debrief prompt when toggling on and prompt is empty
+        if (patch.role === 'debrief' && !updated.agentPrompt.trim()) {
+          updated.agentPrompt =
+            'Review the child task notes and produce a summary with suggestions for follow-up work.';
+        }
         return updated;
       }),
     );
@@ -347,7 +387,7 @@ const PipelineBuilderDialog: React.FC<PipelineBuilderDialogProps> = ({
       const existingIds = prev.map((s) => s.id);
       const stage = makeStage(name, existingIds);
       setSelectedIndex(prev.length);
-      return [...prev, stage];
+      return normalizeDebrief([...prev, stage]);
     });
   }, []);
 
@@ -367,7 +407,7 @@ const PipelineBuilderDialog: React.FC<PipelineBuilderDialogProps> = ({
           ...prev.slice(index + 1),
         ];
         setSelectedIndex(index + 1);
-        return next;
+        return normalizeDebrief(next);
       });
     },
     [],
@@ -400,7 +440,7 @@ const PipelineBuilderDialog: React.FC<PipelineBuilderDialogProps> = ({
     setDraftStages((prev) => {
       const next = [...prev];
       [next[index - 1], next[index]] = [next[index], next[index - 1]];
-      return next;
+      return normalizeDebrief(next);
     });
     setSelectedIndex(index - 1);
   }, []);
@@ -410,7 +450,7 @@ const PipelineBuilderDialog: React.FC<PipelineBuilderDialogProps> = ({
       if (index >= prev.length - 1) return prev;
       const next = [...prev];
       [next[index], next[index + 1]] = [next[index + 1], next[index]];
-      return next;
+      return normalizeDebrief(next);
     });
     setSelectedIndex((si) => si + 1);
   }, []);
@@ -428,6 +468,8 @@ const PipelineBuilderDialog: React.FC<PipelineBuilderDialogProps> = ({
     const ids = draftStages.map((s) => s.id);
     if (new Set(ids).size !== ids.length)
       return 'Duplicate stage names detected — rename conflicting stages.';
+    if (draftStages.filter((s) => s.role === 'debrief').length > 1)
+      return 'Only one debrief stage is allowed per pipeline.';
     if (draftBounceLimit < 1 || draftBounceLimit > 10)
       return 'Bounce limit must be between 1 and 10.';
     return null;

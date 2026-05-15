@@ -35,6 +35,14 @@ export interface PipelineStage {
   color?: string;
   /** Optional emoji shown in the column header and flow diagram. */
   icon?: string;
+  /**
+   * When set to `'debrief'`, this stage acts as the final review stage for
+   * epics before they move to `done`. The factory routes completed epics here
+   * so an agent can produce a summary and suggestions, which are then stored
+   * as a mailbox message for the user. At most one stage per pipeline should
+   * have this role.
+   */
+  role?: 'debrief';
 }
 
 /**

@@ -25,6 +25,7 @@ import type { TerminalSession, TerminalSessionOpts } from '../../services/termin
 import type { UpdateInfo } from '../../services/self-updater';
 import type { AutoUpdateState } from '../../services/auto-updater';
 import type { VMInfo } from '../../services/vm-manager';
+import type { MailboxMessage } from '../../shared/mailbox-types';
 
 export {};
 
@@ -346,6 +347,21 @@ declare global {
         onReady: (callback: () => void) => () => void;
         /** The operating system platform (e.g. 'linux', 'darwin', 'win32'). */
         platform: string;
+      };
+
+      mailbox: {
+        /** List all mailbox messages (newest first) */
+        list: () => Promise<MailboxMessage[]>;
+        /** Mark a single message as read */
+        markRead: (id: string) => Promise<void>;
+        /** Mark all messages as read */
+        markAllRead: () => Promise<void>;
+        /** Delete a message by id */
+        delete: (id: string) => Promise<void>;
+        /** Listen for mailbox state push updates. Returns cleanup function. */
+        onChanged: (
+          callback: (payload: { messages: MailboxMessage[]; unreadCount: number }) => void,
+        ) => () => void;
       };
 
       shell: {

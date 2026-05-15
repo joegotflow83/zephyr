@@ -7,7 +7,8 @@ import * as path from 'path';
 import { ipcMain, BrowserWindow } from 'electron';
 import { IPC } from '../../shared/ipc-channels';
 import type { FactoryTaskStore } from '../../services/factory-task-store';
-import type { FactoryTask } from '../../shared/factory-types';
+import type { FactoryTask, TaskNote } from '../../shared/factory-types';
+import type { Pipeline } from '../../shared/pipeline-types';
 import type { ProjectConfig } from '../../shared/models';
 
 /** Columns that are not pipeline stages — dispatch is skipped for these. */
@@ -16,6 +17,11 @@ const IMPLICIT_COLUMNS = new Set(['backlog', 'done', 'blocked']);
 export interface FactoryTaskServices {
   factoryTaskStore: FactoryTaskStore;
   projectStore?: { getProject: (id: string) => ProjectConfig | null };
+  /**
+   * Resolve the active pipeline for a project. Used to detect debrief stages
+   * so context files can be written before the agent container starts.
+   */
+  getPipelineForProject?: (projectId: string) => Pipeline | null;
   /**
    * Called when a task enters a pipeline stage column (not backlog/done/blocked).
    * Implementors should restart the idle container for that stage so the agent
@@ -66,8 +72,72 @@ function broadcastTaskChanged(
   }
 }
 
+/**
+ * Build the markdown context file written to `/workspace/@epic-debrief-context.md`
+ * before a debrief-stage agent starts.
+ *
+ * Includes the epic title/description at the top, then all child task notes
+ * grouped by stage name (in pipeline order, debrief stage excluded). This gives
+ * the debrief agent full context about what was accomplished in each stage so it
+ * can produce a useful summary with follow-up suggestions.
+ */
+function buildDebriefContext(epic: FactoryTask, children: FactoryTask[], pipeline: Pipeline): string {
+  const lines: string[] = [];
+  const debriefStageId = pipeline.stages.find((s) => s.role === 'debrief')?.id;
+
+  lines.push(`# Epic: ${epic.title}`);
+  lines.push('');
+  if (epic.description) {
+    lines.push(epic.description);
+    lines.push('');
+  }
+  lines.push('---');
+  lines.push('');
+
+  // Collect all non-debrief notes from children, grouped by stage id
+  const notesByStage = new Map<string, { stageName: string; notes: TaskNote[] }>();
+  for (const child of children) {
+    for (const note of child.notes ?? []) {
+      if (!note.stage || note.stage === debriefStageId) continue;
+      if (!notesByStage.has(note.stage)) {
+        const stage = pipeline.stages.find((s) => s.id === note.stage);
+        notesByStage.set(note.stage, { stageName: stage?.name ?? note.stage, notes: [] });
+      }
+      notesByStage.get(note.stage)!.notes.push(note);
+    }
+  }
+
+  if (notesByStage.size === 0) {
+    lines.push('*No stage notes recorded.*');
+    return lines.join('\n');
+  }
+
+  // Render in pipeline stage order (skip debrief stage itself)
+  const stageOrder = pipeline.stages
+    .map((s) => s.id)
+    .filter((id) => id !== debriefStageId);
+
+  // Include any stages not explicitly in the pipeline order (defensive)
+  for (const stageId of notesByStage.keys()) {
+    if (!stageOrder.includes(stageId)) stageOrder.push(stageId);
+  }
+
+  for (const stageId of stageOrder) {
+    const entry = notesByStage.get(stageId);
+    if (!entry) continue;
+    lines.push(`## ${entry.stageName}`);
+    lines.push('');
+    for (const note of entry.notes) {
+      lines.push(note.content);
+      lines.push('');
+    }
+  }
+
+  return lines.join('\n');
+}
+
 export function registerFactoryTaskHandlers(services: FactoryTaskServices): void {
-  const { factoryTaskStore, projectStore, onTaskEnteredStage } = services;
+  const { factoryTaskStore, projectStore, getPipelineForProject, onTaskEnteredStage } = services;
 
   // List all tasks for a project
   ipcMain.handle(IPC.FACTORY_TASK_LIST, (_event, projectId: string): FactoryTask[] => {
@@ -130,6 +200,24 @@ export function registerFactoryTaskHandlers(services: FactoryTaskServices): void
               JSON.stringify(task, null, 2),
               'utf-8',
             ).catch(() => undefined);
+
+            // Phase 4: If this is a debrief stage and the task is an epic,
+            // write @epic-debrief-context.md so the agent has full context
+            // about what was accomplished in each prior stage.
+            if (task.isEpic && getPipelineForProject) {
+              const pipeline = getPipelineForProject(projectId);
+              const stage = pipeline?.stages.find((s) => s.id === toColumn);
+              if (stage?.role === 'debrief' && pipeline) {
+                const allTasks = factoryTaskStore.getQueue(projectId).tasks;
+                const epicChildren = allTasks.filter((t) => t.parentTaskId === task.id);
+                const contextContent = buildDebriefContext(task, epicChildren, pipeline);
+                await fs.writeFile(
+                  path.join(workspacePath, '@epic-debrief-context.md'),
+                  contextContent,
+                  'utf-8',
+                ).catch(() => undefined);
+              }
+            }
           }
         } catch {
           // non-fatal — task may already be locked by an agent
@@ -142,6 +230,46 @@ export function registerFactoryTaskHandlers(services: FactoryTaskServices): void
         }
         onTaskEnteredStage?.(projectId, toColumn);
       }
+
+      // Phase 4: Handle epic auto-routed to a debrief stage as a side effect of
+      // the last child task completing (Phase 3.3). The factory-task-store moves
+      // the epic internally — the handler must detect this and write the context
+      // file + dispatch the debrief stage container.
+      if (toColumn === 'done' && task.parentTaskId && workspacePath && getPipelineForProject) {
+        const pipeline = getPipelineForProject(projectId);
+        const debriefStage = pipeline?.stages.find((s) => s.role === 'debrief');
+        if (debriefStage && pipeline) {
+          const parent = factoryTaskStore.getTask(projectId, task.parentTaskId);
+          if (parent?.isEpic && parent.column === debriefStage.id) {
+            // Epic was silently routed to the debrief stage; lock it, write
+            // the workspace files, and trigger the container dispatch.
+            try {
+              const lockedEpic = factoryTaskStore.lockTask(projectId, parent.id, debriefStage.id);
+              broadcastTaskChanged(factoryTaskStore, projectId);
+              await syncQueueToWorkspace(factoryTaskStore, projectStore, projectId);
+
+              await fs.writeFile(
+                path.join(workspacePath, `@current-task-${debriefStage.id}.json`),
+                JSON.stringify(lockedEpic, null, 2),
+                'utf-8',
+              ).catch(() => undefined);
+
+              const allTasks = factoryTaskStore.getQueue(projectId).tasks;
+              const epicChildren = allTasks.filter((t) => t.parentTaskId === parent.id);
+              const contextContent = buildDebriefContext(lockedEpic, epicChildren, pipeline);
+              await fs.writeFile(
+                path.join(workspacePath, '@epic-debrief-context.md'),
+                contextContent,
+                'utf-8',
+              ).catch(() => undefined);
+            } catch {
+              // non-fatal — epic may already be locked by an agent
+            }
+            onTaskEnteredStage?.(projectId, debriefStage.id);
+          }
+        }
+      }
+
       return task;
     },
   );

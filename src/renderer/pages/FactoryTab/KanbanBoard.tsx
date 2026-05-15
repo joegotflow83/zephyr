@@ -240,6 +240,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
           <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide shrink-0">Epics</span>
           {epicProgress.map((ep) => {
             const epicTask = tasks.find((t) => t.id === ep.id) ?? null;
+            const isDebriefing = !!(pipeline && epicTask && pipeline.stages.find((s) => s.id === epicTask.column && s.role === 'debrief'));
             return (
               <div
                 key={ep.id}
@@ -251,6 +252,11 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                 onKeyDown={(e) => { if ((e.key === 'Enter' || e.key === ' ') && epicTask) onSelectTask(epicTask); }}
               >
                 <span className="text-purple-400 truncate max-w-[200px]">📌 {ep.title}</span>
+                {isDebriefing && (
+                  <span className="px-1.5 py-0.5 text-[9px] font-semibold bg-amber-500/20 text-amber-300 rounded border border-amber-500/30 uppercase tracking-wide shrink-0">
+                    Debriefing
+                  </span>
+                )}
                 <div className="flex items-center gap-1">
                   <div className="w-16 h-1.5 bg-gray-700 rounded-full overflow-hidden">
                     <div

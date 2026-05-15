@@ -293,6 +293,7 @@ function cloneStage(s: Pipeline['stages'][number]): Pipeline['stages'][number] {
     instances: s.instances,
     color: s.color,
     icon: s.icon,
+    role: s.role,
   };
 }
 
