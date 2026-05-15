@@ -28,6 +28,7 @@ import {
   STARTER_PROMPT_GENERIC_STAGE,
   STARTER_PROMPT_SECURITY_REVIEWER,
   STARTER_PROMPT_TECHNICAL_WRITER,
+  STARTER_PROMPT_DEBRIEF,
 } from '../../src/shared/pipeline-builtins';
 
 // ─── Structural invariants ────────────────────────────────────────────────────
@@ -244,8 +245,8 @@ describe('BUILTIN_PIPELINES — agentPrompt snapshots', () => {
 // ─── PIPELINE_BUILDER_STARTER_PROMPTS structure ───────────────────────────────
 
 describe('PIPELINE_BUILDER_STARTER_PROMPTS', () => {
-  it('has exactly 4 entries', () => {
-    expect(PIPELINE_BUILDER_STARTER_PROMPTS).toHaveLength(4);
+  it('has exactly 5 entries', () => {
+    expect(PIPELINE_BUILDER_STARTER_PROMPTS).toHaveLength(5);
   });
 
   it('exposes labels in display order', () => {
@@ -254,6 +255,7 @@ describe('PIPELINE_BUILDER_STARTER_PROMPTS', () => {
       'Generic Stage',
       'Security Reviewer',
       'Technical Writer',
+      'Debrief',
     ]);
   });
 
@@ -262,6 +264,7 @@ describe('PIPELINE_BUILDER_STARTER_PROMPTS', () => {
     expect(PIPELINE_BUILDER_STARTER_PROMPTS[1].prompt).toBe(STARTER_PROMPT_GENERIC_STAGE);
     expect(PIPELINE_BUILDER_STARTER_PROMPTS[2].prompt).toBe(STARTER_PROMPT_SECURITY_REVIEWER);
     expect(PIPELINE_BUILDER_STARTER_PROMPTS[3].prompt).toBe(STARTER_PROMPT_TECHNICAL_WRITER);
+    expect(PIPELINE_BUILDER_STARTER_PROMPTS[4].prompt).toBe(STARTER_PROMPT_DEBRIEF);
   });
 
   it('no starter prompt contains the stub prefix sentinel', () => {

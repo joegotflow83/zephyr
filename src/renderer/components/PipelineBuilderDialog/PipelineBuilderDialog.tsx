@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import type { Pipeline, PipelineStage } from '../../../shared/pipeline-types';
 import { columnsFor } from '../../../shared/pipeline-types';
 import { slugifyStageId } from '../../../lib/pipeline/slugify';
-import { PIPELINE_BUILDER_STARTER_PROMPTS } from '../../../shared/pipeline-builtins';
+import { PIPELINE_BUILDER_STARTER_PROMPTS, STARTER_PROMPT_DEBRIEF } from '../../../shared/pipeline-builtins';
 
 export interface PipelineBuilderDialogProps {
   isOpen: boolean;
@@ -371,10 +371,9 @@ const PipelineBuilderDialog: React.FC<PipelineBuilderDialogProps> = ({
           const otherIds = prev.filter((_, j) => j !== index).map((x) => x.id);
           updated.id = slugifyStageId(patch.name ?? '', otherIds);
         }
-        // Auto-populate debrief prompt when toggling on and prompt is empty
-        if (patch.role === 'debrief' && !updated.agentPrompt.trim()) {
-          updated.agentPrompt =
-            'Review the child task notes and produce a summary with suggestions for follow-up work.';
+        // Auto-populate the debrief starter prompt whenever the role is enabled.
+        if (patch.role === 'debrief') {
+          updated.agentPrompt = STARTER_PROMPT_DEBRIEF;
         }
         return updated;
       }),

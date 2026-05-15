@@ -472,6 +472,12 @@ describe('starter prompt dropdown', () => {
 
   it('each starter prompt contains the protocol preamble signal files section', () => {
     for (const { label, prompt } of PIPELINE_BUILDER_STARTER_PROMPTS) {
+      // Debrief has its own simplified workflow and omits the shared preamble sections.
+      if (label === 'Debrief') {
+        expect(prompt, `${label} missing LOCK PROTOCOL`).toContain('LOCK PROTOCOL');
+        expect(prompt, `${label} missing @task-status.json`).toContain('@task-status.json');
+        continue;
+      }
       expect(prompt, `${label} missing SIGNAL FILES`).toContain('SIGNAL FILES');
       expect(prompt, `${label} missing LOCK PROTOCOL`).toContain('LOCK PROTOCOL');
       expect(prompt, `${label} missing ROUTING SIGNAL`).toContain('ROUTING SIGNAL');
