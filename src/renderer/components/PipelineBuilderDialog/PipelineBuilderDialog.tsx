@@ -371,9 +371,11 @@ const PipelineBuilderDialog: React.FC<PipelineBuilderDialogProps> = ({
           const otherIds = prev.filter((_, j) => j !== index).map((x) => x.id);
           updated.id = slugifyStageId(patch.name ?? '', otherIds);
         }
-        // Auto-populate the debrief starter prompt whenever the role is enabled.
+        // Append the debrief starter prompt when the role is enabled so the
+        // agent's existing instructions are preserved.
         if (patch.role === 'debrief') {
-          updated.agentPrompt = STARTER_PROMPT_DEBRIEF;
+          const separator = updated.agentPrompt.trim() ? '\n\n---\n\n' : '';
+          updated.agentPrompt = updated.agentPrompt + separator + STARTER_PROMPT_DEBRIEF;
         }
         return updated;
       }),
