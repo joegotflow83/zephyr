@@ -260,9 +260,14 @@ export class FactoryTaskStore {
     // the gate; forward, flow→blocked, and blocked→flow moves never escalate
     // even if the counter is already at/over limit, because they don't
     // increment the counter and therefore aren't bounce events.
-    const targetColumn = isBackward && newBounceCount >= pipeline.bounceLimit
+    const rawTarget = isBackward && newBounceCount >= pipeline.bounceLimit
       ? 'blocked'
       : toColumn;
+    // Non-epic tasks bypass the debrief stage entirely and land in 'done'.
+    // Only epics are routed through debrief (by the auto-advance logic below
+    // once all their children complete).
+    const debriefStageId = pipeline.stages.find((s) => s.role === 'debrief')?.id;
+    const targetColumn = rawTarget === debriefStageId && !task.isEpic ? 'done' : rawTarget;
 
     const now = new Date().toISOString();
     const prevHistory = task.history ?? [];

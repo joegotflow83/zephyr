@@ -1825,4 +1825,40 @@ describe('FactoryTaskStore persistence', () => {
     const found = store2.getTask('proj-1', task.id);
     expect(found?.column).toBe('start');
   });
+
+  describe('debrief stage bypass for non-epic tasks', () => {
+    const DEBRIEF_PIPELINE: Pipeline = Object.freeze({
+      id: 'debrief-pipeline',
+      name: 'Debrief Pipeline',
+      stages: [
+        { id: 'coder', name: 'Coder', agentPrompt: '', instances: 1 },
+        { id: 'qa', name: 'QA', agentPrompt: '', instances: 1 },
+        { id: 'debrief', name: 'Debrief', agentPrompt: '', instances: 1, role: 'debrief' as const },
+      ],
+      bounceLimit: 3,
+      builtIn: false,
+      createdAt: '2024-01-01T00:00:00.000Z',
+      updatedAt: '2024-01-01T00:00:00.000Z',
+    }) as Pipeline;
+
+    it('non-epic task forwarded to debrief stage lands in done instead', () => {
+      const store = new FactoryTaskStore(tmpDir, { getPipelineForProject: () => DEBRIEF_PIPELINE });
+      const task = store.addTask('proj-d', { title: 'Child task', description: '' });
+      store.moveTask('proj-d', task.id, 'coder');
+      store.moveTask('proj-d', task.id, 'qa');
+      // Forwarding from qa would normally go to debrief, but the task is not an epic
+      store.moveTask('proj-d', task.id, 'debrief');
+      expect(store.getTask('proj-d', task.id)?.column).toBe('done');
+    });
+
+    it('epic task forwarded to debrief stage lands in debrief', () => {
+      const store = new FactoryTaskStore(tmpDir, { getPipelineForProject: () => DEBRIEF_PIPELINE });
+      const task = store.addTask('proj-d', { title: 'Epic', description: '' });
+      store.updateTask('proj-d', task.id, { isEpic: true });
+      store.moveTask('proj-d', task.id, 'coder');
+      store.moveTask('proj-d', task.id, 'qa');
+      store.moveTask('proj-d', task.id, 'debrief');
+      expect(store.getTask('proj-d', task.id)?.column).toBe('debrief');
+    });
+  });
 });
