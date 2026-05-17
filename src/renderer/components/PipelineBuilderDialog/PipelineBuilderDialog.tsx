@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import type { Pipeline, PipelineStage } from '../../../shared/pipeline-types';
 import { columnsFor } from '../../../shared/pipeline-types';
 import { slugifyStageId } from '../../../lib/pipeline/slugify';
-import { PIPELINE_BUILDER_STARTER_PROMPTS, STARTER_PROMPT_DEBRIEF } from '../../../shared/pipeline-builtins';
+import { PIPELINE_BUILDER_STARTER_PROMPTS } from '../../../shared/pipeline-builtins';
 
 export interface PipelineBuilderDialogProps {
   isOpen: boolean;
@@ -22,13 +22,6 @@ function makeStage(name: string, existingIds: string[]): PipelineStage {
     agentPrompt: '',
     instances: 1,
   };
-}
-
-/** Strip the debrief role from any stage that is not the last in the array. */
-function normalizeDebrief(stages: PipelineStage[]): PipelineStage[] {
-  return stages.map((s, i) =>
-    s.role === 'debrief' && i !== stages.length - 1 ? { ...s, role: undefined } : s,
-  );
 }
 
 // ---------------------------------------------------------------------------
@@ -145,25 +138,6 @@ const StageCard: React.FC<StageCardProps> = ({
             ))}
           </select>
         </div>
-
-        {/* Debrief toggle — only meaningful on the last stage */}
-        {isLast && (
-          <label
-            className="flex items-center gap-1.5 mt-2 cursor-pointer select-none"
-            onClick={(e) => e.stopPropagation()}
-            title="When enabled, completed epics route through this stage for a summary before moving to Done"
-          >
-            <input
-              type="checkbox"
-              checked={stage.role === 'debrief'}
-              onChange={(e) => onChange({ role: e.target.checked ? 'debrief' : undefined })}
-              disabled={isReadOnly}
-              aria-label="Debrief stage"
-              className="accent-amber-400 disabled:opacity-50"
-            />
-            <span className="text-xs text-white/60">Debrief stage</span>
-          </label>
-        )}
 
         {/* Reorder / CRUD actions */}
         {!isReadOnly && (
@@ -371,12 +345,6 @@ const PipelineBuilderDialog: React.FC<PipelineBuilderDialogProps> = ({
           const otherIds = prev.filter((_, j) => j !== index).map((x) => x.id);
           updated.id = slugifyStageId(patch.name ?? '', otherIds);
         }
-        // Append the debrief starter prompt when the role is enabled so the
-        // agent's existing instructions are preserved.
-        if (patch.role === 'debrief') {
-          const separator = updated.agentPrompt.trim() ? '\n\n---\n\n' : '';
-          updated.agentPrompt = updated.agentPrompt + separator + STARTER_PROMPT_DEBRIEF;
-        }
         return updated;
       }),
     );
@@ -388,7 +356,7 @@ const PipelineBuilderDialog: React.FC<PipelineBuilderDialogProps> = ({
       const existingIds = prev.map((s) => s.id);
       const stage = makeStage(name, existingIds);
       setSelectedIndex(prev.length);
-      return normalizeDebrief([...prev, stage]);
+      return [...prev, stage];
     });
   }, []);
 
@@ -408,7 +376,7 @@ const PipelineBuilderDialog: React.FC<PipelineBuilderDialogProps> = ({
           ...prev.slice(index + 1),
         ];
         setSelectedIndex(index + 1);
-        return normalizeDebrief(next);
+        return next;
       });
     },
     [],
@@ -441,7 +409,7 @@ const PipelineBuilderDialog: React.FC<PipelineBuilderDialogProps> = ({
     setDraftStages((prev) => {
       const next = [...prev];
       [next[index - 1], next[index]] = [next[index], next[index - 1]];
-      return normalizeDebrief(next);
+      return next;
     });
     setSelectedIndex(index - 1);
   }, []);
@@ -451,7 +419,7 @@ const PipelineBuilderDialog: React.FC<PipelineBuilderDialogProps> = ({
       if (index >= prev.length - 1) return prev;
       const next = [...prev];
       [next[index], next[index + 1]] = [next[index + 1], next[index]];
-      return normalizeDebrief(next);
+      return next;
     });
     setSelectedIndex((si) => si + 1);
   }, []);
@@ -469,8 +437,11 @@ const PipelineBuilderDialog: React.FC<PipelineBuilderDialogProps> = ({
     const ids = draftStages.map((s) => s.id);
     if (new Set(ids).size !== ids.length)
       return 'Duplicate stage names detected — rename conflicting stages.';
-    if (draftStages.filter((s) => s.role === 'debrief').length > 1)
+    const debriefCount = draftStages.filter((s) => s.role === 'debrief').length;
+    if (debriefCount > 1)
       return 'Only one debrief stage is allowed per pipeline.';
+    if (debriefCount === 1 && draftStages[draftStages.length - 1].role !== 'debrief')
+      return 'The debrief stage must be the last stage in the pipeline.';
     if (draftBounceLimit < 1 || draftBounceLimit > 10)
       return 'Bounce limit must be between 1 and 10.';
     return null;
@@ -615,7 +586,7 @@ const PipelineBuilderDialog: React.FC<PipelineBuilderDialogProps> = ({
             <div className="flex-1 overflow-y-auto py-2">
               {draftStages.map((stage, i) => (
                 <StageCard
-                  key={`${stage.id}-${i}`}
+                  key={i}
                   stage={stage}
                   index={i}
                   isSelected={i === selectedIndex}
@@ -645,9 +616,14 @@ const PipelineBuilderDialog: React.FC<PipelineBuilderDialogProps> = ({
                   onChange={(e) => {
                     const idx = parseInt(e.target.value, 10);
                     if (!isNaN(idx)) {
-                      updateStage(selectedIndex, {
-                        agentPrompt: PIPELINE_BUILDER_STARTER_PROMPTS[idx].prompt,
-                      });
+                      const { prompt, role } = PIPELINE_BUILDER_STARTER_PROMPTS[idx];
+                      const patch: Partial<PipelineStage> = { agentPrompt: prompt };
+                      if (role) {
+                        patch.role = role;
+                      } else if (selectedStage?.role === 'debrief') {
+                        patch.role = undefined;
+                      }
+                      updateStage(selectedIndex, patch);
                     }
                   }}
                   aria-label="Insert starter prompt"

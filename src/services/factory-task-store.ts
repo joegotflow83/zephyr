@@ -371,6 +371,23 @@ export class FactoryTaskStore {
       }
     }
 
+    // Phase 3.5 — Epic moved directly to 'done' from the debrief stage.
+    //
+    // When the debrief agent signals 'forward', processTaskStatusUpdate calls
+    // moveTask() on the epic itself (which has no parentTaskId, so the Phase 2.9
+    // auto-advance block above never fires). Compile and save the mailbox message
+    // here so the Mailbox panel gets the debrief suggestions.
+    if (updated.column === 'done' && updated.isEpic && !updated.parentTaskId) {
+      const epicPipeline = this.deps.getPipelineForProject?.(projectId);
+      const debriefStage = epicPipeline?.stages.find((s) => s.role === 'debrief');
+      if (task.column === debriefStage?.id && epicPipeline && this.deps.mailboxStore) {
+        const children = queue.tasks.filter((t) => t.parentTaskId === updated.id);
+        const msg = this.compileMailboxMessage(updated, children, epicPipeline);
+        this.deps.mailboxStore.add(msg);
+        this.deps.onMailboxChanged?.();
+      }
+    }
+
     this.saveQueue(queue);
     return updated;
   }
@@ -611,19 +628,25 @@ export class FactoryTaskStore {
     pipeline: Pipeline,
   ): MailboxMessage {
     const debriefStage = pipeline.stages.find((s) => s.role === 'debrief');
-    const allNotes: TaskNote[] = children.flatMap((c) => c.notes ?? []);
+    const childNotes: TaskNote[] = children.flatMap((c) => c.notes ?? []);
+    // The debrief agent processes the epic directly, so its note is stored on
+    // the epic itself. Include epic notes when searching for debrief content.
+    const epicNotes: TaskNote[] = epic.notes ?? [];
 
     let summary: TaskNote[];
     let suggestions: string | undefined;
 
     if (debriefStage) {
-      const debriefNotes = allNotes.filter((n) => n.stage === debriefStage.id);
-      summary = allNotes.filter((n) => n.stage !== debriefStage.id);
+      const debriefNotes = [
+        ...epicNotes.filter((n) => n.stage === debriefStage.id),
+        ...childNotes.filter((n) => n.stage === debriefStage.id),
+      ];
+      summary = childNotes.filter((n) => n.stage !== debriefStage.id);
       if (debriefNotes.length > 0) {
         suggestions = debriefNotes.map((n) => n.content).join('\n\n');
       }
     } else {
-      summary = allNotes;
+      summary = childNotes;
     }
 
     const projectName = this.deps.getProjectName?.(epic.projectId) ?? epic.projectId;

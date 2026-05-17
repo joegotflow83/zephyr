@@ -81,7 +81,7 @@ function broadcastTaskChanged(
  * the debrief agent full context about what was accomplished in each stage so it
  * can produce a useful summary with follow-up suggestions.
  */
-function buildDebriefContext(epic: FactoryTask, children: FactoryTask[], pipeline: Pipeline): string {
+export function buildDebriefContext(epic: FactoryTask, children: FactoryTask[], pipeline: Pipeline): string {
   const lines: string[] = [];
   const debriefStageId = pipeline.stages.find((s) => s.role === 'debrief')?.id;
 

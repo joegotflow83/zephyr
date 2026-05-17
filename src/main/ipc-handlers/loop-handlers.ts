@@ -27,6 +27,7 @@ import type { FactoryTaskStore } from '../../services/factory-task-store';
 import type { PipelineStore } from '../../services/pipeline-store';
 import { deriveTransitions } from '../../lib/pipeline/transitions';
 import { getLogger } from '../../services/logging';
+import { buildDebriefContext } from './factory-task-handlers';
 
 /**
  * Bash hook script injected into containers for factory mode loops.
@@ -2326,6 +2327,36 @@ export function registerLoopHandlers(services: LoopServices): LoopHandlerContext
                     }
                   } catch { /* already locked */ }
                   dispatchFactoryStage(state.projectId, movedTask.column);
+                }
+              }
+
+              // Detect if the last child completing caused the epic to be silently
+              // auto-routed to the debrief stage (Phase 3.3 inside moveTask). The
+              // child task is now in 'done' so the dispatch above misses the epic.
+              // Check the child's parent and dispatch the debrief container if needed.
+              if (sdPre.status === 'forward' && taskBefore?.parentTaskId && workspacePath) {
+                const parent = factoryTaskStore.getTask(state.projectId, taskBefore.parentTaskId);
+                if (parent?.isEpic) {
+                  const projCfg = projectStore?.getProject(state.projectId);
+                  const pl = projCfg?.pipelineId ? pipelineStore?.getPipeline(projCfg.pipelineId) : null;
+                  const debriefStage = pl?.stages.find((s) => s.role === 'debrief');
+                  if (debriefStage && parent.column === debriefStage.id && pl) {
+                    try {
+                      const lockedEpic = factoryTaskStore.lockTask(state.projectId, parent.id, debriefStage.id);
+                      const allTasks = factoryTaskStore.getQueue(state.projectId).tasks;
+                      const epicChildren = allTasks.filter((t) => t.parentTaskId === parent.id);
+                      fsSync.writeFileSync(
+                        path.join(workspacePath, `@current-task-${debriefStage.id}.json`),
+                        JSON.stringify(lockedEpic, null, 2),
+                      );
+                      const contextContent = buildDebriefContext(lockedEpic, epicChildren, pl);
+                      fsSync.writeFileSync(
+                        path.join(workspacePath, '@epic-debrief-context.md'),
+                        contextContent,
+                      );
+                    } catch { /* non-fatal — epic may already be locked */ }
+                    dispatchFactoryStage(state.projectId, debriefStage.id);
+                  }
                 }
               }
 

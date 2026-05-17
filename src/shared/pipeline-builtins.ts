@@ -789,7 +789,7 @@ WORKFLOW
          "taskId": "<taskId>",
          "fromStage": "<debrief_stage_id>",
          "status": "forward",
-         "note": "<your full debrief text here — this becomes the Mailbox message>"
+         "summary": "<your full debrief text here — this becomes the Mailbox message>"
        }
 
 RULES
@@ -805,12 +805,14 @@ RULES
 export const PIPELINE_BUILDER_STARTER_PROMPTS: ReadonlyArray<{
   label: string;
   prompt: string;
+  /** When set, selecting this starter also assigns the given role to the stage. */
+  role?: PipelineStage['role'];
 }> = Object.freeze([
   { label: 'PM (Product Manager)', prompt: STARTER_PROMPT_PM },
   { label: 'Generic Stage', prompt: STARTER_PROMPT_GENERIC_STAGE },
   { label: 'Security Reviewer', prompt: STARTER_PROMPT_SECURITY_REVIEWER },
   { label: 'Technical Writer', prompt: STARTER_PROMPT_TECHNICAL_WRITER },
-  { label: 'Debrief', prompt: STARTER_PROMPT_DEBRIEF },
+  { label: 'Debrief', prompt: STARTER_PROMPT_DEBRIEF, role: 'debrief' as const },
 ]);
 
 // ─── Stage builder ────────────────────────────────────────────────────────────
