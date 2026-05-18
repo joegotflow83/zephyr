@@ -51,8 +51,16 @@ LOCK PROTOCOL
 
 ROUTING SIGNAL
   Write /workspace/@task-status.json:
-  { "taskId": "<id>", "fromStage": "<yours>", "status": "forward" }
-  For a rejection: set status to "rejected" and add toStage pointing to the earlier stage.
+  {
+    "taskId": "<id>",
+    "fromStage": "<yours>",
+    "status": "forward",
+    "summary": "Brief Markdown description of what was done in this stage."
+  }
+  Always include "summary" — it is stored as a per-stage note visible in the task
+  history and is the source material the debrief agent uses for its report.
+  For a rejection: set status to "rejected", add toStage, and set "summary" to
+  a concise explanation of why the task was sent back.
   When nothing to do: { "status": "idle" }
 
 QUESTIONS

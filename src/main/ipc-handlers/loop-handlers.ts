@@ -1849,7 +1849,6 @@ export function registerLoopHandlers(services: LoopServices): LoopHandlerContext
         '  TASK_FILE="/workspace/@current-task-${STAGE_ID}.json"',
         '  if [ -f "$TASK_FILE" ]; then',
         `    cd /workspace && ${agentInvocation} || true`,
-        '    rm -f "$TASK_FILE"',
         '  fi',
         '  sleep 5',
         'done',
@@ -2009,10 +2008,9 @@ export function registerLoopHandlers(services: LoopServices): LoopHandlerContext
       const state = await startLoopCore(opts);
 
       // After restarting, ensure the current-task file exists for any pending
-      // task in this stage. The previous container run may have deleted the file
-      // (end-of-loop `rm -f "$TASK_FILE"`) without the agent successfully
-      // advancing the task, leaving it stranded with no signal for the new
-      // container to pick up.
+      // task in this stage. The host normally manages this file, but if the
+      // container crashed before the agent could write @task-status.json the
+      // host never had a chance to clean up, leaving the task stranded.
       const stageId = role.replace(/-\d+$/, '');
       const project = projectStore?.getProject(projectId);
       const workspacePath = project?.local_path;
