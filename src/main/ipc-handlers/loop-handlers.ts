@@ -1855,6 +1855,25 @@ export function registerLoopHandlers(services: LoopServices): LoopHandlerContext
       ].join('\n');
       const agentLoopCmd: string[] = ['bash', '-c', agentLoopScript];
 
+      // Debrief stages use a one-shot script: run once and exit so the
+      // container reaches a terminal state and dispatchFactoryStage can
+      // restart it cleanly when the next epic arrives. A continuous polling
+      // loop is wrong for debrief because it processes rare, event-driven
+      // work (epic completions). If the container stays RUNNING and the task
+      // file is somehow not cleaned up, the agent would be re-invoked on a
+      // task whose epic is already in 'done', causing processTaskStatusUpdate
+      // to return false (forward from 'done' = null) and never delete the
+      // file — resulting in an infinite tight loop.
+      const debriefSingleShotScript = [
+        'export PATH="$HOME/.local/bin:$PATH"',
+        'sleep 2',
+        'TASK_FILE="/workspace/@current-task-${STAGE_ID}.json"',
+        'if [ -f "$TASK_FILE" ]; then',
+        `  cd /workspace && ${agentInvocation} || true`,
+        'fi',
+      ].join('\n');
+      const debriefSingleShotCmd: string[] = ['bash', '-c', debriefSingleShotScript];
+
       const results: LoopState[] = [];
       for (const stage of pipeline.stages) {
         const instances = Math.max(1, stage.instances ?? 1);
@@ -1866,7 +1885,7 @@ export function registerLoopHandlers(services: LoopServices): LoopHandlerContext
             projectId,
             projectName: project.name,
             role,
-            cmd: agentLoopCmd,
+            cmd: stage.role === 'debrief' ? debriefSingleShotCmd : agentLoopCmd,
             envVars: {
               ...(baseOpts.envVars ?? {}),
               STAGE_ID: stage.id,
