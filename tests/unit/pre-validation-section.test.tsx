@@ -93,7 +93,7 @@ describe('PreValidationSection', () => {
 
   it('renders a checkbox for each available script', async () => {
     render(<PreValidationSection selected={[]} onChange={onChangeMock} />);
-    await waitFor(() => expect(mockList).toHaveBeenCalled());
+    await waitFor(() => expect(screen.queryByText(/loading scripts/i)).not.toBeInTheDocument());
 
     expect(screen.getByText('python-lint.sh')).toBeInTheDocument();
     expect(screen.getByText('node-test.sh')).toBeInTheDocument();
@@ -102,7 +102,7 @@ describe('PreValidationSection', () => {
 
   it('shows description text next to each script', async () => {
     render(<PreValidationSection selected={[]} onChange={onChangeMock} />);
-    await waitFor(() => expect(mockList).toHaveBeenCalled());
+    await waitFor(() => expect(screen.queryByText(/loading scripts/i)).not.toBeInTheDocument());
 
     expect(screen.getByText(/Runs ruff \+ mypy/)).toBeInTheDocument();
     expect(screen.getByText(/Runs npm test/)).toBeInTheDocument();
@@ -110,7 +110,7 @@ describe('PreValidationSection', () => {
 
   it('shows "(built-in)" badge for built-in scripts', async () => {
     render(<PreValidationSection selected={[]} onChange={onChangeMock} />);
-    await waitFor(() => expect(mockList).toHaveBeenCalled());
+    await waitFor(() => expect(screen.queryByText(/loading scripts/i)).not.toBeInTheDocument());
 
     const builtInBadges = screen.getAllByText('(built-in)');
     expect(builtInBadges).toHaveLength(2); // python-lint + node-test
@@ -119,7 +119,7 @@ describe('PreValidationSection', () => {
   it('shows empty-state message when no scripts are available', async () => {
     mockList.mockResolvedValue([]);
     render(<PreValidationSection selected={[]} onChange={onChangeMock} />);
-    await waitFor(() => expect(mockList).toHaveBeenCalled());
+    await waitFor(() => expect(screen.queryByText(/loading scripts/i)).not.toBeInTheDocument());
 
     expect(screen.getByText(/no scripts available/i)).toBeInTheDocument();
   });
@@ -137,7 +137,7 @@ describe('PreValidationSection', () => {
 
   it('renders checkboxes unchecked when selected is empty', async () => {
     render(<PreValidationSection selected={[]} onChange={onChangeMock} />);
-    await waitFor(() => expect(mockList).toHaveBeenCalled());
+    await waitFor(() => expect(screen.queryByText(/loading scripts/i)).not.toBeInTheDocument());
 
     const checkboxes = screen.getAllByRole('checkbox');
     for (const cb of checkboxes) {
@@ -159,7 +159,7 @@ describe('PreValidationSection', () => {
 
   it('calls onChange with filename added when unchecked box is clicked', async () => {
     render(<PreValidationSection selected={[]} onChange={onChangeMock} />);
-    await waitFor(() => expect(mockList).toHaveBeenCalled());
+    await waitFor(() => expect(screen.queryByText(/loading scripts/i)).not.toBeInTheDocument());
 
     const label = screen.getByText('python-lint.sh').closest('label');
     const checkbox = label!.querySelector('input[type="checkbox"]')!;
@@ -175,7 +175,7 @@ describe('PreValidationSection', () => {
         onChange={onChangeMock}
       />,
     );
-    await waitFor(() => expect(mockList).toHaveBeenCalled());
+    await waitFor(() => expect(screen.queryByText(/loading scripts/i)).not.toBeInTheDocument());
 
     const label = screen.getByText('python-lint.sh').closest('label');
     const checkbox = label!.querySelector('input[type="checkbox"]')!;
@@ -188,14 +188,14 @@ describe('PreValidationSection', () => {
 
   it('shows "Add Custom Script" button', async () => {
     render(<PreValidationSection selected={[]} onChange={onChangeMock} />);
-    await waitFor(() => expect(mockList).toHaveBeenCalled());
+    await waitFor(() => expect(screen.queryByText(/loading scripts/i)).not.toBeInTheDocument());
 
     expect(screen.getByText(/\+ Add Custom Script/i)).toBeInTheDocument();
   });
 
   it('opens the add editor when "Add Custom Script" is clicked', async () => {
     render(<PreValidationSection selected={[]} onChange={onChangeMock} />);
-    await waitFor(() => expect(mockList).toHaveBeenCalled());
+    await waitFor(() => expect(screen.queryByText(/loading scripts/i)).not.toBeInTheDocument());
 
     fireEvent.click(screen.getByText(/\+ Add Custom Script/i));
 
@@ -206,7 +206,7 @@ describe('PreValidationSection', () => {
 
   it('shows error when filename is empty on save', async () => {
     render(<PreValidationSection selected={[]} onChange={onChangeMock} />);
-    await waitFor(() => expect(mockList).toHaveBeenCalled());
+    await waitFor(() => expect(screen.queryByText(/loading scripts/i)).not.toBeInTheDocument());
 
     fireEvent.click(screen.getByText(/\+ Add Custom Script/i));
     fireEvent.click(screen.getByRole('button', { name: /save script/i }));
@@ -217,7 +217,7 @@ describe('PreValidationSection', () => {
 
   it('shows error when content is empty on save', async () => {
     render(<PreValidationSection selected={[]} onChange={onChangeMock} />);
-    await waitFor(() => expect(mockList).toHaveBeenCalled());
+    await waitFor(() => expect(screen.queryByText(/loading scripts/i)).not.toBeInTheDocument());
 
     fireEvent.click(screen.getByText(/\+ Add Custom Script/i));
 
@@ -243,7 +243,7 @@ describe('PreValidationSection', () => {
     ]);
 
     render(<PreValidationSection selected={[]} onChange={onChangeMock} />);
-    await waitFor(() => expect(mockList).toHaveBeenCalled());
+    await waitFor(() => expect(screen.queryByText(/loading scripts/i)).not.toBeInTheDocument());
 
     fireEvent.click(screen.getByText(/\+ Add Custom Script/i));
 
@@ -271,7 +271,7 @@ describe('PreValidationSection', () => {
     mockList.mockResolvedValueOnce(SCRIPTS).mockResolvedValueOnce(updatedScripts);
 
     render(<PreValidationSection selected={[]} onChange={onChangeMock} />);
-    await waitFor(() => expect(mockList).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(screen.queryByText(/loading scripts/i)).not.toBeInTheDocument());
 
     fireEvent.click(screen.getByText(/\+ Add Custom Script/i));
     fireEvent.change(screen.getByPlaceholderText(/my-check\.sh/i), {
@@ -282,17 +282,15 @@ describe('PreValidationSection', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /save script/i }));
 
-    // Wait for the reload
-    await waitFor(() => expect(mockList).toHaveBeenCalledTimes(2));
+    // Wait for the reload and new script to appear
+    await screen.findByText('new.sh');
     // Editor should be closed
     expect(screen.queryByPlaceholderText(/my-check\.sh/i)).not.toBeInTheDocument();
-    // New script should appear
-    expect(screen.getByText('new.sh')).toBeInTheDocument();
   });
 
   it('cancels add editor and hides it', async () => {
     render(<PreValidationSection selected={[]} onChange={onChangeMock} />);
-    await waitFor(() => expect(mockList).toHaveBeenCalled());
+    await waitFor(() => expect(screen.queryByText(/loading scripts/i)).not.toBeInTheDocument());
 
     fireEvent.click(screen.getByText(/\+ Add Custom Script/i));
     expect(screen.getByPlaceholderText(/my-check\.sh/i)).toBeInTheDocument();
