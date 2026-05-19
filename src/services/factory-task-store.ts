@@ -227,15 +227,25 @@ export class FactoryTaskStore {
         );
       }
     } else {
-      // Kanban drag-drop: enforce adjacency so the human cannot accidentally
-      // skip stages on the board.
-      const { allowed } = deriveTransitions(pipeline);
-      const allowedTargets = allowed[task.column] ?? [];
-      if (!allowedTargets.includes(toColumn)) {
-        throw new Error(
-          `[FactoryTaskStore] Invalid transition from '${task.column}' to '${toColumn}'. ` +
-            `Allowed targets: ${allowedTargets.join(', ')}`,
-        );
+      // Debrief stages are excluded from the regular flow in deriveTransitions so
+      // that forward-signal auto-advance never routes regular tasks into them.
+      // However, moveTask's own bypass logic (below) correctly redirects non-epics
+      // to 'done' when the target is a debrief stage, so skip adjacency validation
+      // here and let that bypass handle it.
+      const isDebriefTarget = pipeline.stages.some(
+        (s) => s.role === 'debrief' && s.id === toColumn,
+      );
+      if (!isDebriefTarget) {
+        // Kanban drag-drop: enforce adjacency so the human cannot accidentally
+        // skip stages on the board.
+        const { allowed } = deriveTransitions(pipeline);
+        const allowedTargets = allowed[task.column] ?? [];
+        if (!allowedTargets.includes(toColumn)) {
+          throw new Error(
+            `[FactoryTaskStore] Invalid transition from '${task.column}' to '${toColumn}'. ` +
+              `Allowed targets: ${allowedTargets.join(', ')}`,
+          );
+        }
       }
     }
 

@@ -394,6 +394,18 @@ export class DockerRuntime implements ContainerRuntime {
 
     let buffer = '';
 
+    // Docker prepends a timestamp to every frame payload when timestamps:true.
+    // Frames correspond to individual write() syscalls, so partial lines (e.g.
+    // the claude CLI streaming one word at a time to stderr) each get their own
+    // timestamp. Without intervention, consecutive frames without a trailing '\n'
+    // are concatenated in `buffer` producing lines like:
+    //   "2026-05-18T16:06:30-04:00 Build2026-05-18T16:06:30-04:00  and..."
+    // Fix: if a frame's payload starts with a Docker timestamp and the buffer
+    // already has unsettled content (no trailing newline), insert '\n' first so
+    // each Docker log entry becomes a distinct line.
+    const RE_DOCKER_TS =
+      /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2}) /;
+
     stream.on('data', (chunk: Buffer) => {
       // Docker multiplexes stdout/stderr with an 8-byte header.
       // Format: [STREAM_TYPE, 0, 0, 0, SIZE1, SIZE2, SIZE3, SIZE4, ...PAYLOAD...]
@@ -412,6 +424,13 @@ export class DockerRuntime implements ContainerRuntime {
         if (offset + 8 + payloadSize > buf.length) break;
 
         const payload = buf.subarray(offset + 8, offset + 8 + payloadSize).toString('utf8');
+
+        // Each Docker frame starts a new log entry (has its own timestamp).
+        // If the previous frame left unsettled content without a newline,
+        // separate the entries so they don't run together into one line.
+        if (RE_DOCKER_TS.test(payload) && buffer.length > 0 && !buffer.endsWith('\n')) {
+          buffer += '\n';
+        }
         buffer += payload;
 
         const lines = buffer.split('\n');

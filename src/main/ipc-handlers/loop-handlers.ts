@@ -1813,7 +1813,11 @@ export function registerLoopHandlers(services: LoopServices): LoopHandlerContext
         for (const stage of pipeline.stages) {
           try {
             const promptPath = path.join(project.local_path, `PROMPT_${stage.id}.md`);
-            await fs.writeFile(promptPath, stage.agentPrompt, { encoding: 'utf8', mode: 0o644 });
+            // Substitute the <debrief_stage_id> placeholder so users who apply
+            // the Debrief starter prompt without editing it still get a working
+            // agent (the placeholder is replaced with the actual stage id).
+            const promptContent = stage.agentPrompt.replaceAll('<debrief_stage_id>', stage.id);
+            await fs.writeFile(promptPath, promptContent, { encoding: 'utf8', mode: 0o644 });
           } catch (err) {
             logger.warn(`Failed to write PROMPT_${stage.id}.md to local_path`, { err, projectId });
           }
@@ -1893,6 +1897,15 @@ export function registerLoopHandlers(services: LoopServices): LoopHandlerContext
             },
           };
 
+          if (stage.role === 'debrief') {
+            // Debrief is one-shot: only run when an epic is waiting.
+            // Register opts so dispatchFactoryStage can start the container
+            // on demand; don't start immediately or it exits with no task
+            // and the orchestrator marks it FAILED on every factory boot.
+            loopOptsMap.set(getLoopKey(projectId, role), roleOpts);
+            continue;
+          }
+
           try {
             const state = await startLoopCore(roleOpts);
             results.push(state);
@@ -1924,10 +1937,43 @@ export function registerLoopHandlers(services: LoopServices): LoopHandlerContext
         // previous session or manual kanban placement), write the @current-task
         // file so the agent loop's bash guard fires immediately on startup rather
         // than waiting for an upstream stage to dispatch a new task.
-        // Only write for the first unlocked, non-epic task per stage to avoid
-        // overwriting a file that may have been set by a concurrent dispatch.
+        // Only write for the first unlocked task per stage to avoid overwriting
+        // a file that may have been set by a concurrent dispatch.
+        // Debrief stages process epics; all other stages process regular tasks.
         const allTasks = factoryTaskStore.getQueue(projectId).tasks;
         for (const stage of pipeline.stages) {
+          if (stage.role === 'debrief') {
+            // Look for an unlocked epic waiting in the debrief column (e.g.
+            // from an interrupted run) and dispatch the one-shot container.
+            const epicTask = allTasks.find(
+              (t) => t.column === stage.id && !t.lockedBy && t.isEpic,
+            );
+            if (epicTask) {
+              try {
+                const locked = factoryTaskStore.lockTask(projectId, epicTask.id, stage.id);
+                const epicChildren = allTasks.filter((t) => t.parentTaskId === locked.id);
+                const contextContent = buildDebriefContext(locked, epicChildren, pipeline);
+                fsSync.writeFileSync(
+                  path.join(project.local_path, `@current-task-${stage.id}.json`),
+                  JSON.stringify(locked, null, 2),
+                );
+                fsSync.writeFileSync(
+                  path.join(project.local_path, '@epic-debrief-context.md'),
+                  contextContent,
+                );
+                logger.info('FACTORY_START: dispatched existing debrief epic', {
+                  projectId,
+                  stageId: stage.id,
+                  taskId: locked.id,
+                });
+              } catch {
+                // Already locked by a concurrent dispatch — leave existing files
+              }
+              dispatchFactoryStage(projectId, stage.id);
+            }
+            continue;
+          }
+
           const nextTask = allTasks.find(
             (t) => t.column === stage.id && !t.lockedBy && !t.isEpic,
           );
@@ -2307,7 +2353,12 @@ export function registerLoopHandlers(services: LoopServices): LoopHandlerContext
                   const nextSourceTask = factoryTaskStore
                     .getQueue(state.projectId)
                     .tasks.find(
-                      (t) => t.column === sourceStage && !t.lockedBy && !t.isEpic,
+                      // Include stage-pre-locked tasks (lockedBy === sourceStage) as well as
+                      // fully unlocked ones. When multiple tasks are forwarded to a stage in
+                      // rapid succession the current-task file gets overwritten and earlier
+                      // tasks end up stage-pre-locked without a file; excluding them would
+                      // leave them stranded until the 30-min stuck-watchdog fires.
+                      (t) => t.column === sourceStage && (!t.lockedBy || t.lockedBy === sourceStage) && !t.isEpic,
                     );
                   if (nextSourceTask) {
                     try {

@@ -188,8 +188,13 @@ export class ContainerOrchestrator {
 
       return this.states.get(key)!;
     } catch (error) {
-      // Mark as FAILED
+      // Mark as FAILED and surface the reason in the log buffer so the user
+      // can see why startup failed rather than staring at an empty log panel.
       const errorMessage = error instanceof Error ? error.message : String(error);
+      const existingState = this.states.get(key);
+      if (existingState) {
+        existingState.logs.push(`Error: Failed to start container: ${errorMessage}`);
+      }
       this.updateState(key, {
         status: LoopStatus.FAILED,
         error: `Failed to start loop: ${errorMessage}`,
@@ -632,9 +637,14 @@ export class ContainerOrchestrator {
       this.monitorContainerExit(loopKey, containerId, mode);
     } catch (error) {
       console.error(`Failed to start log stream for ${loopKey}:`, error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      const state = this.states.get(loopKey);
+      if (state) {
+        state.logs.push(`Error: Failed to start log stream: ${errorMessage}`);
+      }
       this.updateState(loopKey, {
         status: LoopStatus.FAILED,
-        error: `Log streaming failed: ${error instanceof Error ? error.message : String(error)}`,
+        error: `Log streaming failed: ${errorMessage}`,
         stoppedAt: new Date().toISOString(),
       });
     }
@@ -693,6 +703,7 @@ export class ContainerOrchestrator {
     try {
       const status = await this.docker.getContainerStatus(containerId);
       if (status.state === 'exited' || status.state === 'dead') {
+        state.logs.push('Error: Container exited unexpectedly');
         this.updateState(loopKey, {
           status: LoopStatus.FAILED,
           error: 'Container exited unexpectedly',
@@ -705,6 +716,7 @@ export class ContainerOrchestrator {
       // monitorContainerExit will catch the eventual exit on the next poll.
     } catch {
       // Container no longer exists — treat as lost.
+      state.logs.push('Error: Container lost (no longer exists)');
       this.updateState(loopKey, {
         status: LoopStatus.FAILED,
         error: 'Container lost',
@@ -824,6 +836,7 @@ export class ContainerOrchestrator {
             const stoppedAt = new Date().toISOString();
 
             // Container should not exit normally — mark as FAILED
+            state.logs.push('Error: Container exited unexpectedly');
             this.updateState(loopKey, {
               status: LoopStatus.FAILED,
               error: 'Container exited unexpectedly',
@@ -838,6 +851,7 @@ export class ContainerOrchestrator {
         } catch (error) {
           // Container no longer exists
           const errorMessage = error instanceof Error ? error.message : String(error);
+          state.logs.push(`Error: Container lost: ${errorMessage}`);
           this.updateState(loopKey, {
             status: LoopStatus.FAILED,
             error: `Container lost: ${errorMessage}`,

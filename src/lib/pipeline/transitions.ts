@@ -42,7 +42,19 @@ export interface DerivedTransitions {
  */
 export function deriveTransitions(pipeline: Pipeline): DerivedTransitions {
   const all = columnsFor(pipeline); // [backlog, ...stages, done, blocked, needs_input]
-  const flow = all.filter((c) => c !== 'blocked' && c !== 'needs_input'); // [backlog, ...stages, done]
+
+  // Debrief stages are excluded from the regular task flow. They are only
+  // entered by epics via a direct column assignment inside moveTask (Phase 2.9)
+  // and never by individual child tasks. Including them in the flow would make
+  // deriveTransitions().forward['lastRegularStage'] point at the debrief stage
+  // instead of 'done', causing child tasks to land there on every forward signal.
+  const debriefIds = new Set(
+    pipeline.stages.filter((s) => s.role === 'debrief').map((s) => s.id),
+  );
+
+  const flow = all.filter(
+    (c) => c !== 'blocked' && c !== 'needs_input' && !debriefIds.has(c),
+  ); // [backlog, ...non-debrief stages, done]
 
   const allowed: Record<string, string[]> = {};
   const forward: Record<string, string | null> = {};
@@ -60,6 +72,16 @@ export function deriveTransitions(pipeline: Pipeline): DerivedTransitions {
 
     allowed[col] = moves;
     forward[col] = next;
+  }
+
+  // Debrief stages sit outside the regular flow but still need a forward
+  // entry so the debrief agent can advance the epic to 'done' when it signals
+  // 'forward'. Each debrief stage maps directly to 'done'.
+  for (const id of debriefIds) {
+    forward[id] = 'done';
+    // Debrief stages are not reachable by drag-and-drop for regular tasks,
+    // but include them in allowed so the kanban can render their column.
+    allowed[id] = ['done', 'blocked'];
   }
 
   // Human override: from Blocked, move the task to any flow column to resume.
