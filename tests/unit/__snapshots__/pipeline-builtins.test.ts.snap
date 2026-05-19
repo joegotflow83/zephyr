@@ -211,10 +211,16 @@ DECOMPOSITION (epics only)
     "action": "decompose",
     "parentTaskId": "<epicTaskId>",
     "tasks": [
-      { "title": "...", "description": "..." },
-      ...
+      { "title": "Scaffold project", "description": "...", "order": 1 },
+      { "title": "Add feature A",    "description": "...", "order": 2 },
+      { "title": "Add feature B",    "description": "...", "order": 2 }
     ]
   }
+  "order" (optional positive integer, default 1): controls dispatch sequence.
+  Lower-order tasks are dispatched first; same-order tasks may run in
+  parallel. Always assign order 1 to foundation work (scaffolding, DB
+  schema, project setup) that later tasks depend on. Omit "order" when
+  tasks are independent.
   Each sub-task description must state: what to build, which files are
   involved (if known), and clear acceptance criteria.
   After writing decomposition, route the epic to "pm" (holding state) and
@@ -1224,10 +1230,16 @@ DECOMPOSITION (epics only)
     "action": "decompose",
     "parentTaskId": "<epicTaskId>",
     "tasks": [
-      { "title": "...", "description": "..." },
-      ...
+      { "title": "Scaffold project", "description": "...", "order": 1 },
+      { "title": "Add feature A",    "description": "...", "order": 2 },
+      { "title": "Add feature B",    "description": "...", "order": 2 }
     ]
   }
+  "order" (optional positive integer, default 1): controls dispatch sequence.
+  Lower-order tasks are dispatched first; same-order tasks may run in
+  parallel. Always assign order 1 to foundation work (scaffolding, DB
+  schema, project setup) that later tasks depend on. Omit "order" when
+  tasks are independent.
   Each sub-task description must state: what to build, which files are
   involved (if known), and clear acceptance criteria.
   After writing decomposition, route the epic to holding state and clear lock.
