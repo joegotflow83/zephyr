@@ -564,7 +564,7 @@ export class FactoryTaskStore {
     projectId: string,
     parentTaskId: string,
     childColumn: string,
-    children: Array<{ title: string; description: string }>,
+    children: Array<{ title: string; description: string; order?: number }>,
   ): { parent: FactoryTask; children: FactoryTask[] } {
     const queue = this.getQueue(projectId);
     const parentIdx = queue.tasks.findIndex((t) => t.id === parentTaskId);
@@ -584,6 +584,7 @@ export class FactoryTaskStore {
       id: randomUUID(),
       title: child.title,
       description: child.description,
+      ...(child.order !== undefined ? { order: child.order } : {}),
       column: childColumn,
       projectId,
       parentTaskId,

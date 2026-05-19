@@ -19,6 +19,19 @@ const ACTIVE_THRESHOLD_MS = 5000;
 /** Tick interval for re-evaluating activity pulse */
 const TICK_MS = 1000;
 
+/**
+ * Approximate height of a FlowNode in pixels. Used by StageConnector to
+ * compute SVG path y-coordinates for fan-out / fan-in arrows. Should be
+ * kept in sync with the actual rendered height of the FlowNode button.
+ */
+const NODE_HEIGHT = 104;
+
+/** Vertical gap between stacked nodes in a multi-instance stage (gap-2 = 8px). */
+const NODE_GAP = 8;
+
+/** Width of the SVG connector drawn between two stage columns. */
+const CONNECTOR_WIDTH = 32;
+
 /** Extract the stage id from a composite role key (e.g. "coder-0" → "coder", "coder" → "coder"). */
 export function stageIdFromRole(role: string): string {
   return role.replace(/-\d+$/, '');
@@ -30,11 +43,33 @@ export function instanceIndexFromRole(role: string): number | null {
   return m ? parseInt(m[1], 10) : null;
 }
 
+/** Total pixel height of a stage column with `count` stacked nodes. */
+function stageColHeight(count: number): number {
+  return count * NODE_HEIGHT + (count - 1) * NODE_GAP;
+}
+
+/**
+ * Y-center of each node in a stage column, expressed relative to a container
+ * of height `containerH`. The column itself is centered within the container
+ * (matching `items-center` on the outer flex row).
+ */
+function nodeYCenters(count: number, containerH: number): number[] {
+  const colH = stageColHeight(count);
+  const offset = (containerH - colH) / 2;
+  return Array.from(
+    { length: count },
+    (_, i) => offset + i * (NODE_HEIGHT + NODE_GAP) + NODE_HEIGHT / 2,
+  );
+}
+
 /**
  * Renders a horizontal pipeline diagram for a coding factory.
- * Each agent role is a node showing status, activity pulse, iteration, and commit count.
- * Nodes are connected by directional arrows in the order they were spawned (pipeline stage order).
- * Supports composite role keys (e.g. "coder-0", "coder-1") produced by Phase 2.5 multi-instance spawning.
+ *
+ * Loops sharing the same stage id (e.g. "coder-0" and "coder-1") are grouped
+ * into a single stage column and stacked vertically. Adjacent stage columns
+ * are joined by directional arrows; when either side has multiple instances
+ * the connector fans out or fans in with individual bezier curves so the flow
+ * is unambiguous: pm → [coder 1, coder 2] → security.
  */
 export const FactoryFlowView: React.FC<FactoryFlowViewProps> = ({
   loops,
@@ -49,60 +84,145 @@ export const FactoryFlowView: React.FC<FactoryFlowViewProps> = ({
     return () => clearInterval(id);
   }, []);
 
-  // Build a map from role → loop; Map preserves insertion order which equals pipeline spawn order.
-  const loopByRole = new Map<string, LoopState>();
+  // Group loops by stageId, preserving first-appearance (pipeline spawn) order.
+  const orderedStageIds: string[] = [];
+  const stageInstanceMap = new Map<string, LoopState[]>();
   for (const loop of loops) {
-    if (loop.role) {
-      loopByRole.set(loop.role, loop);
+    if (!loop.role) continue;
+    const sid = stageIdFromRole(loop.role);
+    if (!stageInstanceMap.has(sid)) {
+      orderedStageIds.push(sid);
+      stageInstanceMap.set(sid, []);
     }
+    stageInstanceMap.get(sid)!.push(loop);
   }
+  const orderedStages = orderedStageIds.map((sid) => ({
+    stageId: sid,
+    instances: stageInstanceMap.get(sid)!,
+  }));
 
-  // Ordered roles in pipeline stage order (Map iteration order = insertion order).
-  const orderedRoles = [...loopByRole.keys()];
-
-  // Count how many instances exist per stageId so multi-instance stages get numbered labels.
-  const stageCounts = new Map<string, number>();
-  for (const role of orderedRoles) {
-    const sid = stageIdFromRole(role);
-    stageCounts.set(sid, (stageCounts.get(sid) ?? 0) + 1);
-  }
-
-  if (orderedRoles.length === 0) return null;
+  if (orderedStages.length === 0) return null;
 
   return (
     <div className="px-6 py-4">
       <div className="flex items-center gap-1 overflow-x-auto pb-2">
-        {orderedRoles.map((role, idx) => {
-          const loop = loopByRole.get(role)!;
-          const isSelected = getLoopKey(loop) === selectedLoopKey;
-          const isActive =
-            loop.lastLogAt != null && Date.now() - loop.lastLogAt < ACTIVE_THRESHOLD_MS;
-          const isRunning =
-            loop.status === LoopStatus.RUNNING || loop.status === LoopStatus.STARTING;
-
-          return (
-            <React.Fragment key={role}>
-              {/* Arrow connector between nodes */}
-              {idx > 0 && <Arrow />}
-              <FlowNode
-                role={role}
-                loop={loop}
-                stageCounts={stageCounts}
-                isSelected={isSelected}
-                isActive={isActive}
-                isRunning={isRunning}
-                onClick={() => onSelectLoop(loop)}
-                onRestart={onRestartLoop ? () => onRestartLoop(loop) : undefined}
+        {orderedStages.map((stage, idx) => (
+          <React.Fragment key={stage.stageId}>
+            {idx > 0 && (
+              <StageConnector
+                fromCount={orderedStages[idx - 1].instances.length}
+                toCount={stage.instances.length}
               />
-            </React.Fragment>
-          );
-        })}
+            )}
+            <StageColumn
+              stageId={stage.stageId}
+              instances={stage.instances}
+              selectedLoopKey={selectedLoopKey}
+              onSelectLoop={onSelectLoop}
+              onRestartLoop={onRestartLoop}
+            />
+          </React.Fragment>
+        ))}
       </div>
     </div>
   );
 };
 
 /* ── Sub-components ─────────────────────────────────────────────────────────── */
+
+interface StageColumnProps {
+  stageId: string;
+  instances: LoopState[];
+  selectedLoopKey: string | null;
+  onSelectLoop: (loop: LoopState) => void;
+  onRestartLoop?: (loop: LoopState) => void;
+}
+
+const StageColumn: React.FC<StageColumnProps> = ({
+  stageId,
+  instances,
+  selectedLoopKey,
+  onSelectLoop,
+  onRestartLoop,
+}) => (
+  <div className="flex flex-col gap-2 flex-shrink-0">
+    {instances.map((loop) => {
+      const instanceIndex = instanceIndexFromRole(loop.role ?? '');
+      const isActive = loop.lastLogAt != null && Date.now() - loop.lastLogAt < ACTIVE_THRESHOLD_MS;
+      const isRunning =
+        loop.status === LoopStatus.RUNNING || loop.status === LoopStatus.STARTING;
+      return (
+        <FlowNode
+          key={loop.role ?? stageId}
+          role={loop.role ?? stageId}
+          loop={loop}
+          showInstanceNumber={instances.length > 1 && instanceIndex !== null}
+          isSelected={getLoopKey(loop) === selectedLoopKey}
+          isActive={isActive}
+          isRunning={isRunning}
+          onClick={() => onSelectLoop(loop)}
+          onRestart={onRestartLoop ? () => onRestartLoop(loop) : undefined}
+        />
+      );
+    })}
+  </div>
+);
+
+/**
+ * Connector drawn between two adjacent stage columns.
+ *
+ * 1→1: simple CSS arrow (same as before).
+ * 1→N, N→1, N→M: SVG bezier curves — one path per (fromNode, toNode) pair —
+ * so every instance on the left has a visible line to every instance on the
+ * right. The SVG height is sized to the taller of the two columns so the
+ * y-coordinates computed by `nodeYCenters` align with the rendered nodes.
+ */
+const StageConnector: React.FC<{ fromCount: number; toCount: number }> = ({
+  fromCount,
+  toCount,
+}) => {
+  if (fromCount === 1 && toCount === 1) {
+    return <Arrow />;
+  }
+
+  const containerH = Math.max(stageColHeight(fromCount), stageColHeight(toCount));
+  const fromYs = nodeYCenters(fromCount, containerH);
+  const toYs = nodeYCenters(toCount, containerH);
+  const midX = CONNECTOR_WIDTH / 2;
+
+  return (
+    <svg
+      width={CONNECTOR_WIDTH}
+      height={containerH}
+      className="flex-shrink-0"
+    >
+      <defs>
+        <marker
+          id="flow-arrowhead"
+          markerWidth="6"
+          markerHeight="6"
+          refX="5"
+          refY="3"
+          orient="auto"
+        >
+          <path d="M 0 0 L 6 3 L 0 6 z" fill="#6b7280" />
+        </marker>
+      </defs>
+      {fromYs.flatMap((fy, fi) =>
+        toYs.map((ty, ti) => (
+          <path
+            key={`${fi}-${ti}`}
+            d={`M 0 ${fy} C ${midX} ${fy} ${midX} ${ty} ${CONNECTOR_WIDTH} ${ty}`}
+            fill="none"
+            stroke="#6b7280"
+            strokeWidth="1.5"
+            markerEnd="url(#flow-arrowhead)"
+          />
+        )),
+      )}
+    </svg>
+  );
+};
 
 const Arrow: React.FC = () => (
   <div className="flex items-center flex-shrink-0 px-1">
@@ -114,8 +234,8 @@ const Arrow: React.FC = () => (
 interface FlowNodeProps {
   role: string;
   loop: LoopState;
-  /** Instance counts per stageId — used to decide whether to append an instance number to the label. */
-  stageCounts: Map<string, number>;
+  /** True when this node's stage has multiple instances — appends an instance number to the label. */
+  showInstanceNumber: boolean;
   isSelected: boolean;
   isActive: boolean;
   isRunning: boolean;
@@ -127,7 +247,7 @@ interface FlowNodeProps {
 const FlowNode: React.FC<FlowNodeProps> = ({
   role,
   loop,
-  stageCounts,
+  showInstanceNumber,
   isSelected,
   isActive,
   isRunning,
@@ -136,13 +256,10 @@ const FlowNode: React.FC<FlowNodeProps> = ({
 }) => {
   const stageId = stageIdFromRole(role);
   const instanceIndex = instanceIndexFromRole(role);
-  const baseLabel = stageId;
-  // Only append an instance number when multiple containers share the same stage.
-  const hasMultipleInstances = (stageCounts.get(stageId) ?? 0) > 1;
   const label =
-    instanceIndex !== null && hasMultipleInstances
-      ? `${baseLabel} ${instanceIndex + 1}`
-      : baseLabel;
+    showInstanceNumber && instanceIndex !== null
+      ? `${stageId} ${instanceIndex + 1}`
+      : stageId;
   const { borderColor, statusLabel, statusColor } = getStatusStyles(loop.status);
 
   return (

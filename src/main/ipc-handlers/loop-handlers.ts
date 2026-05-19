@@ -176,8 +176,9 @@ host processes it, the file disappears.
   "action": "decompose",
   "parentTaskId": "<epic task id>",
   "tasks": [
-    { "title": "Atomic step 1", "description": "Detailed description" },
-    { "title": "Atomic step 2", "description": "Detailed description" }
+    { "title": "Scaffold project", "description": "Detailed description", "order": 1 },
+    { "title": "Add feature A",    "description": "Detailed description", "order": 2 },
+    { "title": "Add feature B",    "description": "Detailed description", "order": 2 }
   ]
 }
 \`\`\`
@@ -187,6 +188,11 @@ host processes it, the file disappears.
   tracker; the parent stays in Backlog.
 - \`tasks\` must be a non-empty array. Each entry needs a non-empty title;
   description may be empty.
+- \`order\` (optional positive integer, default 1): execution sequence within
+  siblings. Lower-order tasks are dispatched first; siblings with the same
+  order value may run in parallel. Assign order 1 to foundation tasks
+  (scaffolding, DB migrations, project setup) that later tasks depend on.
+  Omit \`order\` when sequence does not matter.
 - The host rejects malformed payloads silently and leaves the file in place
   for the next trigger to retry — fix the payload and re-write.
 `;
@@ -647,8 +653,12 @@ export interface TaskDecomposition {
   /** Atomic sub-tasks. Each must have a non-empty title; description may be
    *  empty. The dispatcher rejects empty arrays — a no-op decomposition has
    *  no useful semantics and would only flag the parent as epic without
-   *  giving it any children to track. */
-  tasks: Array<{ title: string; description: string }>;
+   *  giving it any children to track.
+   *
+   *  `order` (optional positive integer, default 1): execution sequence
+   *  within siblings. Lower-order tasks are dispatched first; same-order
+   *  tasks may run in parallel. */
+  tasks: Array<{ title: string; description: string; order?: number }>;
 }
 
 /**
@@ -725,6 +735,17 @@ export function processTaskDecomposition(
       });
       return false;
     }
+    const orderVal = (child as { order?: unknown }).order;
+    if (
+      orderVal !== undefined &&
+      (typeof orderVal !== 'number' || !Number.isInteger(orderVal) || orderVal < 1)
+    ) {
+      logger.warn('task-decomposition: order must be a positive integer when provided', {
+        projectId,
+        parentTaskId: data.parentTaskId,
+      });
+      return false;
+    }
   }
 
   const project = deps.projectStore.getProject(projectId);
@@ -774,6 +795,27 @@ export function processTaskDecomposition(
     });
     return false;
   }
+}
+
+/**
+ * Returns `false` when a task should be withheld because a sibling with a
+ * lower `order` value has not yet reached `'done'`.
+ *
+ * Ordering only applies within the children of a single epic — tasks without
+ * a `parentTaskId` are always eligible. Tasks at order 1 (the default) are
+ * also always eligible; they are only blocked if a *lower* order exists.
+ */
+export function isTaskEligibleByOrder(task: FactoryTask, allTasks: FactoryTask[]): boolean {
+  if (!task.parentTaskId) return true;
+  const taskOrder = task.order ?? 1;
+  if (taskOrder <= 1) return true;
+  return !allTasks.some(
+    (t) =>
+      t.parentTaskId === task.parentTaskId &&
+      t.id !== task.id &&
+      (t.order ?? 1) < taskOrder &&
+      t.column !== 'done',
+  );
 }
 
 /**
@@ -1975,7 +2017,7 @@ export function registerLoopHandlers(services: LoopServices): LoopHandlerContext
           }
 
           const nextTask = allTasks.find(
-            (t) => t.column === stage.id && !t.lockedBy && !t.isEpic,
+            (t) => t.column === stage.id && !t.lockedBy && !t.isEpic && isTaskEligibleByOrder(t, allTasks),
           );
           if (nextTask) {
             try {
@@ -2350,15 +2392,14 @@ export function registerLoopHandlers(services: LoopServices): LoopHandlerContext
                 // in the source stage so the agent loop immediately picks it up rather
                 // than sitting idle until a new task arrives from upstream.
                 if (sourceFileDeleted) {
-                  const nextSourceTask = factoryTaskStore
-                    .getQueue(state.projectId)
-                    .tasks.find(
+                  const allSourceTasks = factoryTaskStore.getQueue(state.projectId).tasks;
+                const nextSourceTask = allSourceTasks.find(
                       // Include stage-pre-locked tasks (lockedBy === sourceStage) as well as
                       // fully unlocked ones. When multiple tasks are forwarded to a stage in
                       // rapid succession the current-task file gets overwritten and earlier
                       // tasks end up stage-pre-locked without a file; excluding them would
                       // leave them stranded until the 30-min stuck-watchdog fires.
-                      (t) => t.column === sourceStage && (!t.lockedBy || t.lockedBy === sourceStage) && !t.isEpic,
+                      (t) => t.column === sourceStage && (!t.lockedBy || t.lockedBy === sourceStage) && !t.isEpic && isTaskEligibleByOrder(t, allSourceTasks),
                     );
                   if (nextSourceTask) {
                     try {

@@ -87,6 +87,17 @@ export interface FactoryTask {
    */
   isEpic?: boolean;
   /**
+   * Execution order within siblings of the same epic. Tasks with a lower
+   * order are dispatched before tasks with a higher order — the host withholds
+   * higher-order tasks until all siblings with a lower order have reached
+   * `'done'`. Siblings sharing the same order value may run in parallel.
+   *
+   * Only meaningful for tasks with a `parentTaskId`. Defaults to `1` when
+   * absent (all siblings eligible simultaneously unless the PM assigns
+   * different values). Always a positive integer.
+   */
+  order?: number;
+  /**
    * Identifier of the container currently holding this task (e.g.
    * `"<projectName>-<stageId>-<instanceIndex>"`). Prevents parallel workers
    * from picking up the same task. Cleared on stage transition and on
