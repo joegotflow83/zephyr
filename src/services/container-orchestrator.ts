@@ -703,12 +703,20 @@ export class ContainerOrchestrator {
     try {
       const status = await this.docker.getContainerStatus(containerId);
       if (status.state === 'exited' || status.state === 'dead') {
-        state.logs.push('Error: Container exited unexpectedly');
-        this.updateState(loopKey, {
-          status: LoopStatus.FAILED,
-          error: 'Container exited unexpectedly',
-          stoppedAt,
-        });
+        const cleanExit = status.exitCode === 0;
+        if (cleanExit) {
+          this.updateState(loopKey, {
+            status: LoopStatus.COMPLETED,
+            stoppedAt,
+          });
+        } else {
+          state.logs.push('Error: Container exited unexpectedly');
+          this.updateState(loopKey, {
+            status: LoopStatus.FAILED,
+            error: 'Container exited unexpectedly',
+            stoppedAt,
+          });
+        }
         this.logStreams.delete(loopKey);
         this.clearLogBroadcastTimer(loopKey);
       }
@@ -835,13 +843,20 @@ export class ContainerOrchestrator {
             // Container exited
             const stoppedAt = new Date().toISOString();
 
-            // Container should not exit normally — mark as FAILED
-            state.logs.push('Error: Container exited unexpectedly');
-            this.updateState(loopKey, {
-              status: LoopStatus.FAILED,
-              error: 'Container exited unexpectedly',
-              stoppedAt,
-            });
+            const cleanExit = status.exitCode === 0;
+            if (cleanExit) {
+              this.updateState(loopKey, {
+                status: LoopStatus.COMPLETED,
+                stoppedAt,
+              });
+            } else {
+              state.logs.push('Error: Container exited unexpectedly');
+              this.updateState(loopKey, {
+                status: LoopStatus.FAILED,
+                error: 'Container exited unexpectedly',
+                stoppedAt,
+              });
+            }
 
             // Clean up
             this.logStreams.delete(loopKey);

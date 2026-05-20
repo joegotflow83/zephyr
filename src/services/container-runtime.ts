@@ -78,6 +78,7 @@ export interface ContainerStatus {
   status: string;
   startedAt?: string;
   finishedAt?: string;
+  exitCode?: number;
 }
 
 /**

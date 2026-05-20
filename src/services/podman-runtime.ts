@@ -545,6 +545,7 @@ export class PodmanRuntime implements ContainerRuntime {
         Status: string;
         StartedAt: string;
         FinishedAt: string;
+        ExitCode: number;
       };
     }>;
 
@@ -559,6 +560,7 @@ export class PodmanRuntime implements ContainerRuntime {
       status: inspect.State.Status,
       startedAt: inspect.State.StartedAt,
       finishedAt: inspect.State.FinishedAt,
+      exitCode: inspect.State.ExitCode,
     };
   }
 

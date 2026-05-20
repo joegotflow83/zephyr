@@ -233,6 +233,7 @@ export class DockerRuntime implements ContainerRuntime {
       status: inspect.State.Status,
       startedAt: inspect.State.StartedAt,
       finishedAt: inspect.State.FinishedAt,
+      exitCode: inspect.State.ExitCode,
     };
   }
 
