@@ -8,7 +8,7 @@ Zephyr Desktop lets you run your own customized **Agentic Pipelines**: a set of 
 
 ### Core features
 
-- **Coding Factory** — define a pipeline of agent stages (e.g. PM → Coder → Reviewer → QA); tasks flow automatically between stages as agents complete them; supports multiple parallel instances per stage
+- **Pipeline Factory** — define a pipeline of agent stages (e.g. PM → Coder → Reviewer → QA); tasks flow automatically between stages as agents complete them; supports multiple parallel instances per stage
 - **Kanban board** — drag tasks between columns, view per-task history, lock/unlock agents, track epic progress, and delete completed tasks
 - **Pipeline builder** — create and edit pipelines with custom stages, agent prompts, icons, colors, and instance counts; built-in pipelines included
 - **Task management** — add tasks manually or sync from spec files; tasks can be decomposed into epics by the PM agent; epic progress tracked automatically
