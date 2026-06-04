@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   build-macos:
-    runs-on: macos-latest
+    runs-on: macos-14
     steps:
       - uses: actions/checkout@v4
 
@@ -35,9 +35,6 @@ jobs:
 
       - name: Run tests
         run: npm run test:unit
-
-      - name: Install appdmg for DMG creation
-        run: npm install --save-dev appdmg
 
       - name: Import macOS signing certificate
         if: ${{ env.APPLE_CERTIFICATE != '' }}
