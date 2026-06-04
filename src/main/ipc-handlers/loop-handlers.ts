@@ -1887,7 +1887,7 @@ export function registerLoopHandlers(services: LoopServices): LoopHandlerContext
       const llmProvider = factorySettings?.llm_provider ?? 'claude';
       const agentInvocation = llmProvider === 'kiro'
         ? `kiro-cli chat --no-interactive --trust-all-tools "$(cat /workspace/PROMPT_\${STAGE_ID}.md 2>/dev/null)"`
-        : `claude --print "$(cat /workspace/PROMPT_\${STAGE_ID}.md 2>/dev/null)" --output-format stream-json --verbose`;
+        : `claude --dangerously-skip-permissions --print "$(cat /workspace/PROMPT_\${STAGE_ID}.md 2>/dev/null)" --output-format stream-json --verbose`;
       const agentLoopScript = [
         'export PATH="$HOME/.local/bin:$PATH"',
         'sleep 5',
