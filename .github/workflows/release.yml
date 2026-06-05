@@ -45,36 +45,12 @@ jobs:
           p12-file-base64: ${{ secrets.APPLE_CERTIFICATE }}
           p12-password: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
 
-      - name: Build arm64
-        env:
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_ID_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-        run: npx electron-forge make --arch=arm64
-
-      - name: Save arm64 outputs
-        run: mv out/make out/make-arm64
-
       - name: Build x64
         env:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_ID_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: npx electron-forge make --arch=x64
-
-      - name: Upload arm64 DMG artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: Zephyr-macOS-arm64-${{ steps.pkg_version.outputs.VERSION }}-dmg
-          path: out/make-arm64/*.dmg
-          if-no-files-found: warn
-
-      - name: Upload arm64 ZIP artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: Zephyr-macOS-arm64-${{ steps.pkg_version.outputs.VERSION }}-zip
-          path: out/make-arm64/zip/darwin/**/*.zip
-          if-no-files-found: warn
 
       - name: Upload x64 DMG artifact
         uses: actions/upload-artifact@v4
