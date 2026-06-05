@@ -302,6 +302,23 @@ jobs:
             echo "IS_PRERELEASE=false" >> "$GITHUB_OUTPUT"
           fi
 
+      - name: Validate release assets
+        run: |
+          echo "Validating release assets..."
+          mapfile -t ASSETS < <(find release-assets -type f | sort)
+          if [ ${#ASSETS[@]} -eq 0 ]; then
+            echo "ERROR: No release assets found. Build jobs may have failed or produced no output."
+            exit 1
+          fi
+          echo "Found ${#ASSETS[@]} asset(s):"
+          for f in "${ASSETS[@]}"; do echo "  $f"; done
+
+          # Require latest-mac.yml so macOS auto-update works
+          if [ ! -f release-assets/latest-mac.yml ]; then
+            echo "ERROR: latest-mac.yml was not generated. macOS ZIP artifact is likely missing."
+            exit 1
+          fi
+
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
