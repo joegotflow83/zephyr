@@ -313,8 +313,9 @@ jobs:
             PRERELEASE_FLAG="--prerelease"
           fi
 
+          mapfile -t ASSETS < <(find release-assets -type f | sort)
           gh release create "$TAG" \
             --title "Zephyr Desktop $VERSION" \
             --generate-notes \
             $PRERELEASE_FLAG \
-            release-assets/*
+            "${ASSETS[@]}"
