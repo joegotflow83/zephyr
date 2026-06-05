@@ -173,7 +173,7 @@ jobs:
           path: artifacts
 
       - name: Display artifact structure
-        run: ls -R artifacts/
+        run: mkdir -p artifacts && ls -R artifacts/
 
       - name: Prepare release assets
         run: |
