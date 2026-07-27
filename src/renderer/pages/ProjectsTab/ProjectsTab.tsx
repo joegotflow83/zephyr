@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { ProjectRow } from './ProjectRow';
 import { useProjects } from '../../hooks/useProjects';
 import { useAppStore } from '../../stores/app-store';
@@ -26,6 +26,9 @@ export const ProjectsTab: React.FC<ProjectsTabProps> = ({ toast }) => {
   const removeLoop = useAppStore((state) => state.removeLoop);
   const vmInfos = useAppStore((state) => state.vmInfos);
   const multipassAvailable = useAppStore((state) => state.multipassAvailable);
+
+  // Search filter — matches against the columns shown in the table
+  const [search, setSearch] = useState('');
 
   // Dialog state
   const [dialogMode, setDialogMode] = useState<'add' | 'edit' | null>(null);
@@ -147,7 +150,19 @@ export const ProjectsTab: React.FC<ProjectsTabProps> = ({ toast }) => {
     setEditingProject(undefined);
   };
 
+  const query = search.trim().toLowerCase();
+
+  const filteredProjects = useMemo(() => {
+    if (!query) return projects;
+    return projects.filter((p) =>
+      [p.name, p.repo_url, p.docker_image].some((field) => field?.toLowerCase().includes(query))
+    );
+  }, [projects, query]);
+
+  // Distinguishes "no projects configured" (show onboarding) from
+  // "no projects match the search" (show a clearable no-results message).
   const isEmpty = !loading && projects.length === 0;
+  const noMatches = !loading && projects.length > 0 && filteredProjects.length === 0;
 
   return (
     <div className="flex flex-col h-full">
@@ -173,12 +188,28 @@ export const ProjectsTab: React.FC<ProjectsTabProps> = ({ toast }) => {
       {/* Header */}
       {!isEmpty && (
         <>
-          <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
+          <div className="flex items-center justify-between gap-4 p-6 border-b border-gray-200 dark:border-gray-700">
             <div>
               <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Projects</h1>
               <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
                 Manage your AI loop projects and Docker configurations
               </p>
+            </div>
+            <div className="relative flex-1 max-w-xs ml-auto">
+              <input
+                type="search"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Escape') setSearch('');
+                }}
+                placeholder="Search projects..."
+                aria-label="Search projects"
+                className="w-full pl-9 pr-3 py-2 text-sm bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">
+                🔍
+              </span>
             </div>
             <button
               onClick={handleAdd}
@@ -203,8 +234,24 @@ export const ProjectsTab: React.FC<ProjectsTabProps> = ({ toast }) => {
             </div>
           )}
 
+          {/* No search results */}
+          {noMatches && (
+            <div className="flex flex-col items-center justify-center flex-1 p-12 text-center">
+              <div className="text-4xl mb-3">🔍</div>
+              <p className="text-gray-500 dark:text-gray-400 mb-4">
+                No projects match &ldquo;{search.trim()}&rdquo;
+              </p>
+              <button
+                onClick={() => setSearch('')}
+                className="px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white rounded-lg font-medium hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+              >
+                Clear search
+              </button>
+            </div>
+          )}
+
           {/* Projects table */}
-          {!loading && projects.length > 0 && (
+          {!loading && filteredProjects.length > 0 && (
             <div className="flex-1 overflow-auto p-6">
               <table className="w-full">
                 <thead>
@@ -224,7 +271,7 @@ export const ProjectsTab: React.FC<ProjectsTabProps> = ({ toast }) => {
                   </tr>
                 </thead>
                 <tbody>
-                  {projects.map((project) => {
+                  {filteredProjects.map((project) => {
                     // Find VM info for persistent VM projects by matching the project's VM name
                     // stored in the vmInfos array. The VM name is keyed by name in the store.
                     const projectVMInfo =

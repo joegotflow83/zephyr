@@ -6,6 +6,7 @@
  * - Empty state display when no projects exist
  * - Action buttons (Add, Edit, Delete) trigger callbacks
  * - Loading and error states
+ * - Search filtering across name, repository, and docker image
  */
 
 import React from 'react';
@@ -221,6 +222,111 @@ describe('ProjectsTab', () => {
 
       expect(screen.getByRole('button', { name: /Edit/i })).toBeInTheDocument();
       expect(screen.getByRole('button', { name: /Delete/i })).toBeInTheDocument();
+    });
+  });
+
+  describe('Search', () => {
+    const searchProjects = [
+      createProjectConfig({
+        name: 'Alpha Service',
+        repo_url: 'https://github.com/user/alpha',
+        docker_image: 'ubuntu:22.04',
+      }),
+      createProjectConfig({
+        name: 'Beta Worker',
+        repo_url: 'https://gitlab.com/user/beta',
+        docker_image: 'alpine:latest',
+      }),
+    ];
+
+    const mockWithProjects = () => {
+      vi.mocked(useProjects).mockReturnValue({
+        projects: searchProjects,
+        loading: false,
+        error: null,
+        refresh: mockRefresh,
+        add: mockAdd,
+        update: mockUpdate,
+        remove: mockRemove,
+        get: mockGet,
+      });
+    };
+
+    it('filters projects by name', async () => {
+      const user = userEvent.setup();
+      mockWithProjects();
+      render(<ProjectsTab toast={mockToast} />);
+
+      await user.type(screen.getByLabelText('Search projects'), 'alpha');
+
+      expect(screen.getByText('Alpha Service')).toBeInTheDocument();
+      expect(screen.queryByText('Beta Worker')).not.toBeInTheDocument();
+    });
+
+    it('matches repository url and docker image, case-insensitively', async () => {
+      const user = userEvent.setup();
+      mockWithProjects();
+      render(<ProjectsTab toast={mockToast} />);
+
+      const input = screen.getByLabelText('Search projects');
+
+      await user.type(input, 'GITLAB');
+      expect(screen.getByText('Beta Worker')).toBeInTheDocument();
+      expect(screen.queryByText('Alpha Service')).not.toBeInTheDocument();
+
+      await user.clear(input);
+      await user.type(input, 'ubuntu');
+      expect(screen.getByText('Alpha Service')).toBeInTheDocument();
+      expect(screen.queryByText('Beta Worker')).not.toBeInTheDocument();
+    });
+
+    it('shows all projects when the query is blank', async () => {
+      const user = userEvent.setup();
+      mockWithProjects();
+      render(<ProjectsTab toast={mockToast} />);
+
+      await user.type(screen.getByLabelText('Search projects'), '   ');
+
+      expect(screen.getByText('Alpha Service')).toBeInTheDocument();
+      expect(screen.getByText('Beta Worker')).toBeInTheDocument();
+    });
+
+    it('shows a no-results message instead of the onboarding empty state', async () => {
+      const user = userEvent.setup();
+      mockWithProjects();
+      render(<ProjectsTab toast={mockToast} />);
+
+      await user.type(screen.getByLabelText('Search projects'), 'nonexistent');
+
+      expect(screen.getByText(/No projects match/)).toBeInTheDocument();
+      expect(screen.queryByText('No Projects Yet')).not.toBeInTheDocument();
+    });
+
+    it('restores the full list via the clear button', async () => {
+      const user = userEvent.setup();
+      mockWithProjects();
+      render(<ProjectsTab toast={mockToast} />);
+
+      await user.type(screen.getByLabelText('Search projects'), 'nonexistent');
+      await user.click(screen.getByRole('button', { name: /Clear search/i }));
+
+      expect(screen.getByText('Alpha Service')).toBeInTheDocument();
+      expect(screen.getByText('Beta Worker')).toBeInTheDocument();
+    });
+
+    it('clears the query on Escape', async () => {
+      const user = userEvent.setup();
+      mockWithProjects();
+      render(<ProjectsTab toast={mockToast} />);
+
+      const input = screen.getByLabelText('Search projects');
+      await user.type(input, 'alpha');
+      expect(screen.queryByText('Beta Worker')).not.toBeInTheDocument();
+
+      await user.type(input, '{Escape}');
+
+      expect(input).toHaveValue('');
+      expect(screen.getByText('Beta Worker')).toBeInTheDocument();
     });
   });
 
