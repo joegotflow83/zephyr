@@ -12,8 +12,7 @@ contextBridge.exposeInMainWorld('api', {
     list: () => ipcRenderer.invoke(IPC.PROJECTS_LIST),
     get: (id: string) => ipcRenderer.invoke(IPC.PROJECTS_GET, id),
     add: (config: unknown) => ipcRenderer.invoke(IPC.PROJECTS_ADD, config),
-    update: (id: string, partial: unknown) =>
-      ipcRenderer.invoke(IPC.PROJECTS_UPDATE, id, partial),
+    update: (id: string, partial: unknown) => ipcRenderer.invoke(IPC.PROJECTS_UPDATE, id, partial),
     remove: (id: string) => ipcRenderer.invoke(IPC.PROJECTS_REMOVE, id),
   },
 
@@ -44,13 +43,15 @@ contextBridge.exposeInMainWorld('api', {
 
     // Event listeners
     onStatusChanged: (callback: (isAvailable: boolean, info?: unknown) => void) => {
-      const listener = (_event: unknown, isAvailable: boolean, info?: unknown) => callback(isAvailable, info);
+      const listener = (_event: unknown, isAvailable: boolean, info?: unknown) =>
+        callback(isAvailable, info);
       ipcRenderer.on(IPC.RUNTIME_STATUS_CHANGED, listener);
       // Return cleanup function
       return () => ipcRenderer.removeListener(IPC.RUNTIME_STATUS_CHANGED, listener);
     },
     onPullProgress: (callback: (data: { image: string; progress: unknown }) => void) => {
-      const listener = (_event: unknown, data: { image: string; progress: unknown }) => callback(data);
+      const listener = (_event: unknown, data: { image: string; progress: unknown }) =>
+        callback(data);
       ipcRenderer.on(IPC.RUNTIME_PULL_PROGRESS, listener);
       // Return cleanup function
       return () => ipcRenderer.removeListener(IPC.RUNTIME_PULL_PROGRESS, listener);
@@ -71,7 +72,8 @@ contextBridge.exposeInMainWorld('api', {
     stop: (projectId: string, role?: string) => ipcRenderer.invoke(IPC.LOOP_STOP, projectId, role),
     list: () => ipcRenderer.invoke(IPC.LOOP_LIST),
     get: (projectId: string, role?: string) => ipcRenderer.invoke(IPC.LOOP_GET, projectId, role),
-    remove: (projectId: string, role?: string) => ipcRenderer.invoke(IPC.LOOP_REMOVE, projectId, role),
+    remove: (projectId: string, role?: string) =>
+      ipcRenderer.invoke(IPC.LOOP_REMOVE, projectId, role),
 
     // Event listeners
     onStateChanged: (callback: (state: unknown) => void) => {
@@ -92,8 +94,7 @@ contextBridge.exposeInMainWorld('api', {
   factory: {
     start: (projectId: string, baseOpts: unknown) =>
       ipcRenderer.invoke(IPC.FACTORY_START, projectId, baseOpts),
-    stop: (projectId: string) =>
-      ipcRenderer.invoke(IPC.FACTORY_STOP, projectId),
+    stop: (projectId: string) => ipcRenderer.invoke(IPC.FACTORY_STOP, projectId),
     restartContainer: (projectId: string, role: string) =>
       ipcRenderer.invoke(IPC.FACTORY_RESTART_CONTAINER, projectId, role),
     scaleUp: (projectId: string, stageId: string) =>
@@ -103,8 +104,7 @@ contextBridge.exposeInMainWorld('api', {
   },
 
   factoryTasks: {
-    list: (projectId: string) =>
-      ipcRenderer.invoke(IPC.FACTORY_TASK_LIST, projectId),
+    list: (projectId: string) => ipcRenderer.invoke(IPC.FACTORY_TASK_LIST, projectId),
     get: (projectId: string, taskId: string) =>
       ipcRenderer.invoke(IPC.FACTORY_TASK_GET, projectId, taskId),
     add: (projectId: string, title: string, description: string) =>
@@ -117,8 +117,7 @@ contextBridge.exposeInMainWorld('api', {
       ipcRenderer.invoke(IPC.FACTORY_TASK_UPDATE, projectId, taskId, updates),
     unlock: (projectId: string, taskId: string) =>
       ipcRenderer.invoke(IPC.FACTORY_TASK_UNLOCK, projectId, taskId),
-    sync: (projectId: string) =>
-      ipcRenderer.invoke(IPC.FACTORY_TASK_SYNC, projectId),
+    sync: (projectId: string) => ipcRenderer.invoke(IPC.FACTORY_TASK_SYNC, projectId),
     onChanged: (callback: (projectId: string, tasks: unknown[]) => void) => {
       const listener = (_event: unknown, projectId: string, tasks: unknown[]) =>
         callback(projectId, tasks);
@@ -132,8 +131,7 @@ contextBridge.exposeInMainWorld('api', {
     list: () => ipcRenderer.invoke(IPC.PIPELINE_LIST),
     get: (id: string) => ipcRenderer.invoke(IPC.PIPELINE_GET, id),
     add: (input: unknown) => ipcRenderer.invoke(IPC.PIPELINE_ADD, input),
-    update: (id: string, patch: unknown) =>
-      ipcRenderer.invoke(IPC.PIPELINE_UPDATE, id, patch),
+    update: (id: string, patch: unknown) => ipcRenderer.invoke(IPC.PIPELINE_UPDATE, id, patch),
     remove: (id: string) => ipcRenderer.invoke(IPC.PIPELINE_REMOVE, id),
     onChanged: (callback: (pipelines: unknown[]) => void) => {
       const listener = (_event: unknown, pipelines: unknown[]) => callback(pipelines);
@@ -146,8 +144,9 @@ contextBridge.exposeInMainWorld('api', {
   logs: {
     export: (projectId: string, format?: 'text' | 'json') =>
       ipcRenderer.invoke(IPC.LOGS_EXPORT, projectId, format),
-    exportAll: (format?: 'text' | 'json') =>
-      ipcRenderer.invoke(IPC.LOGS_EXPORT_ALL, format),
+    exportAll: (format?: 'text' | 'json') => ipcRenderer.invoke(IPC.LOGS_EXPORT_ALL, format),
+    write: (level: string, message: string, ...args: unknown[]) =>
+      ipcRenderer.send(IPC.LOGS_RENDERER, level, message, ...args),
   },
 
   terminal: {
@@ -155,8 +154,7 @@ contextBridge.exposeInMainWorld('api', {
       ipcRenderer.invoke(IPC.TERMINAL_OPEN, containerId, opts),
     openVM: (vmName: string, containerName: string, opts?: unknown) =>
       ipcRenderer.invoke(IPC.TERMINAL_OPEN_VM, vmName, containerName, opts),
-    close: (sessionId: string) =>
-      ipcRenderer.invoke(IPC.TERMINAL_CLOSE, sessionId),
+    close: (sessionId: string) => ipcRenderer.invoke(IPC.TERMINAL_CLOSE, sessionId),
     write: (sessionId: string, data: string) =>
       ipcRenderer.send(IPC.TERMINAL_WRITE, sessionId, data),
     resize: (sessionId: string, cols: number, rows: number) =>
@@ -183,6 +181,14 @@ contextBridge.exposeInMainWorld('api', {
       // Return cleanup function
       return () => ipcRenderer.removeListener(IPC.TERMINAL_ERROR, listener);
     },
+  },
+
+  // Planning sessions reuse the terminal:* event channels for I/O — only the
+  // container lifecycle differs, so there is no planning-specific data stream.
+  planning: {
+    open: (projectId: string, opts?: unknown) =>
+      ipcRenderer.invoke(IPC.PLANNING_OPEN, projectId, opts),
+    close: (sessionId: string) => ipcRenderer.invoke(IPC.PLANNING_CLOSE, sessionId),
   },
 
   updates: {
@@ -250,15 +256,13 @@ contextBridge.exposeInMainWorld('api', {
   },
 
   githubPat: {
-    set: (projectId: string, pat: string) =>
-      ipcRenderer.invoke(IPC.GITHUB_PAT_SET, projectId, pat),
+    set: (projectId: string, pat: string) => ipcRenderer.invoke(IPC.GITHUB_PAT_SET, projectId, pat),
     has: (projectId: string) => ipcRenderer.invoke(IPC.GITHUB_PAT_GET, projectId),
     delete: (projectId: string) => ipcRenderer.invoke(IPC.GITHUB_PAT_DELETE, projectId),
   },
 
   gitlabPat: {
-    set: (projectId: string, pat: string) =>
-      ipcRenderer.invoke(IPC.GITLAB_PAT_SET, projectId, pat),
+    set: (projectId: string, pat: string) => ipcRenderer.invoke(IPC.GITLAB_PAT_SET, projectId, pat),
     has: (projectId: string) => ipcRenderer.invoke(IPC.GITLAB_PAT_GET, projectId),
     delete: (projectId: string) => ipcRenderer.invoke(IPC.GITLAB_PAT_DELETE, projectId),
   },
@@ -267,8 +271,7 @@ contextBridge.exposeInMainWorld('api', {
     listOrphaned: () => ipcRenderer.invoke(IPC.DEPLOY_KEYS_LIST_ORPHANED),
     getUrl: (repo: string, service?: 'github' | 'gitlab') =>
       ipcRenderer.invoke(IPC.DEPLOY_KEYS_GET_URL, repo, service),
-    markCleaned: (keyId: number) =>
-      ipcRenderer.invoke(IPC.DEPLOY_KEYS_MARK_CLEANED, keyId),
+    markCleaned: (keyId: number) => ipcRenderer.invoke(IPC.DEPLOY_KEYS_MARK_CLEANED, keyId),
   },
 
   app: {
@@ -305,7 +308,8 @@ contextBridge.exposeInMainWorld('api', {
     /** Get detailed info for a specific VM by name */
     get: (name: string) => ipcRenderer.invoke(IPC.VM_GET, name),
     /** Start (or provision-then-start) the persistent VM for a project */
-    start: (projectId: string, vmConfig?: unknown) => ipcRenderer.invoke(IPC.VM_START, projectId, vmConfig),
+    start: (projectId: string, vmConfig?: unknown) =>
+      ipcRenderer.invoke(IPC.VM_START, projectId, vmConfig),
     /** Stop the persistent VM for a project */
     stop: (projectId: string) => ipcRenderer.invoke(IPC.VM_STOP, projectId),
     /** Delete a VM by name and purge it from disk */

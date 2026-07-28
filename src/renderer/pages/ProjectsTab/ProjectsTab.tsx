@@ -4,6 +4,7 @@ import { useProjects } from '../../hooks/useProjects';
 import { useAppStore } from '../../stores/app-store';
 import { ProjectDialog } from '../../components/ProjectDialog/ProjectDialog';
 import { ConfirmDialog } from '../../components/ConfirmDialog/ConfirmDialog';
+import { PlanningSessionDialog } from '../../components/PlanningSessionDialog/PlanningSessionDialog';
 import type { ProjectConfig } from '../../../shared/models';
 
 interface ToastMethods {
@@ -45,6 +46,9 @@ export const ProjectsTab: React.FC<ProjectsTabProps> = ({ toast }) => {
     [key: string]: boolean;
   }>({});
 
+  // Planning session state — the project whose planning dialog is open
+  const [planningProject, setPlanningProject] = useState<ProjectConfig | null>(null);
+
   // Load projects on mount
   useEffect(() => {
     refresh();
@@ -62,6 +66,25 @@ export const ProjectsTab: React.FC<ProjectsTabProps> = ({ toast }) => {
 
   const handleDelete = (project: ProjectConfig) => {
     setConfirmDialog({ project, show: true });
+  };
+
+  const handlePlan = (project: ProjectConfig) => {
+    setPlanningProject(project);
+  };
+
+  // The main process has already written the specs back to the project store;
+  // refresh so the table and any open dialog reflect them.
+  const handlePlanningClose = (specFiles?: Record<string, string>) => {
+    setPlanningProject(null);
+    if (specFiles) {
+      const count = Object.keys(specFiles).length;
+      toast.success(
+        count === 1
+          ? 'Saved 1 spec file to the project'
+          : `Saved ${count} spec files to the project`
+      );
+      refresh();
+    }
   };
 
   const handleConfirmDelete = async () => {
@@ -171,9 +194,12 @@ export const ProjectsTab: React.FC<ProjectsTabProps> = ({ toast }) => {
         <div className="flex flex-col items-center justify-center h-full p-6">
           <div className="text-center max-w-md">
             <div className="text-6xl mb-4">📁</div>
-            <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">No Projects Yet</h2>
+            <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+              No Projects Yet
+            </h2>
             <p className="text-gray-500 dark:text-gray-400 mb-6">
-              Get started by adding your first AI loop project. Each project runs in its own Docker container.
+              Get started by adding your first AI loop project. Each project runs in its own Docker
+              container.
             </p>
             <button
               onClick={handleAdd}
@@ -276,7 +302,9 @@ export const ProjectsTab: React.FC<ProjectsTabProps> = ({ toast }) => {
                     // stored in the vmInfos array. The VM name is keyed by name in the store.
                     const projectVMInfo =
                       project.sandbox_type === 'vm' && project.vm_config?.vm_mode === 'persistent'
-                        ? vmInfos.find((v) => v.name.startsWith(`zephyr-${project.id.slice(0, 8)}`)) ?? null
+                        ? (vmInfos.find((v) =>
+                            v.name.startsWith(`zephyr-${project.id.slice(0, 8)}`)
+                          ) ?? null)
                         : null;
 
                     return (
@@ -289,6 +317,7 @@ export const ProjectsTab: React.FC<ProjectsTabProps> = ({ toast }) => {
                         isStoppingVM={!!actionLoading[`stopvm-${project.id}`]}
                         onEdit={handleEdit}
                         onDelete={handleDelete}
+                        onPlan={handlePlan}
                         onStartVM={handleStartVM}
                         onStopVM={handleStopVM}
                       />
@@ -323,6 +352,11 @@ export const ProjectsTab: React.FC<ProjectsTabProps> = ({ toast }) => {
           onConfirm={handleConfirmDelete}
           onCancel={handleCancelDelete}
         />
+      )}
+
+      {/* Planning Session Dialog */}
+      {planningProject && (
+        <PlanningSessionDialog project={planningProject} onClose={handlePlanningClose} />
       )}
     </div>
   );

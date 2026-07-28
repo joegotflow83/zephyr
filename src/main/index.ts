@@ -24,6 +24,7 @@ import { registerCredentialHandlers } from './ipc-handlers/credential-handlers';
 import { registerLoopHandlers } from './ipc-handlers/loop-handlers';
 import { registerLogHandlers } from './ipc-handlers/log-handlers';
 import { registerTerminalHandlers } from './ipc-handlers/terminal-handlers';
+import { registerPlanningHandlers } from './ipc-handlers/planning-handlers';
 import { registerUpdateHandlers } from './ipc-handlers/update-handlers';
 import { registerAutoUpdateHandlers } from './ipc-handlers/auto-update-handlers';
 import { registerImageHandlers } from './ipc-handlers/image-handlers';
@@ -79,14 +80,11 @@ const importExport = new ImportExportService(configManager);
 // Read container_runtime from settings synchronously (loadJson uses readFileSync).
 // Defaults to 'docker' if settings are absent or the field is unset.
 const initialSettings = configManager.loadJson<AppSettings>('settings.json');
-const runtime: ContainerRuntime = initialSettings?.container_runtime === 'podman'
-  ? new PodmanRuntime()
-  : new DockerRuntime();
+const runtime: ContainerRuntime =
+  initialSettings?.container_runtime === 'podman' ? new PodmanRuntime() : new DockerRuntime();
 const runtimeHealth = new RuntimeHealthMonitor(runtime);
 
-const credentialManager = new CredentialManager(
-  path.join(os.homedir(), '.zephyr')
-);
+const credentialManager = new CredentialManager(path.join(os.homedir(), '.zephyr'));
 const loginManager = new LoginManager(credentialManager);
 const logParser = new LogParser();
 const vmManager = new VMManager();
@@ -110,22 +108,32 @@ const mailboxStore = new MailboxStore(path.join(os.homedir(), '.zephyr'));
 // pipeline (Phase 2.3). The lookup is injected as a callback so the store
 // remains decoupled from ProjectStore / PipelineStore — tests stub it inline
 // without bootstrapping the full service graph.
-const factoryTaskStore = new FactoryTaskStore(
-  path.join(os.homedir(), '.zephyr', 'factory-tasks'),
-  {
-    getPipelineForProject: (projectId: string) => {
-      const project = projectStore.getProject(projectId);
-      if (!project?.pipelineId) return null;
-      return pipelineStore.getPipeline(project.pipelineId);
-    },
-    mailboxStore,
-    onMailboxChanged: () => emitMailboxChanged(mailboxStore),
+const factoryTaskStore = new FactoryTaskStore(path.join(os.homedir(), '.zephyr', 'factory-tasks'), {
+  getPipelineForProject: (projectId: string) => {
+    const project = projectStore.getProject(projectId);
+    if (!project?.pipelineId) return null;
+    return pipelineStore.getPipeline(project.pipelineId);
   },
-);
+  mailboxStore,
+  onMailboxChanged: () => emitMailboxChanged(mailboxStore),
+});
 const sshKeyManager = new SSHKeyManager(runtime);
 
 // Register all IPC handlers before the window is created.
-registerDataHandlers({ configManager, projectStore, importExport, preValidationStore, hooksStore, kiroHooksStore, claudeSettingsStore, containerOrchestrator, runtime, credentialManager, sshKeyManager, deployKeyStore });
+registerDataHandlers({
+  configManager,
+  projectStore,
+  importExport,
+  preValidationStore,
+  hooksStore,
+  kiroHooksStore,
+  claudeSettingsStore,
+  containerOrchestrator,
+  runtime,
+  credentialManager,
+  sshKeyManager,
+  deployKeyStore,
+});
 registerRuntimeHandlers({ runtime, runtimeHealth });
 registerCredentialHandlers({ credentialManager, loginManager });
 const { dispatchFactoryStage, stopWatchdog } = registerLoopHandlers({
@@ -147,6 +155,14 @@ const { dispatchFactoryStage, stopWatchdog } = registerLoopHandlers({
 });
 registerLogHandlers({ logExporter, containerOrchestrator });
 registerTerminalHandlers({ terminalManager, vmManager });
+const closePlanningSessions = registerPlanningHandlers({
+  runtime,
+  terminalManager,
+  projectStore,
+  configManager,
+  authInjector,
+  credentialManager,
+});
 registerUpdateHandlers({ selfUpdater });
 registerAutoUpdateHandlers({ autoUpdater });
 registerImageHandlers({ imageStore, imageBuilder });
@@ -188,9 +204,7 @@ const createWindow = () => {
   if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
     mainWindow.loadURL(MAIN_WINDOW_VITE_DEV_SERVER_URL);
   } else {
-    mainWindow.loadFile(
-      path.join(__dirname, `../renderer/${MAIN_WINDOW_VITE_NAME}/index.html`),
-    );
+    mainWindow.loadFile(path.join(__dirname, `../renderer/${MAIN_WINDOW_VITE_NAME}/index.html`));
   }
 
   return mainWindow;
@@ -291,7 +305,7 @@ async function cleanupOrphanedVMs(): Promise<void> {
       } else {
         // Persistent VMs: log if no active loop is using them
         const hasActiveLoop = Array.from(activeProjectIds).some(
-          (id) => containerOrchestrator.getLoopState(id)?.vmName === vm.name,
+          (id) => containerOrchestrator.getLoopState(id)?.vmName === vm.name
         );
         if (!hasActiveLoop) {
           logger.info(`Persistent VM "${vm.name}" has no active loop (state: ${vm.state})`);
@@ -316,7 +330,9 @@ app.on('ready', async () => {
     }
     if (settings.max_concurrent_containers) {
       containerOrchestrator.setMaxConcurrent(settings.max_concurrent_containers);
-      logger.info('Max concurrent containers set from settings', { max: settings.max_concurrent_containers });
+      logger.info('Max concurrent containers set from settings', {
+        max: settings.max_concurrent_containers,
+      });
     }
   } catch (error) {
     logger.warn('Could not load settings, using default log level', { error });
@@ -387,6 +403,11 @@ async function gracefulShutdown(): Promise<void> {
     logger.debug('Stopping runtime health monitor');
     runtimeHealth.stop();
 
+    // 3b. Tear down planning sessions first so their spec files are written
+    // back to the project store before the terminals are torn down.
+    logger.debug('Closing planning sessions');
+    await closePlanningSessions();
+
     // 4. Close all terminal sessions
     logger.debug('Closing all terminal sessions');
     await terminalManager.closeAllSessions();
@@ -401,7 +422,7 @@ async function gracefulShutdown(): Promise<void> {
       if (available) {
         const vms = await vmManager.listVMs();
         const ephemeralRunning = vms.filter(
-          (vm) => vmManager.isZephyrVM(vm.name) && isEphemeralVMName(vm.name),
+          (vm) => vmManager.isZephyrVM(vm.name) && isEphemeralVMName(vm.name)
         );
         if (ephemeralRunning.length > 0) {
           logger.info(`Deleting ${ephemeralRunning.length} ephemeral VM(s) on quit`);
@@ -409,8 +430,8 @@ async function gracefulShutdown(): Promise<void> {
             ephemeralRunning.map((vm) =>
               vmManager.deleteVM(vm.name, true).catch((err) => {
                 logger.warn(`Failed to delete ephemeral VM "${vm.name}" on quit`, { err });
-              }),
-            ),
+              })
+            )
           );
         }
       }
@@ -429,9 +450,7 @@ async function gracefulShutdown(): Promise<void> {
  * @returns true if app should quit, false to cancel quit
  */
 async function confirmQuitIfNeeded(): Promise<boolean> {
-  const activeLoops = containerOrchestrator
-    .listAll()
-    .filter((loop) => isLoopActive(loop.status));
+  const activeLoops = containerOrchestrator.listAll().filter((loop) => isLoopActive(loop.status));
 
   if (activeLoops.length === 0) {
     return true; // No active loops, safe to quit

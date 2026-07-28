@@ -79,6 +79,7 @@ export const IPC = {
   // Log export
   LOGS_EXPORT: 'logs:export',
   LOGS_EXPORT_ALL: 'logs:export-all',
+  LOGS_RENDERER: 'logs:renderer',
 
   // Terminal operations
   TERMINAL_OPEN: 'terminal:open',
@@ -86,6 +87,10 @@ export const IPC = {
   TERMINAL_CLOSE: 'terminal:close',
   TERMINAL_WRITE: 'terminal:write',
   TERMINAL_RESIZE: 'terminal:resize',
+
+  // Planning sessions (interactive LLM chat in a throwaway container)
+  PLANNING_OPEN: 'planning:open',
+  PLANNING_CLOSE: 'planning:close',
 
   // Terminal events (outbound from main to renderer)
   TERMINAL_DATA: 'terminal:data',

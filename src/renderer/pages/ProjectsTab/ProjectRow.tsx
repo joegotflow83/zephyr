@@ -10,6 +10,7 @@ interface ProjectRowProps {
   isStoppingVM?: boolean;
   onEdit: (project: ProjectConfig) => void;
   onDelete: (project: ProjectConfig) => void;
+  onPlan?: (project: ProjectConfig) => void;
   onStartVM?: (project: ProjectConfig) => void;
   onStopVM?: (project: ProjectConfig) => void;
 }
@@ -27,6 +28,7 @@ export const ProjectRow: React.FC<ProjectRowProps> = ({
   isStoppingVM = false,
   onEdit,
   onDelete,
+  onPlan,
   onStartVM,
   onStopVM,
 }) => {
@@ -35,15 +37,25 @@ export const ProjectRow: React.FC<ProjectRowProps> = ({
 
   const stopVMDisabled = isStoppingVM;
 
+  // Planning mounts local_path into a container built from docker_image, so both
+  // are required before the button does anything useful.
+  const planEnabled = Boolean(project.local_path && project.docker_image);
+
   return (
     <tr className="border-b border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800">
       <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-white">
         {project.name}
       </td>
-      <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300 max-w-xs truncate" title={project.repo_url}>
+      <td
+        className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300 max-w-xs truncate"
+        title={project.repo_url}
+      >
         {project.repo_url}
       </td>
-      <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300 max-w-xs truncate" title={project.docker_image}>
+      <td
+        className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300 max-w-xs truncate"
+        title={project.docker_image}
+      >
         {project.docker_image}
       </td>
       <td className="px-4 py-3 text-sm text-right space-x-2">
@@ -57,7 +69,13 @@ export const ProjectRow: React.FC<ProjectRowProps> = ({
                   ? 'bg-gray-100 dark:bg-gray-700 text-gray-500 cursor-not-allowed'
                   : 'bg-green-700 text-white hover:bg-green-600'
               }`}
-              title={isStartingVM ? 'Starting VM...' : vmInfo?.state === 'Running' ? 'VM is already running' : 'Start the VM'}
+              title={
+                isStartingVM
+                  ? 'Starting VM...'
+                  : vmInfo?.state === 'Running'
+                    ? 'VM is already running'
+                    : 'Start the VM'
+              }
             >
               {isStartingVM ? 'Starting...' : 'Start VM'}
             </button>
@@ -74,6 +92,24 @@ export const ProjectRow: React.FC<ProjectRowProps> = ({
               {isStoppingVM ? 'Stopping...' : 'Stop VM'}
             </button>
           </>
+        )}
+        {onPlan && (
+          <button
+            onClick={() => onPlan(project)}
+            disabled={!planEnabled}
+            className={`px-3 py-1 rounded font-medium transition-colors ${
+              planEnabled
+                ? 'bg-blue-700 text-white hover:bg-blue-600'
+                : 'bg-gray-100 dark:bg-gray-700 text-gray-500 cursor-not-allowed'
+            }`}
+            title={
+              planEnabled
+                ? 'Chat with the configured LLM engine in this project to draft spec files'
+                : 'Requires a local path and a container image on this project'
+            }
+          >
+            Plan
+          </button>
         )}
         <button
           onClick={() => onEdit(project)}
@@ -94,8 +130,19 @@ export const ProjectRow: React.FC<ProjectRowProps> = ({
         >
           {isDeleting && (
             <svg className="animate-spin h-3 w-3" viewBox="0 0 24 24" fill="none">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+              <circle
+                className="opacity-25"
+                cx="12"
+                cy="12"
+                r="10"
+                stroke="currentColor"
+                strokeWidth="4"
+              />
+              <path
+                className="opacity-75"
+                fill="currentColor"
+                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+              />
             </svg>
           )}
           {isDeleting ? 'Deleting...' : 'Delete'}

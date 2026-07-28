@@ -1,7 +1,13 @@
 // Global type augmentations for the renderer process.
 // window.api is exposed by the preload script via contextBridge.
 
-import type { AppSettings, ProjectConfig, VMConfig, ZephyrImage, ImageBuildConfig } from '../../shared/models';
+import type {
+  AppSettings,
+  ProjectConfig,
+  VMConfig,
+  ZephyrImage,
+  ImageBuildConfig,
+} from '../../shared/models';
 import type { FactoryTask } from '../../shared/factory-types';
 import type { Pipeline } from '../../shared/pipeline-types';
 import type { DeployKeyRecord } from '../../services/deploy-key-store';
@@ -38,11 +44,11 @@ declare global {
         list: () => Promise<ProjectConfig[]>;
         get: (id: string) => Promise<ProjectConfig | null>;
         add: (
-          config: Omit<ProjectConfig, 'id' | 'created_at' | 'updated_at'>,
+          config: Omit<ProjectConfig, 'id' | 'created_at' | 'updated_at'>
         ) => Promise<ProjectConfig>;
         update: (
           id: string,
-          partial: Partial<Omit<ProjectConfig, 'id' | 'created_at'>>,
+          partial: Partial<Omit<ProjectConfig, 'id' | 'created_at'>>
         ) => Promise<ProjectConfig>;
         remove: (id: string) => Promise<boolean>;
       };
@@ -61,10 +67,7 @@ declare global {
 
       docker: {
         /** Check Docker availability and get daemon info */
-        status: () => Promise<
-          | { available: false }
-          | { available: true; info: RuntimeInfo }
-        >;
+        status: () => Promise<{ available: false } | { available: true; info: RuntimeInfo }>;
         /** Pull a Docker image with progress updates via onPullProgress */
         pullImage: (image: string) => Promise<{ success: boolean }>;
         /** Create a new container */
@@ -80,18 +83,16 @@ declare global {
         /** Get container status by ID */
         getContainerStatus: (containerId: string) => Promise<ContainerStatus>;
         /** Execute a command in a container (non-interactive) */
-        exec: (
-          containerId: string,
-          cmd: string[],
-          opts?: ExecOpts,
-        ) => Promise<ExecResult>;
+        exec: (containerId: string, cmd: string[], opts?: ExecOpts) => Promise<ExecResult>;
 
         // Event listeners
         /** Listen for Docker availability changes. Returns cleanup function. */
-        onStatusChanged: (callback: (isAvailable: boolean, info?: RuntimeInfo) => void) => () => void;
+        onStatusChanged: (
+          callback: (isAvailable: boolean, info?: RuntimeInfo) => void
+        ) => () => void;
         /** Listen for image pull progress. Returns cleanup function. */
         onPullProgress: (
-          callback: (data: { image: string; progress: unknown }) => void,
+          callback: (data: { image: string; progress: unknown }) => void
         ) => () => void;
       };
 
@@ -107,7 +108,11 @@ declare global {
         /** Open browser-based login window for a service */
         login: (service: string) => Promise<LoginResult>;
         /** Check which auth methods are currently configured */
-        checkAuth: () => Promise<{ api_key: boolean; browser_session: boolean; aws_bedrock: boolean }>;
+        checkAuth: () => Promise<{
+          api_key: boolean;
+          browser_session: boolean;
+          aws_bedrock: boolean;
+        }>;
       };
 
       loops: {
@@ -124,9 +129,7 @@ declare global {
         /** Listen for loop state changes. Returns cleanup function. */
         onStateChanged: (callback: (state: LoopState) => void) => () => void;
         /** Listen for parsed log lines. Returns cleanup function. */
-        onLogLine: (
-          callback: (projectId: string, line: ParsedLogLine) => void,
-        ) => () => void;
+        onLogLine: (callback: (projectId: string, line: ParsedLogLine) => void) => () => void;
       };
 
       factory: {
@@ -154,7 +157,11 @@ declare global {
         /** Remove a task by ID */
         remove: (projectId: string, taskId: string) => Promise<boolean>;
         /** Update task fields (title, description) */
-        update: (projectId: string, taskId: string, updates: Partial<Pick<FactoryTask, 'title' | 'description'>>) => Promise<FactoryTask>;
+        update: (
+          projectId: string,
+          taskId: string,
+          updates: Partial<Pick<FactoryTask, 'title' | 'description'>>
+        ) => Promise<FactoryTask>;
         /** Force-unlock a task (manual override from UI) */
         unlock: (projectId: string, taskId: string) => Promise<FactoryTask>;
         /** Sync tasks from spec files in the project's specs directory */
@@ -175,7 +182,7 @@ declare global {
          */
         add: (
           input: Omit<Pipeline, 'createdAt' | 'updatedAt'> &
-            Partial<Pick<Pipeline, 'createdAt' | 'updatedAt'>>,
+            Partial<Pick<Pipeline, 'createdAt' | 'updatedAt'>>
         ) => Promise<Pipeline>;
         /**
          * Patch a user pipeline. `id`, `builtIn`, and `createdAt` are protected.
@@ -196,25 +203,27 @@ declare global {
         /** Export a single loop's logs. Opens save dialog. Returns result with success status and path. */
         export: (
           projectId: string,
-          format?: 'text' | 'json',
+          format?: 'text' | 'json'
         ) => Promise<{ success: boolean; path?: string; error?: string }>;
         /** Export all loop logs to a zip file. Opens save dialog. Returns result with success status and path. */
         exportAll: (
-          format?: 'text' | 'json',
+          format?: 'text' | 'json'
         ) => Promise<{ success: boolean; path?: string; error?: string }>;
+        /** Fire-and-forget: forward a renderer log line to the main process logger (subsystem 'ui'). */
+        write: (level: string, message: string, ...args: unknown[]) => void;
       };
 
       terminal: {
         /** Open a new terminal session to a Docker container on the host */
         open: (
           containerId: string,
-          opts?: TerminalSessionOpts,
+          opts?: TerminalSessionOpts
         ) => Promise<{ success: boolean; session?: TerminalSession; error?: string }>;
         /** Open a terminal session to a Docker container running inside a Multipass VM */
         openVM: (
           vmName: string,
           containerName: string,
-          opts?: TerminalSessionOpts,
+          opts?: TerminalSessionOpts
         ) => Promise<{ success: boolean; session?: TerminalSession; error?: string }>;
         /** Close a terminal session */
         close: (sessionId: string) => Promise<{ success: boolean; error?: string }>;
@@ -224,7 +233,7 @@ declare global {
         resize: (
           sessionId: string,
           cols: number,
-          rows: number,
+          rows: number
         ) => Promise<{ success: boolean; error?: string }>;
 
         // Event listeners
@@ -234,6 +243,27 @@ declare global {
         onClosed: (callback: (sessionId: string) => void) => () => void;
         /** Listen for terminal session errors. Returns cleanup function. */
         onError: (callback: (sessionId: string, error: string) => void) => () => void;
+      };
+
+      planning: {
+        /**
+         * Start a planning session: creates a throwaway container for the
+         * project and attaches a terminal to the configured LLM engine.
+         * Output flows over the terminal.* event listeners.
+         */
+        open: (
+          projectId: string,
+          opts?: { rows?: number; cols?: number }
+        ) => Promise<{ success: boolean; session?: TerminalSession; error?: string }>;
+        /**
+         * End a planning session: removes the container and writes the
+         * project's specs directory back into ProjectConfig.spec_files.
+         */
+        close: (sessionId: string) => Promise<{
+          success: boolean;
+          specFiles?: Record<string, string>;
+          error?: string;
+        }>;
       };
 
       updates: {
@@ -360,7 +390,7 @@ declare global {
         delete: (id: string) => Promise<void>;
         /** Listen for mailbox state push updates. Returns cleanup function. */
         onChanged: (
-          callback: (payload: { messages: MailboxMessage[]; unreadCount: number }) => void,
+          callback: (payload: { messages: MailboxMessage[]; unreadCount: number }) => void
         ) => () => void;
       };
 
