@@ -18,12 +18,7 @@ import os from 'os';
 import path from 'path';
 import { randomUUID } from 'crypto';
 
-import {
-  FactoryTask,
-  FactoryTaskQueue,
-  TaskHistoryEntry,
-  TaskNote,
-} from '../shared/factory-types';
+import { FactoryTask, FactoryTaskQueue, TaskHistoryEntry, TaskNote } from '../shared/factory-types';
 import type { Pipeline } from '../shared/pipeline-types';
 import { columnsFor } from '../shared/pipeline-types';
 import type { MailboxStore } from './mailbox-store';
@@ -151,7 +146,7 @@ export class FactoryTaskStore {
    */
   addTask(
     projectId: string,
-    task: { title: string; description: string; sourceFile?: string },
+    task: { title: string; description: string; sourceFile?: string }
   ): FactoryTask {
     const queue = this.getQueue(projectId);
     const now = new Date().toISOString();
@@ -199,7 +194,12 @@ export class FactoryTaskStore {
    *
    * @returns The updated task.
    */
-  moveTask(projectId: string, taskId: string, toColumn: string, opts?: { agentRejection?: boolean; reason?: string; note?: string }): FactoryTask {
+  moveTask(
+    projectId: string,
+    taskId: string,
+    toColumn: string,
+    opts?: { agentRejection?: boolean; reason?: string; note?: string }
+  ): FactoryTask {
     const queue = this.getQueue(projectId);
     const idx = queue.tasks.findIndex((t) => t.id === taskId);
     if (idx === -1) {
@@ -210,7 +210,7 @@ export class FactoryTaskStore {
     const pipeline = this.deps.getPipelineForProject?.(projectId);
     if (!pipeline) {
       throw new Error(
-        `[FactoryTaskStore] Cannot move task ${taskId}: no pipeline assigned to project ${projectId}`,
+        `[FactoryTaskStore] Cannot move task ${taskId}: no pipeline assigned to project ${projectId}`
       );
     }
 
@@ -223,7 +223,7 @@ export class FactoryTaskStore {
       if (!validColumns.includes(toColumn)) {
         throw new Error(
           `[FactoryTaskStore] Unknown target column '${toColumn}' for agent rejection. ` +
-            `Valid columns: ${validColumns.join(', ')}`,
+            `Valid columns: ${validColumns.join(', ')}`
         );
       }
     } else {
@@ -233,7 +233,7 @@ export class FactoryTaskStore {
       // to 'done' when the target is a debrief stage, so skip adjacency validation
       // here and let that bypass handle it.
       const isDebriefTarget = pipeline.stages.some(
-        (s) => s.role === 'debrief' && s.id === toColumn,
+        (s) => s.role === 'debrief' && s.id === toColumn
       );
       if (!isDebriefTarget) {
         // Kanban drag-drop: enforce adjacency so the human cannot accidentally
@@ -243,7 +243,7 @@ export class FactoryTaskStore {
         if (!allowedTargets.includes(toColumn)) {
           throw new Error(
             `[FactoryTaskStore] Invalid transition from '${task.column}' to '${toColumn}'. ` +
-              `Allowed targets: ${allowedTargets.join(', ')}`,
+              `Allowed targets: ${allowedTargets.join(', ')}`
           );
         }
       }
@@ -259,7 +259,7 @@ export class FactoryTaskStore {
     const toIdx = flow.indexOf(toColumn);
     const isBackward = fromIdx > -1 && toIdx > -1 && toIdx < fromIdx;
 
-    const newBounceCount = isBackward ? (task.bounceCount ?? 0) + 1 : task.bounceCount ?? 0;
+    const newBounceCount = isBackward ? (task.bounceCount ?? 0) + 1 : (task.bounceCount ?? 0);
 
     // Phase 2.4 gate: when a backward bounce pushes `bounceCount` to/above
     // `pipeline.bounceLimit`, redirect the task to Blocked instead of the
@@ -270,9 +270,7 @@ export class FactoryTaskStore {
     // the gate; forward, flow→blocked, and blocked→flow moves never escalate
     // even if the counter is already at/over limit, because they don't
     // increment the counter and therefore aren't bounce events.
-    const rawTarget = isBackward && newBounceCount >= pipeline.bounceLimit
-      ? 'blocked'
-      : toColumn;
+    const rawTarget = isBackward && newBounceCount >= pipeline.bounceLimit ? 'blocked' : toColumn;
     // Non-epic tasks bypass the debrief stage entirely and land in 'done'.
     // Only epics are routed through debrief (by the auto-advance logic below
     // once all their children complete).
@@ -290,8 +288,7 @@ export class FactoryTaskStore {
     };
     // Skip recording a history entry when the column doesn't actually change
     // (e.g. an agent self-rejecting to its own stage as a retry signal).
-    const historyUpdated =
-      task.column !== targetColumn ? [...prevHistory, entry] : prevHistory;
+    const historyUpdated = task.column !== targetColumn ? [...prevHistory, entry] : prevHistory;
 
     // Append agent summary note when provided (forward or rejected transitions).
     const noteEntry: TaskNote | undefined = opts?.note
@@ -342,7 +339,7 @@ export class FactoryTaskStore {
       const parentIdx = queue.tasks.findIndex((t) => t.id === updated.parentTaskId);
       if (parentIdx > -1 && queue.tasks[parentIdx].isEpic) {
         const siblings = queue.tasks.filter(
-          (t) => t.parentTaskId === updated.parentTaskId && t.id !== taskId,
+          (t) => t.parentTaskId === updated.parentTaskId && t.id !== taskId
         );
         if (siblings.every((t) => t.column === 'done')) {
           const epicPipeline = this.deps.getPipelineForProject?.(queue.projectId);
@@ -428,7 +425,7 @@ export class FactoryTaskStore {
   updateTask(
     projectId: string,
     taskId: string,
-    updates: Partial<Pick<FactoryTask, 'title' | 'description'>>,
+    updates: Partial<Pick<FactoryTask, 'title' | 'description'>>
   ): FactoryTask {
     const queue = this.getQueue(projectId);
     const idx = queue.tasks.findIndex((t) => t.id === taskId);
@@ -486,7 +483,7 @@ export class FactoryTaskStore {
     if (task.lockedBy && task.lockedBy !== lockId) {
       throw new Error(
         `[FactoryTaskStore] Task ${taskId} already locked by '${task.lockedBy}' ` +
-          `(requested by '${lockId}')`,
+          `(requested by '${lockId}')`
       );
     }
     if (task.lockedBy === lockId) {
@@ -529,7 +526,10 @@ export class FactoryTaskStore {
       ...task,
       lockedBy: undefined,
       updatedAt: now,
-      history: [...(task.history ?? []), { timestamp: now, action: 'unlocked', actor: task.lockedBy }],
+      history: [
+        ...(task.history ?? []),
+        { timestamp: now, action: 'unlocked', actor: task.lockedBy },
+      ],
     };
     queue.tasks[idx] = updated;
     this.saveQueue(queue);
@@ -564,7 +564,7 @@ export class FactoryTaskStore {
     projectId: string,
     parentTaskId: string,
     childColumn: string,
-    children: Array<{ title: string; description: string; order?: number }>,
+    children: Array<{ title: string; description: string; order?: number }>
   ): { parent: FactoryTask; children: FactoryTask[] } {
     const queue = this.getQueue(projectId);
     const parentIdx = queue.tasks.findIndex((t) => t.id === parentTaskId);
@@ -641,7 +641,7 @@ export class FactoryTaskStore {
   private compileMailboxMessage(
     epic: FactoryTask,
     children: FactoryTask[],
-    pipeline: Pipeline,
+    pipeline: Pipeline
   ): MailboxMessage {
     const debriefStage = pipeline.stages.find((s) => s.role === 'debrief');
     const childNotes: TaskNote[] = children.flatMap((c) => c.notes ?? []);
@@ -703,11 +703,11 @@ export class FactoryTaskStore {
   syncFromSpecs(
     projectId: string,
     specFiles: Record<string, string>,
-    localPath?: string,
+    localPath?: string
   ): FactoryTask[] {
     const queue = this.getQueue(projectId);
     const existingSourceFiles = new Set(
-      queue.tasks.map((t) => t.sourceFile).filter((s): s is string => Boolean(s)),
+      queue.tasks.map((t) => t.sourceFile).filter((s): s is string => Boolean(s))
     );
 
     // Build candidates map: filename → content (in-memory values as baseline)

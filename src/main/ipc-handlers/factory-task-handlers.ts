@@ -38,7 +38,7 @@ export interface FactoryTaskServices {
 async function syncQueueToWorkspace(
   factoryTaskStore: FactoryTaskStore,
   projectStore: { getProject: (id: string) => ProjectConfig | null } | undefined,
-  projectId: string,
+  projectId: string
 ): Promise<void> {
   const project = projectStore?.getProject(projectId);
   if (!project?.local_path) return;
@@ -47,7 +47,7 @@ async function syncQueueToWorkspace(
     await fs.writeFile(
       path.join(project.local_path, '@task-queue.json'),
       JSON.stringify(tasks, null, 2),
-      'utf-8',
+      'utf-8'
     );
   } catch {
     // non-fatal — workspace may not be mounted or accessible yet
@@ -60,10 +60,7 @@ async function syncQueueToWorkspace(
  * Called after every mutation so all open windows stay in sync without
  * polling. Payload: (projectId, tasks[]).
  */
-function broadcastTaskChanged(
-  factoryTaskStore: FactoryTaskStore,
-  projectId: string,
-): void {
+function broadcastTaskChanged(factoryTaskStore: FactoryTaskStore, projectId: string): void {
   const tasks = factoryTaskStore.getQueue(projectId).tasks;
   for (const win of BrowserWindow.getAllWindows()) {
     if (!win.isDestroyed()) {
@@ -81,7 +78,11 @@ function broadcastTaskChanged(
  * the debrief agent full context about what was accomplished in each stage so it
  * can produce a useful summary with follow-up suggestions.
  */
-export function buildDebriefContext(epic: FactoryTask, children: FactoryTask[], pipeline: Pipeline): string {
+export function buildDebriefContext(
+  epic: FactoryTask,
+  children: FactoryTask[],
+  pipeline: Pipeline
+): string {
   const lines: string[] = [];
   const debriefStageId = pipeline.stages.find((s) => s.role === 'debrief')?.id;
 
@@ -99,11 +100,13 @@ export function buildDebriefContext(epic: FactoryTask, children: FactoryTask[], 
   for (const child of children) {
     for (const note of child.notes ?? []) {
       if (!note.stage || note.stage === debriefStageId) continue;
-      if (!notesByStage.has(note.stage)) {
+      let entry = notesByStage.get(note.stage);
+      if (!entry) {
         const stage = pipeline.stages.find((s) => s.id === note.stage);
-        notesByStage.set(note.stage, { stageName: stage?.name ?? note.stage, notes: [] });
+        entry = { stageName: stage?.name ?? note.stage, notes: [] };
+        notesByStage.set(note.stage, entry);
       }
-      notesByStage.get(note.stage)!.notes.push(note);
+      entry.notes.push(note);
     }
   }
 
@@ -113,9 +116,7 @@ export function buildDebriefContext(epic: FactoryTask, children: FactoryTask[], 
   }
 
   // Render in pipeline stage order (skip debrief stage itself)
-  const stageOrder = pipeline.stages
-    .map((s) => s.id)
-    .filter((id) => id !== debriefStageId);
+  const stageOrder = pipeline.stages.map((s) => s.id).filter((id) => id !== debriefStageId);
 
   // Include any stages not explicitly in the pipeline order (defensive)
   for (const stageId of notesByStage.keys()) {
@@ -149,23 +150,18 @@ export function registerFactoryTaskHandlers(services: FactoryTaskServices): void
     IPC.FACTORY_TASK_GET,
     (_event, projectId: string, taskId: string): FactoryTask | null => {
       return factoryTaskStore.getTask(projectId, taskId);
-    },
+    }
   );
 
   // Add a new task to backlog
   ipcMain.handle(
     IPC.FACTORY_TASK_ADD,
-    async (
-      _event,
-      projectId: string,
-      title: string,
-      description: string,
-    ): Promise<FactoryTask> => {
+    async (_event, projectId: string, title: string, description: string): Promise<FactoryTask> => {
       const task = factoryTaskStore.addTask(projectId, { title, description });
       broadcastTaskChanged(factoryTaskStore, projectId);
       await syncQueueToWorkspace(factoryTaskStore, projectStore, projectId);
       return task;
-    },
+    }
   );
 
   // Move a task to a different column (validates transition against the
@@ -195,11 +191,13 @@ export function registerFactoryTaskHandlers(services: FactoryTaskServices): void
           // single task to work on, then exits — giving each task a fresh
           // context window.
           if (workspacePath) {
-            await fs.writeFile(
-              path.join(workspacePath, `@current-task-${toColumn}.json`),
-              JSON.stringify(task, null, 2),
-              'utf-8',
-            ).catch(() => undefined);
+            await fs
+              .writeFile(
+                path.join(workspacePath, `@current-task-${toColumn}.json`),
+                JSON.stringify(task, null, 2),
+                'utf-8'
+              )
+              .catch(() => undefined);
 
             // Phase 4: If this is a debrief stage and the task is an epic,
             // write @epic-debrief-context.md so the agent has full context
@@ -211,11 +209,13 @@ export function registerFactoryTaskHandlers(services: FactoryTaskServices): void
                 const allTasks = factoryTaskStore.getQueue(projectId).tasks;
                 const epicChildren = allTasks.filter((t) => t.parentTaskId === task.id);
                 const contextContent = buildDebriefContext(task, epicChildren, pipeline);
-                await fs.writeFile(
-                  path.join(workspacePath, '@epic-debrief-context.md'),
-                  contextContent,
-                  'utf-8',
-                ).catch(() => undefined);
+                await fs
+                  .writeFile(
+                    path.join(workspacePath, '@epic-debrief-context.md'),
+                    contextContent,
+                    'utf-8'
+                  )
+                  .catch(() => undefined);
               }
             }
           }
@@ -224,9 +224,9 @@ export function registerFactoryTaskHandlers(services: FactoryTaskServices): void
         }
         // Clear the source stage's current-task file when moving out of a stage
         if (fromColumn && !IMPLICIT_COLUMNS.has(fromColumn) && workspacePath) {
-          await fs.unlink(
-            path.join(workspacePath, `@current-task-${fromColumn}.json`),
-          ).catch(() => undefined);
+          await fs
+            .unlink(path.join(workspacePath, `@current-task-${fromColumn}.json`))
+            .catch(() => undefined);
         }
         onTaskEnteredStage?.(projectId, toColumn);
       }
@@ -248,20 +248,24 @@ export function registerFactoryTaskHandlers(services: FactoryTaskServices): void
               broadcastTaskChanged(factoryTaskStore, projectId);
               await syncQueueToWorkspace(factoryTaskStore, projectStore, projectId);
 
-              await fs.writeFile(
-                path.join(workspacePath, `@current-task-${debriefStage.id}.json`),
-                JSON.stringify(lockedEpic, null, 2),
-                'utf-8',
-              ).catch(() => undefined);
+              await fs
+                .writeFile(
+                  path.join(workspacePath, `@current-task-${debriefStage.id}.json`),
+                  JSON.stringify(lockedEpic, null, 2),
+                  'utf-8'
+                )
+                .catch(() => undefined);
 
               const allTasks = factoryTaskStore.getQueue(projectId).tasks;
               const epicChildren = allTasks.filter((t) => t.parentTaskId === parent.id);
               const contextContent = buildDebriefContext(lockedEpic, epicChildren, pipeline);
-              await fs.writeFile(
-                path.join(workspacePath, '@epic-debrief-context.md'),
-                contextContent,
-                'utf-8',
-              ).catch(() => undefined);
+              await fs
+                .writeFile(
+                  path.join(workspacePath, '@epic-debrief-context.md'),
+                  contextContent,
+                  'utf-8'
+                )
+                .catch(() => undefined);
             } catch {
               // non-fatal — epic may already be locked by an agent
             }
@@ -271,7 +275,7 @@ export function registerFactoryTaskHandlers(services: FactoryTaskServices): void
       }
 
       return task;
-    },
+    }
   );
 
   // Remove a task permanently
@@ -281,7 +285,7 @@ export function registerFactoryTaskHandlers(services: FactoryTaskServices): void
       factoryTaskStore.removeTask(projectId, taskId);
       broadcastTaskChanged(factoryTaskStore, projectId);
       await syncQueueToWorkspace(factoryTaskStore, projectStore, projectId);
-    },
+    }
   );
 
   // Update task title or description
@@ -291,13 +295,13 @@ export function registerFactoryTaskHandlers(services: FactoryTaskServices): void
       _event,
       projectId: string,
       taskId: string,
-      updates: Partial<Pick<FactoryTask, 'title' | 'description'>>,
+      updates: Partial<Pick<FactoryTask, 'title' | 'description'>>
     ): Promise<FactoryTask> => {
       const task = factoryTaskStore.updateTask(projectId, taskId, updates);
       broadcastTaskChanged(factoryTaskStore, projectId);
       await syncQueueToWorkspace(factoryTaskStore, projectStore, projectId);
       return task;
-    },
+    }
   );
 
   // Force-unlock a task (manual override from UI)
@@ -308,7 +312,7 @@ export function registerFactoryTaskHandlers(services: FactoryTaskServices): void
       broadcastTaskChanged(factoryTaskStore, projectId);
       await syncQueueToWorkspace(factoryTaskStore, projectStore, projectId);
       return task;
-    },
+    }
   );
 
   // Sync tasks from project spec files
@@ -324,6 +328,6 @@ export function registerFactoryTaskHandlers(services: FactoryTaskServices): void
         await syncQueueToWorkspace(factoryTaskStore, projectStore, projectId);
       }
       return newTasks;
-    },
+    }
   );
 }

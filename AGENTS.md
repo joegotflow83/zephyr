@@ -14,8 +14,10 @@ You are building Zephyr Desktop — an Electron + React + TypeScript desktop app
 - Unit tests: `npm run test:unit`
 - Targeted tests (Vitest): `npm run test:unit -- tests/unit/<test-file>.test.tsx`
 - If unit tests fail with `@rollup/rollup-linux-x64-gnu` missing: run `npm install @rollup/rollup-linux-x64-gnu` once
-- Lint: `npm run lint`
-- Validate: `bash validate.sh` (runs lint + unit tests after Phase 1.8)
+- Lint: `npm run lint` (zero-warning enforced via `--max-warnings 0` — any warning fails
+  the build; auto-fix with `npm run lint:fix`, format with `npm run format`, check
+  formatting with `npm run format:check`)
+- Validate before pushing: `npm run lint && npm run test:unit`
 
 ## Sub-agents (when needed)
 - Docker Agent: dockerode integration, container lifecycle

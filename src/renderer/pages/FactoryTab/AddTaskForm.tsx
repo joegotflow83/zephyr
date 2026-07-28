@@ -15,7 +15,11 @@ export interface AddTaskFormProps {
   onInitialDescriptionConsumed?: () => void;
 }
 
-export function AddTaskForm({ onAdd, initialDescription, onInitialDescriptionConsumed }: AddTaskFormProps) {
+export function AddTaskForm({
+  onAdd,
+  initialDescription,
+  onInitialDescriptionConsumed,
+}: AddTaskFormProps) {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
 

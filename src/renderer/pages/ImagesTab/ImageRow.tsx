@@ -15,14 +15,17 @@ interface ImageRowProps {
 export const ImageRow: React.FC<ImageRowProps> = ({ image, buildActive, onRebuild, onDelete }) => {
   const formatDate = (isoString: string) => {
     const date = new Date(isoString);
-    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
+    return date.toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+      timeZone: 'UTC',
+    });
   };
 
   return (
     <tr className="border-b border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800">
-      <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-white">
-        {image.name}
-      </td>
+      <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-white">{image.name}</td>
       <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">
         {image.languages.length > 0 ? (
           <div className="flex flex-wrap gap-1">

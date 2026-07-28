@@ -141,7 +141,9 @@ export const SpecFilesSection: React.FC<SpecFilesSectionProps> = ({ specFiles, o
           </label>
           <div className="flex gap-2">
             <div className="flex-1 flex items-center border border-gray-200 dark:border-gray-600 rounded bg-gray-100 dark:bg-gray-700 px-2 overflow-hidden">
-              <span className="text-sm text-gray-400 dark:text-gray-500 shrink-0 select-none">specs/</span>
+              <span className="text-sm text-gray-400 dark:text-gray-500 shrink-0 select-none">
+                specs/
+              </span>
               <input
                 type="text"
                 value={newFilename}
@@ -179,7 +181,8 @@ export const SpecFilesSection: React.FC<SpecFilesSectionProps> = ({ specFiles, o
             </button>
           </div>
           <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-            File will be available at <span className="font-mono">/workspace/specs/&lt;filename&gt;</span> in the container
+            File will be available at{' '}
+            <span className="font-mono">/workspace/specs/&lt;filename&gt;</span> in the container
           </p>
         </div>
       ) : (

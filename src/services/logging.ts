@@ -8,7 +8,17 @@ import path from 'path';
 import { app } from 'electron';
 
 export type LogLevel = 'error' | 'warn' | 'info' | 'verbose' | 'debug' | 'silly';
-export type Subsystem = 'docker' | 'loop' | 'terminal' | 'ui' | 'main' | 'ipc' | 'updater' | 'cleanup' | 'auth-injector' | 'vm';
+export type Subsystem =
+  | 'docker'
+  | 'loop'
+  | 'terminal'
+  | 'ui'
+  | 'main'
+  | 'ipc'
+  | 'updater'
+  | 'cleanup'
+  | 'auth-injector'
+  | 'vm';
 
 export interface Logger {
   error(message: string, ...args: unknown[]): void;
@@ -97,10 +107,13 @@ export function setupLogging(level: LogLevel = 'info', logDir?: string): void {
  * @returns A logger instance for the subsystem
  */
 export function getLogger(subsystem: Subsystem): Logger {
-  if (!subsystemLoggers.has(subsystem)) {
-    subsystemLoggers.set(subsystem, new SubsystemLogger(subsystem, log));
+  const existing = subsystemLoggers.get(subsystem);
+  if (existing) {
+    return existing;
   }
-  return subsystemLoggers.get(subsystem)!;
+  const logger = new SubsystemLogger(subsystem, log);
+  subsystemLoggers.set(subsystem, logger);
+  return logger;
 }
 
 /**

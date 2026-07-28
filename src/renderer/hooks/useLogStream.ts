@@ -67,7 +67,10 @@ export function useLogStream(projectId: string | null | undefined): UseLogStream
       });
 
       // Update state if current project has pending updates
-      if (currentProjectIdRef.current && pendingUpdatesRef.current.has(currentProjectIdRef.current)) {
+      if (
+        currentProjectIdRef.current &&
+        pendingUpdatesRef.current.has(currentProjectIdRef.current)
+      ) {
         setLines([...bufferRef.current[currentProjectIdRef.current]]);
       }
 

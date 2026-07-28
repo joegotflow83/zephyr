@@ -17,11 +17,11 @@ import path from 'path';
 
 export interface DeployKeyRecord {
   key_id: number;
-  repo: string;         // "owner/repo"
+  repo: string; // "owner/repo"
   project_id: string;
   project_name: string;
   loop_id: string;
-  created_at: string;   // ISO8601
+  created_at: string; // ISO8601
   status: 'active' | 'cleaned' | 'orphaned';
   service?: 'github' | 'gitlab';
 }

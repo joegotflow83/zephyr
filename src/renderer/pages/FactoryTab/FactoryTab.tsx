@@ -11,13 +11,17 @@ import type { LoopState } from '../../../shared/loop-types';
 import { getLoopKey, isLoopTerminal, LoopMode } from '../../../shared/loop-types';
 import { useLoops } from '../../hooks/useLoops';
 import { parseLogLine } from '../../utils/parseLogLine';
+import { logger } from '../../utils/logger';
 
 interface FactoryTabProps {
   initialTaskDescription?: string;
   onInitialTaskConsumed?: () => void;
 }
 
-export const FactoryTab: React.FC<FactoryTabProps> = ({ initialTaskDescription, onInitialTaskConsumed }) => {
+export const FactoryTab: React.FC<FactoryTabProps> = ({
+  initialTaskDescription,
+  onInitialTaskConsumed,
+}) => {
   const projects = useAppStore((s) => s.projects);
   const projectsLoading = useAppStore((s) => s.projectsLoading);
   const loops = useAppStore((s) => s.loops);
@@ -39,16 +43,12 @@ export const FactoryTab: React.FC<FactoryTabProps> = ({ initialTaskDescription, 
       setSelectedProjectId(factoryProjects[0].id);
     }
     // If the currently selected project is no longer factory-enabled, pick another
-    if (
-      selectedProjectId &&
-      !factoryProjects.find((p) => p.id === selectedProjectId)
-    ) {
+    if (selectedProjectId && !factoryProjects.find((p) => p.id === selectedProjectId)) {
       setSelectedProjectId(factoryProjects.length > 0 ? factoryProjects[0].id : null);
     }
   }, [factoryProjects, selectedProjectId]);
 
-  const pipelineId =
-    factoryProjects.find((p) => p.id === selectedProjectId)?.pipelineId ?? null;
+  const pipelineId = factoryProjects.find((p) => p.id === selectedProjectId)?.pipelineId ?? null;
 
   const { tasks, loading, pipeline, addTask, moveTask, removeTask, syncFromSpecs } =
     useFactoryTasks(selectedProjectId, pipelineId);
@@ -62,12 +62,7 @@ export const FactoryTab: React.FC<FactoryTabProps> = ({ initialTaskDescription, 
 
   // Auto-sync on first load if tasks array is empty
   useEffect(() => {
-    if (
-      selectedProjectId &&
-      !hasSynced[selectedProjectId] &&
-      tasks.length === 0 &&
-      !loading
-    ) {
+    if (selectedProjectId && !hasSynced[selectedProjectId] && tasks.length === 0 && !loading) {
       setHasSynced((prev) => ({ ...prev, [selectedProjectId]: true }));
       void syncFromSpecs();
     }
@@ -84,8 +79,8 @@ export const FactoryTab: React.FC<FactoryTabProps> = ({ initialTaskDescription, 
 
   // Loops for the selected project
   const projectLoops = useMemo<LoopState[]>(
-    () => selectedProjectId ? loops.filter((l) => l.projectId === selectedProjectId) : [],
-    [loops, selectedProjectId],
+    () => (selectedProjectId ? loops.filter((l) => l.projectId === selectedProjectId) : []),
+    [loops, selectedProjectId]
   );
 
   // Count running instances per stage from live loop state
@@ -104,14 +99,14 @@ export const FactoryTab: React.FC<FactoryTabProps> = ({ initialTaskDescription, 
 
   // Derive selected loop and its parsed log lines for the drawer
   const selectedLoop = useMemo<LoopState | undefined>(
-    () => selectedLoopKey ? loops.find((l) => getLoopKey(l) === selectedLoopKey) : undefined,
-    [loops, selectedLoopKey],
+    () => (selectedLoopKey ? loops.find((l) => getLoopKey(l) === selectedLoopKey) : undefined),
+    [loops, selectedLoopKey]
   );
 
   const parsedLogs = useMemo(
     () => (selectedLoop?.logs ?? []).map(parseLogLine),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [selectedLoop?.logs],
+    [selectedLoop?.logs]
   );
 
   const handleMoveTask = useCallback(
@@ -134,11 +129,7 @@ export const FactoryTab: React.FC<FactoryTabProps> = ({ initialTaskDescription, 
   const handleUpdateTask = useCallback(
     async (taskId: string, updates: Partial<FactoryTask>) => {
       if (!selectedProjectId) return;
-      const updated = await window.api.factoryTasks.update(
-        selectedProjectId,
-        taskId,
-        updates
-      );
+      const updated = await window.api.factoryTasks.update(selectedProjectId, taskId, updates);
       setSelectedTask((prev) => (prev?.id === taskId ? updated : prev));
     },
     [selectedProjectId]
@@ -202,9 +193,7 @@ export const FactoryTab: React.FC<FactoryTabProps> = ({ initialTaskDescription, 
   // Loading state while projects load initially
   if (projectsLoading && projects.length === 0) {
     return (
-      <div className="flex items-center justify-center h-full text-gray-400">
-        Loading projects…
-      </div>
+      <div className="flex items-center justify-center h-full text-gray-400">Loading projects…</div>
     );
   }
 
@@ -281,7 +270,9 @@ export const FactoryTab: React.FC<FactoryTabProps> = ({ initialTaskDescription, 
             selectedLoopKey={selectedLoopKey}
             onSelectLoop={(loop) => setSelectedLoopKey(getLoopKey(loop))}
             onRestartLoop={(loop) => {
-              window.api.factory.restartContainer(loop.projectId, loop.role ?? '').catch(() => undefined);
+              window.api.factory
+                .restartContainer(loop.projectId, loop.role ?? '')
+                .catch(() => undefined);
             }}
           />
         </div>
@@ -291,7 +282,9 @@ export const FactoryTab: React.FC<FactoryTabProps> = ({ initialTaskDescription, 
       {selectedProjectId && factoryNotRunning && (
         <div className="flex items-center gap-2 px-4 py-2 bg-yellow-900/40 border-b border-yellow-700/50 text-yellow-300 text-xs">
           <span>⚠️</span>
-          <span>Factory is not running. Agents cannot pick up tasks until the factory is started.</span>
+          <span>
+            Factory is not running. Agents cannot pick up tasks until the factory is started.
+          </span>
           <button
             onClick={handleStartFactory}
             disabled={startingFactory}
@@ -311,16 +304,26 @@ export const FactoryTab: React.FC<FactoryTabProps> = ({ initialTaskDescription, 
             onMoveTask={handleMoveTask}
             onRemoveTask={handleRemoveTask}
             onSelectTask={setSelectedTask}
-            onScaleUp={selectedProjectId && !factoryNotRunning ? (stageId) => {
-              window.api.factory.scaleUp(selectedProjectId, stageId).catch((err: unknown) => {
-                console.error('Scale up failed:', err);
-              });
-            } : undefined}
-            onScaleDown={selectedProjectId && !factoryNotRunning ? (stageId) => {
-              window.api.factory.scaleDown(selectedProjectId, stageId).catch((err: unknown) => {
-                console.error('Scale down failed:', err);
-              });
-            } : undefined}
+            onScaleUp={
+              selectedProjectId && !factoryNotRunning
+                ? (stageId) => {
+                    window.api.factory.scaleUp(selectedProjectId, stageId).catch((err: unknown) => {
+                      logger.error('Scale up failed:', err);
+                    });
+                  }
+                : undefined
+            }
+            onScaleDown={
+              selectedProjectId && !factoryNotRunning
+                ? (stageId) => {
+                    window.api.factory
+                      .scaleDown(selectedProjectId, stageId)
+                      .catch((err: unknown) => {
+                        logger.error('Scale down failed:', err);
+                      });
+                  }
+                : undefined
+            }
             runningInstances={runningInstances}
           />
         ) : (
@@ -377,6 +380,7 @@ export const FactoryTab: React.FC<FactoryTabProps> = ({ initialTaskDescription, 
       {/* Task detail side panel */}
       {selectedTask && (
         <TaskDetailPanel
+          key={selectedTask.id}
           task={selectedTask}
           pipeline={pipeline}
           tasks={tasks}

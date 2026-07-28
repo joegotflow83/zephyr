@@ -54,24 +54,18 @@ export function registerPipelineHandlers(services: PipelineServices): void {
   });
 
   // Add a new user pipeline. Store throws on id collision.
-  ipcMain.handle(
-    IPC.PIPELINE_ADD,
-    (_event, input: PipelineAddInput): Pipeline => {
-      const pipeline = pipelineStore.addPipeline(input);
-      broadcastPipelineChanged(pipelineStore);
-      return pipeline;
-    },
-  );
+  ipcMain.handle(IPC.PIPELINE_ADD, (_event, input: PipelineAddInput): Pipeline => {
+    const pipeline = pipelineStore.addPipeline(input);
+    broadcastPipelineChanged(pipelineStore);
+    return pipeline;
+  });
 
   // Patch a user pipeline. Store throws when id is unknown or built-in.
-  ipcMain.handle(
-    IPC.PIPELINE_UPDATE,
-    (_event, id: string, patch: Partial<Pipeline>): Pipeline => {
-      const pipeline = pipelineStore.updatePipeline(id, patch);
-      broadcastPipelineChanged(pipelineStore);
-      return pipeline;
-    },
-  );
+  ipcMain.handle(IPC.PIPELINE_UPDATE, (_event, id: string, patch: Partial<Pipeline>): Pipeline => {
+    const pipeline = pipelineStore.updatePipeline(id, patch);
+    broadcastPipelineChanged(pipelineStore);
+    return pipeline;
+  });
 
   // Delete a user pipeline. Store throws when id is unknown or built-in.
   // Also clears the dangling pipelineId from any projects that referenced it so

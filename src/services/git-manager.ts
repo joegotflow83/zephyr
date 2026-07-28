@@ -61,11 +61,7 @@ export class GitManager {
    * @throws Error if clone fails (network, auth, invalid URL, etc.)
    * @throws Error if destination directory already exists and is non-empty
    */
-  async cloneRepo(
-    url: string,
-    dest: string,
-    onProgress?: CloneProgressCallback
-  ): Promise<void> {
+  async cloneRepo(url: string, dest: string, onProgress?: CloneProgressCallback): Promise<void> {
     if (!url || !url.trim()) {
       throw new Error('Repository URL must not be empty');
     }
@@ -76,9 +72,7 @@ export class GitManager {
     if (existsSync(destPath)) {
       const files = readdirSync(destPath);
       if (files.length > 0) {
-        throw new Error(
-          `Target directory already exists and is non-empty: ${destPath}`
-        );
+        throw new Error(`Target directory already exists and is non-empty: ${destPath}`);
       }
     }
 
@@ -219,9 +213,7 @@ export class GitManager {
     try {
       await repo.fetch(remote);
     } catch (error) {
-      throw new Error(
-        `Failed to fetch from remote '${remote}': ${(error as Error).message}`
-      );
+      throw new Error(`Failed to fetch from remote '${remote}': ${(error as Error).message}`);
     }
   }
 
@@ -238,11 +230,7 @@ export class GitManager {
    * @throws Error if the path is not a valid Git repository
    * @throws Error if the file does not exist at the given ref
    */
-  async getRemoteFileContent(
-    repoPath: string,
-    ref: string,
-    filePath: string
-  ): Promise<string> {
+  async getRemoteFileContent(repoPath: string, ref: string, filePath: string): Promise<string> {
     const gitDir = path.resolve(repoPath);
 
     if (!existsSync(gitDir)) {
@@ -261,9 +249,7 @@ export class GitManager {
       const content = await repo.raw(['show', `${ref}:${filePath}`]);
       return content;
     } catch (error) {
-      throw new Error(
-        `Failed to read '${filePath}' at ref '${ref}': ${(error as Error).message}`
-      );
+      throw new Error(`Failed to read '${filePath}' at ref '${ref}': ${(error as Error).message}`);
     }
   }
 
@@ -301,7 +287,7 @@ export class GitManager {
       }));
     } catch (error) {
       // Empty repo or no commits
-      if ((error as any)?.message?.includes('your current branch')) {
+      if (error instanceof Error && error.message.includes('your current branch')) {
         return [];
       }
       throw error;

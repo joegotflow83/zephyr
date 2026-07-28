@@ -36,7 +36,7 @@ export function registerCredentialHandlers(services: CredentialServices): void {
     IPC.CREDENTIALS_STORE,
     async (_event, service: CredentialService, key: string): Promise<void> => {
       await credentialManager.storeApiKey(service, key);
-    },
+    }
   );
 
   // ── Get API Key (masked) ──────────────────────────────────────────────────
@@ -50,7 +50,7 @@ export function registerCredentialHandlers(services: CredentialServices): void {
       }
       // Return masked version to renderer for display
       return maskApiKey(key);
-    },
+    }
   );
 
   // ── Delete API Key ────────────────────────────────────────────────────────
@@ -59,7 +59,7 @@ export function registerCredentialHandlers(services: CredentialServices): void {
     IPC.CREDENTIALS_DELETE,
     async (_event, service: CredentialService): Promise<void> => {
       await credentialManager.deleteApiKey(service);
-    },
+    }
   );
 
   // ── List Stored Services ──────────────────────────────────────────────────
@@ -70,15 +70,12 @@ export function registerCredentialHandlers(services: CredentialServices): void {
 
   // ── Login (browser-based) ─────────────────────────────────────────────────
 
-  ipcMain.handle(
-    IPC.CREDENTIALS_LOGIN,
-    async (_event, service: string): Promise<LoginResult> => {
-      if (service === 'claude-code') {
-        return loginManager.openClaudeCodeLoginSession();
-      }
-      return loginManager.openLoginSession(service);
-    },
-  );
+  ipcMain.handle(IPC.CREDENTIALS_LOGIN, async (_event, service: string): Promise<LoginResult> => {
+    if (service === 'claude-code') {
+      return loginManager.openClaudeCodeLoginSession();
+    }
+    return loginManager.openLoginSession(service);
+  });
 
   // ── Check Auth Status ─────────────────────────────────────────────────────
 
@@ -91,7 +88,7 @@ export function registerCredentialHandlers(services: CredentialServices): void {
         browser_session: stored.includes('anthropic_session'),
         aws_bedrock: stored.includes('anthropic_bedrock'),
       };
-    },
+    }
   );
 
   // ── GitHub PAT (per-project) ──────────────────────────────────────────────
@@ -100,23 +97,17 @@ export function registerCredentialHandlers(services: CredentialServices): void {
     IPC.GITHUB_PAT_SET,
     async (_event, projectId: string, pat: string): Promise<void> => {
       await credentialManager.setGithubPat(projectId, pat);
-    },
+    }
   );
 
-  ipcMain.handle(
-    IPC.GITHUB_PAT_GET,
-    async (_event, projectId: string): Promise<boolean> => {
-      const pat = await credentialManager.getGithubPat(projectId);
-      return pat !== null;
-    },
-  );
+  ipcMain.handle(IPC.GITHUB_PAT_GET, async (_event, projectId: string): Promise<boolean> => {
+    const pat = await credentialManager.getGithubPat(projectId);
+    return pat !== null;
+  });
 
-  ipcMain.handle(
-    IPC.GITHUB_PAT_DELETE,
-    async (_event, projectId: string): Promise<void> => {
-      await credentialManager.deleteGithubPat(projectId);
-    },
-  );
+  ipcMain.handle(IPC.GITHUB_PAT_DELETE, async (_event, projectId: string): Promise<void> => {
+    await credentialManager.deleteGithubPat(projectId);
+  });
 
   // ── GitLab PAT (per-project) ──────────────────────────────────────────────
 
@@ -124,21 +115,15 @@ export function registerCredentialHandlers(services: CredentialServices): void {
     IPC.GITLAB_PAT_SET,
     async (_event, projectId: string, pat: string): Promise<void> => {
       await credentialManager.setGitlabPat(projectId, pat);
-    },
+    }
   );
 
-  ipcMain.handle(
-    IPC.GITLAB_PAT_GET,
-    async (_event, projectId: string): Promise<boolean> => {
-      const pat = await credentialManager.getGitlabPat(projectId);
-      return pat !== null;
-    },
-  );
+  ipcMain.handle(IPC.GITLAB_PAT_GET, async (_event, projectId: string): Promise<boolean> => {
+    const pat = await credentialManager.getGitlabPat(projectId);
+    return pat !== null;
+  });
 
-  ipcMain.handle(
-    IPC.GITLAB_PAT_DELETE,
-    async (_event, projectId: string): Promise<void> => {
-      await credentialManager.deleteGitlabPat(projectId);
-    },
-  );
+  ipcMain.handle(IPC.GITLAB_PAT_DELETE, async (_event, projectId: string): Promise<void> => {
+    await credentialManager.deleteGitlabPat(projectId);
+  });
 }

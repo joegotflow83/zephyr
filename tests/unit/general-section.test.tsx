@@ -6,6 +6,9 @@ import { GeneralSection } from '../../src/renderer/pages/SettingsTab/GeneralSect
 // Mock hooks
 vi.mock('../../src/renderer/hooks/useSettings');
 
+const mockLogger = vi.hoisted(() => ({ error: vi.fn(), warn: vi.fn(), info: vi.fn(), debug: vi.fn() }));
+vi.mock('../../src/renderer/utils/logger', () => ({ logger: mockLogger }));
+
 const mockUseSettings = vi.fn();
 
 // Mock modules
@@ -333,9 +336,6 @@ describe('GeneralSection', () => {
   describe('Error Handling', () => {
     it('should handle notifications update errors gracefully', async () => {
       const user = userEvent.setup({ delay: null });
-      const consoleErrorSpy = vi
-        .spyOn(console, 'error')
-        .mockImplementation(() => {});
       mockUpdate.mockRejectedValue(new Error('Failed to save'));
 
       render(<GeneralSection />);
@@ -348,19 +348,14 @@ describe('GeneralSection', () => {
         vi.runAllTimers();
       });
 
-      expect(consoleErrorSpy).toHaveBeenCalledWith(
+      expect(mockLogger.error).toHaveBeenCalledWith(
         'Failed to save notifications setting:',
         expect.any(Error)
       );
-
-      consoleErrorSpy.mockRestore();
     });
 
     it('should handle log level update errors gracefully', async () => {
       const user = userEvent.setup({ delay: null });
-      const consoleErrorSpy = vi
-        .spyOn(console, 'error')
-        .mockImplementation(() => {});
       mockUpdate.mockRejectedValue(new Error('Failed to save'));
 
       render(<GeneralSection />);
@@ -373,19 +368,14 @@ describe('GeneralSection', () => {
         vi.runAllTimers();
       });
 
-      expect(consoleErrorSpy).toHaveBeenCalledWith(
+      expect(mockLogger.error).toHaveBeenCalledWith(
         'Failed to save log level setting:',
         expect.any(Error)
       );
-
-      consoleErrorSpy.mockRestore();
     });
 
     it('should handle theme update errors gracefully', async () => {
       const user = userEvent.setup({ delay: null });
-      const consoleErrorSpy = vi
-        .spyOn(console, 'error')
-        .mockImplementation(() => {});
       mockUpdate.mockRejectedValue(new Error('Failed to save'));
 
       render(<GeneralSection />);
@@ -398,12 +388,10 @@ describe('GeneralSection', () => {
         vi.runAllTimers();
       });
 
-      expect(consoleErrorSpy).toHaveBeenCalledWith(
+      expect(mockLogger.error).toHaveBeenCalledWith(
         'Failed to save theme setting:',
         expect.any(Error)
       );
-
-      consoleErrorSpy.mockRestore();
     });
   });
 });

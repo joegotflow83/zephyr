@@ -85,7 +85,11 @@ export const CredentialsSection: React.FC = () => {
     if (!settings) return;
     try {
       setError(null);
-      const updated = { ...settings, llm_provider: 'claude' as const, anthropic_auth_method: method };
+      const updated = {
+        ...settings,
+        llm_provider: 'claude' as const,
+        anthropic_auth_method: method,
+      };
       await window.api.settings.save(updated);
       setSettings(updated);
     } catch (err) {
@@ -226,7 +230,11 @@ export const CredentialsSection: React.FC = () => {
   };
 
   if (loading) {
-    return <div className="text-gray-500 dark:text-gray-400 text-center py-4">Loading credentials...</div>;
+    return (
+      <div className="text-gray-500 dark:text-gray-400 text-center py-4">
+        Loading credentials...
+      </div>
+    );
   }
 
   const activeProvider = settings?.llm_provider ?? 'claude';
@@ -244,8 +252,8 @@ export const CredentialsSection: React.FC = () => {
       <div>
         <h3 className="text-gray-900 dark:text-white font-semibold mb-1">AI Provider</h3>
         <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">
-          Choose which AI agent runs inside containers. The selected provider is
-          automatically configured at loop start.
+          Choose which AI agent runs inside containers. The selected provider is automatically
+          configured at loop start.
         </p>
 
         <div className="space-y-3">
@@ -261,14 +269,20 @@ export const CredentialsSection: React.FC = () => {
               <>
                 {authStatus.api_key && (
                   <button
-                    onClick={(e) => { e.stopPropagation(); handleClearApiKey(); }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleClearApiKey();
+                    }}
                     className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white text-xs rounded transition-colors"
                   >
                     Clear
                   </button>
                 )}
                 <button
-                  onClick={(e) => { e.stopPropagation(); setShowApiKeyDialog(true); }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowApiKeyDialog(true);
+                  }}
                   className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white text-xs rounded transition-colors"
                 >
                   {authStatus.api_key ? 'Update Key' : 'Configure'}
@@ -289,14 +303,20 @@ export const CredentialsSection: React.FC = () => {
               <>
                 {authStatus.browser_session && (
                   <button
-                    onClick={(e) => { e.stopPropagation(); handleClearBrowserSession(); }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleClearBrowserSession();
+                    }}
                     className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white text-xs rounded transition-colors"
                   >
                     Clear Session
                   </button>
                 )}
                 <button
-                  onClick={(e) => { e.stopPropagation(); handleBrowserLogin(); }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleBrowserLogin();
+                  }}
                   disabled={loginInProgress}
                   className="px-3 py-1 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-xs rounded transition-colors"
                 >
@@ -322,14 +342,20 @@ export const CredentialsSection: React.FC = () => {
               <>
                 {authStatus.aws_bedrock && (
                   <button
-                    onClick={(e) => { e.stopPropagation(); handleClearBedrock(); }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleClearBedrock();
+                    }}
                     className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white text-xs rounded transition-colors"
                   >
                     Clear
                   </button>
                 )}
                 <button
-                  onClick={(e) => { e.stopPropagation(); setShowBedrockDialog(true); }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowBedrockDialog(true);
+                  }}
                   className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white text-xs rounded transition-colors"
                 >
                   {authStatus.aws_bedrock ? 'Update' : 'Configure'}
@@ -373,7 +399,10 @@ export const CredentialsSection: React.FC = () => {
                 </button>
                 {settings?.kiro_db_path && (
                   <button
-                    onClick={() => { setKiroDbPath(''); void handleSaveKiroDbPath(); }}
+                    onClick={() => {
+                      setKiroDbPath('');
+                      void handleSaveKiroDbPath();
+                    }}
                     className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-xs rounded transition-colors"
                   >
                     Clear
@@ -517,7 +546,6 @@ export const CredentialsSection: React.FC = () => {
           onClose={() => setShowGitlabDialog(false)}
         />
       )}
-
     </div>
   );
 };
@@ -546,7 +574,9 @@ const AuthMethodCard: React.FC<AuthMethodCardProps> = ({
   <div
     onClick={onClick}
     className={`bg-white dark:bg-gray-900 rounded-lg border p-4 flex items-center justify-between cursor-pointer transition-colors ${
-      active ? 'border-blue-500' : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
+      active
+        ? 'border-blue-500'
+        : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
     }`}
   >
     <div className="flex items-center space-x-3 flex-1 min-w-0">

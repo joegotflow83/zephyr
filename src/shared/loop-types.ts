@@ -140,7 +140,10 @@ export interface LoopStartOpts {
  * Derive a unique key for a loop from its project ID and optional factory role.
  * Non-factory loops use just the projectId; factory loops use "projectId:role".
  */
-export function getLoopKey(projectIdOrState: string | { projectId: string; role?: string }, role?: string): string {
+export function getLoopKey(
+  projectIdOrState: string | { projectId: string; role?: string },
+  role?: string
+): string {
   if (typeof projectIdOrState === 'string') {
     return role ? `${projectIdOrState}:${role}` : projectIdOrState;
   }
@@ -156,7 +159,7 @@ export function createLoopState(
   projectId: string,
   mode: LoopMode = LoopMode.CONTINUOUS,
   projectName = '',
-  role?: string,
+  role?: string
 ): LoopState {
   return {
     projectId,
@@ -179,11 +182,7 @@ export function createLoopState(
  * Checks if a loop is in a terminal state (no longer running).
  */
 export function isLoopTerminal(status: LoopStatus): boolean {
-  return [
-    LoopStatus.STOPPED,
-    LoopStatus.FAILED,
-    LoopStatus.COMPLETED,
-  ].includes(status);
+  return [LoopStatus.STOPPED, LoopStatus.FAILED, LoopStatus.COMPLETED].includes(status);
 }
 
 /**
@@ -207,8 +206,6 @@ export function validateLoopStartOpts(opts: LoopStartOpts): void {
     throw new Error('LoopStartOpts.dockerImage must be a non-empty string');
   }
   if (!Object.values(LoopMode).includes(opts.mode)) {
-    throw new Error(
-      `LoopStartOpts.mode must be one of: ${Object.values(LoopMode).join(', ')}`,
-    );
+    throw new Error(`LoopStartOpts.mode must be one of: ${Object.values(LoopMode).join(', ')}`);
   }
 }

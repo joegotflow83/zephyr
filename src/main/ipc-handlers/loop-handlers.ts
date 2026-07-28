@@ -206,7 +206,9 @@ function mergeClarificationHook(settingsContent: string): string {
   let settings: Record<string, unknown> = {};
   try {
     settings = JSON.parse(settingsContent);
-  } catch { /* start from empty */ }
+  } catch {
+    /* start from empty */
+  }
 
   const hooks = (settings.hooks as Record<string, unknown[]> | undefined) ?? {};
   const postToolUse = ((hooks.PostToolUse as unknown[]) ?? []) as Array<Record<string, unknown>>;
@@ -237,7 +239,9 @@ export function mergeTaskStatusHook(settingsContent: string): string {
   let settings: Record<string, unknown> = {};
   try {
     settings = JSON.parse(settingsContent);
-  } catch { /* start from empty */ }
+  } catch {
+    /* start from empty */
+  }
 
   const hooks = (settings.hooks as Record<string, unknown[]> | undefined) ?? {};
   const postToolUse = ((hooks.PostToolUse as unknown[]) ?? []) as Array<Record<string, unknown>>;
@@ -268,7 +272,9 @@ export function mergeTaskDecompositionHook(settingsContent: string): string {
   let settings: Record<string, unknown> = {};
   try {
     settings = JSON.parse(settingsContent);
-  } catch { /* start from empty */ }
+  } catch {
+    /* start from empty */
+  }
 
   const hooks = (settings.hooks as Record<string, unknown[]> | undefined) ?? {};
   const postToolUse = ((hooks.PostToolUse as unknown[]) ?? []) as Array<Record<string, unknown>>;
@@ -316,7 +322,9 @@ export function mergeSupervisorActionHook(settingsContent: string): string {
   let settings: Record<string, unknown> = {};
   try {
     settings = JSON.parse(settingsContent);
-  } catch { /* start from empty */ }
+  } catch {
+    /* start from empty */
+  }
 
   const hooks = (settings.hooks as Record<string, unknown[]> | undefined) ?? {};
   const postToolUse = ((hooks.PostToolUse as unknown[]) ?? []) as Array<Record<string, unknown>>;
@@ -409,13 +417,16 @@ function writeBlockedEscalationHandover(
   task: FactoryTask,
   requestedStage: string,
   deps: TaskStatusUpdateDeps,
-  logger: ReturnType<typeof getLogger>,
+  logger: ReturnType<typeof getLogger>
 ): void {
   if (!deps.projectStore || !deps.pipelineStore) {
-    logger.warn('task-status: blocked escalation handover skipped — missing projectStore/pipelineStore', {
-      projectId,
-      taskId: task.id,
-    });
+    logger.warn(
+      'task-status: blocked escalation handover skipped — missing projectStore/pipelineStore',
+      {
+        projectId,
+        taskId: task.id,
+      }
+    );
     return;
   }
 
@@ -428,9 +439,7 @@ function writeBlockedEscalationHandover(
     return;
   }
 
-  const pipeline = project.pipelineId
-    ? deps.pipelineStore.getPipeline(project.pipelineId)
-    : null;
+  const pipeline = project.pipelineId ? deps.pipelineStore.getPipeline(project.pipelineId) : null;
   const bounceLimit = pipeline?.bounceLimit ?? 3;
   const requestedStageName =
     pipeline?.stages.find((s) => s.id === requestedStage)?.name ?? requestedStage;
@@ -498,7 +507,7 @@ function writeBlockedEscalationHandover(
 export function processTaskStatusUpdate(
   projectId: string,
   raw: unknown,
-  deps: TaskStatusUpdateDeps,
+  deps: TaskStatusUpdateDeps
 ): boolean {
   const logger = getLogger('loop');
 
@@ -553,8 +562,10 @@ export function processTaskStatusUpdate(
           return false;
         }
         deps.factoryTaskStore.moveTask(
-          projectId, task.id, next,
-          ...(data.summary ? [{ note: data.summary }] : [] as []),
+          projectId,
+          task.id,
+          next,
+          ...(data.summary ? [{ note: data.summary }] : ([] as []))
         );
         return true;
       }
@@ -693,7 +704,7 @@ export interface TaskDecompositionDeps {
 export function processTaskDecomposition(
   projectId: string,
   raw: unknown,
-  deps: TaskDecompositionDeps,
+  deps: TaskDecompositionDeps
 ): boolean {
   const logger = getLogger('loop');
 
@@ -729,10 +740,13 @@ export function processTaskDecomposition(
       !(child as { title: string }).title.trim() ||
       typeof (child as { description?: unknown }).description !== 'string'
     ) {
-      logger.warn('task-decomposition: each task must have a non-empty title and string description', {
-        projectId,
-        parentTaskId: data.parentTaskId,
-      });
+      logger.warn(
+        'task-decomposition: each task must have a non-empty title and string description',
+        {
+          projectId,
+          parentTaskId: data.parentTaskId,
+        }
+      );
       return false;
     }
     const orderVal = (child as { order?: unknown }).order;
@@ -780,12 +794,7 @@ export function processTaskDecomposition(
   }
 
   try {
-    deps.factoryTaskStore.decomposeTask(
-      projectId,
-      data.parentTaskId,
-      firstStageColumn,
-      data.tasks,
-    );
+    deps.factoryTaskStore.decomposeTask(projectId, data.parentTaskId, firstStageColumn, data.tasks);
     return true;
   } catch (err) {
     logger.warn('task-decomposition: store rejected decomposition', {
@@ -814,7 +823,7 @@ export function isTaskEligibleByOrder(task: FactoryTask, allTasks: FactoryTask[]
       t.parentTaskId === task.parentTaskId &&
       t.id !== task.id &&
       (t.order ?? 1) < taskOrder &&
-      t.column !== 'done',
+      t.column !== 'done'
   );
 }
 
@@ -845,7 +854,7 @@ export interface SupervisorActionDeps {
 export async function processSupervisorAction(
   projectId: string,
   data: unknown,
-  deps: SupervisorActionDeps,
+  deps: SupervisorActionDeps
 ): Promise<boolean> {
   const logger = getLogger('loop');
   if (!data || typeof data !== 'object') {
@@ -954,7 +963,10 @@ export function registerLoopHandlers(services: LoopServices): LoopHandlerContext
   // Maps projectId -> { keyId, repoUrl, pat, service } so we can delete keys from
   // GitHub or GitLab when the loop stops, fails, or completes.
   // Maps loopKey -> deploy key info for cleanup on loop termination.
-  const activeDeployKeys = new Map<string, { keyId: number; repoUrl: string; pat: string; service: 'github' | 'gitlab' }>();
+  const activeDeployKeys = new Map<
+    string,
+    { keyId: number; repoUrl: string; pat: string; service: 'github' | 'gitlab' }
+  >();
 
   // Maps loopKey → raw LoopStartOpts (before auth injection) so FACTORY_RESTART_CONTAINER
   // and the @supervisor-action.json watcher can restart a container with identical opts.
@@ -967,733 +979,886 @@ export function registerLoopHandlers(services: LoopServices): LoopHandlerContext
    * hooks/prompts mounting, deploy keys, etc. Called by the FACTORY_START handler.
    */
   async function startLoopCore(rawOpts: LoopStartOpts): Promise<LoopState> {
-      // Store raw opts keyed by loopKey before any mutation so restart can replay them.
-      const startLoopKey = getLoopKey(rawOpts.projectId, rawOpts.role);
-      loopOptsMap.set(startLoopKey, rawOpts);
+    // Store raw opts keyed by loopKey before any mutation so restart can replay them.
+    const startLoopKey = getLoopKey(rawOpts.projectId, rawOpts.role);
+    loopOptsMap.set(startLoopKey, rawOpts);
 
-      let opts = rawOpts;
-      const project = projectStore?.getProject(opts.projectId) ?? null;
+    let opts = rawOpts;
+    const project = projectStore?.getProject(opts.projectId) ?? null;
 
-      // Write selected pre-validation scripts to the project's local_path root
-      // so they appear at /workspace/<script> in the container via volume mount.
-      if (project && project.local_path && project.pre_validation_scripts.length > 0 && preValidationStore) {
+    // Write selected pre-validation scripts to the project's local_path root
+    // so they appear at /workspace/<script> in the container via volume mount.
+    if (
+      project &&
+      project.local_path &&
+      project.pre_validation_scripts.length > 0 &&
+      preValidationStore
+    ) {
+      for (const filename of project.pre_validation_scripts) {
+        try {
+          const content = await preValidationStore.getScript(filename);
+          if (content) {
+            const dest = path.join(project.local_path, filename);
+            await fs.writeFile(dest, content, { mode: 0o755 });
+          }
+        } catch (err) {
+          logger.warn(`Failed to write pre-validation script ${filename} to local_path`, { err });
+        }
+      }
+    }
+
+    // Inject auth credentials into container opts before starting
+    let authMethod = 'unknown';
+    if (authInjector) {
+      try {
+        const authConfig = await authInjector.getContainerAuthConfig();
+        authMethod = authConfig.authMethod;
+        opts = {
+          ...opts,
+          envVars: { ...authConfig.envVars, ...opts.envVars },
+          volumeMounts: [...(authConfig.volumeMounts ?? []), ...(opts.volumeMounts ?? [])],
+        };
+      } catch (err) {
+        logger.warn('Failed to get auth config, starting loop without auth injection', { err });
+      }
+    }
+
+    // For VM loops and single-mode container loops: hook files and settings
+    // cannot be injected via `docker exec` after the container starts because:
+    //   - VM loops have no containerId to exec into
+    //   - Single-mode container loops start the agent as their CMD, so exec
+    //     injection would race against (or miss) the agent startup
+    // Hooks and settings go into a temp dir mounted at /home/ralph/.claude.
+    const isVm = opts.sandboxType === 'vm';
+    if (isVm && project) {
+      const hasHooks = project.hooks.length > 0 && !!hooksStore;
+      const hasSpecFiles = Object.keys(project.spec_files ?? {}).length > 0;
+      const hasClaudeSettings = !!project.claude_settings_file && !!claudeSettingsStore;
+      // browser_session credentials must be pre-mounted for VM/SINGLE runs because
+      // docker exec injection would race against (or miss) the agent startup.
+      const hasBrowserSession = authMethod === 'browser_session';
+
+      const hasKiroConfig = !!project.kiro_config;
+      const hasKiroHooks = (project.kiro_hooks ?? []).length > 0 && !!kiroHooksStore;
+
+      if (hasHooks || hasClaudeSettings || hasBrowserSession || !!project.local_path) {
+        const claudeDir = path.join(
+          os.tmpdir(),
+          `zephyr-claude-${opts.projectId}${opts.role ? `-${opts.role}` : ''}`
+        );
+        try {
+          await fs.mkdir(path.join(claudeDir, 'hooks'), { recursive: true });
+
+          // Write default settings to keep the auto-updater disabled and onboarding
+          // pre-completed even when this directory is bind-mounted over the image's
+          // pre-baked /home/ralph/.claude. If the user has a custom settings file it
+          // will overwrite this below.
+          await fs.writeFile(
+            path.join(claudeDir, 'settings.json'),
+            '{"autoUpdaterStatus":"disabled","hasCompletedOnboarding":true}\n',
+            'utf8'
+          );
+
+          if (hasHooks && hooksStore) {
+            for (const filename of project.hooks) {
+              try {
+                const content = await hooksStore.getHook(filename);
+                if (content) {
+                  const safe = path.basename(filename);
+                  await fs.writeFile(path.join(claudeDir, 'hooks', safe), content, { mode: 0o755 });
+                }
+              } catch (err) {
+                logger.warn(`Failed to write hook ${filename} for .claude mount`, { err });
+              }
+            }
+          }
+
+          if (hasClaudeSettings && project.claude_settings_file && claudeSettingsStore) {
+            try {
+              const content = await claudeSettingsStore.getFile(project.claude_settings_file);
+              if (content) {
+                await fs.writeFile(path.join(claudeDir, 'settings.json'), content, 'utf8');
+              }
+            } catch (err) {
+              logger.warn(`Failed to write claude settings.json for .claude mount`, { err });
+            }
+          }
+
+          // Inject the built-in clarification notify hook for workspace-backed loops.
+          // Merges the PostToolUse registration into whatever settings.json was written
+          // above (default or user's), then writes the hook script alongside it.
+          if (project.local_path) {
+            try {
+              const existingSettings = await fs
+                .readFile(path.join(claudeDir, 'settings.json'), 'utf8')
+                .catch(() => '{"autoUpdaterStatus":"disabled","hasCompletedOnboarding":true}');
+              await fs.writeFile(
+                path.join(claudeDir, 'settings.json'),
+                mergeClarificationHook(existingSettings),
+                'utf8'
+              );
+              await fs.writeFile(
+                path.join(claudeDir, 'hooks', 'clarification-notify.sh'),
+                CLARIFICATION_HOOK_SCRIPT,
+                { mode: 0o755 }
+              );
+            } catch (err) {
+              logger.warn('Failed to inject clarification notify hook for .claude mount', { err });
+            }
+          }
+
+          // Inject the built-in task-status notify hook for factory-enabled workspace-backed loops.
+          // Only factory projects need this hook — it advances kanban tasks when agents complete phases.
+          if (project.local_path && project.factory_config?.enabled) {
+            try {
+              const existingSettings = await fs
+                .readFile(path.join(claudeDir, 'settings.json'), 'utf8')
+                .catch(() => '{"autoUpdaterStatus":"disabled","hasCompletedOnboarding":true}');
+              await fs.writeFile(
+                path.join(claudeDir, 'settings.json'),
+                mergeTaskStatusHook(existingSettings),
+                'utf8'
+              );
+              await fs.writeFile(
+                path.join(claudeDir, 'hooks', 'task-status-notify.sh'),
+                TASK_STATUS_HOOK_SCRIPT,
+                { mode: 0o755 }
+              );
+            } catch (err) {
+              logger.warn('Failed to inject task-status notify hook for .claude mount', { err });
+            }
+          }
+
+          // Inject the built-in task-decomposition notify hook for factory-enabled workspace-backed loops.
+          // Only factory projects need this hook — it triggers PM epic decomposition when agents write
+          // @task-decomposition.json.
+          if (project.local_path && project.factory_config?.enabled) {
+            try {
+              const existingSettings = await fs
+                .readFile(path.join(claudeDir, 'settings.json'), 'utf8')
+                .catch(() => '{"autoUpdaterStatus":"disabled","hasCompletedOnboarding":true}');
+              await fs.writeFile(
+                path.join(claudeDir, 'settings.json'),
+                mergeTaskDecompositionHook(existingSettings),
+                'utf8'
+              );
+              await fs.writeFile(
+                path.join(claudeDir, 'hooks', 'task-decomposition-notify.sh'),
+                TASK_DECOMPOSITION_HOOK_SCRIPT,
+                { mode: 0o755 }
+              );
+            } catch (err) {
+              logger.warn('Failed to inject task-decomposition notify hook for .claude mount', {
+                err,
+              });
+            }
+          }
+
+          // Inject the supervisor-action notify hook for factory-enabled workspace-backed loops.
+          // Any container (including a future dedicated supervisor) can write @supervisor-action.json
+          // to trigger host-side container restarts.
+          if (project.local_path && project.factory_config?.enabled) {
+            try {
+              const existingSettings = await fs
+                .readFile(path.join(claudeDir, 'settings.json'), 'utf8')
+                .catch(() => '{"autoUpdaterStatus":"disabled","hasCompletedOnboarding":true}');
+              await fs.writeFile(
+                path.join(claudeDir, 'settings.json'),
+                mergeSupervisorActionHook(existingSettings),
+                'utf8'
+              );
+              await fs.writeFile(
+                path.join(claudeDir, 'hooks', 'supervisor-action-notify.sh'),
+                SUPERVISOR_ACTION_HOOK_SCRIPT,
+                { mode: 0o755 }
+              );
+            } catch (err) {
+              logger.warn('Failed to inject supervisor-action notify hook for .claude mount', {
+                err,
+              });
+            }
+          }
+
+          // Pre-write OAuth credentials to .credentials.json so they are available
+          // before the agent CMD starts (exec injection happens too late for SINGLE/VM).
+          if (hasBrowserSession && credentialManager) {
+            try {
+              const sessionJson = await credentialManager.getApiKey('anthropic_session');
+              if (sessionJson) {
+                await fs.writeFile(path.join(claudeDir, '.credentials.json'), sessionJson, 'utf8');
+              } else {
+                logger.warn(
+                  'browser_session auth: no session data stored; container may lack credentials'
+                );
+              }
+            } catch (err) {
+              logger.warn('Failed to write browser session credentials for .claude mount', { err });
+            }
+          }
+
+          opts = {
+            ...opts,
+            // Mount at the ralph user's home .claude dir, not /root/.claude.
+            // The container runs as the "ralph" user (HOME=/home/ralph), so
+            // /root/.claude is inaccessible (drwx------ owned by root).
+            volumeMounts: [...(opts.volumeMounts ?? []), `${claudeDir}:/home/ralph/.claude`],
+          };
+        } catch (err) {
+          logger.warn('Failed to prepare .claude directory for loop', { err });
+        }
+      }
+
+      // Pre-mount Kiro config and hooks at /home/ralph/.kiro for VM/single-mode runs.
+      if (hasKiroConfig || hasKiroHooks) {
+        const kiroDir = path.join(
+          os.tmpdir(),
+          `zephyr-kiro-${opts.projectId}${opts.role ? `-${opts.role}` : ''}`
+        );
+        try {
+          await fs.mkdir(path.join(kiroDir, 'hooks'), { recursive: true });
+
+          if (hasKiroConfig && project.kiro_config) {
+            await fs.writeFile(path.join(kiroDir, 'config.json'), project.kiro_config, 'utf8');
+          }
+
+          if (hasKiroHooks && kiroHooksStore) {
+            for (const filename of project.kiro_hooks ?? []) {
+              try {
+                const content = await kiroHooksStore.getHook(filename);
+                if (content) {
+                  const safe = path.basename(filename);
+                  await fs.writeFile(path.join(kiroDir, 'hooks', safe), content, { mode: 0o755 });
+                }
+              } catch (err) {
+                logger.warn(`Failed to write kiro hook ${filename} for .kiro mount`, { err });
+              }
+            }
+          }
+
+          opts = {
+            ...opts,
+            // Same reason as the .claude mount: ralph's home is /home/ralph.
+            volumeMounts: [...(opts.volumeMounts ?? []), `${kiroDir}:/home/ralph/.kiro`],
+          };
+        } catch (err) {
+          logger.warn('Failed to prepare .kiro directory for loop', { err });
+        }
+      }
+
+      // Write spec files to specs/ inside the workspace for VM runs.
+      // When local_path is set it is already volume-mounted as /workspace, so writing
+      // to local_path/specs/ makes them available at /workspace/specs/ in the container.
+      if (hasSpecFiles) {
+        const specFilesMap = project.spec_files ?? {};
+        if (project.local_path) {
+          const specsDir = path.join(project.local_path, 'specs');
+          try {
+            await fs.mkdir(specsDir, { recursive: true });
+            for (const [filename, content] of Object.entries(specFilesMap)) {
+              const safe = path.basename(filename);
+              await fs.writeFile(path.join(specsDir, safe), content, 'utf8');
+            }
+          } catch (err) {
+            logger.warn('Failed to write spec files to local_path/specs for run', { err });
+          }
+        } else {
+          // No local_path: write to a temp dir and mount it as a separate volume at /workspace/specs.
+          const specsDir = path.join(os.tmpdir(), `zephyr-specs-${opts.projectId}`);
+          try {
+            await fs.mkdir(specsDir, { recursive: true });
+            for (const [filename, content] of Object.entries(specFilesMap)) {
+              const safe = path.basename(filename);
+              await fs.writeFile(path.join(specsDir, safe), content, 'utf8');
+            }
+            opts = {
+              ...opts,
+              volumeMounts: [...(opts.volumeMounts ?? []), `${specsDir}:/workspace/specs`],
+            };
+          } catch (err) {
+            logger.warn('Failed to prepare spec files directory for run', { err });
+          }
+        }
+      }
+    }
+
+    // For VM loops: pre-validation scripts must also reach the container.
+    // They are normally written to project.local_path (which is volume-mounted
+    // as /workspace), but that requires local_path to be set. When it is not,
+    // write them to a temp directory and mount that directory at /workspace so
+    // they are still accessible to the agent at /workspace/<script>.
+    if (
+      opts.sandboxType === 'vm' &&
+      project &&
+      project.pre_validation_scripts.length > 0 &&
+      preValidationStore &&
+      !project.local_path
+    ) {
+      const pvDir = path.join(os.tmpdir(), `zephyr-pv-${opts.projectId}`);
+      try {
+        await fs.mkdir(pvDir, { recursive: true });
         for (const filename of project.pre_validation_scripts) {
           try {
             const content = await preValidationStore.getScript(filename);
             if (content) {
-              const dest = path.join(project.local_path, filename);
-              await fs.writeFile(dest, content, { mode: 0o755 });
+              await fs.writeFile(path.join(pvDir, path.basename(filename)), content, {
+                mode: 0o755,
+              });
             }
           } catch (err) {
-            logger.warn(`Failed to write pre-validation script ${filename} to local_path`, { err });
+            logger.warn(`Failed to write pre-validation script ${filename} for VM mount`, { err });
           }
         }
+        opts = {
+          ...opts,
+          volumeMounts: [...(opts.volumeMounts ?? []), `${pvDir}:/workspace`],
+          workDir: opts.workDir ?? '/workspace',
+        };
+      } catch (err) {
+        logger.warn('Failed to prepare pre-validation scripts directory for VM loop', { err });
       }
+    }
 
-
-      // Inject auth credentials into container opts before starting
-      let authMethod = 'unknown';
-      if (authInjector) {
+    // Stage the Kiro CLI auth database for in-container copy.
+    // The working pattern (from ralph-village) is:
+    //   1. Copy the host DB to a temp file (avoids VirtioFS truncation)
+    //   2. Mount the copy at /tmp/kiro-data.sqlite3:ro
+    //   3. After container start, exec a cp inside the container to the
+    //      final writable path — SQLite needs write access for WAL/journal
+    const kiroDestFile = '/home/ralph/.local/share/kiro-cli/data.sqlite3';
+    let kiroStagedMount = false;
+    if (opts.volumeMounts) {
+      const kiroIdx = opts.volumeMounts.findIndex((m) => m.includes(kiroDestFile));
+      if (kiroIdx !== -1) {
+        const mount = opts.volumeMounts[kiroIdx];
+        const hostPath = mount.split(':')[0];
         try {
-          const authConfig = await authInjector.getContainerAuthConfig();
-          authMethod = authConfig.authMethod;
-          opts = {
-            ...opts,
-            envVars: { ...authConfig.envVars, ...opts.envVars },
-            volumeMounts: [...(authConfig.volumeMounts ?? []), ...(opts.volumeMounts ?? [])],
-          };
-        } catch (err) {
-          logger.warn('Failed to get auth config, starting loop without auth injection', { err });
-        }
-      }
-
-      // For VM loops and single-mode container loops: hook files and settings
-      // cannot be injected via `docker exec` after the container starts because:
-      //   - VM loops have no containerId to exec into
-      //   - Single-mode container loops start the agent as their CMD, so exec
-      //     injection would race against (or miss) the agent startup
-      // Hooks and settings go into a temp dir mounted at /home/ralph/.claude.
-      const isVm = opts.sandboxType === 'vm';
-      if (isVm && project) {
-        const hasHooks = project.hooks.length > 0 && !!hooksStore;
-        const hasSpecFiles = Object.keys(project.spec_files ?? {}).length > 0;
-        const hasClaudeSettings = !!project.claude_settings_file && !!claudeSettingsStore;
-        // browser_session credentials must be pre-mounted for VM/SINGLE runs because
-        // docker exec injection would race against (or miss) the agent startup.
-        const hasBrowserSession = authMethod === 'browser_session';
-
-        const hasKiroConfig = !!project.kiro_config;
-        const hasKiroHooks = (project.kiro_hooks ?? []).length > 0 && !!kiroHooksStore;
-
-        if (hasHooks || hasClaudeSettings || hasBrowserSession || !!project.local_path) {
-          const claudeDir = path.join(os.tmpdir(), `zephyr-claude-${opts.projectId}${opts.role ? `-${opts.role}` : ''}`);
-          try {
-            await fs.mkdir(path.join(claudeDir, 'hooks'), { recursive: true });
-
-            // Write default settings to keep the auto-updater disabled and onboarding
-            // pre-completed even when this directory is bind-mounted over the image's
-            // pre-baked /home/ralph/.claude. If the user has a custom settings file it
-            // will overwrite this below.
-            await fs.writeFile(path.join(claudeDir, 'settings.json'), '{"autoUpdaterStatus":"disabled","hasCompletedOnboarding":true}\n', 'utf8');
-
-            if (hasHooks && hooksStore) {
-              for (const filename of project.hooks) {
-                try {
-                  const content = await hooksStore.getHook(filename);
-                  if (content) {
-                    const safe = path.basename(filename);
-                    await fs.writeFile(path.join(claudeDir, 'hooks', safe), content, { mode: 0o755 });
-                  }
-                } catch (err) {
-                  logger.warn(`Failed to write hook ${filename} for .claude mount`, { err });
-                }
-              }
-            }
-
-            if (hasClaudeSettings && project.claude_settings_file && claudeSettingsStore) {
-              try {
-                const content = await claudeSettingsStore.getFile(project.claude_settings_file);
-                if (content) {
-                  await fs.writeFile(path.join(claudeDir, 'settings.json'), content, 'utf8');
-                }
-              } catch (err) {
-                logger.warn(`Failed to write claude settings.json for .claude mount`, { err });
-              }
-            }
-
-            // Inject the built-in clarification notify hook for workspace-backed loops.
-            // Merges the PostToolUse registration into whatever settings.json was written
-            // above (default or user's), then writes the hook script alongside it.
-            if (project.local_path) {
-              try {
-                const existingSettings = await fs.readFile(path.join(claudeDir, 'settings.json'), 'utf8').catch(() => '{"autoUpdaterStatus":"disabled","hasCompletedOnboarding":true}');
-                await fs.writeFile(path.join(claudeDir, 'settings.json'), mergeClarificationHook(existingSettings), 'utf8');
-                await fs.writeFile(path.join(claudeDir, 'hooks', 'clarification-notify.sh'), CLARIFICATION_HOOK_SCRIPT, { mode: 0o755 });
-              } catch (err) {
-                logger.warn('Failed to inject clarification notify hook for .claude mount', { err });
-              }
-            }
-
-            // Inject the built-in task-status notify hook for factory-enabled workspace-backed loops.
-            // Only factory projects need this hook — it advances kanban tasks when agents complete phases.
-            if (project.local_path && project.factory_config?.enabled) {
-              try {
-                const existingSettings = await fs.readFile(path.join(claudeDir, 'settings.json'), 'utf8').catch(() => '{"autoUpdaterStatus":"disabled","hasCompletedOnboarding":true}');
-                await fs.writeFile(path.join(claudeDir, 'settings.json'), mergeTaskStatusHook(existingSettings), 'utf8');
-                await fs.writeFile(path.join(claudeDir, 'hooks', 'task-status-notify.sh'), TASK_STATUS_HOOK_SCRIPT, { mode: 0o755 });
-              } catch (err) {
-                logger.warn('Failed to inject task-status notify hook for .claude mount', { err });
-              }
-            }
-
-            // Inject the built-in task-decomposition notify hook for factory-enabled workspace-backed loops.
-            // Only factory projects need this hook — it triggers PM epic decomposition when agents write
-            // @task-decomposition.json.
-            if (project.local_path && project.factory_config?.enabled) {
-              try {
-                const existingSettings = await fs.readFile(path.join(claudeDir, 'settings.json'), 'utf8').catch(() => '{"autoUpdaterStatus":"disabled","hasCompletedOnboarding":true}');
-                await fs.writeFile(path.join(claudeDir, 'settings.json'), mergeTaskDecompositionHook(existingSettings), 'utf8');
-                await fs.writeFile(path.join(claudeDir, 'hooks', 'task-decomposition-notify.sh'), TASK_DECOMPOSITION_HOOK_SCRIPT, { mode: 0o755 });
-              } catch (err) {
-                logger.warn('Failed to inject task-decomposition notify hook for .claude mount', { err });
-              }
-            }
-
-            // Inject the supervisor-action notify hook for factory-enabled workspace-backed loops.
-            // Any container (including a future dedicated supervisor) can write @supervisor-action.json
-            // to trigger host-side container restarts.
-            if (project.local_path && project.factory_config?.enabled) {
-              try {
-                const existingSettings = await fs.readFile(path.join(claudeDir, 'settings.json'), 'utf8').catch(() => '{"autoUpdaterStatus":"disabled","hasCompletedOnboarding":true}');
-                await fs.writeFile(path.join(claudeDir, 'settings.json'), mergeSupervisorActionHook(existingSettings), 'utf8');
-                await fs.writeFile(path.join(claudeDir, 'hooks', 'supervisor-action-notify.sh'), SUPERVISOR_ACTION_HOOK_SCRIPT, { mode: 0o755 });
-              } catch (err) {
-                logger.warn('Failed to inject supervisor-action notify hook for .claude mount', { err });
-              }
-            }
-
-            // Pre-write OAuth credentials to .credentials.json so they are available
-            // before the agent CMD starts (exec injection happens too late for SINGLE/VM).
-            if (hasBrowserSession && credentialManager) {
-              try {
-                const sessionJson = await credentialManager.getApiKey('anthropic_session');
-                if (sessionJson) {
-                  await fs.writeFile(path.join(claudeDir, '.credentials.json'), sessionJson, 'utf8');
-                } else {
-                  logger.warn('browser_session auth: no session data stored; container may lack credentials');
-                }
-              } catch (err) {
-                logger.warn('Failed to write browser session credentials for .claude mount', { err });
-              }
-            }
-
-            opts = {
-              ...opts,
-              // Mount at the ralph user's home .claude dir, not /root/.claude.
-              // The container runs as the "ralph" user (HOME=/home/ralph), so
-              // /root/.claude is inaccessible (drwx------ owned by root).
-              volumeMounts: [...(opts.volumeMounts ?? []), `${claudeDir}:/home/ralph/.claude`],
-            };
-          } catch (err) {
-            logger.warn('Failed to prepare .claude directory for loop', { err });
-          }
-        }
-
-        // Pre-mount Kiro config and hooks at /home/ralph/.kiro for VM/single-mode runs.
-        if (hasKiroConfig || hasKiroHooks) {
-          const kiroDir = path.join(os.tmpdir(), `zephyr-kiro-${opts.projectId}${opts.role ? `-${opts.role}` : ''}`);
-          try {
-            await fs.mkdir(path.join(kiroDir, 'hooks'), { recursive: true });
-
-            if (hasKiroConfig && project.kiro_config) {
-              await fs.writeFile(path.join(kiroDir, 'config.json'), project.kiro_config, 'utf8');
-            }
-
-            if (hasKiroHooks && kiroHooksStore) {
-              for (const filename of project.kiro_hooks ?? []) {
-                try {
-                  const content = await kiroHooksStore.getHook(filename);
-                  if (content) {
-                    const safe = path.basename(filename);
-                    await fs.writeFile(path.join(kiroDir, 'hooks', safe), content, { mode: 0o755 });
-                  }
-                } catch (err) {
-                  logger.warn(`Failed to write kiro hook ${filename} for .kiro mount`, { err });
-                }
-              }
-            }
-
-            opts = {
-              ...opts,
-              // Same reason as the .claude mount: ralph's home is /home/ralph.
-              volumeMounts: [...(opts.volumeMounts ?? []), `${kiroDir}:/home/ralph/.kiro`],
-            };
-          } catch (err) {
-            logger.warn('Failed to prepare .kiro directory for loop', { err });
-          }
-        }
-
-        // Write spec files to specs/ inside the workspace for VM runs.
-        // When local_path is set it is already volume-mounted as /workspace, so writing
-        // to local_path/specs/ makes them available at /workspace/specs/ in the container.
-        if (hasSpecFiles) {
-          const specFilesMap = project.spec_files ?? {};
-          if (project.local_path) {
-            const specsDir = path.join(project.local_path, 'specs');
-            try {
-              await fs.mkdir(specsDir, { recursive: true });
-              for (const [filename, content] of Object.entries(specFilesMap)) {
-                const safe = path.basename(filename);
-                await fs.writeFile(path.join(specsDir, safe), content, 'utf8');
-              }
-            } catch (err) {
-              logger.warn('Failed to write spec files to local_path/specs for run', { err });
-            }
-          } else {
-            // No local_path: write to a temp dir and mount it as a separate volume at /workspace/specs.
-            const specsDir = path.join(os.tmpdir(), `zephyr-specs-${opts.projectId}`);
-            try {
-              await fs.mkdir(specsDir, { recursive: true });
-              for (const [filename, content] of Object.entries(specFilesMap)) {
-                const safe = path.basename(filename);
-                await fs.writeFile(path.join(specsDir, safe), content, 'utf8');
-              }
-              opts = {
-                ...opts,
-                volumeMounts: [...(opts.volumeMounts ?? []), `${specsDir}:/workspace/specs`],
-              };
-            } catch (err) {
-              logger.warn('Failed to prepare spec files directory for run', { err });
-            }
-          }
-        }
-      }
-
-      // For VM loops: pre-validation scripts must also reach the container.
-      // They are normally written to project.local_path (which is volume-mounted
-      // as /workspace), but that requires local_path to be set. When it is not,
-      // write them to a temp directory and mount that directory at /workspace so
-      // they are still accessible to the agent at /workspace/<script>.
-      if (
-        opts.sandboxType === 'vm' &&
-        project &&
-        project.pre_validation_scripts.length > 0 &&
-        preValidationStore &&
-        !project.local_path
-      ) {
-        const pvDir = path.join(os.tmpdir(), `zephyr-pv-${opts.projectId}`);
-        try {
-          await fs.mkdir(pvDir, { recursive: true });
-          for (const filename of project.pre_validation_scripts) {
-            try {
-              const content = await preValidationStore.getScript(filename);
-              if (content) {
-                await fs.writeFile(path.join(pvDir, path.basename(filename)), content, { mode: 0o755 });
-              }
-            } catch (err) {
-              logger.warn(`Failed to write pre-validation script ${filename} for VM mount`, { err });
-            }
-          }
-          opts = {
-            ...opts,
-            volumeMounts: [...(opts.volumeMounts ?? []), `${pvDir}:/workspace`],
-            workDir: opts.workDir ?? '/workspace',
-          };
-        } catch (err) {
-          logger.warn('Failed to prepare pre-validation scripts directory for VM loop', { err });
-        }
-      }
-
-      // Stage the Kiro CLI auth database for in-container copy.
-      // The working pattern (from ralph-village) is:
-      //   1. Copy the host DB to a temp file (avoids VirtioFS truncation)
-      //   2. Mount the copy at /tmp/kiro-data.sqlite3:ro
-      //   3. After container start, exec a cp inside the container to the
-      //      final writable path — SQLite needs write access for WAL/journal
-      const kiroDestFile = '/home/ralph/.local/share/kiro-cli/data.sqlite3';
-      let kiroStagedMount = false;
-      if (opts.volumeMounts) {
-        const kiroIdx = opts.volumeMounts.findIndex((m) => m.includes(kiroDestFile));
-        if (kiroIdx !== -1) {
-          const mount = opts.volumeMounts[kiroIdx];
-          const hostPath = mount.split(':')[0];
-          try {
-            const tmpFile = path.join(os.tmpdir(), `zephyr-kiro-db-${opts.projectId}${opts.role ? `-${opts.role}` : ''}.sqlite3`);
-            await fs.copyFile(hostPath, tmpFile);
-            await fs.chmod(tmpFile, 0o644);
-            const updated = [...opts.volumeMounts];
-            updated[kiroIdx] = `${tmpFile}:/tmp/kiro-data.sqlite3:ro`;
-            opts = { ...opts, volumeMounts: updated };
-            kiroStagedMount = true;
-          } catch (err) {
-            logger.warn('Failed to stage Kiro DB, using direct mount', { err });
-          }
-        }
-      }
-
-      // Remove any stale terminal loops for this project before starting a new one.
-      // This clears leftover factory role loops when switching to a non-factory run
-      // (and vice versa), so the UI doesn't show ghost entries from the previous mode.
-      for (const stale of containerOrchestrator.listByProject(opts.projectId)) {
-        if (isLoopTerminal(stale.status)) {
-          containerOrchestrator.removeLoop(stale.projectId, stale.role);
-        }
-      }
-
-      const state = await containerOrchestrator.startLoop(opts);
-
-      // Register container with cleanup manager for automatic cleanup on shutdown
-      if (cleanupManager && state.containerId) {
-        cleanupManager.registerContainer(state.containerId);
-      }
-
-      // Install workspace dependencies into the container so libraries are available
-      // system-wide before the agent starts. Runs as root so pip can write to
-      // system site-packages. Failures are non-fatal — the loop continues without them.
-      if (state.containerId && runtime) {
-        // Copy staged Kiro DB from /tmp mount to the writable final location.
-        // SQLite requires write access for WAL/journal even on read operations.
-        if (kiroStagedMount) {
-          try {
-            await runtime.execCommand(
-              state.containerId,
-              ['sh', '-c', 'mkdir -p /home/ralph/.local/share/kiro-cli && cp /tmp/kiro-data.sqlite3 /home/ralph/.local/share/kiro-cli/data.sqlite3 && chmod 644 /home/ralph/.local/share/kiro-cli/data.sqlite3'],
-            );
-          } catch (err) {
-            logger.warn('Failed to copy Kiro DB inside container', { err });
-          }
-        }
-
-        // Python: install any requirements.txt / requirements-*.txt in /workspace
-        try {
-          await runtime.execCommand(
-            state.containerId,
-            ['sh', '-c', 'find /workspace -maxdepth 1 -name "requirements*.txt" | while read f; do pip3 install --break-system-packages -q -r "$f"; done'],
-            { user: 'root' },
+          const tmpFile = path.join(
+            os.tmpdir(),
+            `zephyr-kiro-db-${opts.projectId}${opts.role ? `-${opts.role}` : ''}.sqlite3`
           );
+          await fs.copyFile(hostPath, tmpFile);
+          await fs.chmod(tmpFile, 0o644);
+          const updated = [...opts.volumeMounts];
+          updated[kiroIdx] = `${tmpFile}:/tmp/kiro-data.sqlite3:ro`;
+          opts = { ...opts, volumeMounts: updated };
+          kiroStagedMount = true;
         } catch (err) {
-          logger.warn('Failed to install Python workspace dependencies', { err });
-        }
-
-        // Node.js: run npm install if package.json exists in /workspace
-        try {
-          await runtime.execCommand(
-            state.containerId,
-            ['sh', '-c', '[ -f /workspace/package.json ] && cd /workspace && npm install 2>&1 || true'],
-            { user: 'root' },
-          );
-        } catch (err) {
-          logger.warn('Failed to install Node.js workspace dependencies', { err });
-        }
-
-        // Rust: fetch Cargo dependencies if Cargo.toml exists in /workspace
-        try {
-          await runtime.execCommand(
-            state.containerId,
-            ['sh', '-c', '[ -f /workspace/Cargo.toml ] && cd /workspace && cargo fetch 2>&1 || true'],
-            { user: 'ralph' },
-          );
-        } catch (err) {
-          logger.warn('Failed to fetch Rust workspace dependencies', { err });
-        }
-
-        // Go: download module dependencies if go.mod exists in /workspace
-        try {
-          await runtime.execCommand(
-            state.containerId,
-            ['sh', '-c', '[ -f /workspace/go.mod ] && cd /workspace && go mod download 2>&1 || true'],
-            { user: 'ralph' },
-          );
-        } catch (err) {
-          logger.warn('Failed to download Go workspace dependencies', { err });
+          logger.warn('Failed to stage Kiro DB, using direct mount', { err });
         }
       }
+    }
 
-      // Ensure ~/.claude.json exists — safety net for containers running images built
-      // before this file was added to generateClaudeCodeConfigBlock().
-      if (state.containerId && runtime) {
+    // Remove any stale terminal loops for this project before starting a new one.
+    // This clears leftover factory role loops when switching to a non-factory run
+    // (and vice versa), so the UI doesn't show ghost entries from the previous mode.
+    for (const stale of containerOrchestrator.listByProject(opts.projectId)) {
+      if (isLoopTerminal(stale.status)) {
+        containerOrchestrator.removeLoop(stale.projectId, stale.role);
+      }
+    }
+
+    const state = await containerOrchestrator.startLoop(opts);
+
+    // Register container with cleanup manager for automatic cleanup on shutdown
+    if (cleanupManager && state.containerId) {
+      cleanupManager.registerContainer(state.containerId);
+    }
+
+    // Install workspace dependencies into the container so libraries are available
+    // system-wide before the agent starts. Runs as root so pip can write to
+    // system site-packages. Failures are non-fatal — the loop continues without them.
+    if (state.containerId && runtime) {
+      // Copy staged Kiro DB from /tmp mount to the writable final location.
+      // SQLite requires write access for WAL/journal even on read operations.
+      if (kiroStagedMount) {
         try {
           await runtime.execCommand(state.containerId, [
-            'sh', '-c', ENSURE_CLAUDE_JSON,
+            'sh',
+            '-c',
+            'mkdir -p /home/ralph/.local/share/kiro-cli && cp /tmp/kiro-data.sqlite3 /home/ralph/.local/share/kiro-cli/data.sqlite3 && chmod 644 /home/ralph/.local/share/kiro-cli/data.sqlite3',
           ]);
         } catch (err) {
-          logger.warn('Failed to ensure ~/.claude.json exists in container', { err });
+          logger.warn('Failed to copy Kiro DB inside container', { err });
         }
       }
 
-      // For browser_session auth: exec-write OAuth credentials to ~/.claude/.credentials.json
-      // This is the file the Claude Code CLI reads for browser-based auth (not ~/.claude.json).
-      if (authMethod === 'browser_session' && state.containerId && credentialManager && runtime) {
-        try {
-          const sessionJson = await credentialManager.getApiKey('anthropic_session');
-          if (sessionJson) {
-            const encoded = Buffer.from(sessionJson).toString('base64');
-            await runtime.execCommand(state.containerId, [
-              'sh', '-c',
-              `mkdir -p ~/.claude && printf '%s' '${encoded}' | base64 -d > ~/.claude/.credentials.json`,
-            ]);
-            logger.info('Wrote browser session credentials to ~/.claude/.credentials.json in container');
-          } else {
-            logger.warn('browser_session auth mode but no session data stored; container may lack credentials');
-          }
-        } catch (err) {
-          logger.warn('Failed to write browser session credentials to container', { err });
-        }
+      // Python: install any requirements.txt / requirements-*.txt in /workspace
+      try {
+        await runtime.execCommand(
+          state.containerId,
+          [
+            'sh',
+            '-c',
+            'find /workspace -maxdepth 1 -name "requirements*.txt" | while read f; do pip3 install --break-system-packages -q -r "$f"; done',
+          ],
+          { user: 'root' }
+        );
+      } catch (err) {
+        logger.warn('Failed to install Python workspace dependencies', { err });
       }
 
-      // Configure git user identity in the container so commits have a proper author.
-      if (state.containerId && runtime) {
-        try {
-          const gitName = project?.git_user_name?.trim() || 'Ralph';
-          const gitEmail = project?.git_user_email?.trim() || 'ralph@placeholder.com';
+      // Node.js: run npm install if package.json exists in /workspace
+      try {
+        await runtime.execCommand(
+          state.containerId,
+          [
+            'sh',
+            '-c',
+            '[ -f /workspace/package.json ] && cd /workspace && npm install 2>&1 || true',
+          ],
+          { user: 'root' }
+        );
+      } catch (err) {
+        logger.warn('Failed to install Node.js workspace dependencies', { err });
+      }
+
+      // Rust: fetch Cargo dependencies if Cargo.toml exists in /workspace
+      try {
+        await runtime.execCommand(
+          state.containerId,
+          ['sh', '-c', '[ -f /workspace/Cargo.toml ] && cd /workspace && cargo fetch 2>&1 || true'],
+          { user: 'ralph' }
+        );
+      } catch (err) {
+        logger.warn('Failed to fetch Rust workspace dependencies', { err });
+      }
+
+      // Go: download module dependencies if go.mod exists in /workspace
+      try {
+        await runtime.execCommand(
+          state.containerId,
+          ['sh', '-c', '[ -f /workspace/go.mod ] && cd /workspace && go mod download 2>&1 || true'],
+          { user: 'ralph' }
+        );
+      } catch (err) {
+        logger.warn('Failed to download Go workspace dependencies', { err });
+      }
+    }
+
+    // Ensure ~/.claude.json exists — safety net for containers running images built
+    // before this file was added to generateClaudeCodeConfigBlock().
+    if (state.containerId && runtime) {
+      try {
+        await runtime.execCommand(state.containerId, ['sh', '-c', ENSURE_CLAUDE_JSON]);
+      } catch (err) {
+        logger.warn('Failed to ensure ~/.claude.json exists in container', { err });
+      }
+    }
+
+    // For browser_session auth: exec-write OAuth credentials to ~/.claude/.credentials.json
+    // This is the file the Claude Code CLI reads for browser-based auth (not ~/.claude.json).
+    if (authMethod === 'browser_session' && state.containerId && credentialManager && runtime) {
+      try {
+        const sessionJson = await credentialManager.getApiKey('anthropic_session');
+        if (sessionJson) {
+          const encoded = Buffer.from(sessionJson).toString('base64');
           await runtime.execCommand(state.containerId, [
-            'sh', '-c',
-            `git config --global user.name "${gitName}" && git config --global user.email "${gitEmail}"`,
+            'sh',
+            '-c',
+            `mkdir -p ~/.claude && printf '%s' '${encoded}' | base64 -d > ~/.claude/.credentials.json`,
           ]);
-          logger.info('Configured git user identity in container', { gitName, gitEmail });
-        } catch (err) {
-          logger.warn('Failed to configure git user identity in container', { err });
+          logger.info(
+            'Wrote browser session credentials to ~/.claude/.credentials.json in container'
+          );
+        } else {
+          logger.warn(
+            'browser_session auth mode but no session data stored; container may lack credentials'
+          );
         }
+      } catch (err) {
+        logger.warn('Failed to write browser session credentials to container', { err });
       }
+    }
 
-      // Inject hook files into ~/.claude/hooks inside the container.
-      // Uses base64 to safely transfer file contents via docker exec.
-      if (project && project.hooks.length > 0 && state.containerId && hooksStore && runtime) {
-        try {
-          await runtime.execCommand(state.containerId, [
-            'sh', '-c', 'mkdir -p ~/.claude/hooks',
-          ]);
-
-          for (const filename of project.hooks) {
-            try {
-              const content = await hooksStore.getHook(filename);
-              if (content) {
-                // Buffer.from().toString('base64') produces no newlines, safe for single-quoting
-                const encoded = Buffer.from(content).toString('base64');
-                const safe = path.basename(filename);
-                await runtime.execCommand(state.containerId, [
-                  'sh', '-c',
-                  `printf '%s' '${encoded}' | base64 -d > ~/.claude/hooks/${safe} && chmod +x ~/.claude/hooks/${safe}`,
-                ]);
-              }
-            } catch (err) {
-              logger.warn(`Failed to inject hook ${filename} into container`, { err });
-            }
-          }
-        } catch (err) {
-          logger.warn('Failed to create ~/.claude/hooks in container', { err });
-        }
+    // Configure git user identity in the container so commits have a proper author.
+    if (state.containerId && runtime) {
+      try {
+        const gitName = project?.git_user_name?.trim() || 'Ralph';
+        const gitEmail = project?.git_user_email?.trim() || 'ralph@placeholder.com';
+        await runtime.execCommand(state.containerId, [
+          'sh',
+          '-c',
+          `git config --global user.name "${gitName}" && git config --global user.email "${gitEmail}"`,
+        ]);
+        logger.info('Configured git user identity in container', { gitName, gitEmail });
+      } catch (err) {
+        logger.warn('Failed to configure git user identity in container', { err });
       }
+    }
 
-      // Inject custom prompt files into ~/.claude/ inside the container.
-      // Uses base64 to safely transfer file contents via docker exec.
-      // VM-backed loops handle this via volume mount above.
-      if (project && Object.keys(project.custom_prompts).length > 0 && state.containerId && runtime) {
-        try {
-          await runtime.execCommand(state.containerId, [
-            'sh', '-c', 'mkdir -p ~/.claude',
-          ]);
+    // Inject hook files into ~/.claude/hooks inside the container.
+    // Uses base64 to safely transfer file contents via docker exec.
+    if (project && project.hooks.length > 0 && state.containerId && hooksStore && runtime) {
+      try {
+        await runtime.execCommand(state.containerId, ['sh', '-c', 'mkdir -p ~/.claude/hooks']);
 
-          for (const [filename, content] of Object.entries(project.custom_prompts)) {
-            try {
+        for (const filename of project.hooks) {
+          try {
+            const content = await hooksStore.getHook(filename);
+            if (content) {
+              // Buffer.from().toString('base64') produces no newlines, safe for single-quoting
               const encoded = Buffer.from(content).toString('base64');
               const safe = path.basename(filename);
               await runtime.execCommand(state.containerId, [
-                'sh', '-c',
-                `printf '%s' '${encoded}' | base64 -d > ~/.claude/${safe}`,
+                'sh',
+                '-c',
+                `printf '%s' '${encoded}' | base64 -d > ~/.claude/hooks/${safe} && chmod +x ~/.claude/hooks/${safe}`,
               ]);
-            } catch (err) {
-              logger.warn(`Failed to inject custom prompt ${filename} into container`, { err });
             }
+          } catch (err) {
+            logger.warn(`Failed to inject hook ${filename} into container`, { err });
           }
-        } catch (err) {
-          logger.warn('Failed to create ~/.claude in container for custom prompts', { err });
         }
+      } catch (err) {
+        logger.warn('Failed to create ~/.claude/hooks in container', { err });
       }
+    }
 
-      // Inject spec files into /workspace/specs/ inside the container.
-      // Uses base64 to safely transfer file contents via docker exec.
-      // VM runs handle this via volume mount above.
-      if (project && Object.keys(project.spec_files ?? {}).length > 0 && state.containerId && runtime) {
-        try {
-          await runtime.execCommand(state.containerId, [
-            'sh', '-c', 'mkdir -p /workspace/specs',
-          ]);
+    // Inject custom prompt files into ~/.claude/ inside the container.
+    // Uses base64 to safely transfer file contents via docker exec.
+    // VM-backed loops handle this via volume mount above.
+    if (project && Object.keys(project.custom_prompts).length > 0 && state.containerId && runtime) {
+      try {
+        await runtime.execCommand(state.containerId, ['sh', '-c', 'mkdir -p ~/.claude']);
 
-          for (const [filename, content] of Object.entries(project.spec_files ?? {})) {
-            try {
-              const encoded = Buffer.from(content).toString('base64');
-              const safe = path.basename(filename);
-              await runtime.execCommand(state.containerId, [
-                'sh', '-c',
-                `printf '%s' '${encoded}' | base64 -d > /workspace/specs/${safe}`,
-              ]);
-            } catch (err) {
-              logger.warn(`Failed to inject spec file ${filename} into container`, { err });
-            }
-          }
-        } catch (err) {
-          logger.warn('Failed to create /workspace/specs in container for spec files', { err });
-        }
-      }
-
-      // Inject claude settings.json into ~/.claude/settings.json inside the container.
-      // Uses base64 to safely transfer file contents via docker exec.
-      // Skipped for VM runs: those already have the file pre-mounted as a volume (handled above).
-      if (project && project.claude_settings_file && state.containerId && claudeSettingsStore && runtime) {
-        try {
-          const content = await claudeSettingsStore.getFile(project.claude_settings_file);
-          if (content) {
+        for (const [filename, content] of Object.entries(project.custom_prompts)) {
+          try {
             const encoded = Buffer.from(content).toString('base64');
+            const safe = path.basename(filename);
             await runtime.execCommand(state.containerId, [
-              'sh', '-c',
-              `mkdir -p ~/.claude && printf '%s' '${encoded}' | base64 -d > ~/.claude/settings.json`,
+              'sh',
+              '-c',
+              `printf '%s' '${encoded}' | base64 -d > ~/.claude/${safe}`,
             ]);
+          } catch (err) {
+            logger.warn(`Failed to inject custom prompt ${filename} into container`, { err });
           }
-        } catch (err) {
-          logger.warn('Failed to inject claude settings.json into container', { err });
         }
+      } catch (err) {
+        logger.warn('Failed to create ~/.claude in container for custom prompts', { err });
       }
+    }
 
-      // Inject built-in clarification notify hook for workspace-backed loops.
-      // Must run AFTER the user's settings.json injection above so the merge sees the
-      // final user settings rather than the image default.
-      if (project?.local_path && state.containerId && runtime) {
-        try {
-          await runtime.execCommand(state.containerId, ['sh', '-c', 'mkdir -p ~/.claude/hooks']);
-          const hookEncoded = Buffer.from(CLARIFICATION_HOOK_SCRIPT).toString('base64');
+    // Inject spec files into /workspace/specs/ inside the container.
+    // Uses base64 to safely transfer file contents via docker exec.
+    // VM runs handle this via volume mount above.
+    if (
+      project &&
+      Object.keys(project.spec_files ?? {}).length > 0 &&
+      state.containerId &&
+      runtime
+    ) {
+      try {
+        await runtime.execCommand(state.containerId, ['sh', '-c', 'mkdir -p /workspace/specs']);
+
+        for (const [filename, content] of Object.entries(project.spec_files ?? {})) {
+          try {
+            const encoded = Buffer.from(content).toString('base64');
+            const safe = path.basename(filename);
+            await runtime.execCommand(state.containerId, [
+              'sh',
+              '-c',
+              `printf '%s' '${encoded}' | base64 -d > /workspace/specs/${safe}`,
+            ]);
+          } catch (err) {
+            logger.warn(`Failed to inject spec file ${filename} into container`, { err });
+          }
+        }
+      } catch (err) {
+        logger.warn('Failed to create /workspace/specs in container for spec files', { err });
+      }
+    }
+
+    // Inject claude settings.json into ~/.claude/settings.json inside the container.
+    // Uses base64 to safely transfer file contents via docker exec.
+    // Skipped for VM runs: those already have the file pre-mounted as a volume (handled above).
+    if (
+      project &&
+      project.claude_settings_file &&
+      state.containerId &&
+      claudeSettingsStore &&
+      runtime
+    ) {
+      try {
+        const content = await claudeSettingsStore.getFile(project.claude_settings_file);
+        if (content) {
+          const encoded = Buffer.from(content).toString('base64');
           await runtime.execCommand(state.containerId, [
-            'sh', '-c',
-            `printf '%s' '${hookEncoded}' | base64 -d > ~/.claude/hooks/clarification-notify.sh && chmod +x ~/.claude/hooks/clarification-notify.sh`,
+            'sh',
+            '-c',
+            `mkdir -p ~/.claude && printf '%s' '${encoded}' | base64 -d > ~/.claude/settings.json`,
           ]);
-          // Load user settings (if any) so we merge rather than clobber them.
-          const baseSettings = project.claude_settings_file && claudeSettingsStore
-            ? (await claudeSettingsStore.getFile(project.claude_settings_file) ?? '{"autoUpdaterStatus":"disabled","hasCompletedOnboarding":true}')
+        }
+      } catch (err) {
+        logger.warn('Failed to inject claude settings.json into container', { err });
+      }
+    }
+
+    // Inject built-in clarification notify hook for workspace-backed loops.
+    // Must run AFTER the user's settings.json injection above so the merge sees the
+    // final user settings rather than the image default.
+    if (project?.local_path && state.containerId && runtime) {
+      try {
+        await runtime.execCommand(state.containerId, ['sh', '-c', 'mkdir -p ~/.claude/hooks']);
+        const hookEncoded = Buffer.from(CLARIFICATION_HOOK_SCRIPT).toString('base64');
+        await runtime.execCommand(state.containerId, [
+          'sh',
+          '-c',
+          `printf '%s' '${hookEncoded}' | base64 -d > ~/.claude/hooks/clarification-notify.sh && chmod +x ~/.claude/hooks/clarification-notify.sh`,
+        ]);
+        // Load user settings (if any) so we merge rather than clobber them.
+        const baseSettings =
+          project.claude_settings_file && claudeSettingsStore
+            ? ((await claudeSettingsStore.getFile(project.claude_settings_file)) ??
+              '{"autoUpdaterStatus":"disabled","hasCompletedOnboarding":true}')
             : '{"autoUpdaterStatus":"disabled","hasCompletedOnboarding":true}';
-          const settingsEncoded = Buffer.from(mergeClarificationHook(baseSettings)).toString('base64');
-          await runtime.execCommand(state.containerId, [
-            'sh', '-c',
-            `printf '%s' '${settingsEncoded}' | base64 -d > ~/.claude/settings.json`,
-          ]);
-        } catch (err) {
-          logger.warn('Failed to inject clarification notify hook into container', { err });
-        }
+        const settingsEncoded = Buffer.from(mergeClarificationHook(baseSettings)).toString(
+          'base64'
+        );
+        await runtime.execCommand(state.containerId, [
+          'sh',
+          '-c',
+          `printf '%s' '${settingsEncoded}' | base64 -d > ~/.claude/settings.json`,
+        ]);
+      } catch (err) {
+        logger.warn('Failed to inject clarification notify hook into container', { err });
       }
+    }
 
-      // Inject built-in task-status, task-decomposition, and supervisor-action notify hooks
-      // for factory-enabled workspace-backed loops. Re-derives baseSettings and
-      // applies all hooks so none overwrite each other (all merges are idempotent).
-      if (project?.local_path && project.factory_config?.enabled && state.containerId && runtime) {
-        try {
-          const taskHookEncoded = Buffer.from(TASK_STATUS_HOOK_SCRIPT).toString('base64');
-          await runtime.execCommand(state.containerId, [
-            'sh', '-c',
-            `printf '%s' '${taskHookEncoded}' | base64 -d > ~/.claude/hooks/task-status-notify.sh && chmod +x ~/.claude/hooks/task-status-notify.sh`,
-          ]);
-          const decompHookEncoded = Buffer.from(TASK_DECOMPOSITION_HOOK_SCRIPT).toString('base64');
-          await runtime.execCommand(state.containerId, [
-            'sh', '-c',
-            `printf '%s' '${decompHookEncoded}' | base64 -d > ~/.claude/hooks/task-decomposition-notify.sh && chmod +x ~/.claude/hooks/task-decomposition-notify.sh`,
-          ]);
-          const supervisorHookEncoded = Buffer.from(SUPERVISOR_ACTION_HOOK_SCRIPT).toString('base64');
-          await runtime.execCommand(state.containerId, [
-            'sh', '-c',
-            `printf '%s' '${supervisorHookEncoded}' | base64 -d > ~/.claude/hooks/supervisor-action-notify.sh && chmod +x ~/.claude/hooks/supervisor-action-notify.sh`,
-          ]);
-          // Merge all four hooks into settings so none overwrites the others.
-          const baseSettings = project.claude_settings_file && claudeSettingsStore
-            ? (await claudeSettingsStore.getFile(project.claude_settings_file) ?? '{"autoUpdaterStatus":"disabled","hasCompletedOnboarding":true}')
+    // Inject built-in task-status, task-decomposition, and supervisor-action notify hooks
+    // for factory-enabled workspace-backed loops. Re-derives baseSettings and
+    // applies all hooks so none overwrite each other (all merges are idempotent).
+    if (project?.local_path && project.factory_config?.enabled && state.containerId && runtime) {
+      try {
+        const taskHookEncoded = Buffer.from(TASK_STATUS_HOOK_SCRIPT).toString('base64');
+        await runtime.execCommand(state.containerId, [
+          'sh',
+          '-c',
+          `printf '%s' '${taskHookEncoded}' | base64 -d > ~/.claude/hooks/task-status-notify.sh && chmod +x ~/.claude/hooks/task-status-notify.sh`,
+        ]);
+        const decompHookEncoded = Buffer.from(TASK_DECOMPOSITION_HOOK_SCRIPT).toString('base64');
+        await runtime.execCommand(state.containerId, [
+          'sh',
+          '-c',
+          `printf '%s' '${decompHookEncoded}' | base64 -d > ~/.claude/hooks/task-decomposition-notify.sh && chmod +x ~/.claude/hooks/task-decomposition-notify.sh`,
+        ]);
+        const supervisorHookEncoded = Buffer.from(SUPERVISOR_ACTION_HOOK_SCRIPT).toString('base64');
+        await runtime.execCommand(state.containerId, [
+          'sh',
+          '-c',
+          `printf '%s' '${supervisorHookEncoded}' | base64 -d > ~/.claude/hooks/supervisor-action-notify.sh && chmod +x ~/.claude/hooks/supervisor-action-notify.sh`,
+        ]);
+        // Merge all four hooks into settings so none overwrites the others.
+        const baseSettings =
+          project.claude_settings_file && claudeSettingsStore
+            ? ((await claudeSettingsStore.getFile(project.claude_settings_file)) ??
+              '{"autoUpdaterStatus":"disabled","hasCompletedOnboarding":true}')
             : '{"autoUpdaterStatus":"disabled","hasCompletedOnboarding":true}';
-          const settingsEncoded = Buffer.from(mergeSupervisorActionHook(mergeTaskDecompositionHook(mergeTaskStatusHook(mergeClarificationHook(baseSettings))))).toString('base64');
-          await runtime.execCommand(state.containerId, [
-            'sh', '-c',
-            `printf '%s' '${settingsEncoded}' | base64 -d > ~/.claude/settings.json`,
-          ]);
-        } catch (err) {
-          logger.warn('Failed to inject task-status/task-decomposition/supervisor-action notify hooks into container', { err });
-        }
+        const settingsEncoded = Buffer.from(
+          mergeSupervisorActionHook(
+            mergeTaskDecompositionHook(mergeTaskStatusHook(mergeClarificationHook(baseSettings)))
+          )
+        ).toString('base64');
+        await runtime.execCommand(state.containerId, [
+          'sh',
+          '-c',
+          `printf '%s' '${settingsEncoded}' | base64 -d > ~/.claude/settings.json`,
+        ]);
+      } catch (err) {
+        logger.warn(
+          'Failed to inject task-status/task-decomposition/supervisor-action notify hooks into container',
+          { err }
+        );
       }
+    }
 
-      // Inject Kiro config into ~/.kiro/config.json inside the container.
-      // Uses base64 to safely transfer the JSON content via docker exec.
-      // Skipped for VM runs: those already have the file pre-mounted.
-      if (project && project.kiro_config && state.containerId && runtime) {
-        try {
-          const encoded = Buffer.from(project.kiro_config).toString('base64');
-          await runtime.execCommand(state.containerId, [
-            'sh', '-c',
-            `mkdir -p ~/.kiro && printf '%s' '${encoded}' | base64 -d > ~/.kiro/config.json`,
-          ]);
-        } catch (err) {
-          logger.warn('Failed to inject kiro config.json into container', { err });
-        }
+    // Inject Kiro config into ~/.kiro/config.json inside the container.
+    // Uses base64 to safely transfer the JSON content via docker exec.
+    // Skipped for VM runs: those already have the file pre-mounted.
+    if (project && project.kiro_config && state.containerId && runtime) {
+      try {
+        const encoded = Buffer.from(project.kiro_config).toString('base64');
+        await runtime.execCommand(state.containerId, [
+          'sh',
+          '-c',
+          `mkdir -p ~/.kiro && printf '%s' '${encoded}' | base64 -d > ~/.kiro/config.json`,
+        ]);
+      } catch (err) {
+        logger.warn('Failed to inject kiro config.json into container', { err });
       }
+    }
 
-      // Inject Kiro hook files into ~/.kiro/hooks inside the container.
-      // Uses base64 to safely transfer file contents via docker exec.
-      // Skipped for VM runs: those already have hooks pre-mounted.
-      if (project && (project.kiro_hooks ?? []).length > 0 && state.containerId && kiroHooksStore && runtime) {
-        try {
-          await runtime.execCommand(state.containerId, [
-            'sh', '-c', 'mkdir -p ~/.kiro/hooks',
-          ]);
+    // Inject Kiro hook files into ~/.kiro/hooks inside the container.
+    // Uses base64 to safely transfer file contents via docker exec.
+    // Skipped for VM runs: those already have hooks pre-mounted.
+    if (
+      project &&
+      (project.kiro_hooks ?? []).length > 0 &&
+      state.containerId &&
+      kiroHooksStore &&
+      runtime
+    ) {
+      try {
+        await runtime.execCommand(state.containerId, ['sh', '-c', 'mkdir -p ~/.kiro/hooks']);
 
-          for (const filename of project.kiro_hooks ?? []) {
-            try {
-              const content = await kiroHooksStore.getHook(filename);
-              if (content) {
-                const encoded = Buffer.from(content).toString('base64');
-                const safe = path.basename(filename);
-                await runtime.execCommand(state.containerId, [
-                  'sh', '-c',
-                  `printf '%s' '${encoded}' | base64 -d > ~/.kiro/hooks/${safe} && chmod +x ~/.kiro/hooks/${safe}`,
-                ]);
-              }
-            } catch (err) {
-              logger.warn(`Failed to inject kiro hook ${filename} into container`, { err });
+        for (const filename of project.kiro_hooks ?? []) {
+          try {
+            const content = await kiroHooksStore.getHook(filename);
+            if (content) {
+              const encoded = Buffer.from(content).toString('base64');
+              const safe = path.basename(filename);
+              await runtime.execCommand(state.containerId, [
+                'sh',
+                '-c',
+                `printf '%s' '${encoded}' | base64 -d > ~/.kiro/hooks/${safe} && chmod +x ~/.kiro/hooks/${safe}`,
+              ]);
             }
+          } catch (err) {
+            logger.warn(`Failed to inject kiro hook ${filename} into container`, { err });
           }
-        } catch (err) {
-          logger.warn('Failed to create ~/.kiro/hooks in container', { err });
         }
+      } catch (err) {
+        logger.warn('Failed to create ~/.kiro/hooks in container', { err });
       }
+    }
 
-      // Inject ephemeral SSH deploy key for GitHub repos.
-      // Only runs when: project has a GitHub repo_url, a PAT is stored, and
-      // the container has started (containerId is set). Failures are non-fatal
-      // — the loop continues without SSH access rather than aborting.
-      if (
-        project &&
-        project.repo_url &&
-        sshKeyManager?.isGithubUrl(project.repo_url) &&
-        credentialManager &&
-        state.containerId
-      ) {
-        try {
-          const pat = await credentialManager.getGithubPat(opts.projectId);
-          if (!pat) {
-            logger.warn('No GitHub PAT stored for this project — SSH deploy key setup skipped. Add a PAT in the project settings to enable git push over SSH.', { projectId: opts.projectId });
-          } else {
-            const { privateKey, publicKey } = sshKeyManager.generateKeyPair();
-            const keyTitle = `zephyr-${opts.projectId.slice(0, 8)}-${Date.now()}`;
-            logger.info('Registering GitHub deploy key', { projectId: opts.projectId, repoUrl: project.repo_url });
-            const keyId = await sshKeyManager.addDeployKey(pat, project.repo_url, publicKey, keyTitle);
+    // Inject ephemeral SSH deploy key for GitHub repos.
+    // Only runs when: project has a GitHub repo_url, a PAT is stored, and
+    // the container has started (containerId is set). Failures are non-fatal
+    // — the loop continues without SSH access rather than aborting.
+    if (
+      project &&
+      project.repo_url &&
+      sshKeyManager?.isGithubUrl(project.repo_url) &&
+      credentialManager &&
+      state.containerId
+    ) {
+      try {
+        const pat = await credentialManager.getGithubPat(opts.projectId);
+        if (!pat) {
+          logger.warn(
+            'No GitHub PAT stored for this project — SSH deploy key setup skipped. Add a PAT in the project settings to enable git push over SSH.',
+            { projectId: opts.projectId }
+          );
+        } else {
+          const { privateKey, publicKey } = sshKeyManager.generateKeyPair();
+          const keyTitle = `zephyr-${opts.projectId.slice(0, 8)}-${Date.now()}`;
+          logger.info('Registering GitHub deploy key', {
+            projectId: opts.projectId,
+            repoUrl: project.repo_url,
+          });
+          const keyId = await sshKeyManager.addDeployKey(
+            pat,
+            project.repo_url,
+            publicKey,
+            keyTitle
+          );
 
-            // Record in store before injection so a mid-injection crash leaves a traceable entry
-            if (deployKeyStore) {
-              const { owner, repo } = sshKeyManager.parseGithubRepo(project.repo_url);
-              deployKeyStore.record({
-                key_id: keyId,
-                repo: `${owner}/${repo}`,
-                project_id: opts.projectId,
-                project_name: opts.projectName,
-                loop_id: state.containerId,
-                created_at: new Date().toISOString(),
-                service: 'github',
-              });
-            }
-
-            await sshKeyManager.injectIntoContainer(state.containerId, privateKey);
-            activeDeployKeys.set(getLoopKey(opts.projectId, opts.role), { keyId, repoUrl: project.repo_url, pat, service: 'github' });
-            logger.info('SSH deploy key injected into container', { projectId: opts.projectId, keyId });
+          // Record in store before injection so a mid-injection crash leaves a traceable entry
+          if (deployKeyStore) {
+            const { owner, repo } = sshKeyManager.parseGithubRepo(project.repo_url);
+            deployKeyStore.record({
+              key_id: keyId,
+              repo: `${owner}/${repo}`,
+              project_id: opts.projectId,
+              project_name: opts.projectName,
+              loop_id: state.containerId,
+              created_at: new Date().toISOString(),
+              service: 'github',
+            });
           }
-        } catch (err) {
-          logger.warn('Failed to set up GitHub SSH deploy key; loop continues without SSH access', { projectId: opts.projectId, err });
+
+          await sshKeyManager.injectIntoContainer(state.containerId, privateKey);
+          activeDeployKeys.set(getLoopKey(opts.projectId, opts.role), {
+            keyId,
+            repoUrl: project.repo_url,
+            pat,
+            service: 'github',
+          });
+          logger.info('SSH deploy key injected into container', {
+            projectId: opts.projectId,
+            keyId,
+          });
         }
+      } catch (err) {
+        logger.warn('Failed to set up GitHub SSH deploy key; loop continues without SSH access', {
+          projectId: opts.projectId,
+          err,
+        });
       }
+    }
 
-      // Inject ephemeral SSH deploy key for GitLab repos.
-      // Only runs when: project has a GitLab repo_url, a PAT is stored, and
-      // the container has started (containerId is set). Failures are non-fatal.
-      if (
-        project &&
-        project.repo_url &&
-        sshKeyManager?.isGitlabUrl(project.repo_url) &&
-        credentialManager &&
-        state.containerId
-      ) {
-        try {
-          const pat = await credentialManager.getGitlabPat(opts.projectId);
-          if (!pat) {
-            logger.warn('No GitLab PAT stored for this project — SSH deploy key setup skipped. Add a PAT in the project settings to enable git push over SSH.', { projectId: opts.projectId });
-          } else {
-            const { privateKey, publicKey } = sshKeyManager.generateKeyPair();
-            const keyTitle = `zephyr-${opts.projectId.slice(0, 8)}-${Date.now()}`;
-            logger.info('Registering GitLab deploy key', { projectId: opts.projectId, repoUrl: project.repo_url });
-            const keyId = await sshKeyManager.addGitlabDeployKey(pat, project.repo_url, publicKey, keyTitle);
+    // Inject ephemeral SSH deploy key for GitLab repos.
+    // Only runs when: project has a GitLab repo_url, a PAT is stored, and
+    // the container has started (containerId is set). Failures are non-fatal.
+    if (
+      project &&
+      project.repo_url &&
+      sshKeyManager?.isGitlabUrl(project.repo_url) &&
+      credentialManager &&
+      state.containerId
+    ) {
+      try {
+        const pat = await credentialManager.getGitlabPat(opts.projectId);
+        if (!pat) {
+          logger.warn(
+            'No GitLab PAT stored for this project — SSH deploy key setup skipped. Add a PAT in the project settings to enable git push over SSH.',
+            { projectId: opts.projectId }
+          );
+        } else {
+          const { privateKey, publicKey } = sshKeyManager.generateKeyPair();
+          const keyTitle = `zephyr-${opts.projectId.slice(0, 8)}-${Date.now()}`;
+          logger.info('Registering GitLab deploy key', {
+            projectId: opts.projectId,
+            repoUrl: project.repo_url,
+          });
+          const keyId = await sshKeyManager.addGitlabDeployKey(
+            pat,
+            project.repo_url,
+            publicKey,
+            keyTitle
+          );
 
-            // Record in store before injection so a mid-injection crash leaves a traceable entry
-            if (deployKeyStore) {
-              const { owner, repo } = sshKeyManager.parseGitlabRepo(project.repo_url);
-              deployKeyStore.record({
-                key_id: keyId,
-                repo: `${owner}/${repo}`,
-                project_id: opts.projectId,
-                project_name: opts.projectName,
-                loop_id: state.containerId,
-                created_at: new Date().toISOString(),
-                service: 'gitlab',
-              });
-            }
-
-            await sshKeyManager.injectIntoContainerForGitlab(state.containerId, privateKey);
-            activeDeployKeys.set(getLoopKey(opts.projectId, opts.role), { keyId, repoUrl: project.repo_url, pat, service: 'gitlab' });
-            logger.info('GitLab SSH deploy key injected into container', { projectId: opts.projectId, keyId });
+          // Record in store before injection so a mid-injection crash leaves a traceable entry
+          if (deployKeyStore) {
+            const { owner, repo } = sshKeyManager.parseGitlabRepo(project.repo_url);
+            deployKeyStore.record({
+              key_id: keyId,
+              repo: `${owner}/${repo}`,
+              project_id: opts.projectId,
+              project_name: opts.projectName,
+              loop_id: state.containerId,
+              created_at: new Date().toISOString(),
+              service: 'gitlab',
+            });
           }
-        } catch (err) {
-          logger.warn('Failed to set up GitLab SSH deploy key; loop continues without SSH access', { projectId: opts.projectId, err });
-        }
-      }
 
-      return state;
+          await sshKeyManager.injectIntoContainerForGitlab(state.containerId, privateKey);
+          activeDeployKeys.set(getLoopKey(opts.projectId, opts.role), {
+            keyId,
+            repoUrl: project.repo_url,
+            pat,
+            service: 'gitlab',
+          });
+          logger.info('GitLab SSH deploy key injected into container', {
+            projectId: opts.projectId,
+            keyId,
+          });
+        }
+      } catch (err) {
+        logger.warn('Failed to set up GitLab SSH deploy key; loop continues without SSH access', {
+          projectId: opts.projectId,
+          err,
+        });
+      }
+    }
+
+    return state;
   }
 
-  ipcMain.handle(
-    IPC.LOOP_STOP,
-    async (_event, projectId: string, role?: string): Promise<void> => {
-      return containerOrchestrator.stopLoop(projectId, role);
-    },
-  );
+  ipcMain.handle(IPC.LOOP_STOP, async (_event, projectId: string, role?: string): Promise<void> => {
+    return containerOrchestrator.stopLoop(projectId, role);
+  });
 
   ipcMain.handle(IPC.LOOP_LIST, async (): Promise<LoopState[]> => {
     return containerOrchestrator.listAll();
@@ -1703,14 +1868,14 @@ export function registerLoopHandlers(services: LoopServices): LoopHandlerContext
     IPC.LOOP_GET,
     async (_event, projectId: string, role?: string): Promise<LoopState | null> => {
       return containerOrchestrator.getLoopState(projectId, role);
-    },
+    }
   );
 
   ipcMain.handle(
     IPC.LOOP_REMOVE,
     async (_event, projectId: string, role?: string): Promise<void> => {
       return containerOrchestrator.removeLoop(projectId, role);
-    },
+    }
   );
 
   // ── Factory (multi-container coding factory) ────────────────────────────
@@ -1721,7 +1886,10 @@ export function registerLoopHandlers(services: LoopServices): LoopHandlerContext
    * @param featureRequestsContent - Optional custom content for @feature_requests.md.
    *   Defaults to the built-in template when omitted or empty.
    */
-  async function scaffoldTeamFiles(workspacePath: string, featureRequestsContent?: string): Promise<void> {
+  async function scaffoldTeamFiles(
+    workspacePath: string,
+    featureRequestsContent?: string
+  ): Promise<void> {
     // Create directory tree with world-writable permissions so the container's
     // ralph user can write regardless of host UID mismatch.
     for (const dir of [
@@ -1733,13 +1901,17 @@ export function registerLoopHandlers(services: LoopServices): LoopHandlerContext
       await fs.chmod(dir, 0o777);
     }
 
-    const defaultFeatureRequests = '# Feature Requests\n\nAdd feature requests here. Each entry should include:\n- Description of the feature\n- Priority (high/medium/low)\n- Acceptance criteria\n';
+    const defaultFeatureRequests =
+      '# Feature Requests\n\nAdd feature requests here. Each entry should include:\n- Description of the feature\n- Priority (high/medium/low)\n- Acceptance criteria\n';
 
     // Files to create with default content (only if missing)
     const files: Record<string, string> = {
-      '@feature_requests.md': featureRequestsContent?.trim() ? featureRequestsContent : defaultFeatureRequests,
+      '@feature_requests.md': featureRequestsContent?.trim()
+        ? featureRequestsContent
+        : defaultFeatureRequests,
       '@team_plan.md': '# Team Plan\n\nOverall plan and current sprint objectives.\n',
-      '@human_clarification.md': '# Human Clarification\n\nUse this file to provide clarifications, answers, or guidance requested by the AI agents.\n',
+      '@human_clarification.md':
+        '# Human Clarification\n\nUse this file to provide clarifications, answers, or guidance requested by the AI agents.\n',
       '@task-status.json': '{}',
       '@task-status.requested': '',
       '@TASK_STATUS_INSTRUCTIONS.md': TASK_STATUS_INSTRUCTIONS,
@@ -1751,46 +1923,48 @@ export function registerLoopHandlers(services: LoopServices): LoopHandlerContext
       '@TASK_DECOMPOSITION_INSTRUCTIONS.md': TASK_DECOMPOSITION_INSTRUCTIONS,
       // @supervisor-action.json is not pre-created — its presence means "action pending".
       '@supervisor-action.requested': '',
-      'team/handovers/README.md': [
-        '# Team Handovers',
-        '',
-        'This directory holds dynamic handover files written by agents and the host as tasks move through pipeline stages.',
-        '',
-        '## Naming convention',
-        '',
-        '- Agent-to-agent: `<taskId>-<fromStage>-to-<toStage>.md`',
-        '  Example: `task-abc123-coder-to-security.md`',
-        '- Host-to-PM (bounce escalation): `<taskId>-host-to-pm.md`',
-        '  Example: `task-abc123-host-to-pm.md`',
-        '',
-        '## Protocol',
-        '',
-        '1. When completing a stage, the outgoing agent writes a handover file describing work done,',
-        '   open questions, and any context the next stage needs.',
-        '2. The receiving agent reads the handover file at the start of its turn.',
-        '3. Host-to-PM handovers are written automatically when a task exceeds its bounce limit',
-        '   and is redirected to Blocked. The PM reads it and decides whether to escalate to',
-        '   a human (via `@human_clarification.md`), revise the task spec, or decompose it.',
-        '4. Files are gitignored — they are ephemeral per-run coordination artifacts.',
-      ].join('\n') + '\n',
+      'team/handovers/README.md':
+        [
+          '# Team Handovers',
+          '',
+          'This directory holds dynamic handover files written by agents and the host as tasks move through pipeline stages.',
+          '',
+          '## Naming convention',
+          '',
+          '- Agent-to-agent: `<taskId>-<fromStage>-to-<toStage>.md`',
+          '  Example: `task-abc123-coder-to-security.md`',
+          '- Host-to-PM (bounce escalation): `<taskId>-host-to-pm.md`',
+          '  Example: `task-abc123-host-to-pm.md`',
+          '',
+          '## Protocol',
+          '',
+          '1. When completing a stage, the outgoing agent writes a handover file describing work done,',
+          '   open questions, and any context the next stage needs.',
+          '2. The receiving agent reads the handover file at the start of its turn.',
+          '3. Host-to-PM handovers are written automatically when a task exceeds its bounce limit',
+          '   and is redirected to Blocked. The PM reads it and decides whether to escalate to',
+          '   a human (via `@human_clarification.md`), revise the task spec, or decompose it.',
+          '4. Files are gitignored — they are ephemeral per-run coordination artifacts.',
+        ].join('\n') + '\n',
       'team/handovers/status.log': '',
       'team/complete.flag': '',
-      '.gitignore': [
-        'team/handovers/',
-        'team/complete.flag',
-        'team/status.log',
-        '@human_clarifications.md',
-        '.*_checked_*',
-        '.last_*',
-        'tasks/pending/*',
-        'team/human_*.md',
-        '@task-status.json',
-        '@task-status.requested',
-        '@task-decomposition.json',
-        '@task-decomposition.requested',
-        '@supervisor-action.json',
-        '@supervisor-action.requested',
-      ].join('\n') + '\n',
+      '.gitignore':
+        [
+          'team/handovers/',
+          'team/complete.flag',
+          'team/status.log',
+          '@human_clarifications.md',
+          '.*_checked_*',
+          '.last_*',
+          'tasks/pending/*',
+          'team/human_*.md',
+          '@task-status.json',
+          '@task-status.requested',
+          '@task-decomposition.json',
+          '@task-decomposition.requested',
+          '@supervisor-action.json',
+          '@supervisor-action.requested',
+        ].join('\n') + '\n',
     };
 
     for (const [filePath, defaultContent] of Object.entries(files)) {
@@ -1806,7 +1980,10 @@ export function registerLoopHandlers(services: LoopServices): LoopHandlerContext
 
     // Always reset the clarification-requested flag so stale requests from a
     // previous factory run don't cause agents to stall waiting for human input.
-    await fs.writeFile(path.join(workspacePath, '@human_clarification.requested'), '', { encoding: 'utf8', mode: 0o666 });
+    await fs.writeFile(path.join(workspacePath, '@human_clarification.requested'), '', {
+      encoding: 'utf8',
+      mode: 0o666,
+    });
   }
 
   ipcMain.handle(
@@ -1842,7 +2019,10 @@ export function registerLoopHandlers(services: LoopServices): LoopHandlerContext
       if (project.local_path) {
         try {
           await scaffoldTeamFiles(project.local_path, project.feature_requests_content);
-          logger.info('Team coordination files scaffolded', { projectId, path: project.local_path });
+          logger.info('Team coordination files scaffolded', {
+            projectId,
+            path: project.local_path,
+          });
         } catch (err) {
           logger.warn('Failed to scaffold team files', { err, projectId });
         }
@@ -1867,7 +2047,7 @@ export function registerLoopHandlers(services: LoopServices): LoopHandlerContext
       } else {
         logger.warn(
           'Project has no local_path; pipeline prompts cannot be written to /workspace and agents will fail to read them',
-          { projectId },
+          { projectId }
         );
       }
 
@@ -1885,9 +2065,10 @@ export function registerLoopHandlers(services: LoopServices): LoopHandlerContext
       // injection, hook installation, etc.) time to complete before the agent runs.
       const factorySettings = configManager?.loadJson<AppSettings>('settings.json');
       const llmProvider = factorySettings?.llm_provider ?? 'claude';
-      const agentInvocation = llmProvider === 'kiro'
-        ? `kiro-cli chat --no-interactive --trust-all-tools "$(cat /workspace/PROMPT_\${STAGE_ID}.md 2>/dev/null)"`
-        : `claude --dangerously-skip-permissions --print "$(cat /workspace/PROMPT_\${STAGE_ID}.md 2>/dev/null)" --output-format stream-json --verbose`;
+      const agentInvocation =
+        llmProvider === 'kiro'
+          ? `kiro-cli chat --no-interactive --trust-all-tools "$(cat /workspace/PROMPT_\${STAGE_ID}.md 2>/dev/null)"`
+          : `claude --dangerously-skip-permissions --print "$(cat /workspace/PROMPT_\${STAGE_ID}.md 2>/dev/null)" --output-format stream-json --verbose`;
       const agentLoopScript = [
         'export PATH="$HOME/.local/bin:$PATH"',
         'sleep 5',
@@ -1954,7 +2135,7 @@ export function registerLoopHandlers(services: LoopServices): LoopHandlerContext
           } catch (err) {
             logger.warn(
               `Failed to start factory stage ${stage.id} instance ${instanceIndex} for project ${projectId}`,
-              { err },
+              { err }
             );
             // Continue starting other stages — partial factory is better than none
           }
@@ -1969,7 +2150,7 @@ export function registerLoopHandlers(services: LoopServices): LoopHandlerContext
           await fs.writeFile(
             path.join(project.local_path, '@task-queue.json'),
             JSON.stringify(tasks, null, 2),
-            'utf-8',
+            'utf-8'
           );
         } catch (err) {
           logger.warn('Failed to write @task-queue.json on factory start', { err, projectId });
@@ -1987,9 +2168,7 @@ export function registerLoopHandlers(services: LoopServices): LoopHandlerContext
           if (stage.role === 'debrief') {
             // Look for an unlocked epic waiting in the debrief column (e.g.
             // from an interrupted run) and dispatch the one-shot container.
-            const epicTask = allTasks.find(
-              (t) => t.column === stage.id && !t.lockedBy && t.isEpic,
-            );
+            const epicTask = allTasks.find((t) => t.column === stage.id && !t.lockedBy && t.isEpic);
             if (epicTask) {
               try {
                 const locked = factoryTaskStore.lockTask(projectId, epicTask.id, stage.id);
@@ -1997,11 +2176,11 @@ export function registerLoopHandlers(services: LoopServices): LoopHandlerContext
                 const contextContent = buildDebriefContext(locked, epicChildren, pipeline);
                 fsSync.writeFileSync(
                   path.join(project.local_path, `@current-task-${stage.id}.json`),
-                  JSON.stringify(locked, null, 2),
+                  JSON.stringify(locked, null, 2)
                 );
                 fsSync.writeFileSync(
                   path.join(project.local_path, '@epic-debrief-context.md'),
-                  contextContent,
+                  contextContent
                 );
                 logger.info('FACTORY_START: dispatched existing debrief epic', {
                   projectId,
@@ -2017,14 +2196,18 @@ export function registerLoopHandlers(services: LoopServices): LoopHandlerContext
           }
 
           const nextTask = allTasks.find(
-            (t) => t.column === stage.id && !t.lockedBy && !t.isEpic && isTaskEligibleByOrder(t, allTasks),
+            (t) =>
+              t.column === stage.id &&
+              !t.lockedBy &&
+              !t.isEpic &&
+              isTaskEligibleByOrder(t, allTasks)
           );
           if (nextTask) {
             try {
               const locked = factoryTaskStore.lockTask(projectId, nextTask.id, stage.id);
               fsSync.writeFileSync(
                 path.join(project.local_path, `@current-task-${stage.id}.json`),
-                JSON.stringify(locked, null, 2),
+                JSON.stringify(locked, null, 2)
               );
               logger.info('FACTORY_START: dispatched existing stage task', {
                 projectId,
@@ -2039,60 +2222,65 @@ export function registerLoopHandlers(services: LoopServices): LoopHandlerContext
       }
 
       return results;
-    },
+    }
   );
 
-  ipcMain.handle(
-    IPC.FACTORY_STOP,
-    async (_event, projectId: string): Promise<void> => {
-      // Find all running loops for this project and stop them
-      const projectLoops = containerOrchestrator.listByProject(projectId);
-      const activeLoops = projectLoops.filter((l) => !isLoopTerminal(l.status));
+  ipcMain.handle(IPC.FACTORY_STOP, async (_event, projectId: string): Promise<void> => {
+    // Find all running loops for this project and stop them
+    const projectLoops = containerOrchestrator.listByProject(projectId);
+    const activeLoops = projectLoops.filter((l) => !isLoopTerminal(l.status));
 
-      const errors: Error[] = [];
-      for (const loop of activeLoops) {
-        try {
-          await containerOrchestrator.stopLoop(loop.projectId, loop.role);
-        } catch (err) {
-          errors.push(err instanceof Error ? err : new Error(String(err)));
+    const errors: Error[] = [];
+    for (const loop of activeLoops) {
+      try {
+        await containerOrchestrator.stopLoop(loop.projectId, loop.role);
+      } catch (err) {
+        errors.push(err instanceof Error ? err : new Error(String(err)));
+      }
+    }
+
+    // Containers are gone — clear stale locks so the kanban reflects idle state.
+    // Run even when some containers failed to stop: a partial stop still means
+    // none of those agents are executing, so their locks are no longer valid.
+    if (factoryTaskStore) {
+      const queue = factoryTaskStore.getQueue(projectId);
+      for (const task of queue.tasks) {
+        if (task.lockedBy) {
+          try {
+            factoryTaskStore.unlockTask(projectId, task.id);
+          } catch (err) {
+            logger.warn(`FACTORY_STOP: failed to unlock task ${task.id}`, err);
+          }
         }
       }
+    }
 
-      // Containers are gone — clear stale locks so the kanban reflects idle state.
-      // Run even when some containers failed to stop: a partial stop still means
-      // none of those agents are executing, so their locks are no longer valid.
-      if (factoryTaskStore) {
-        const queue = factoryTaskStore.getQueue(projectId);
-        for (const task of queue.tasks) {
-          if (task.lockedBy) {
+    // Delete all @current-task-*.json files so agents don't re-trigger on
+    // stale files if the factory is restarted later.
+    const project = projectStore?.getProject(projectId);
+    if (project?.local_path) {
+      try {
+        const entries = fsSync.readdirSync(project.local_path);
+        for (const entry of entries) {
+          if (entry.startsWith('@current-task-') && entry.endsWith('.json')) {
             try {
-              factoryTaskStore.unlockTask(projectId, task.id);
-            } catch (err) {
-              logger.warn(`FACTORY_STOP: failed to unlock task ${task.id}`, err);
+              fsSync.unlinkSync(path.join(project.local_path, entry));
+            } catch {
+              /* ignore */
             }
           }
         }
+      } catch {
+        /* local_path may not be accessible */
       }
+    }
 
-      // Delete all @current-task-*.json files so agents don't re-trigger on
-      // stale files if the factory is restarted later.
-      const project = projectStore?.getProject(projectId);
-      if (project?.local_path) {
-        try {
-          const entries = fsSync.readdirSync(project.local_path);
-          for (const entry of entries) {
-            if (entry.startsWith('@current-task-') && entry.endsWith('.json')) {
-              try { fsSync.unlinkSync(path.join(project.local_path, entry)); } catch { /* ignore */ }
-            }
-          }
-        } catch { /* local_path may not be accessible */ }
-      }
-
-      if (errors.length > 0) {
-        throw new Error(`Failed to stop ${errors.length} factory loop(s): ${errors.map((e) => e.message).join('; ')}`);
-      }
-    },
-  );
+    if (errors.length > 0) {
+      throw new Error(
+        `Failed to stop ${errors.length} factory loop(s): ${errors.map((e) => e.message).join('; ')}`
+      );
+    }
+  });
 
   ipcMain.handle(
     IPC.FACTORY_RESTART_CONTAINER,
@@ -2101,7 +2289,7 @@ export function registerLoopHandlers(services: LoopServices): LoopHandlerContext
       const opts = loopOptsMap.get(loopKey);
       if (!opts) {
         throw new Error(
-          `No stored opts for loop ${loopKey}; container was not started in this session`,
+          `No stored opts for loop ${loopKey}; container was not started in this session`
         );
       }
 
@@ -2135,7 +2323,9 @@ export function registerLoopHandlers(services: LoopServices): LoopHandlerContext
               const locked = factoryTaskStore.lockTask(projectId, pendingTask.id, stageId);
               fsSync.writeFileSync(taskFilePath, JSON.stringify(locked, null, 2));
               logger.info('FACTORY_RESTART_CONTAINER: re-dispatched stranded task', {
-                projectId, stageId, taskId: pendingTask.id,
+                projectId,
+                stageId,
+                taskId: pendingTask.id,
               });
               const updatedQueue = factoryTaskStore.getQueue(projectId);
               BrowserWindow.getAllWindows().forEach((win) => {
@@ -2145,7 +2335,9 @@ export function registerLoopHandlers(services: LoopServices): LoopHandlerContext
               });
             } catch (err) {
               logger.warn('FACTORY_RESTART_CONTAINER: failed to re-dispatch task', {
-                projectId, stageId, err,
+                projectId,
+                stageId,
+                err,
               });
             }
           }
@@ -2153,7 +2345,7 @@ export function registerLoopHandlers(services: LoopServices): LoopHandlerContext
       }
 
       return state;
-    },
+    }
   );
 
   // Scale up: spawn a new container instance for a pipeline stage.
@@ -2194,16 +2386,21 @@ export function registerLoopHandlers(services: LoopServices): LoopHandlerContext
       };
 
       return startLoopCore(newOpts);
-    },
+    }
   );
 
   // Scale down: stop the highest-indexed instance of a pipeline stage.
   ipcMain.handle(
     IPC.FACTORY_SCALE_DOWN,
     async (_event, projectId: string, stageId: string): Promise<void> => {
-      const running = containerOrchestrator.listAll().filter(
-        (l) => l.projectId === projectId && l.role?.startsWith(`${stageId}-`) && !isLoopTerminal(l.status),
-      );
+      const running = containerOrchestrator
+        .listAll()
+        .filter(
+          (l) =>
+            l.projectId === projectId &&
+            l.role?.startsWith(`${stageId}-`) &&
+            !isLoopTerminal(l.status)
+        );
       if (running.length <= 1) {
         throw new Error(`Cannot scale below 1 instance for ${stageId}`);
       }
@@ -2218,7 +2415,7 @@ export function registerLoopHandlers(services: LoopServices): LoopHandlerContext
         }
       }
       await containerOrchestrator.stopLoop(projectId, maxRole);
-    },
+    }
   );
 
   // ── Event broadcasting ────────────────────────────────────────────────────
@@ -2242,10 +2439,16 @@ export function registerLoopHandlers(services: LoopServices): LoopHandlerContext
     try {
       if (keyInfo.service === 'gitlab') {
         await sshKeyManager.removeGitlabDeployKey(keyInfo.pat, keyInfo.repoUrl, keyInfo.keyId);
-        logger.info('SSH deploy key removed from GitLab', { projectId: state.projectId, keyId: keyInfo.keyId });
+        logger.info('SSH deploy key removed from GitLab', {
+          projectId: state.projectId,
+          keyId: keyInfo.keyId,
+        });
       } else {
         await sshKeyManager.removeDeployKey(keyInfo.pat, keyInfo.repoUrl, keyInfo.keyId);
-        logger.info('SSH deploy key removed from GitHub', { projectId: state.projectId, keyId: keyInfo.keyId });
+        logger.info('SSH deploy key removed from GitHub', {
+          projectId: state.projectId,
+          keyId: keyInfo.keyId,
+        });
       }
       deployKeyStore?.markCleaned(keyInfo.keyId);
     } catch (err) {
@@ -2333,164 +2536,193 @@ export function registerLoopHandlers(services: LoopServices): LoopHandlerContext
           // to advance one extra stage (e.g. security → qa on a coder forward).
           let lastProcessedStatusMtime = 0;
           const onStatusChange = () => {
-              try {
-                const stat = fsSync.statSync(statusJsonPath);
-                if (stat.mtimeMs <= lastProcessedStatusMtime) return;
-                lastProcessedStatusMtime = stat.mtimeMs;
-              } catch { return; }
+            try {
+              const stat = fsSync.statSync(statusJsonPath);
+              if (stat.mtimeMs <= lastProcessedStatusMtime) return;
+              lastProcessedStatusMtime = stat.mtimeMs;
+            } catch {
+              return;
+            }
 
-              let statusData: unknown;
+            let statusData: unknown;
+            try {
+              const statusRaw = fsSync.readFileSync(statusJsonPath, 'utf-8');
+              statusData = JSON.parse(statusRaw);
+            } catch {
+              return;
+            }
+
+            // Capture source stage before the move so we can clean up its
+            // current-task file after a forward or rejected transition.
+            const sdPre = statusData as { taskId?: string; status?: string };
+            const taskBefore = sdPre.taskId
+              ? factoryTaskStore.getTask(state.projectId, sdPre.taskId)
+              : null;
+            const sourceStage = taskBefore?.column;
+
+            const changed = processTaskStatusUpdate(state.projectId, statusData, {
+              factoryTaskStore,
+              projectStore,
+              pipelineStore,
+            });
+            if (!changed) return;
+
+            // When a task moves out of a pipeline stage, delete its current-task
+            // file so the agent's bash guard stops firing for that stage.
+            // Guard: only delete if the file still points to THIS task —
+            // another task may have already been written there (e.g. security
+            // rejected task B to coder while coder was finishing task A).
+            if (
+              (sdPre.status === 'forward' || sdPre.status === 'rejected') &&
+              sourceStage &&
+              !['backlog', 'done', 'blocked', 'needs_input'].includes(sourceStage)
+            ) {
+              let sourceFileDeleted = false;
               try {
-                const statusRaw = fsSync.readFileSync(
-                  statusJsonPath,
-                  'utf-8',
+                const currentTaskFile = path.join(
+                  workspacePath,
+                  `@current-task-${sourceStage}.json`
                 );
-                statusData = JSON.parse(statusRaw);
+                const existing = JSON.parse(fsSync.readFileSync(currentTaskFile, 'utf-8')) as {
+                  id?: string;
+                };
+                if (existing.id === sdPre.taskId) {
+                  fsSync.unlinkSync(currentTaskFile);
+                  sourceFileDeleted = true;
+                }
+                // else: a new task was already assigned to this stage — leave it
               } catch {
-                return;
+                /* file may not exist */
               }
 
-              // Capture source stage before the move so we can clean up its
-              // current-task file after a forward or rejected transition.
-              const sdPre = statusData as { taskId?: string; status?: string };
-              const taskBefore = sdPre.taskId
-                ? factoryTaskStore.getTask(state.projectId, sdPre.taskId)
-                : null;
-              const sourceStage = taskBefore?.column;
-
-              const changed = processTaskStatusUpdate(state.projectId, statusData, {
-                factoryTaskStore,
-                projectStore,
-                pipelineStore,
-              });
-              if (!changed) return;
-
-              // When a task moves out of a pipeline stage, delete its current-task
-              // file so the agent's bash guard stops firing for that stage.
-              // Guard: only delete if the file still points to THIS task —
-              // another task may have already been written there (e.g. security
-              // rejected task B to coder while coder was finishing task A).
-              if (
-                (sdPre.status === 'forward' || sdPre.status === 'rejected') &&
-                sourceStage &&
-                !['backlog', 'done', 'blocked', 'needs_input'].includes(sourceStage)
-              ) {
-                let sourceFileDeleted = false;
-                try {
-                  const currentTaskFile = path.join(workspacePath, `@current-task-${sourceStage}.json`);
-                  const existing = JSON.parse(
-                    fsSync.readFileSync(currentTaskFile, 'utf-8'),
-                  ) as { id?: string };
-                  if (existing.id === sdPre.taskId) {
-                    fsSync.unlinkSync(currentTaskFile);
-                    sourceFileDeleted = true;
-                  }
-                  // else: a new task was already assigned to this stage — leave it
-                } catch { /* file may not exist */ }
-
-                // When the current-task file was cleared, dispatch the next queued task
-                // in the source stage so the agent loop immediately picks it up rather
-                // than sitting idle until a new task arrives from upstream.
-                if (sourceFileDeleted) {
-                  const allSourceTasks = factoryTaskStore.getQueue(state.projectId).tasks;
+              // When the current-task file was cleared, dispatch the next queued task
+              // in the source stage so the agent loop immediately picks it up rather
+              // than sitting idle until a new task arrives from upstream.
+              if (sourceFileDeleted) {
+                const allSourceTasks = factoryTaskStore.getQueue(state.projectId).tasks;
                 const nextSourceTask = allSourceTasks.find(
-                      // Include stage-pre-locked tasks (lockedBy === sourceStage) as well as
-                      // fully unlocked ones. When multiple tasks are forwarded to a stage in
-                      // rapid succession the current-task file gets overwritten and earlier
-                      // tasks end up stage-pre-locked without a file; excluding them would
-                      // leave them stranded until the 30-min stuck-watchdog fires.
-                      (t) => t.column === sourceStage && (!t.lockedBy || t.lockedBy === sourceStage) && !t.isEpic && isTaskEligibleByOrder(t, allSourceTasks),
-                    );
-                  if (nextSourceTask) {
-                    try {
-                      const lockedNext = factoryTaskStore.lockTask(
-                        state.projectId,
-                        nextSourceTask.id,
-                        sourceStage,
-                      );
-                      fsSync.writeFileSync(
-                        path.join(workspacePath, `@current-task-${sourceStage}.json`),
-                        JSON.stringify(lockedNext, null, 2),
-                      );
-                    } catch { /* already locked by another instance — leave it */ }
-                    dispatchFactoryStage(state.projectId, sourceStage);
-                  }
-                }
-              }
-
-              const sd = statusData as { taskId?: string };
-              if (sd.taskId) {
-                const movedTask = factoryTaskStore.getTask(state.projectId, sd.taskId);
-                if (movedTask && !['backlog', 'done', 'blocked', 'needs_input'].includes(movedTask.column)) {
-                  // Pre-lock with the stage name so the kanban badge reflects the
-                  // new stage immediately while the next agent container wakes up.
+                  // Include stage-pre-locked tasks (lockedBy === sourceStage) as well as
+                  // fully unlocked ones. When multiple tasks are forwarded to a stage in
+                  // rapid succession the current-task file gets overwritten and earlier
+                  // tasks end up stage-pre-locked without a file; excluding them would
+                  // leave them stranded until the 30-min stuck-watchdog fires.
+                  (t) =>
+                    t.column === sourceStage &&
+                    (!t.lockedBy || t.lockedBy === sourceStage) &&
+                    !t.isEpic &&
+                    isTaskEligibleByOrder(t, allSourceTasks)
+                );
+                if (nextSourceTask) {
                   try {
-                    factoryTaskStore.lockTask(state.projectId, sd.taskId, movedTask.column);
-                    // Write the current-task file so the target stage's agent guard activates.
-                    const lockedTask = factoryTaskStore.getTask(state.projectId, sd.taskId);
-                    if (lockedTask) {
-                      fsSync.writeFileSync(
-                        path.join(workspacePath, `@current-task-${movedTask.column}.json`),
-                        JSON.stringify(lockedTask, null, 2),
-                      );
-                    }
-                  } catch { /* already locked */ }
-                  dispatchFactoryStage(state.projectId, movedTask.column);
-                }
-              }
-
-              // Detect if the last child completing caused the epic to be silently
-              // auto-routed to the debrief stage (Phase 3.3 inside moveTask). The
-              // child task is now in 'done' so the dispatch above misses the epic.
-              // Check the child's parent and dispatch the debrief container if needed.
-              if (sdPre.status === 'forward' && taskBefore?.parentTaskId && workspacePath) {
-                const parent = factoryTaskStore.getTask(state.projectId, taskBefore.parentTaskId);
-                if (parent?.isEpic) {
-                  const projCfg = projectStore?.getProject(state.projectId);
-                  const pl = projCfg?.pipelineId ? pipelineStore?.getPipeline(projCfg.pipelineId) : null;
-                  const debriefStage = pl?.stages.find((s) => s.role === 'debrief');
-                  if (debriefStage && parent.column === debriefStage.id && pl) {
-                    try {
-                      const lockedEpic = factoryTaskStore.lockTask(state.projectId, parent.id, debriefStage.id);
-                      const allTasks = factoryTaskStore.getQueue(state.projectId).tasks;
-                      const epicChildren = allTasks.filter((t) => t.parentTaskId === parent.id);
-                      fsSync.writeFileSync(
-                        path.join(workspacePath, `@current-task-${debriefStage.id}.json`),
-                        JSON.stringify(lockedEpic, null, 2),
-                      );
-                      const contextContent = buildDebriefContext(lockedEpic, epicChildren, pl);
-                      fsSync.writeFileSync(
-                        path.join(workspacePath, '@epic-debrief-context.md'),
-                        contextContent,
-                      );
-                    } catch { /* non-fatal — epic may already be locked */ }
-                    dispatchFactoryStage(state.projectId, debriefStage.id);
+                    const lockedNext = factoryTaskStore.lockTask(
+                      state.projectId,
+                      nextSourceTask.id,
+                      sourceStage
+                    );
+                    fsSync.writeFileSync(
+                      path.join(workspacePath, `@current-task-${sourceStage}.json`),
+                      JSON.stringify(lockedNext, null, 2)
+                    );
+                  } catch {
+                    /* already locked by another instance — leave it */
                   }
+                  dispatchFactoryStage(state.projectId, sourceStage);
                 }
               }
+            }
 
-              const updatedQueue = factoryTaskStore.getQueue(state.projectId);
-              BrowserWindow.getAllWindows().forEach((win) => {
-                if (!win.isDestroyed()) {
-                  win.webContents.send(
-                    IPC.FACTORY_TASK_CHANGED,
-                    state.projectId,
-                    updatedQueue.tasks,
-                  );
+            const sd = statusData as { taskId?: string };
+            if (sd.taskId) {
+              const movedTask = factoryTaskStore.getTask(state.projectId, sd.taskId);
+              if (
+                movedTask &&
+                !['backlog', 'done', 'blocked', 'needs_input'].includes(movedTask.column)
+              ) {
+                // Pre-lock with the stage name so the kanban badge reflects the
+                // new stage immediately while the next agent container wakes up.
+                try {
+                  factoryTaskStore.lockTask(state.projectId, sd.taskId, movedTask.column);
+                  // Write the current-task file so the target stage's agent guard activates.
+                  const lockedTask = factoryTaskStore.getTask(state.projectId, sd.taskId);
+                  if (lockedTask) {
+                    fsSync.writeFileSync(
+                      path.join(workspacePath, `@current-task-${movedTask.column}.json`),
+                      JSON.stringify(lockedTask, null, 2)
+                    );
+                  }
+                } catch {
+                  /* already locked */
                 }
-              });
+                dispatchFactoryStage(state.projectId, movedTask.column);
+              }
+            }
 
-              fs.writeFile(
-                path.join(workspacePath, '@task-queue.json'),
-                JSON.stringify(updatedQueue.tasks, null, 2),
-                'utf-8',
-              ).catch(() => {/* non-fatal */});
+            // Detect if the last child completing caused the epic to be silently
+            // auto-routed to the debrief stage (Phase 3.3 inside moveTask). The
+            // child task is now in 'done' so the dispatch above misses the epic.
+            // Check the child's parent and dispatch the debrief container if needed.
+            if (sdPre.status === 'forward' && taskBefore?.parentTaskId && workspacePath) {
+              const parent = factoryTaskStore.getTask(state.projectId, taskBefore.parentTaskId);
+              if (parent?.isEpic) {
+                const projCfg = projectStore?.getProject(state.projectId);
+                const pl = projCfg?.pipelineId
+                  ? pipelineStore?.getPipeline(projCfg.pipelineId)
+                  : null;
+                const debriefStage = pl?.stages.find((s) => s.role === 'debrief');
+                if (debriefStage && parent.column === debriefStage.id && pl) {
+                  try {
+                    const lockedEpic = factoryTaskStore.lockTask(
+                      state.projectId,
+                      parent.id,
+                      debriefStage.id
+                    );
+                    const allTasks = factoryTaskStore.getQueue(state.projectId).tasks;
+                    const epicChildren = allTasks.filter((t) => t.parentTaskId === parent.id);
+                    fsSync.writeFileSync(
+                      path.join(workspacePath, `@current-task-${debriefStage.id}.json`),
+                      JSON.stringify(lockedEpic, null, 2)
+                    );
+                    const contextContent = buildDebriefContext(lockedEpic, epicChildren, pl);
+                    fsSync.writeFileSync(
+                      path.join(workspacePath, '@epic-debrief-context.md'),
+                      contextContent
+                    );
+                  } catch {
+                    /* non-fatal — epic may already be locked */
+                  }
+                  dispatchFactoryStage(state.projectId, debriefStage.id);
+                }
+              }
+            }
+
+            const updatedQueue = factoryTaskStore.getQueue(state.projectId);
+            BrowserWindow.getAllWindows().forEach((win) => {
+              if (!win.isDestroyed()) {
+                win.webContents.send(IPC.FACTORY_TASK_CHANGED, state.projectId, updatedQueue.tasks);
+              }
+            });
+
+            fs.writeFile(
+              path.join(workspacePath, '@task-queue.json'),
+              JSON.stringify(updatedQueue.tasks, null, 2),
+              'utf-8'
+            ).catch(() => {
+              /* non-fatal */
+            });
           };
           const watchers: fsSync.FSWatcher[] = [];
           // Watch the .requested trigger (Claude PostToolUse hook)
-          try { watchers.push(fsSync.watch(taskStatusTrigger, onStatusChange)); } catch { /* may not exist yet */ }
+          try {
+            watchers.push(fsSync.watch(taskStatusTrigger, onStatusChange));
+          } catch {
+            /* may not exist yet */
+          }
           // Watch the .json file directly (kiro-cli / engines without hooks)
-          try { watchers.push(fsSync.watch(statusJsonPath, onStatusChange)); } catch { /* may not exist yet */ }
+          try {
+            watchers.push(fsSync.watch(statusJsonPath, onStatusChange));
+          } catch {
+            /* may not exist yet */
+          }
           if (watchers.length > 0) {
             taskStatusWatchers.set(state.projectId, watchers);
           }
@@ -2499,7 +2731,9 @@ export function registerLoopHandlers(services: LoopServices): LoopHandlerContext
           try {
             const stat = fsSync.statSync(statusJsonPath);
             taskStatusLastMtime.set(state.projectId, stat.mtimeMs);
-          } catch { /* file may not exist */ }
+          } catch {
+            /* file may not exist */
+          }
           const statusPoller = setInterval(() => {
             try {
               const stat = fsSync.statSync(statusJsonPath);
@@ -2508,7 +2742,9 @@ export function registerLoopHandlers(services: LoopServices): LoopHandlerContext
                 taskStatusLastMtime.set(state.projectId, stat.mtimeMs);
                 onStatusChange();
               }
-            } catch { /* file may not exist */ }
+            } catch {
+              /* file may not exist */
+            }
           }, 3000);
           taskStatusPollers.set(state.projectId, statusPoller);
         }
@@ -2529,52 +2765,56 @@ export function registerLoopHandlers(services: LoopServices): LoopHandlerContext
           const decompTrigger = path.join(workspacePath, '@task-decomposition.requested');
           const decompFile = path.join(workspacePath, '@task-decomposition.json');
           const onDecomp = () => {
-              let decompData: unknown;
-              try {
-                const decompRaw = fsSync.readFileSync(decompFile, 'utf-8');
-                decompData = JSON.parse(decompRaw);
-              } catch {
-                return;
-              }
+            let decompData: unknown;
+            try {
+              const decompRaw = fsSync.readFileSync(decompFile, 'utf-8');
+              decompData = JSON.parse(decompRaw);
+            } catch {
+              return;
+            }
 
-              const changed = processTaskDecomposition(state.projectId, decompData, {
-                factoryTaskStore,
-                projectStore,
-                pipelineStore,
+            const changed = processTaskDecomposition(state.projectId, decompData, {
+              factoryTaskStore,
+              projectStore,
+              pipelineStore,
+            });
+            if (!changed) return;
+
+            const proj = projectStore.getProject(state.projectId);
+            const pl = proj?.pipelineId ? pipelineStore.getPipeline(proj.pipelineId) : null;
+            if (pl && pl.stages.length > 0) {
+              dispatchFactoryStage(state.projectId, pl.stages[0].id);
+            }
+
+            // Reset to empty sentinel so the watcher stays alive for
+            // subsequent decompositions (unlink would invalidate it).
+            try {
+              fsSync.writeFileSync(decompFile, '{}', 'utf-8');
+            } catch (err) {
+              logger.warn('Failed to reset @task-decomposition.json after processing', {
+                err,
+                projectId: state.projectId,
               });
-              if (!changed) return;
+            }
 
-              const proj = projectStore.getProject(state.projectId);
-              const pl = proj?.pipelineId ? pipelineStore.getPipeline(proj.pipelineId) : null;
-              if (pl && pl.stages.length > 0) {
-                dispatchFactoryStage(state.projectId, pl.stages[0].id);
+            const updatedQueue = factoryTaskStore.getQueue(state.projectId);
+            BrowserWindow.getAllWindows().forEach((win) => {
+              if (!win.isDestroyed()) {
+                win.webContents.send(IPC.FACTORY_TASK_CHANGED, state.projectId, updatedQueue.tasks);
               }
-
-              // Reset to empty sentinel so the watcher stays alive for
-              // subsequent decompositions (unlink would invalidate it).
-              try {
-                fsSync.writeFileSync(decompFile, '{}', 'utf-8');
-              } catch (err) {
-                logger.warn('Failed to reset @task-decomposition.json after processing', {
-                  err,
-                  projectId: state.projectId,
-                });
-              }
-
-              const updatedQueue = factoryTaskStore.getQueue(state.projectId);
-              BrowserWindow.getAllWindows().forEach((win) => {
-                if (!win.isDestroyed()) {
-                  win.webContents.send(
-                    IPC.FACTORY_TASK_CHANGED,
-                    state.projectId,
-                    updatedQueue.tasks,
-                  );
-                }
-              });
+            });
           };
           const watchers: fsSync.FSWatcher[] = [];
-          try { watchers.push(fsSync.watch(decompTrigger, onDecomp)); } catch { /* may not exist yet */ }
-          try { watchers.push(fsSync.watch(decompFile, onDecomp)); } catch { /* may not exist yet */ }
+          try {
+            watchers.push(fsSync.watch(decompTrigger, onDecomp));
+          } catch {
+            /* may not exist yet */
+          }
+          try {
+            watchers.push(fsSync.watch(decompFile, onDecomp));
+          } catch {
+            /* may not exist yet */
+          }
           if (watchers.length > 0) {
             taskDecompositionWatchers.set(state.projectId, watchers);
           }
@@ -2582,7 +2822,9 @@ export function registerLoopHandlers(services: LoopServices): LoopHandlerContext
           try {
             const stat = fsSync.statSync(decompFile);
             taskDecompositionLastMtime.set(state.projectId, stat.mtimeMs);
-          } catch { /* file may not exist */ }
+          } catch {
+            /* file may not exist */
+          }
           const decompPoller = setInterval(() => {
             try {
               const stat = fsSync.statSync(decompFile);
@@ -2591,7 +2833,9 @@ export function registerLoopHandlers(services: LoopServices): LoopHandlerContext
                 taskDecompositionLastMtime.set(state.projectId, stat.mtimeMs);
                 onDecomp();
               }
-            } catch { /* file may not exist */ }
+            } catch {
+              /* file may not exist */
+            }
           }, 3000);
           taskDecompositionPollers.set(state.projectId, decompPoller);
         }
@@ -2604,24 +2848,24 @@ export function registerLoopHandlers(services: LoopServices): LoopHandlerContext
           const supervisorTrigger = path.join(workspacePath, '@supervisor-action.requested');
           const supervisorFile = path.join(workspacePath, '@supervisor-action.json');
           const onSupervisorAction = () => {
-              let actionData: unknown;
-              try {
-                const raw = fsSync.readFileSync(supervisorFile, 'utf-8');
-                actionData = JSON.parse(raw);
-              } catch {
-                return;
-              }
+            let actionData: unknown;
+            try {
+              const raw = fsSync.readFileSync(supervisorFile, 'utf-8');
+              actionData = JSON.parse(raw);
+            } catch {
+              return;
+            }
 
-              processSupervisorAction(state.projectId, actionData, {
-                containerOrchestrator,
-                loopOptsMap,
-                restartLoop: startLoopCore,
-              }).catch((err) => {
-                logger.warn('supervisor-action watcher: unhandled error', {
-                  err,
-                  projectId: state.projectId,
-                });
+            processSupervisorAction(state.projectId, actionData, {
+              containerOrchestrator,
+              loopOptsMap,
+              restartLoop: startLoopCore,
+            }).catch((err) => {
+              logger.warn('supervisor-action watcher: unhandled error', {
+                err,
+                projectId: state.projectId,
               });
+            });
           };
           try {
             const watcher = fsSync.watch(supervisorTrigger, onSupervisorAction);
@@ -2633,7 +2877,9 @@ export function registerLoopHandlers(services: LoopServices): LoopHandlerContext
           try {
             const stat = fsSync.statSync(supervisorFile);
             supervisorActionLastMtime.set(state.projectId, stat.mtimeMs);
-          } catch { /* file may not exist */ }
+          } catch {
+            /* file may not exist */
+          }
           const supervisorPoller = setInterval(() => {
             try {
               const stat = fsSync.statSync(supervisorFile);
@@ -2642,7 +2888,9 @@ export function registerLoopHandlers(services: LoopServices): LoopHandlerContext
                 supervisorActionLastMtime.set(state.projectId, stat.mtimeMs);
                 onSupervisorAction();
               }
-            } catch { /* file may not exist */ }
+            } catch {
+              /* file may not exist */
+            }
           }, 3000);
           supervisorActionPollers.set(state.projectId, supervisorPoller);
         }
@@ -2692,7 +2940,11 @@ export function registerLoopHandlers(services: LoopServices): LoopHandlerContext
                     const updatedQueue = factoryTaskStore.getQueue(state.projectId);
                     BrowserWindow.getAllWindows().forEach((win) => {
                       if (!win.isDestroyed()) {
-                        win.webContents.send(IPC.FACTORY_TASK_CHANGED, state.projectId, updatedQueue.tasks);
+                        win.webContents.send(
+                          IPC.FACTORY_TASK_CHANGED,
+                          state.projectId,
+                          updatedQueue.tasks
+                        );
                       }
                     });
 
@@ -2700,8 +2952,10 @@ export function registerLoopHandlers(services: LoopServices): LoopHandlerContext
                     fs.writeFile(
                       path.join(workspacePath, '@task-queue.json'),
                       JSON.stringify(updatedQueue.tasks, null, 2),
-                      'utf-8',
-                    ).catch(() => {/* non-fatal */});
+                      'utf-8'
+                    ).catch(() => {
+                      /* non-fatal */
+                    });
                   }
                 }
               } catch {
@@ -2716,7 +2970,11 @@ export function registerLoopHandlers(services: LoopServices): LoopHandlerContext
                 const responseWatcher = fsSync.watch(clarificationFile, async () => {
                   // Only trigger if the file was actually modified (not just accessed)
                   let mTimeAfter: number;
-                  try { mTimeAfter = fsSync.statSync(clarificationFile).mtimeMs; } catch { return; }
+                  try {
+                    mTimeAfter = fsSync.statSync(clarificationFile).mtimeMs;
+                  } catch {
+                    return;
+                  }
                   if (mTimeAfter <= mTimeBefore) return;
 
                   // Tear down this response watcher
@@ -2734,17 +2992,27 @@ export function registerLoopHandlers(services: LoopServices): LoopHandlerContext
                         const updatedQueue = factoryTaskStore.getQueue(state.projectId);
                         BrowserWindow.getAllWindows().forEach((win) => {
                           if (!win.isDestroyed()) {
-                            win.webContents.send(IPC.FACTORY_TASK_CHANGED, state.projectId, updatedQueue.tasks);
+                            win.webContents.send(
+                              IPC.FACTORY_TASK_CHANGED,
+                              state.projectId,
+                              updatedQueue.tasks
+                            );
                           }
                         });
                         fs.writeFile(
                           path.join(workspacePath, '@task-queue.json'),
                           JSON.stringify(updatedQueue.tasks, null, 2),
-                          'utf-8',
-                        ).catch(() => {/* non-fatal */});
+                          'utf-8'
+                        ).catch(() => {
+                          /* non-fatal */
+                        });
                       }
                     } catch (err) {
-                      logger.warn('Failed to move task back from needs_input', { loopKey, savedTaskId, err });
+                      logger.warn('Failed to move task back from needs_input', {
+                        loopKey,
+                        savedTaskId,
+                        err,
+                      });
                     }
                   }
 
@@ -2877,7 +3145,10 @@ export function registerLoopHandlers(services: LoopServices): LoopHandlerContext
   function dispatchFactoryStage(projectId: string, stageId: string): void {
     const firstKey = getLoopKey(projectId, `${stageId}-0`);
     if (!loopOptsMap.has(firstKey)) {
-      logger.warn('dispatchFactoryStage: no registered opts for stage — factory may not be running', { projectId, stageId });
+      logger.warn(
+        'dispatchFactoryStage: no registered opts for stage — factory may not be running',
+        { projectId, stageId }
+      );
     }
     for (let i = 0; i < 16; i++) {
       const role = `${stageId}-${i}`;
@@ -2899,7 +3170,11 @@ export function registerLoopHandlers(services: LoopServices): LoopHandlerContext
       startLoopCore(opts)
         .then(() => upgradeStagePreLock(projectId, stageId, role))
         .catch((err) => {
-          logger.warn('dispatchFactoryStage: failed to restart container', { projectId, role, err });
+          logger.warn('dispatchFactoryStage: failed to restart container', {
+            projectId,
+            role,
+            err,
+          });
         });
     }
   }
@@ -2976,13 +3251,21 @@ export function registerLoopHandlers(services: LoopServices): LoopHandlerContext
 
         // Stop the stuck container (it may still be running — dispatchFactoryStage
         // only restarts terminal containers, so we must kill it explicitly first).
-        containerOrchestrator.stopLoop(projectId, stuckRole).catch(() => { /* already stopped */ });
+        containerOrchestrator.stopLoop(projectId, stuckRole).catch(() => {
+          /* already stopped */
+        });
 
         // Unlock so the restarted container can acquire a fresh instance-level lock
-        try { factoryTaskStore.unlockTask(projectId, task.id); } catch { /* ignore */ }
+        try {
+          factoryTaskStore.unlockTask(projectId, task.id);
+        } catch {
+          /* ignore */
+        }
 
         // Small delay to let stopLoop settle before restarting
-        setTimeout(() => { dispatchFactoryStage(projectId, stageId); }, 2000);
+        setTimeout(() => {
+          dispatchFactoryStage(projectId, stageId);
+        }, 2000);
         break; // one restart per project per tick to avoid thundering herd
       }
     }

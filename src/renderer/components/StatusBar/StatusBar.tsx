@@ -27,9 +27,7 @@ export function StatusBar({ activeFactoryCount = 0, appVersion }: StatusBarProps
       <div className="flex items-center space-x-4">
         <div className="flex items-center space-x-2">
           <div
-            className={`w-2.5 h-2.5 rounded-full ${
-              available ? 'bg-green-500' : 'bg-red-500'
-            }`}
+            className={`w-2.5 h-2.5 rounded-full ${available ? 'bg-green-500' : 'bg-red-500'}`}
             title={available ? `${runtimeLabel} connected` : `${runtimeLabel} disconnected`}
           />
           <span className="text-xs">
@@ -38,9 +36,7 @@ export function StatusBar({ activeFactoryCount = 0, appVersion }: StatusBarProps
         </div>
 
         {available && info && (
-          <span className="text-xs text-gray-500 dark:text-gray-400">
-            v{info.version}
-          </span>
+          <span className="text-xs text-gray-500 dark:text-gray-400">v{info.version}</span>
         )}
       </div>
 
@@ -58,9 +54,7 @@ export function StatusBar({ activeFactoryCount = 0, appVersion }: StatusBarProps
 
       {/* Right section: App version */}
       {appVersion && (
-        <div className="text-xs text-gray-500 dark:text-gray-500">
-          Zephyr v{appVersion}
-        </div>
+        <div className="text-xs text-gray-500 dark:text-gray-500">Zephyr v{appVersion}</div>
       )}
     </div>
   );

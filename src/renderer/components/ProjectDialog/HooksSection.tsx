@@ -247,7 +247,9 @@ export const HooksSection: React.FC<HooksSectionProps> = ({ selected, onChange }
       {showAddEditor ? (
         <div className="mt-2 p-3 bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded space-y-2">
           <div>
-            <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">Filename (with extension)</label>
+            <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">
+              Filename (with extension)
+            </label>
             <input
               type="text"
               value={newFilename}

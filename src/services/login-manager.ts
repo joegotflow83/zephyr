@@ -67,10 +67,7 @@ export class LoginManager {
    * @param options - Optional configuration for login session
    * @returns Promise resolving to LoginResult
    */
-  async openLoginSession(
-    service: string,
-    options: LoginSessionOptions = {}
-  ): Promise<LoginResult> {
+  async openLoginSession(service: string, options: LoginSessionOptions = {}): Promise<LoginResult> {
     const loginUrl = options.url || SERVICE_URLS[service];
     if (!loginUrl) {
       return {
@@ -263,7 +260,11 @@ export class LoginManager {
       };
 
       const timeoutId = setTimeout(() => {
-        resolveOnce({ success: false, service: 'claude-code', error: `Login timed out after ${timeoutMs}ms` });
+        resolveOnce({
+          success: false,
+          service: 'claude-code',
+          error: `Login timed out after ${timeoutMs}ms`,
+        });
       }, timeoutMs);
 
       // Handle the OAuth callback URL after interception
@@ -279,7 +280,11 @@ export class LoginManager {
           const code = parsed.searchParams.get('code');
           const returnedState = parsed.searchParams.get('state');
           if (!code || returnedState !== state) {
-            resolveOnce({ success: false, service: 'claude-code', error: 'Invalid OAuth callback: missing code or state mismatch' });
+            resolveOnce({
+              success: false,
+              service: 'claude-code',
+              error: 'Invalid OAuth callback: missing code or state mismatch',
+            });
             return;
           }
 
@@ -299,11 +304,15 @@ export class LoginManager {
 
           if (!tokenResponse.ok) {
             const errText = await tokenResponse.text();
-            resolveOnce({ success: false, service: 'claude-code', error: `Token exchange failed: ${errText}` });
+            resolveOnce({
+              success: false,
+              service: 'claude-code',
+              error: `Token exchange failed: ${errText}`,
+            });
             return;
           }
 
-          const tokens = await tokenResponse.json() as {
+          const tokens = (await tokenResponse.json()) as {
             access_token: string;
             refresh_token?: string;
             expires_in?: number;
@@ -354,7 +363,11 @@ export class LoginManager {
       });
 
       loginWindow.on('closed', () => {
-        resolveOnce({ success: false, service: 'claude-code', error: 'Login window closed by user' });
+        resolveOnce({
+          success: false,
+          service: 'claude-code',
+          error: 'Login window closed by user',
+        });
       });
 
       const authParams = new URLSearchParams({

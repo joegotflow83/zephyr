@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useRef, useMemo } from 'react';
 import type { FactoryTask, TaskHistoryEntry, TaskNote } from '../../../shared/factory-types';
 import type { Pipeline } from '../../../shared/pipeline-types';
 import { deriveTransitions } from '../../../lib/pipeline/transitions';
@@ -9,7 +9,10 @@ export interface TaskDetailPanelProps {
   tasks?: FactoryTask[];
   onClose: () => void;
   onMove: (taskId: string, targetColumn: string) => Promise<void>;
-  onUpdate: (taskId: string, updates: Partial<Pick<FactoryTask, 'title' | 'description'>>) => Promise<void>;
+  onUpdate: (
+    taskId: string,
+    updates: Partial<Pick<FactoryTask, 'title' | 'description'>>
+  ) => Promise<void>;
   onRemove: (taskId: string) => Promise<void>;
   onUnlock?: (taskId: string) => Promise<void>;
 }
@@ -66,17 +69,7 @@ export const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
 
   const titleInputRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
-    setTitleValue(task.title);
-    setDescriptionValue(task.description);
-    setIsEditingDescription(false);
-    setConfirmDelete(false);
-  }, [task.id]);
-
-  const transitions = useMemo(
-    () => (pipeline ? deriveTransitions(pipeline) : null),
-    [pipeline]
-  );
+  const transitions = useMemo(() => (pipeline ? deriveTransitions(pipeline) : null), [pipeline]);
 
   const col = task.column;
 
@@ -98,21 +91,16 @@ export const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
         border: `1px solid ${pipelineStage.color}66`,
       }
     : undefined;
-  const badgeClass = badgeStyle
-    ? ''
-    : (IMPLICIT_BADGE_CLASSES[col] ?? 'bg-gray-700 text-gray-300');
+  const badgeClass = badgeStyle ? '' : (IMPLICIT_BADGE_CLASSES[col] ?? 'bg-gray-700 text-gray-300');
 
   const stageIcon = pipelineStage?.icon ?? null;
   const stageName = resolveLabel(pipeline, col);
 
   // Hierarchy context
-  const parentTask = task.parentTaskId && tasks
-    ? tasks.find((t) => t.id === task.parentTaskId) ?? null
-    : null;
+  const parentTask =
+    task.parentTaskId && tasks ? (tasks.find((t) => t.id === task.parentTaskId) ?? null) : null;
 
-  const subTasks = task.isEpic && tasks
-    ? tasks.filter((t) => t.parentTaskId === task.id)
-    : [];
+  const subTasks = task.isEpic && tasks ? tasks.filter((t) => t.parentTaskId === task.id) : [];
 
   async function handleTitleSave() {
     const trimmed = titleValue.trim();
@@ -173,11 +161,7 @@ export const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
   return (
     <>
       {/* Backdrop */}
-      <div
-        className="fixed inset-0 z-40 bg-black/40"
-        onClick={onClose}
-        aria-hidden="true"
-      />
+      <div className="fixed inset-0 z-40 bg-black/40" onClick={onClose} aria-hidden="true" />
 
       {/* Slide-over panel */}
       <div
@@ -196,19 +180,24 @@ export const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
             {stageName}
           </span>
           <div className="flex items-center gap-2 ml-2">
-            {task.lockedBy && (() => {
-              const active = /^.+-\d+$/.test(task.lockedBy);
-              return (
-                <span
-                  className={`text-xs flex items-center gap-1 ${active ? 'text-blue-300 animate-pulse' : 'text-yellow-300'}`}
-                  aria-label={active ? 'actively being worked on' : 'queued'}
-                  title={active ? `Actively worked on by ${task.lockedBy}` : `Queued for ${task.lockedBy}`}
-                >
-                  {active ? '⚙' : '🔒'}
-                  <span className="font-mono truncate max-w-[120px]">{task.lockedBy}</span>
-                </span>
-              );
-            })()}
+            {task.lockedBy &&
+              (() => {
+                const active = /^.+-\d+$/.test(task.lockedBy);
+                return (
+                  <span
+                    className={`text-xs flex items-center gap-1 ${active ? 'text-blue-300 animate-pulse' : 'text-yellow-300'}`}
+                    aria-label={active ? 'actively being worked on' : 'queued'}
+                    title={
+                      active
+                        ? `Actively worked on by ${task.lockedBy}`
+                        : `Queued for ${task.lockedBy}`
+                    }
+                  >
+                    {active ? '⚙' : '🔒'}
+                    <span className="font-mono truncate max-w-[120px]">{task.lockedBy}</span>
+                  </span>
+                );
+              })()}
             {(task.bounceCount ?? 0) > 0 && (
               <span
                 className="inline-flex items-center rounded px-1.5 py-0.5 text-xs font-semibold bg-orange-900 text-orange-300"
@@ -246,19 +235,29 @@ export const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
           {task.isEpic && (
             <div>
               <label className="block text-xs font-semibold uppercase tracking-wide text-gray-400 mb-1">
-                Sub-tasks{subTasks.length > 0 && ` (${subTasks.filter((t) => t.column === 'done').length}/${subTasks.length} done)`}
+                Sub-tasks
+                {subTasks.length > 0 &&
+                  ` (${subTasks.filter((t) => t.column === 'done').length}/${subTasks.length} done)`}
               </label>
               {subTasks.length === 0 ? (
                 <p className="text-xs text-gray-500 italic">No sub-tasks yet</p>
               ) : (
                 <ul className="space-y-1" aria-label="sub-tasks">
                   {subTasks.map((sub) => (
-                    <li key={sub.id} className="flex items-center gap-2 text-xs text-gray-300 py-0.5">
-                      <span className={sub.column === 'done' ? 'text-green-400' : 'text-gray-500'} aria-hidden="true">
+                    <li
+                      key={sub.id}
+                      className="flex items-center gap-2 text-xs text-gray-300 py-0.5"
+                    >
+                      <span
+                        className={sub.column === 'done' ? 'text-green-400' : 'text-gray-500'}
+                        aria-hidden="true"
+                      >
                         {sub.column === 'done' ? '✓' : '○'}
                       </span>
                       <span className="truncate flex-1">{sub.title}</span>
-                      <span className="text-gray-500 shrink-0">{resolveLabel(pipeline, sub.column)}</span>
+                      <span className="text-gray-500 shrink-0">
+                        {resolveLabel(pipeline, sub.column)}
+                      </span>
                     </li>
                   ))}
                 </ul>
@@ -420,37 +419,49 @@ export const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
               <div className="rounded bg-red-900/30 border border-red-700/50 px-3 py-2">
                 <p className="text-sm text-red-300 whitespace-pre-wrap">{task.lastError}</p>
                 {task.lastErrorAt && (
-                  <p className="text-[10px] text-red-400/60 mt-1">{formatTimestamp(task.lastErrorAt)}</p>
+                  <p className="text-[10px] text-red-400/60 mt-1">
+                    {formatTimestamp(task.lastErrorAt)}
+                  </p>
                 )}
               </div>
             </div>
           )}
 
           {/* Lock info + unlock button */}
-          {task.lockedBy && (() => {
-            const active = /^.+-\d+$/.test(task.lockedBy);
-            return (
-            <div>
-              <label className="block text-xs font-semibold uppercase tracking-wide text-gray-400 mb-1">
-                {active ? 'Actively Working' : 'Queued For'}
-              </label>
-              <div className="flex items-center gap-2">
-                <span className={`text-sm font-mono ${active ? 'text-blue-300 animate-pulse' : 'text-yellow-300'}`}>
-                  {active ? '⚙' : '🔒'} {task.lockedBy}
-                </span>
-                {onUnlock && (
-                  <button
-                    onClick={async () => { setBusy(true); try { await onUnlock(task.id); } finally { setBusy(false); } }}
-                    disabled={busy}
-                    className="text-xs text-red-400 hover:text-red-300 underline disabled:opacity-50"
-                  >
-                    Force Unlock
-                  </button>
-                )}
-              </div>
-            </div>
-            );
-          })()}
+          {task.lockedBy &&
+            (() => {
+              const active = /^.+-\d+$/.test(task.lockedBy);
+              return (
+                <div>
+                  <label className="block text-xs font-semibold uppercase tracking-wide text-gray-400 mb-1">
+                    {active ? 'Actively Working' : 'Queued For'}
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={`text-sm font-mono ${active ? 'text-blue-300 animate-pulse' : 'text-yellow-300'}`}
+                    >
+                      {active ? '⚙' : '🔒'} {task.lockedBy}
+                    </span>
+                    {onUnlock && (
+                      <button
+                        onClick={async () => {
+                          setBusy(true);
+                          try {
+                            await onUnlock(task.id);
+                          } finally {
+                            setBusy(false);
+                          }
+                        }}
+                        disabled={busy}
+                        className="text-xs text-red-400 hover:text-red-300 underline disabled:opacity-50"
+                      >
+                        Force Unlock
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })()}
 
           {/* History / Notes Timeline */}
           {(task.history?.length ?? 0) > 0 && (
@@ -460,18 +471,32 @@ export const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
               </label>
               <div className="space-y-1 max-h-48 overflow-y-auto">
                 {[...(task.history ?? [])].reverse().map((entry: TaskHistoryEntry, i: number) => (
-                  <div key={i} className="flex gap-2 text-[11px] py-1 border-b border-gray-800 last:border-0">
-                    <span className="text-gray-500 shrink-0 w-28">{formatTimestamp(entry.timestamp)}</span>
-                    <span className={`font-medium shrink-0 ${
-                      entry.action === 'rejected' ? 'text-red-400' :
-                      entry.action === 'locked' ? 'text-yellow-400' :
-                      entry.action === 'unlocked' ? 'text-gray-400' :
-                      'text-blue-400'
-                    }`}>
+                  <div
+                    key={i}
+                    className="flex gap-2 text-[11px] py-1 border-b border-gray-800 last:border-0"
+                  >
+                    <span className="text-gray-500 shrink-0 w-28">
+                      {formatTimestamp(entry.timestamp)}
+                    </span>
+                    <span
+                      className={`font-medium shrink-0 ${
+                        entry.action === 'rejected'
+                          ? 'text-red-400'
+                          : entry.action === 'locked'
+                            ? 'text-yellow-400'
+                            : entry.action === 'unlocked'
+                              ? 'text-gray-400'
+                              : 'text-blue-400'
+                      }`}
+                    >
                       {entry.action}
                     </span>
                     {entry.actor && <span className="text-gray-500 font-mono">{entry.actor}</span>}
-                    {entry.detail && <span className="text-gray-400 truncate flex-1" title={entry.detail}>{entry.detail}</span>}
+                    {entry.detail && (
+                      <span className="text-gray-400 truncate flex-1" title={entry.detail}>
+                        {entry.detail}
+                      </span>
+                    )}
                   </div>
                 ))}
               </div>
@@ -514,7 +539,9 @@ export const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
             </button>
           ) : (
             <div className="rounded border border-red-600 bg-red-900/20 p-3 space-y-2">
-              <p className="text-xs text-red-300 text-center">Are you sure? This cannot be undone.</p>
+              <p className="text-xs text-red-300 text-center">
+                Are you sure? This cannot be undone.
+              </p>
               <div className="flex gap-2">
                 <button
                   onClick={handleDelete}

@@ -24,7 +24,9 @@ const tabs: Tab[] = [
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabId>('projects');
   const [mailboxOpen, setMailboxOpen] = useState(false);
-  const [pendingTaskDescription, setPendingTaskDescription] = useState<string | undefined>(undefined);
+  const [pendingTaskDescription, setPendingTaskDescription] = useState<string | undefined>(
+    undefined
+  );
   const activeFactoryCount = useActiveFactories();
   const { toasts, dismissToast, success, error, warning, info } = useToast();
   const settings = useAppStore((s) => s.settings);

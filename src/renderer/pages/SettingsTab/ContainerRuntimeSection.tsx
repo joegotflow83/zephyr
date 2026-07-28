@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useRuntimeStatus } from '../../hooks/useRuntimeStatus';
 import { useSettings } from '../../hooks/useSettings';
 import { ConfirmDialog } from '../../components/ConfirmDialog/ConfirmDialog';
+import { logger } from '../../utils/logger';
 
 /**
  * ContainerRuntimeSection — settings UI for selecting and configuring the
@@ -36,7 +37,7 @@ export const ContainerRuntimeSection: React.FC = () => {
       setIsSaving(true);
       const timer = setTimeout(() => {
         update({ max_concurrent_containers: maxContainers })
-          .catch((err) => console.error('Failed to save max containers setting:', err))
+          .catch((err) => logger.error('Failed to save max containers setting:', err))
           .finally(() => setIsSaving(false));
       }, 500);
       return () => clearTimeout(timer);
@@ -56,7 +57,7 @@ export const ContainerRuntimeSection: React.FC = () => {
       await update({ container_runtime: pendingRuntime });
       setRestartNeeded(true);
     } catch (err) {
-      console.error('Failed to save runtime setting:', err);
+      logger.error('Failed to save runtime setting:', err);
     }
     setPendingRuntime(null);
   };
@@ -157,16 +158,16 @@ export const ContainerRuntimeSection: React.FC = () => {
           )}
         </div>
         <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-          Maximum number of containers that can run simultaneously. Factory pipelines need one per stage plus any scaled-up instances.
+          Maximum number of containers that can run simultaneously. Factory pipelines need one per
+          stage plus any scaled-up instances.
         </p>
       </div>
 
       {/* Podman-specific: machine note for macOS/Windows */}
       {currentRuntime === 'podman' && (
         <div className="bg-blue-900/20 border border-blue-600/30 rounded p-4 text-sm text-blue-200">
-          On macOS and Windows, ensure{' '}
-          <code className="font-mono">podman machine</code> is running before starting loops.
-          Zephyr does not manage the Podman machine lifecycle.
+          On macOS and Windows, ensure <code className="font-mono">podman machine</code> is running
+          before starting loops. Zephyr does not manage the Podman machine lifecycle.
         </div>
       )}
 

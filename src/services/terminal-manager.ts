@@ -20,6 +20,12 @@ export interface TerminalSession {
  */
 export interface TerminalSessionOpts {
   shell?: string; // e.g., 'bash', 'sh', 'zsh'
+  /**
+   * Full argv to attach the terminal to instead of an interactive shell.
+   * When set, `shell` is ignored. Container sessions only — VM sessions
+   * still run `shell`.
+   */
+  command?: string[];
   user?: string; // Username to run shell as (e.g., 'root')
   workingDir?: string;
   env?: string[];
@@ -77,6 +83,7 @@ export class TerminalManager {
     // Create Docker exec session with PTY
     const execSession = await this.runtime.createExecSession(containerId, {
       shell: opts?.shell,
+      command: opts?.command,
       user: opts?.user,
       workingDir: opts?.workingDir,
       env: opts?.env,
@@ -196,7 +203,7 @@ export class TerminalManager {
     vmName: string,
     containerName: string,
     vm: VMManager,
-    opts?: TerminalSessionOpts,
+    opts?: TerminalSessionOpts
   ): Promise<TerminalSession> {
     const shell = opts?.shell ?? 'bash';
 
@@ -222,27 +229,27 @@ export class TerminalManager {
     // the same write/end interface as Docker exec sessions.
     const stream = new Duplex({
       write(chunk, _encoding, callback) {
-        child.stdin!.write(chunk, callback);
+        child.stdin.write(chunk, callback);
       },
       final(callback) {
-        child.stdin!.end();
+        child.stdin.end();
         callback();
       },
       read() {
         // Called by Node.js when the consumer wants more data.
         // Resume child.stdout in case it was paused by backpressure.
-        child.stdout!.resume();
+        child.stdout.resume();
       },
     });
 
-    child.stdout!.on('data', (chunk: Buffer) => {
+    child.stdout.on('data', (chunk: Buffer) => {
       if (!stream.push(chunk)) {
         // Backpressure: pause the source until stream.read() is called again.
-        child.stdout!.pause();
+        child.stdout.pause();
       }
     });
 
-    child.stderr!.on('data', (chunk: Buffer) => {
+    child.stderr.on('data', (chunk: Buffer) => {
       // Merge stderr into the stream so the terminal shows errors too
       stream.push(chunk);
     });
@@ -262,7 +269,13 @@ export class TerminalManager {
       session,
       execId: '', // No Docker exec ID for VM sessions
       stream,
-      cleanup: () => { try { child.kill(); } catch { /* already dead */ } },
+      cleanup: () => {
+        try {
+          child.kill();
+        } catch {
+          /* already dead */
+        }
+      },
     });
 
     // Forward output to renderer

@@ -86,7 +86,10 @@ export class PipelineStore {
    *
    * @returns The stored pipeline (with generated id/timestamps applied).
    */
-  addPipeline(input: Omit<Pipeline, 'createdAt' | 'updatedAt'> & Partial<Pick<Pipeline, 'createdAt' | 'updatedAt'>>): Pipeline {
+  addPipeline(
+    input: Omit<Pipeline, 'createdAt' | 'updatedAt'> &
+      Partial<Pick<Pipeline, 'createdAt' | 'updatedAt'>>
+  ): Pipeline {
     const { pipelines } = this.loadAndReconcile();
     const id = input.id && input.id.trim().length > 0 ? input.id : randomUUID();
     if (pipelines.some((p) => p.id === id)) {
@@ -128,9 +131,7 @@ export class PipelineStore {
     }
     const existing = pipelines[idx];
     if (existing.builtIn) {
-      throw new Error(
-        `[PipelineStore] Cannot edit built-in pipeline '${id}'. Clone it first.`,
-      );
+      throw new Error(`[PipelineStore] Cannot edit built-in pipeline '${id}'. Clone it first.`);
     }
     const merged: Pipeline = {
       ...existing,
@@ -166,9 +167,7 @@ export class PipelineStore {
       throw new Error(`[PipelineStore] Pipeline not found: ${id}`);
     }
     if (pipelines[idx].builtIn) {
-      throw new Error(
-        `[PipelineStore] Cannot delete built-in pipeline '${id}'.`,
-      );
+      throw new Error(`[PipelineStore] Cannot delete built-in pipeline '${id}'.`);
     }
     pipelines.splice(idx, 1);
     this.writeFile(pipelines);
@@ -195,8 +194,8 @@ export class PipelineStore {
         // On-disk copy of a built-in is ignored — we always replace it with
         // the shipped version below. Flag mutation only if the on-disk copy
         // deviates, so fresh installs (where it's identical) don't rewrite.
-        const shipped = BUILTIN_PIPELINES.find((b) => b.id === p.id)!;
-        if (!pipelinesEqual(p, shipped)) {
+        const shipped = BUILTIN_PIPELINES.find((b) => b.id === p.id);
+        if (shipped && !pipelinesEqual(p, shipped)) {
           mutated = true;
         }
       } else {
@@ -228,11 +227,7 @@ export class PipelineStore {
     try {
       const text = fs.readFileSync(this.filePath(), 'utf-8');
       const parsed = JSON.parse(text) as PipelinesFile;
-      if (
-        !parsed ||
-        typeof parsed !== 'object' ||
-        !Array.isArray(parsed.pipelines)
-      ) {
+      if (!parsed || typeof parsed !== 'object' || !Array.isArray(parsed.pipelines)) {
         return { pipelines: [], mutated: true };
       }
       return {

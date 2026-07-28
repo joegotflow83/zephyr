@@ -37,17 +37,26 @@ export function useImages(): UseImagesResult {
   const rebuildImageAction = useAppStore((state) => state.rebuildImage);
   const refreshImagesAction = useAppStore((state) => state.refreshImages);
 
-  const build = useCallback(async (config: ImageBuildConfig): Promise<void> => {
-    await buildImageAction(config);
-  }, [buildImageAction]);
+  const build = useCallback(
+    async (config: ImageBuildConfig): Promise<void> => {
+      await buildImageAction(config);
+    },
+    [buildImageAction]
+  );
 
-  const remove = useCallback(async (id: string): Promise<void> => {
-    await deleteImageAction(id);
-  }, [deleteImageAction]);
+  const remove = useCallback(
+    async (id: string): Promise<void> => {
+      await deleteImageAction(id);
+    },
+    [deleteImageAction]
+  );
 
-  const rebuild = useCallback(async (id: string): Promise<void> => {
-    await rebuildImageAction(id);
-  }, [rebuildImageAction]);
+  const rebuild = useCallback(
+    async (id: string): Promise<void> => {
+      await rebuildImageAction(id);
+    },
+    [rebuildImageAction]
+  );
 
   const refresh = useCallback(async (): Promise<void> => {
     await refreshImagesAction();

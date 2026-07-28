@@ -35,6 +35,12 @@ vi.mock('electron', () => ({
   },
 }));
 
+// Mock the logging module so tests can assert on the logger instead of console
+const mockLogger = vi.hoisted(() => ({ error: vi.fn(), warn: vi.fn(), info: vi.fn(), debug: vi.fn() }));
+vi.mock('../../src/services/logging', () => ({
+  getLogger: () => mockLogger,
+}));
+
 // ── Import subject under test (after mocks are in place) ─────────────────────
 
 import { registerTerminalHandlers } from '../../src/main/ipc-handlers/terminal-handlers';
@@ -186,7 +192,6 @@ describe('registerTerminalHandlers', () => {
     });
 
     it('should write data to terminal session (fire-and-forget)', () => {
-      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
       registerTerminalHandlers({ terminalManager: mockTerminalManager as any });
 
       send(IPC.TERMINAL_WRITE, 'session-123', 'ls -la\n');
@@ -195,13 +200,10 @@ describe('registerTerminalHandlers', () => {
         'session-123',
         'ls -la\n'
       );
-      expect(consoleErrorSpy).not.toHaveBeenCalled();
-
-      consoleErrorSpy.mockRestore();
+      expect(mockLogger.error).not.toHaveBeenCalled();
     });
 
     it('should log error but not throw if writeToSession fails', () => {
-      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
       mockTerminalManager.writeToSession.mockImplementation(() => {
         throw new Error('Session not found');
       });
@@ -212,12 +214,10 @@ describe('registerTerminalHandlers', () => {
         send(IPC.TERMINAL_WRITE, 'bad-session', 'data');
       }).not.toThrow();
 
-      expect(consoleErrorSpy).toHaveBeenCalledWith(
+      expect(mockLogger.error).toHaveBeenCalledWith(
         'Terminal write error for session bad-session:',
         expect.any(Error)
       );
-
-      consoleErrorSpy.mockRestore();
     });
   });
 

@@ -23,11 +23,14 @@ jobs:
       - name: Run linter
         run: npm run lint
 
-      - name: Run unit tests
-        run: npm run test:unit
+      - name: Check formatting
+        run: npm run format:check
 
       - name: TypeScript type-check
         run: npx tsc --noEmit
+
+      - name: Run unit tests
+        run: npm run test:unit
 
       - name: Run integration tests
         run: npm run test:integration

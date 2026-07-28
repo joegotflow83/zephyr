@@ -232,18 +232,12 @@ const ColumnPreview: React.FC<ColumnPreviewProps> = ({ stages }) => {
                     ? 'bg-white/5 text-white/50 border-white/10'
                     : 'bg-purple-900/30 text-purple-300 border-purple-500/30'
               }`}
-              style={
-                stage?.color
-                  ? { borderTopColor: stage.color, borderTopWidth: 2 }
-                  : undefined
-              }
+              style={stage?.color ? { borderTopColor: stage.color, borderTopWidth: 2 } : undefined}
             >
               {stage?.icon && <span aria-hidden="true">{stage.icon}</span>}
               <span>{label}</span>
             </div>
-            {i < columns.length - 1 && (
-              <span className="text-white/20 text-xs shrink-0">→</span>
-            )}
+            {i < columns.length - 1 && <span className="text-white/20 text-xs shrink-0">→</span>}
           </React.Fragment>
         );
       })}
@@ -346,7 +340,7 @@ const PipelineBuilderDialog: React.FC<PipelineBuilderDialogProps> = ({
           updated.id = slugifyStageId(patch.name ?? '', otherIds);
         }
         return updated;
-      }),
+      })
     );
   }, []);
 
@@ -360,27 +354,20 @@ const PipelineBuilderDialog: React.FC<PipelineBuilderDialogProps> = ({
     });
   }, []);
 
-  const duplicateStage = useCallback(
-    (index: number) => {
-      setDraftStages((prev) => {
-        const source = prev[index];
-        const existingIds = prev.map((s) => s.id);
-        const stage: PipelineStage = {
-          ...source,
-          id: slugifyStageId(source.name, existingIds),
-          name: `${source.name} (copy)`,
-        };
-        const next = [
-          ...prev.slice(0, index + 1),
-          stage,
-          ...prev.slice(index + 1),
-        ];
-        setSelectedIndex(index + 1);
-        return next;
-      });
-    },
-    [],
-  );
+  const duplicateStage = useCallback((index: number) => {
+    setDraftStages((prev) => {
+      const source = prev[index];
+      const existingIds = prev.map((s) => s.id);
+      const stage: PipelineStage = {
+        ...source,
+        id: slugifyStageId(source.name, existingIds),
+        name: `${source.name} (copy)`,
+      };
+      const next = [...prev.slice(0, index + 1), stage, ...prev.slice(index + 1)];
+      setSelectedIndex(index + 1);
+      return next;
+    });
+  }, []);
 
   const requestDelete = useCallback(
     (index: number) => {
@@ -392,7 +379,7 @@ const PipelineBuilderDialog: React.FC<PipelineBuilderDialogProps> = ({
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [draftStages],
+    [draftStages]
   );
 
   const doDelete = useCallback((index: number) => {
@@ -438,8 +425,7 @@ const PipelineBuilderDialog: React.FC<PipelineBuilderDialogProps> = ({
     if (new Set(ids).size !== ids.length)
       return 'Duplicate stage names detected — rename conflicting stages.';
     const debriefCount = draftStages.filter((s) => s.role === 'debrief').length;
-    if (debriefCount > 1)
-      return 'Only one debrief stage is allowed per pipeline.';
+    if (debriefCount > 1) return 'Only one debrief stage is allowed per pipeline.';
     if (debriefCount === 1 && draftStages[draftStages.length - 1].role !== 'debrief')
       return 'The debrief stage must be the last stage in the pipeline.';
     if (draftBounceLimit < 1 || draftBounceLimit > 10)
@@ -521,7 +507,7 @@ const PipelineBuilderDialog: React.FC<PipelineBuilderDialogProps> = ({
             {isNew
               ? 'New Pipeline'
               : isBuiltIn
-                ? `${pipeline!.name} (read-only)`
+                ? `${pipeline?.name ?? ''} (read-only)`
                 : `Edit Pipeline`}
           </h2>
           <button
@@ -643,8 +629,7 @@ const PipelineBuilderDialog: React.FC<PipelineBuilderDialogProps> = ({
             <textarea
               value={selectedStage?.agentPrompt ?? ''}
               onChange={(e) =>
-                selectedStage &&
-                updateStage(selectedIndex, { agentPrompt: e.target.value })
+                selectedStage && updateStage(selectedIndex, { agentPrompt: e.target.value })
               }
               disabled={isReadOnly || !selectedStage}
               placeholder={

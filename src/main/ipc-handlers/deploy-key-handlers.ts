@@ -25,7 +25,7 @@ export function registerDeployKeyHandlers(services: DeployKeyServices): void {
     IPC.DEPLOY_KEYS_GET_URL,
     async (_event, repo: string, service?: 'github' | 'gitlab'): Promise<string> => {
       return deployKeyStore.getDeployKeysUrl(repo, service);
-    },
+    }
   );
 
   // ── Mark Orphaned Key as Cleaned ─────────────────────────────────────────

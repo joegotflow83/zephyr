@@ -47,12 +47,7 @@ const SettingsSection: React.FC<SettingsSectionProps> = ({
           stroke="currentColor"
           viewBox="0 0 24 24"
         >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M19 9l-7 7-7-7"
-          />
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
         </svg>
       </button>
 
@@ -126,10 +121,7 @@ export const SettingsTab: React.FC = () => {
         </SettingsSection>
 
         {/* General Section */}
-        <SettingsSection
-          title="General"
-          description="Application preferences and appearance"
-        >
+        <SettingsSection title="General" description="Application preferences and appearance">
           <GeneralSection />
         </SettingsSection>
 
@@ -142,10 +134,7 @@ export const SettingsTab: React.FC = () => {
         </SettingsSection>
 
         {/* Updates Section */}
-        <SettingsSection
-          title="Updates"
-          description="Check for and install application updates"
-        >
+        <SettingsSection title="Updates" description="Check for and install application updates">
           <UpdatesSection />
         </SettingsSection>
 

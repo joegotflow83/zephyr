@@ -58,7 +58,7 @@ function nodeYCenters(count: number, containerH: number): number[] {
   const offset = (containerH - colH) / 2;
   return Array.from(
     { length: count },
-    (_, i) => offset + i * (NODE_HEIGHT + NODE_GAP) + NODE_HEIGHT / 2,
+    (_, i) => offset + i * (NODE_HEIGHT + NODE_GAP) + NODE_HEIGHT / 2
   );
 }
 
@@ -90,15 +90,17 @@ export const FactoryFlowView: React.FC<FactoryFlowViewProps> = ({
   for (const loop of loops) {
     if (!loop.role) continue;
     const sid = stageIdFromRole(loop.role);
-    if (!stageInstanceMap.has(sid)) {
+    let instances = stageInstanceMap.get(sid);
+    if (!instances) {
+      instances = [];
       orderedStageIds.push(sid);
-      stageInstanceMap.set(sid, []);
+      stageInstanceMap.set(sid, instances);
     }
-    stageInstanceMap.get(sid)!.push(loop);
+    instances.push(loop);
   }
   const orderedStages = orderedStageIds.map((sid) => ({
     stageId: sid,
-    instances: stageInstanceMap.get(sid)!,
+    instances: stageInstanceMap.get(sid) ?? [],
   }));
 
   if (orderedStages.length === 0) return null;
@@ -149,8 +151,7 @@ const StageColumn: React.FC<StageColumnProps> = ({
     {instances.map((loop) => {
       const instanceIndex = instanceIndexFromRole(loop.role ?? '');
       const isActive = loop.lastLogAt != null && Date.now() - loop.lastLogAt < ACTIVE_THRESHOLD_MS;
-      const isRunning =
-        loop.status === LoopStatus.RUNNING || loop.status === LoopStatus.STARTING;
+      const isRunning = loop.status === LoopStatus.RUNNING || loop.status === LoopStatus.STARTING;
       return (
         <FlowNode
           key={loop.role ?? stageId}
@@ -191,11 +192,7 @@ const StageConnector: React.FC<{ fromCount: number; toCount: number }> = ({
   const midX = CONNECTOR_WIDTH / 2;
 
   return (
-    <svg
-      width={CONNECTOR_WIDTH}
-      height={containerH}
-      className="flex-shrink-0"
-    >
+    <svg width={CONNECTOR_WIDTH} height={containerH} className="flex-shrink-0">
       <defs>
         <marker
           id="flow-arrowhead"
@@ -218,7 +215,7 @@ const StageConnector: React.FC<{ fromCount: number; toCount: number }> = ({
             strokeWidth="1.5"
             markerEnd="url(#flow-arrowhead)"
           />
-        )),
+        ))
       )}
     </svg>
   );
@@ -257,9 +254,7 @@ const FlowNode: React.FC<FlowNodeProps> = ({
   const stageId = stageIdFromRole(role);
   const instanceIndex = instanceIndexFromRole(role);
   const label =
-    showInstanceNumber && instanceIndex !== null
-      ? `${stageId} ${instanceIndex + 1}`
-      : stageId;
+    showInstanceNumber && instanceIndex !== null ? `${stageId} ${instanceIndex + 1}` : stageId;
   const { borderColor, statusLabel, statusColor } = getStatusStyles(loop.status);
 
   return (

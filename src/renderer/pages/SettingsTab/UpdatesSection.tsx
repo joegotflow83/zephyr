@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import type { AutoUpdateState } from '../../../services/auto-updater';
+import { logger } from '../../utils/logger';
 
 export const UpdatesSection: React.FC = () => {
   const [state, setState] = useState<AutoUpdateState>({ status: 'idle' });
@@ -16,7 +17,7 @@ export const UpdatesSection: React.FC = () => {
     try {
       await window.api.autoUpdate.check();
     } catch (err) {
-      console.error('Failed to check for updates:', err);
+      logger.error('Failed to check for updates:', err);
     }
   };
 
@@ -24,12 +25,12 @@ export const UpdatesSection: React.FC = () => {
     try {
       await window.api.autoUpdate.download();
     } catch (err) {
-      console.error('Failed to download update:', err);
+      logger.error('Failed to download update:', err);
     }
   };
 
   const handleInstall = () => {
-    window.api.autoUpdate.install().catch(console.error);
+    window.api.autoUpdate.install().catch((err) => logger.error('Failed to install update:', err));
   };
 
   const isbusy = state.status === 'checking' || state.status === 'downloading';
@@ -57,7 +58,9 @@ export const UpdatesSection: React.FC = () => {
             <span className="text-sm text-gray-500 dark:text-gray-400">Latest Version:</span>
             <span
               className={`font-medium ${
-                state.status === 'available' || state.status === 'downloading' || state.status === 'downloaded'
+                state.status === 'available' ||
+                state.status === 'downloading' ||
+                state.status === 'downloaded'
                   ? 'text-green-400'
                   : 'text-gray-800 dark:text-gray-200'
               }`}
@@ -97,7 +100,8 @@ export const UpdatesSection: React.FC = () => {
       {state.status === 'downloading' && (
         <div className="space-y-3" data-testid="download-progress">
           <p className="text-sm text-gray-500 dark:text-gray-400">
-            Downloading update{state.downloadProgress ? ` — ${Math.round(state.downloadProgress.percent)}%` : '...'}
+            Downloading update
+            {state.downloadProgress ? ` — ${Math.round(state.downloadProgress.percent)}%` : '...'}
           </p>
           <div className="w-full bg-gray-700 rounded-full h-2">
             <div

@@ -95,8 +95,10 @@ export class ImportExportService {
 
       // Safety: reject path traversal
       const resolvedDest = path.resolve(configDir, entryName);
-      if (!resolvedDest.startsWith(path.resolve(configDir) + path.sep) &&
-          resolvedDest !== path.resolve(configDir)) {
+      if (
+        !resolvedDest.startsWith(path.resolve(configDir) + path.sep) &&
+        resolvedDest !== path.resolve(configDir)
+      ) {
         continue;
       }
 

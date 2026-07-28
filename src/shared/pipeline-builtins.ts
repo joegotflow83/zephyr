@@ -843,7 +843,7 @@ function stage(
   name: string,
   agentPrompt: string,
   icon: string,
-  color: string,
+  color: string
 ): PipelineStage {
   return { id, name, agentPrompt, instances: 1, icon, color };
 }
@@ -904,26 +904,14 @@ const SECURITY_SPRINT: Pipeline = {
   description:
     'Audit-focused pipeline: static analysis, penetration testing, remediation coding, QA regression.',
   stages: [
-    stage(
-      'static-analyser',
-      'Static Analyser',
-      SECURITY_STATIC_ANALYSER_PROMPT,
-      '🔍',
-      '#f97316',
-    ),
-    stage(
-      'pen-tester',
-      'Penetration Tester',
-      SECURITY_PEN_TESTER_PROMPT,
-      '🎯',
-      '#ef4444',
-    ),
+    stage('static-analyser', 'Static Analyser', SECURITY_STATIC_ANALYSER_PROMPT, '🔍', '#f97316'),
+    stage('pen-tester', 'Penetration Tester', SECURITY_PEN_TESTER_PROMPT, '🎯', '#ef4444'),
     stage(
       'remediation-coder',
       'Remediation Coder',
       SECURITY_REMEDIATION_CODER_PROMPT,
       '🔧',
-      '#0ea5e9',
+      '#0ea5e9'
     ),
     stage('qa', 'QA Engineer', SECURITY_QA_PROMPT, '🧪', '#10b981'),
   ],
@@ -944,20 +932,8 @@ const DOCUMENTATION_PASS: Pipeline = {
   description:
     'Docs-only pipeline: analyse existing code, write documentation, review for accuracy.',
   stages: [
-    stage(
-      'code-analyser',
-      'Code Analyser',
-      DOCS_CODE_ANALYSER_PROMPT,
-      '🔎',
-      '#6366f1',
-    ),
-    stage(
-      'technical-writer',
-      'Technical Writer',
-      DOCS_TECHNICAL_WRITER_PROMPT,
-      '📝',
-      '#8b5cf6',
-    ),
+    stage('code-analyser', 'Code Analyser', DOCS_CODE_ANALYSER_PROMPT, '🔎', '#6366f1'),
+    stage('technical-writer', 'Technical Writer', DOCS_TECHNICAL_WRITER_PROMPT, '📝', '#8b5cf6'),
     stage('reviewer', 'Reviewer', DOCS_REVIEWER_PROMPT, '✅', '#10b981'),
   ],
   bounceLimit: DEFAULT_BOUNCE_LIMIT,
@@ -999,7 +975,7 @@ export const BUILTIN_PIPELINES: readonly Pipeline[] = deepFreeze([
 
 /** Ids of all built-in pipelines — handy for membership checks. */
 export const BUILTIN_PIPELINE_IDS: readonly string[] = Object.freeze(
-  BUILTIN_PIPELINES.map((p) => p.id),
+  BUILTIN_PIPELINES.map((p) => p.id)
 );
 
 /**

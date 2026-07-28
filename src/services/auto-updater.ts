@@ -328,12 +328,16 @@ export class AutoUpdater {
     if (!this.mainWindow || this.mainWindow.isDestroyed()) return;
 
     const platformDetail: Record<string, string> = {
-      linux: 'Click "Open Installer" to open the package manager and install the update.\n\nThe app will close — relaunch it once installation is complete.',
-      darwin: 'Click "Open Installer" to extract the update archive. Drag the new app into your Applications folder to replace the old one, then relaunch.\n\nThe app will close now.',
+      linux:
+        'Click "Open Installer" to open the package manager and install the update.\n\nThe app will close — relaunch it once installation is complete.',
+      darwin:
+        'Click "Open Installer" to extract the update archive. Drag the new app into your Applications folder to replace the old one, then relaunch.\n\nThe app will close now.',
     };
-    const detail = platformDetail[process.platform]
-      ?? 'The update will be installed when you restart the application.\n\nWould you like to restart now?';
-    const buttons = process.platform !== 'win32' ? ['Open Installer', 'Later'] : ['Restart Now', 'Later'];
+    const detail =
+      platformDetail[process.platform] ??
+      'The update will be installed when you restart the application.\n\nWould you like to restart now?';
+    const buttons =
+      process.platform !== 'win32' ? ['Open Installer', 'Later'] : ['Restart Now', 'Later'];
 
     dialog
       .showMessageBox(this.mainWindow, {

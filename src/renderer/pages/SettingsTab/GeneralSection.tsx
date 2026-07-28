@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useSettings } from '../../hooks/useSettings';
 import type { AppSettings } from '../../../shared/models';
 import { version } from '../../../../package.json';
+import { logger } from '../../utils/logger';
 
 /**
  * GeneralSection component for Settings tab
@@ -19,12 +20,8 @@ export const GeneralSection: React.FC = () => {
   const [notificationsEnabled, setNotificationsEnabled] = useState(
     settings?.notification_enabled ?? true
   );
-  const [logLevel, setLogLevel] = useState<AppSettings['log_level']>(
-    settings?.log_level ?? 'INFO'
-  );
-  const [theme, setTheme] = useState<AppSettings['theme']>(
-    settings?.theme ?? 'system'
-  );
+  const [logLevel, setLogLevel] = useState<AppSettings['log_level']>(settings?.log_level ?? 'INFO');
+  const [theme, setTheme] = useState<AppSettings['theme']>(settings?.theme ?? 'system');
   const [isSaving, setIsSaving] = useState(false);
 
   // Sync with settings when they change
@@ -43,7 +40,7 @@ export const GeneralSection: React.FC = () => {
       const timer = setTimeout(() => {
         update({ notification_enabled: notificationsEnabled })
           .catch((err) => {
-            console.error('Failed to save notifications setting:', err);
+            logger.error('Failed to save notifications setting:', err);
           })
           .finally(() => {
             setIsSaving(false);
@@ -61,7 +58,7 @@ export const GeneralSection: React.FC = () => {
       const timer = setTimeout(() => {
         update({ log_level: logLevel })
           .catch((err) => {
-            console.error('Failed to save log level setting:', err);
+            logger.error('Failed to save log level setting:', err);
           })
           .finally(() => {
             setIsSaving(false);
@@ -79,7 +76,7 @@ export const GeneralSection: React.FC = () => {
       const timer = setTimeout(() => {
         update({ theme: theme })
           .catch((err) => {
-            console.error('Failed to save theme setting:', err);
+            logger.error('Failed to save theme setting:', err);
           })
           .finally(() => {
             setIsSaving(false);

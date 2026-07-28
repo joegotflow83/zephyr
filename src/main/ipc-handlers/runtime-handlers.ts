@@ -7,7 +7,12 @@
 
 import { ipcMain, BrowserWindow } from 'electron';
 import { IPC } from '../../shared/ipc-channels';
-import type { ContainerRuntime, ContainerCreateOpts, ExecOpts, RuntimeInfo } from '../../services/container-runtime';
+import type {
+  ContainerRuntime,
+  ContainerCreateOpts,
+  ExecOpts,
+  RuntimeInfo,
+} from '../../services/container-runtime';
 import type { RuntimeHealthMonitor } from '../../services/runtime-health';
 
 export interface RuntimeServices {
@@ -58,7 +63,7 @@ export function registerRuntimeHandlers(services: RuntimeServices): void {
     IPC.RUNTIME_CREATE_CONTAINER,
     async (_event, opts: ContainerCreateOpts): Promise<string> => {
       return runtime.createContainer(opts);
-    },
+    }
   );
 
   ipcMain.handle(IPC.RUNTIME_START, async (_event, containerId: string): Promise<void> => {
@@ -69,14 +74,14 @@ export function registerRuntimeHandlers(services: RuntimeServices): void {
     IPC.RUNTIME_STOP,
     async (_event, containerId: string, timeout?: number): Promise<void> => {
       await runtime.stopContainer(containerId, timeout);
-    },
+    }
   );
 
   ipcMain.handle(
     IPC.RUNTIME_REMOVE,
     async (_event, containerId: string, force?: boolean): Promise<void> => {
       await runtime.removeContainer(containerId, force);
-    },
+    }
   );
 
   ipcMain.handle(IPC.RUNTIME_LIST_CONTAINERS, async () => {
@@ -93,7 +98,7 @@ export function registerRuntimeHandlers(services: RuntimeServices): void {
     IPC.RUNTIME_EXEC,
     async (_event, containerId: string, cmd: string[], opts?: ExecOpts) => {
       return runtime.execCommand(containerId, cmd, opts);
-    },
+    }
   );
 
   // ── Health Monitoring ─────────────────────────────────────────────────────

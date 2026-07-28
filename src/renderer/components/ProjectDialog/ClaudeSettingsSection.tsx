@@ -29,7 +29,10 @@ interface ClaudeSettingsSectionProps {
  * Renders a radio list of Claude settings files with single-selection enforcement.
  * Loads available files from the main process via IPC on mount.
  */
-export const ClaudeSettingsSection: React.FC<ClaudeSettingsSectionProps> = ({ selected, onChange }) => {
+export const ClaudeSettingsSection: React.FC<ClaudeSettingsSectionProps> = ({
+  selected,
+  onChange,
+}) => {
   const [files, setFiles] = useState<SettingsFile[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddEditor, setShowAddEditor] = useState(false);
@@ -150,7 +153,9 @@ export const ClaudeSettingsSection: React.FC<ClaudeSettingsSectionProps> = ({ se
 
   return (
     <div className="mb-4">
-      <div className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Claude Settings</div>
+      <div className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+        Claude Settings
+      </div>
       <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
         Select a settings file to inject into the container at{' '}
         <code className="bg-gray-100 dark:bg-gray-700 px-1 rounded">~/.claude/settings.json</code>.
@@ -255,7 +260,9 @@ export const ClaudeSettingsSection: React.FC<ClaudeSettingsSectionProps> = ({ se
       {showAddEditor ? (
         <div className="mt-2 p-3 bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded space-y-2">
           <div>
-            <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">Filename (with extension)</label>
+            <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">
+              Filename (with extension)
+            </label>
             <input
               type="text"
               value={newFilename}

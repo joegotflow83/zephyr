@@ -164,10 +164,8 @@ export const PipelineLibrarySection: React.FC = () => {
             </p>
             {referenceCount(deleteTarget) > 0 && (
               <div className="mb-4 p-3 rounded-lg bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 text-sm text-yellow-800 dark:text-yellow-300">
-                ⚠{' '}
-                {referenceCount(deleteTarget)} project
-                {referenceCount(deleteTarget) !== 1 ? 's' : ''} will have their factory
-                disabled.
+                ⚠ {referenceCount(deleteTarget)} project
+                {referenceCount(deleteTarget) !== 1 ? 's' : ''} will have their factory disabled.
               </div>
             )}
             {deleteError && (
@@ -244,9 +242,7 @@ const PipelineRow: React.FC<PipelineRowProps> = ({
             {s.icon ?? '▪'}
           </span>
         ))}
-        {extraCount > 0 && (
-          <span className="text-xs text-gray-400 ml-0.5">+{extraCount}</span>
-        )}
+        {extraCount > 0 && <span className="text-xs text-gray-400 ml-0.5">+{extraCount}</span>}
       </div>
 
       {/* Actions */}

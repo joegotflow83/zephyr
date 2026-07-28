@@ -273,9 +273,7 @@ export const LogViewer: React.FC<LogViewerProps> = ({
                   }}
                   className="px-2 py-0.5 whitespace-pre-wrap break-all"
                 >
-                  {timestamp && (
-                    <span className="text-gray-500 mr-2">[{timestamp}]</span>
-                  )}
+                  {timestamp && <span className="text-gray-500 mr-2">[{timestamp}]</span>}
                   <span className={colorClass}>{line.content}</span>
                   {line.commit_hash && (
                     <span className="text-green-400 ml-2">({line.commit_hash})</span>

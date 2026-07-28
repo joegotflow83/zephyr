@@ -17,7 +17,19 @@ export interface ImageBuilderDialogProps {
   onBuilt?: (image: ZephyrImage) => void;
 }
 
-const BASE_TOOLS = ['git', 'curl', 'vim', 'jq', 'ssh', 'build-essential', 'playwright-deps', 'claude-code', 'semgrep', 'trivy', 'bandit'];
+const BASE_TOOLS = [
+  'git',
+  'curl',
+  'vim',
+  'jq',
+  'ssh',
+  'build-essential',
+  'playwright-deps',
+  'claude-code',
+  'semgrep',
+  'trivy',
+  'bandit',
+];
 
 /**
  * Derives a deterministic image name from the selected languages/versions.
@@ -182,7 +194,10 @@ export function ImageBuilderDialog({ isOpen, onClose, onBuilt }: ImageBuilderDia
         <div className="p-6 overflow-y-auto flex-1 space-y-4">
           {/* Image name */}
           <div>
-            <label htmlFor="image-name" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            <label
+              htmlFor="image-name"
+              className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+            >
               Image Name
             </label>
             <input
@@ -198,7 +213,9 @@ export function ImageBuilderDialog({ isOpen, onClose, onBuilt }: ImageBuilderDia
 
           {/* Language selection */}
           <div>
-            <div className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Languages</div>
+            <div className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Languages
+            </div>
             {AVAILABLE_LANGUAGES.map((lang) => (
               <div key={lang.id} className="mb-2">
                 <label className="flex items-center gap-2 cursor-pointer">
@@ -213,7 +230,10 @@ export function ImageBuilderDialog({ isOpen, onClose, onBuilt }: ImageBuilderDia
                 </label>
                 {lang.id in selectedVersions && (
                   <div className="ml-6 mt-1 flex items-center gap-2">
-                    <label htmlFor={`version-${lang.id}`} className="text-xs text-gray-500 dark:text-gray-400">
+                    <label
+                      htmlFor={`version-${lang.id}`}
+                      className="text-xs text-gray-500 dark:text-gray-400"
+                    >
                       Version:
                     </label>
                     <select
@@ -242,7 +262,10 @@ export function ImageBuilderDialog({ isOpen, onClose, onBuilt }: ImageBuilderDia
             </div>
             <div className="flex flex-wrap gap-2">
               {BASE_TOOLS.map((tool) => (
-                <span key={tool} className="bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 text-xs px-2 py-1 rounded">
+                <span
+                  key={tool}
+                  className="bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 text-xs px-2 py-1 rounded"
+                >
                   {tool}
                 </span>
               ))}
@@ -253,7 +276,9 @@ export function ImageBuilderDialog({ isOpen, onClose, onBuilt }: ImageBuilderDia
           {progressLines.length > 0 && (
             <div>
               <div className="flex items-center gap-2 mb-1">
-                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Build Output</span>
+                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Build Output
+                </span>
                 {buildActive && (
                   <div className="animate-spin rounded-full h-3 w-3 border-2 border-gray-400 border-t-transparent" />
                 )}
@@ -312,7 +337,10 @@ export function ImageBuilderDialog({ isOpen, onClose, onBuilt }: ImageBuilderDia
 
         {/* Footer */}
         <div className="flex justify-end gap-3 p-6 border-t border-gray-200 dark:border-gray-700">
-          <button onClick={handleClose} className="px-4 py-2 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white">
+          <button
+            onClick={handleClose}
+            className="px-4 py-2 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white"
+          >
             Cancel
           </button>
           <button

@@ -67,10 +67,7 @@ export class SelfUpdater {
    * @param appDir - Root directory of the application (contains package.json)
    * @param containerOrchestrator - Optional ContainerOrchestrator for triggering self-update loops
    */
-  constructor(
-    appDir: string,
-    containerOrchestrator: ContainerOrchestrator | null = null
-  ) {
+  constructor(appDir: string, containerOrchestrator: ContainerOrchestrator | null = null) {
     this.appDir = appDir;
     this.containerOrchestrator = containerOrchestrator;
   }
@@ -162,10 +159,7 @@ export class SelfUpdater {
    * @throws Error if no ContainerOrchestrator is configured
    * @throws Error if the self-update loop is already running
    */
-  async startSelfUpdate(
-    dockerImage: string,
-    envVars?: Record<string, string>
-  ): Promise<void> {
+  async startSelfUpdate(dockerImage: string, envVars?: Record<string, string>): Promise<void> {
     if (!this.containerOrchestrator) {
       throw new Error('ContainerOrchestrator not configured. Cannot start self-update.');
     }

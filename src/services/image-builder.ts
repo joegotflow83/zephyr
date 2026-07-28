@@ -86,12 +86,7 @@ export class ImageBuilder {
       const uid = (process.getuid ? process.getuid() : 1000).toString();
       const gid = (process.getgid ? process.getgid() : 1000).toString();
 
-      await this.runtime.buildImage(
-        tmpDir,
-        tag,
-        { HOST_UID: uid, HOST_GID: gid },
-        onProgress
-      );
+      await this.runtime.buildImage(tmpDir, tag, { HOST_UID: uid, HOST_GID: gid }, onProgress);
 
       const image = this.imageStore.addImage({
         name: config.name,
@@ -141,12 +136,7 @@ export class ImageBuilder {
       // and is now being rebuilt with Podman, which needs the localhost/ prefix.
       const newTag = deriveDockerTag(existingImage.buildConfig.name, this.runtime.runtimeType);
 
-      await this.runtime.buildImage(
-        tmpDir,
-        newTag,
-        { HOST_UID: uid, HOST_GID: gid },
-        onProgress
-      );
+      await this.runtime.buildImage(tmpDir, newTag, { HOST_UID: uid, HOST_GID: gid }, onProgress);
 
       return this.imageStore.updateImage(imageId, {
         builtAt: new Date().toISOString(),

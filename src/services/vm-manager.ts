@@ -18,6 +18,7 @@ import childProcess from 'child_process';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
+import type { Readable, Writable } from 'stream';
 
 /** VM lifecycle state as reported by multipass */
 export type VMState = 'Running' | 'Stopped' | 'Deleted' | 'Starting';
@@ -109,7 +110,10 @@ export class VMManager {
    */
   private spawnCmd(args: string[], inputData?: string): Promise<ExecResult> {
     return new Promise((resolve, reject) => {
-      const child = childProcess.spawn('multipass', args, { stdio: ['pipe', 'pipe', 'pipe'], env: this.spawnEnv });
+      const child = childProcess.spawn('multipass', args, {
+        stdio: ['pipe', 'pipe', 'pipe'],
+        env: this.spawnEnv,
+      });
 
       let stdout = '';
       let stderr = '';
@@ -178,11 +182,16 @@ export class VMManager {
 
       const result = await this.spawnCmd([
         'launch',
-        '--name', opts.name,
-        '--cpus', String(opts.cpus),
-        '--memory', `${opts.memoryGb}G`,
-        '--disk', `${opts.diskGb}G`,
-        '--cloud-init', tmpFile,
+        '--name',
+        opts.name,
+        '--cpus',
+        String(opts.cpus),
+        '--memory',
+        `${opts.memoryGb}G`,
+        '--disk',
+        `${opts.diskGb}G`,
+        '--cloud-init',
+        tmpFile,
       ]);
 
       if (result.exitCode !== 0) {
@@ -280,20 +289,22 @@ export class VMManager {
     }
 
     try {
-      const parsed = JSON.parse(result.stdout) as { list: Array<{
-        name: string;
-        state: string;
-        ipv4?: string[];
-        release?: string;
-      }> };
+      const parsed = JSON.parse(result.stdout) as {
+        list: Array<{
+          name: string;
+          state: string;
+          ipv4?: string[];
+          release?: string;
+        }>;
+      };
 
       return (parsed.list ?? []).map((vm) => ({
         name: vm.name,
         state: vm.state as VMState,
         ipv4: vm.ipv4?.[0],
-        cpus: 0,       // Not available in list output — use getVMInfo for details
-        memory: '',    // Not available in list output
-        disk: '',      // Not available in list output
+        cpus: 0, // Not available in list output — use getVMInfo for details
+        memory: '', // Not available in list output
+        disk: '', // Not available in list output
         release: vm.release ?? '',
       }));
     } catch {
@@ -314,15 +325,20 @@ export class VMManager {
     }
 
     try {
-      const parsed = JSON.parse(result.stdout) as { info: Record<string, {
-        state: string;
-        ipv4?: string[];
-        cpu_count?: string;
-        memory?: { total?: string };
-        disk?: { total?: string };
-        image_release?: string;
-        release?: string;
-      }> };
+      const parsed = JSON.parse(result.stdout) as {
+        info: Record<
+          string,
+          {
+            state: string;
+            ipv4?: string[];
+            cpu_count?: string;
+            memory?: { total?: string };
+            disk?: { total?: string };
+            image_release?: string;
+            release?: string;
+          }
+        >;
+      };
 
       const info = parsed.info?.[name];
       if (!info) {
@@ -376,7 +392,10 @@ export class VMManager {
   ): Promise<AbortController> {
     return new Promise((resolve, reject) => {
       const execArgs = this.buildExecArgs(name, cmd, opts);
-      const child = childProcess.spawn('multipass', execArgs, { stdio: ['ignore', 'pipe', 'pipe'], env: this.spawnEnv });
+      const child = childProcess.spawn('multipass', execArgs, {
+        stdio: ['ignore', 'pipe', 'pipe'],
+        env: this.spawnEnv,
+      });
 
       child.on('error', (err) => {
         reject(err);
@@ -387,7 +406,11 @@ export class VMManager {
         child.kill('SIGTERM');
         // Give it a moment to terminate, then force-kill
         setTimeout(() => {
-          try { child.kill('SIGKILL'); } catch { /* already dead */ }
+          try {
+            child.kill('SIGKILL');
+          } catch {
+            /* already dead */
+          }
         }, 3000);
       });
 
@@ -439,7 +462,9 @@ export class VMManager {
   async transfer(name: string, localPath: string, vmPath: string): Promise<void> {
     const result = await this.spawnCmd(['transfer', localPath, `${name}:${vmPath}`]);
     if (result.exitCode !== 0) {
-      throw new Error(`Failed to transfer "${localPath}" to VM "${name}:${vmPath}": ${result.stderr}`);
+      throw new Error(
+        `Failed to transfer "${localPath}" to VM "${name}:${vmPath}": ${result.stderr}`
+      );
     }
   }
 
@@ -458,7 +483,9 @@ export class VMManager {
   async mountIntoVM(name: string, hostPath: string, vmPath: string): Promise<void> {
     const result = await this.spawnCmd(['mount', hostPath, `${name}:${vmPath}`]);
     if (result.exitCode !== 0) {
-      throw new Error(`Failed to mount "${hostPath}" into VM "${name}:${vmPath}": ${result.stderr}`);
+      throw new Error(
+        `Failed to mount "${hostPath}" into VM "${name}:${vmPath}": ${result.stderr}`
+      );
     }
   }
 
@@ -512,7 +539,10 @@ export class VMManager {
    * @param cmd - Command to run inside the VM
    * @returns ChildProcess with piped stdio
    */
-  spawnInteractiveInVM(name: string, cmd: string[]): childProcess.ChildProcess {
+  spawnInteractiveInVM(
+    name: string,
+    cmd: string[]
+  ): childProcess.ChildProcessByStdio<Writable, Readable, Readable> {
     const execArgs = this.buildExecArgs(name, cmd);
     return childProcess.spawn('multipass', execArgs, {
       stdio: ['pipe', 'pipe', 'pipe'],

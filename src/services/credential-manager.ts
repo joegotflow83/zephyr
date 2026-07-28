@@ -16,7 +16,14 @@ import { safeStorage } from 'electron';
 import fs from 'fs';
 import path from 'path';
 
-export type CredentialService = 'anthropic' | 'github' | 'gitlab' | 'anthropic_bedrock' | 'anthropic_session' | 'aws_q_developer' | 'aws_kiro';
+export type CredentialService =
+  | 'anthropic'
+  | 'github'
+  | 'gitlab'
+  | 'anthropic_bedrock'
+  | 'anthropic_session'
+  | 'aws_q_developer'
+  | 'aws_kiro';
 
 interface CredentialStorage {
   [service: string]: string; // encrypted base64
@@ -150,7 +157,10 @@ export class CredentialManager {
       return safeStorage.decryptString(buffer);
     } catch (err) {
       // eslint-disable-next-line no-console
-      console.error(`[CredentialManager] Failed to decrypt GitHub PAT for project ${projectId}:`, err);
+      console.error(
+        `[CredentialManager] Failed to decrypt GitHub PAT for project ${projectId}:`,
+        err
+      );
       return null;
     }
   }
@@ -213,7 +223,10 @@ export class CredentialManager {
       return safeStorage.decryptString(buffer);
     } catch (err) {
       // eslint-disable-next-line no-console
-      console.error(`[CredentialManager] Failed to decrypt GitLab PAT for project ${projectId}:`, err);
+      console.error(
+        `[CredentialManager] Failed to decrypt GitLab PAT for project ${projectId}:`,
+        err
+      );
       return null;
     }
   }

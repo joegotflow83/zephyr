@@ -13,9 +13,7 @@ export interface UseProjectsResult {
   loading: boolean;
   error: string | null;
   refresh: () => Promise<void>;
-  add: (
-    config: Omit<ProjectConfig, 'id' | 'created_at' | 'updated_at'>
-  ) => Promise<ProjectConfig>;
+  add: (config: Omit<ProjectConfig, 'id' | 'created_at' | 'updated_at'>) => Promise<ProjectConfig>;
   update: (
     id: string,
     updates: Partial<Omit<ProjectConfig, 'id' | 'created_at'>>

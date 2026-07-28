@@ -25,7 +25,5 @@ export function slugifyStageId(name: string, existing: string[] = []): string {
  * given index (so renaming a stage doesn't collide with itself).
  */
 export function existingStageIds(pipeline: Pipeline, excludeIndex?: number): string[] {
-  return pipeline.stages
-    .filter((_, i) => i !== excludeIndex)
-    .map((s) => s.id);
+  return pipeline.stages.filter((_, i) => i !== excludeIndex).map((s) => s.id);
 }

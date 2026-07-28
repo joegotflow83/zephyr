@@ -43,8 +43,10 @@ function buildOpenSSHPrivateKey(privateScalar: Buffer, publicKey: Buffer): strin
 
   // Public key blob: [type_len][type][key_len][key]
   const pubKeyBlob = Buffer.concat([
-    u32(keyType.length), keyType,
-    u32(publicKey.length), publicKey,
+    u32(keyType.length),
+    keyType,
+    u32(publicKey.length),
+    publicKey,
   ]);
 
   // OpenSSH ED25519 private key data is seed (32 bytes) || public key (32 bytes) = 64 bytes
@@ -52,11 +54,16 @@ function buildOpenSSHPrivateKey(privateScalar: Buffer, publicKey: Buffer): strin
 
   // Private section before padding
   const privateSection = Buffer.concat([
-    checkInt, checkInt,                      // decryption check
-    u32(keyType.length), keyType,            // key type
-    u32(publicKey.length), publicKey,        // public key
-    u32(privKeyData.length), privKeyData,    // private key (seed + pub)
-    u32(comment.length), comment,            // comment
+    checkInt,
+    checkInt, // decryption check
+    u32(keyType.length),
+    keyType, // key type
+    u32(publicKey.length),
+    publicKey, // public key
+    u32(privKeyData.length),
+    privKeyData, // private key (seed + pub)
+    u32(comment.length),
+    comment, // comment
   ]);
 
   // Pad to multiple of 8 bytes (block size for unencrypted "none" cipher)
@@ -69,12 +76,16 @@ function buildOpenSSHPrivateKey(privateScalar: Buffer, publicKey: Buffer): strin
   const none = str('none');
   const fullKey = Buffer.concat([
     magic,
-    u32(none.length), none,                            // cipher: none
-    u32(none.length), none,                            // kdf: none
-    u32(0),                                            // kdf options: empty
-    u32(1),                                            // number of keys
-    u32(pubKeyBlob.length), pubKeyBlob,                // public key
-    u32(privateSectionPadded.length), privateSectionPadded, // private section
+    u32(none.length),
+    none, // cipher: none
+    u32(none.length),
+    none, // kdf: none
+    u32(0), // kdf options: empty
+    u32(1), // number of keys
+    u32(pubKeyBlob.length),
+    pubKeyBlob, // public key
+    u32(privateSectionPadded.length),
+    privateSectionPadded, // private section
   ]);
 
   // Wrap in PEM with standard 70-character line width
@@ -420,8 +431,7 @@ export class SSHKeyManager {
     privateKey: string,
     provider: 'github' | 'gitlab'
   ): Promise<void> {
-    const exec = (cmd: string) =>
-      this.dockerManager.execCommand(containerId, ['sh', '-c', cmd]);
+    const exec = (cmd: string) => this.dockerManager.execCommand(containerId, ['sh', '-c', cmd]);
 
     const hostname = provider === 'github' ? 'github.com' : 'gitlab.com';
     const fallbackKnownHosts = provider === 'github' ? GITHUB_KNOWN_HOSTS : GITLAB_KNOWN_HOSTS;
@@ -456,7 +466,9 @@ export class SSHKeyManager {
         `printf '%s' '${fallbackB64}' | base64 -d > ~/.ssh/known_hosts && chmod 644 ~/.ssh/known_hosts`
       );
       if (writeKnownHostsResult.exitCode !== 0) {
-        throw new Error(`Failed to write SSH known_hosts to container: ${writeKnownHostsResult.stderr}`);
+        throw new Error(
+          `Failed to write SSH known_hosts to container: ${writeKnownHostsResult.stderr}`
+        );
       }
     } else {
       await exec('chmod 644 ~/.ssh/known_hosts');

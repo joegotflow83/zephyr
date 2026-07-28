@@ -150,11 +150,13 @@ export const PreValidationSection: React.FC<PreValidationSectionProps> = ({
 
   return (
     <div className="mb-4">
-      <div className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Pre-Validation Scripts</div>
+      <div className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+        Pre-Validation Scripts
+      </div>
       <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
         Select scripts to place at the root of the project local path (
-        <code className="bg-gray-100 dark:bg-gray-700 px-1 rounded">/workspace</code> in the container).
-        These run before git commits for validation.
+        <code className="bg-gray-100 dark:bg-gray-700 px-1 rounded">/workspace</code> in the
+        container). These run before git commits for validation.
       </p>
 
       {loading ? (
@@ -258,7 +260,9 @@ export const PreValidationSection: React.FC<PreValidationSectionProps> = ({
       {showAddEditor ? (
         <div className="mt-2 p-3 bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded space-y-2">
           <div>
-            <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">Filename (.sh)</label>
+            <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">
+              Filename (.sh)
+            </label>
             <input
               type="text"
               value={newFilename}

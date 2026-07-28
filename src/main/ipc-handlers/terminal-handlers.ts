@@ -6,6 +6,9 @@ import { ipcMain } from 'electron';
 import { IPC } from '../../shared/ipc-channels';
 import type { TerminalManager, TerminalSessionOpts } from '../../services/terminal-manager';
 import type { VMManager } from '../../services/vm-manager';
+import { getLogger } from '../../services/logging';
+
+const logger = getLogger('ipc');
 
 export interface TerminalServices {
   terminalManager: TerminalManager;
@@ -68,7 +71,7 @@ export function registerTerminalHandlers(services: TerminalServices): void {
       terminalManager.writeToSession(sessionId, data);
     } catch (error) {
       // Log error but don't block (fire-and-forget)
-      console.error(`Terminal write error for session ${sessionId}:`, error);
+      logger.error(`Terminal write error for session ${sessionId}:`, error);
     }
   });
 

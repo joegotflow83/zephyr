@@ -6,6 +6,9 @@ import { ipcMain, dialog } from 'electron';
 import { IPC } from '../../shared/ipc-channels';
 import type { LogExporter } from '../../services/log-exporter';
 import type { ContainerOrchestrator } from '../../services/container-orchestrator';
+import { getLogger, type LogLevel } from '../../services/logging';
+
+const VALID_LOG_LEVELS = new Set<LogLevel>(['error', 'warn', 'info', 'verbose', 'debug', 'silly']);
 
 export interface LogServices {
   logExporter: LogExporter;
@@ -14,6 +17,15 @@ export interface LogServices {
 
 export function registerLogHandlers(services: LogServices): void {
   const { logExporter, containerOrchestrator } = services;
+
+  // ── Renderer log forwarding ───────────────────────────────────────────────
+
+  ipcMain.on(IPC.LOGS_RENDERER, (_event, level: LogLevel, message: string, ...args: unknown[]) => {
+    if (!VALID_LOG_LEVELS.has(level)) {
+      return;
+    }
+    getLogger('ui')[level](message, ...args);
+  });
 
   // ── Export single loop log ────────────────────────────────────────────────
 

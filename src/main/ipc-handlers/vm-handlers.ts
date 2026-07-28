@@ -61,11 +61,14 @@ export function registerVMHandlers(services: VMServices): void {
 
   // Start (or create-then-start) the persistent VM for a project.
   // vmConfig is forwarded so the VM can be provisioned on first use.
-  ipcMain.handle(IPC.VM_START, async (_event, projectId: string, vmConfig?: VMConfig): Promise<VMInfo> => {
-    const info = await containerOrchestrator.startProjectVM(projectId, vmConfig);
-    broadcastVMStatus(info);
-    return info;
-  });
+  ipcMain.handle(
+    IPC.VM_START,
+    async (_event, projectId: string, vmConfig?: VMConfig): Promise<VMInfo> => {
+      const info = await containerOrchestrator.startProjectVM(projectId, vmConfig);
+      broadcastVMStatus(info);
+      return info;
+    }
+  );
 
   // Stop the persistent VM for a project. Refuses if a loop is actively running.
   ipcMain.handle(IPC.VM_STOP, async (_event, projectId: string): Promise<void> => {

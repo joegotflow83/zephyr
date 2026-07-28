@@ -33,6 +33,9 @@ vi.mock('../../src/renderer/components/Terminal/Terminal', () => ({
   }),
 }));
 
+const mockLogger = vi.hoisted(() => ({ error: vi.fn(), warn: vi.fn(), info: vi.fn(), debug: vi.fn() }));
+vi.mock('../../src/renderer/utils/logger', () => ({ logger: mockLogger }));
+
 // Mock window.api functions declared at module level for callback capture
 const mockListContainers = vi.fn();
 const mockListLoops = vi.fn();

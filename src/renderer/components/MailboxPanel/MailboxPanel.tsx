@@ -62,31 +62,52 @@ function renderMarkdown(md: string): string {
 
     // Headings
     if (/^### /.test(line)) {
-      if (inList) { output.push('</ul>'); inList = false; }
-      output.push(`<h3 class="text-sm font-bold mt-3 mb-1 text-gray-800 dark:text-gray-200">${line.slice(4)}</h3>`);
+      if (inList) {
+        output.push('</ul>');
+        inList = false;
+      }
+      output.push(
+        `<h3 class="text-sm font-bold mt-3 mb-1 text-gray-800 dark:text-gray-200">${line.slice(4)}</h3>`
+      );
       continue;
     }
     if (/^## /.test(line)) {
-      if (inList) { output.push('</ul>'); inList = false; }
-      output.push(`<h2 class="text-sm font-bold mt-3 mb-1 text-gray-800 dark:text-gray-200">${line.slice(3)}</h2>`);
+      if (inList) {
+        output.push('</ul>');
+        inList = false;
+      }
+      output.push(
+        `<h2 class="text-sm font-bold mt-3 mb-1 text-gray-800 dark:text-gray-200">${line.slice(3)}</h2>`
+      );
       continue;
     }
     if (/^# /.test(line)) {
-      if (inList) { output.push('</ul>'); inList = false; }
-      output.push(`<h1 class="text-base font-bold mt-3 mb-1 text-gray-800 dark:text-gray-200">${line.slice(2)}</h1>`);
+      if (inList) {
+        output.push('</ul>');
+        inList = false;
+      }
+      output.push(
+        `<h1 class="text-base font-bold mt-3 mb-1 text-gray-800 dark:text-gray-200">${line.slice(2)}</h1>`
+      );
       continue;
     }
 
     // Unordered list items
     if (/^[-*] /.test(line)) {
-      if (!inList) { output.push('<ul class="list-disc list-inside space-y-0.5 my-1">'); inList = true; }
+      if (!inList) {
+        output.push('<ul class="list-disc list-inside space-y-0.5 my-1">');
+        inList = true;
+      }
       const content = applyInline(line.slice(2));
       output.push(`<li>${content}</li>`);
       continue;
     }
 
     // Non-list line — close list if open
-    if (inList) { output.push('</ul>'); inList = false; }
+    if (inList) {
+      output.push('</ul>');
+      inList = false;
+    }
 
     // Blank line → paragraph break
     if (line.trim() === '') {
@@ -105,7 +126,10 @@ function applyInline(text: string): string {
   return text
     .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
     .replace(/\*(.+?)\*/g, '<em>$1</em>')
-    .replace(/`(.+?)`/g, '<code class="px-1 bg-gray-100 dark:bg-gray-700 rounded text-xs font-mono">$1</code>');
+    .replace(
+      /`(.+?)`/g,
+      '<code class="px-1 bg-gray-100 dark:bg-gray-700 rounded text-xs font-mono">$1</code>'
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -123,9 +147,7 @@ const MessageRow: React.FC<MessageRowProps> = ({ message, selected, onClick }) =
     type="button"
     onClick={onClick}
     className={`w-full text-left px-4 py-3 border-b border-gray-200 dark:border-gray-700 transition-colors ${
-      selected
-        ? 'bg-blue-50 dark:bg-blue-900/20'
-        : 'hover:bg-gray-50 dark:hover:bg-gray-800'
+      selected ? 'bg-blue-50 dark:bg-blue-900/20' : 'hover:bg-gray-50 dark:hover:bg-gray-800'
     }`}
   >
     <div className="text-xs text-gray-500 dark:text-gray-400 truncate">{message.projectName}</div>
@@ -137,7 +159,10 @@ const MessageRow: React.FC<MessageRowProps> = ({ message, selected, onClick }) =
       }`}
     >
       {!message.read && (
-        <span className="inline-block w-2 h-2 bg-blue-500 rounded-full flex-shrink-0" aria-label="Unread" />
+        <span
+          className="inline-block w-2 h-2 bg-blue-500 rounded-full flex-shrink-0"
+          aria-label="Unread"
+        />
       )}
       <span className="truncate">{message.epicTitle}</span>
     </div>
@@ -167,7 +192,9 @@ const MessageDetail: React.FC<MessageDetailProps> = ({
           <h3 className="text-sm font-bold text-gray-900 dark:text-white mt-0.5 break-words">
             {message.epicTitle}
           </h3>
-          <div className="text-xs text-gray-400 mt-0.5">{formatRelativeTime(message.createdAt)}</div>
+          <div className="text-xs text-gray-400 mt-0.5">
+            {formatRelativeTime(message.createdAt)}
+          </div>
         </div>
         <button
           type="button"
@@ -230,7 +257,7 @@ const MessageDetail: React.FC<MessageDetailProps> = ({
           {onCreateTaskFromSuggestion && (
             <button
               type="button"
-              onClick={() => onCreateTaskFromSuggestion(message.suggestions!)}
+              onClick={() => onCreateTaskFromSuggestion(message.suggestions ?? '')}
               className="mt-3 px-3 py-1.5 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors font-medium"
             >
               Create task from suggestion
@@ -284,7 +311,12 @@ export const MailboxPanel: React.FC<MailboxPanelProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[150] flex justify-end" role="dialog" aria-modal="true" aria-label="Mailbox">
+    <div
+      className="fixed inset-0 z-[150] flex justify-end"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Mailbox"
+    >
       {/* Backdrop */}
       <div
         className="absolute inset-0 bg-black bg-opacity-50"
@@ -314,7 +346,12 @@ export const MailboxPanel: React.FC<MailboxPanelProps> = ({
               aria-label="Close mailbox"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M6 18L18 6M6 6l12 12"
+                />
               </svg>
             </button>
           </div>
@@ -326,8 +363,18 @@ export const MailboxPanel: React.FC<MailboxPanelProps> = ({
           <div className="w-2/5 flex-shrink-0 border-r border-gray-200 dark:border-gray-700 overflow-y-auto">
             {mailboxMessages.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-full text-gray-400 text-sm gap-2 p-4">
-                <svg className="w-8 h-8 opacity-40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                <svg
+                  className="w-8 h-8 opacity-40"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={1.5}
+                    d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
+                  />
                 </svg>
                 <span>No messages</span>
               </div>

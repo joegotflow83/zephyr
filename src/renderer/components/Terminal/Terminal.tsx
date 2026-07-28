@@ -1,15 +1,11 @@
-import React, {
-  useRef,
-  useEffect,
-  useImperativeHandle,
-  forwardRef,
-} from 'react';
+import React, { useRef, useEffect, useImperativeHandle, forwardRef } from 'react';
 import { Terminal as XTerm } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { WebLinksAddon } from '@xterm/addon-web-links';
 import { SearchAddon } from '@xterm/addon-search';
 import '@xterm/xterm/css/xterm.css';
 import './terminal.css';
+import { logger } from '../../utils/logger';
 
 export interface TerminalProps {
   onData?: (data: string) => void;
@@ -32,6 +28,54 @@ export interface TerminalHandle {
   getCurrentFontSize: () => number;
 }
 
+const DARK_THEME = {
+  background: '#1e1e1e',
+  foreground: '#d4d4d4',
+  cursor: '#d4d4d4',
+  black: '#000000',
+  red: '#cd3131',
+  green: '#0dbc79',
+  yellow: '#e5e510',
+  blue: '#2472c8',
+  magenta: '#bc3fbc',
+  cyan: '#11a8cd',
+  white: '#e5e5e5',
+  brightBlack: '#666666',
+  brightRed: '#f14c4c',
+  brightGreen: '#23d18b',
+  brightYellow: '#f5f543',
+  brightBlue: '#3b8eea',
+  brightMagenta: '#d670d6',
+  brightCyan: '#29b8db',
+  brightWhite: '#e5e5e5',
+};
+
+const LIGHT_THEME = {
+  background: '#ffffff',
+  foreground: '#333333',
+  cursor: '#333333',
+  black: '#000000',
+  red: '#cd3131',
+  green: '#00bc00',
+  yellow: '#949800',
+  blue: '#0451a5',
+  magenta: '#bc05bc',
+  cyan: '#0598bc',
+  white: '#555555',
+  brightBlack: '#666666',
+  brightRed: '#cd3131',
+  brightGreen: '#14ce14',
+  brightYellow: '#b5ba00',
+  brightBlue: '#0451a5',
+  brightMagenta: '#bc05bc',
+  brightCyan: '#0598bc',
+  brightWhite: '#a5a5a5',
+};
+
+function getTheme(theme: 'dark' | 'light') {
+  return theme === 'dark' ? DARK_THEME : LIGHT_THEME;
+}
+
 export const Terminal = forwardRef<TerminalHandle, TerminalProps>(
   ({ onData, onResize, fontSize = 14, theme = 'dark', onCopy }, ref) => {
     const containerRef = useRef<HTMLDivElement>(null);
@@ -45,6 +89,11 @@ export const Terminal = forwardRef<TerminalHandle, TerminalProps>(
     onDataRef.current = onData;
     const onResizeRef = useRef(onResize);
     onResizeRef.current = onResize;
+    // Mount-time-only ref so the mount effect can read the initial theme
+    // without depending on the reactive prop (theme changes are handled by
+    // the dedicated theme effect below). currentFontSizeRef above already
+    // serves the same purpose for fontSize.
+    const initialThemeRef = useRef(theme);
 
     useImperativeHandle(ref, () => ({
       write: (data: string) => {
@@ -67,7 +116,9 @@ export const Terminal = forwardRef<TerminalHandle, TerminalProps>(
       copy: () => {
         const selection = xtermRef.current?.getSelection();
         if (selection) {
-          navigator.clipboard.writeText(selection).catch(console.error);
+          navigator.clipboard
+            .writeText(selection)
+            .catch((err) => logger.error('Failed to copy selection:', err));
           if (onCopy) {
             onCopy(selection);
           }
@@ -103,58 +154,16 @@ export const Terminal = forwardRef<TerminalHandle, TerminalProps>(
     }));
 
     useEffect(() => {
-      if (!containerRef.current) return;
+      const containerEl = containerRef.current;
+      if (!containerEl) return;
 
       // Create terminal instance
       const terminal = new XTerm({
-        fontSize,
+        fontSize: currentFontSizeRef.current,
         fontFamily: 'Menlo, Monaco, "Courier New", monospace',
         cursorBlink: true,
         cursorStyle: 'block',
-        theme:
-          theme === 'dark'
-            ? {
-                background: '#1e1e1e',
-                foreground: '#d4d4d4',
-                cursor: '#d4d4d4',
-                black: '#000000',
-                red: '#cd3131',
-                green: '#0dbc79',
-                yellow: '#e5e510',
-                blue: '#2472c8',
-                magenta: '#bc3fbc',
-                cyan: '#11a8cd',
-                white: '#e5e5e5',
-                brightBlack: '#666666',
-                brightRed: '#f14c4c',
-                brightGreen: '#23d18b',
-                brightYellow: '#f5f543',
-                brightBlue: '#3b8eea',
-                brightMagenta: '#d670d6',
-                brightCyan: '#29b8db',
-                brightWhite: '#e5e5e5',
-              }
-            : {
-                background: '#ffffff',
-                foreground: '#333333',
-                cursor: '#333333',
-                black: '#000000',
-                red: '#cd3131',
-                green: '#00bc00',
-                yellow: '#949800',
-                blue: '#0451a5',
-                magenta: '#bc05bc',
-                cyan: '#0598bc',
-                white: '#555555',
-                brightBlack: '#666666',
-                brightRed: '#cd3131',
-                brightGreen: '#14ce14',
-                brightYellow: '#b5ba00',
-                brightBlue: '#0451a5',
-                brightMagenta: '#bc05bc',
-                brightCyan: '#0598bc',
-                brightWhite: '#a5a5a5',
-              },
+        theme: getTheme(initialThemeRef.current),
         allowProposedApi: true,
       });
 
@@ -171,7 +180,7 @@ export const Terminal = forwardRef<TerminalHandle, TerminalProps>(
       terminal.loadAddon(searchAddon);
 
       // Attach to DOM
-      terminal.open(containerRef.current);
+      terminal.open(containerEl);
 
       // Fit to container size
       fitAddon.fit();
@@ -184,7 +193,6 @@ export const Terminal = forwardRef<TerminalHandle, TerminalProps>(
       // rapid burst of output (e.g. vi drawing its initial screen). Catching
       // mousedown at the container level re-focuses the hidden textarea so
       // keystrokes are captured again without requiring a precise click.
-      const containerEl = containerRef.current!;
       const handleMouseDown = () => terminal.focus();
       containerEl.addEventListener('mousedown', handleMouseDown);
 
@@ -193,19 +201,17 @@ export const Terminal = forwardRef<TerminalHandle, TerminalProps>(
       const dataDisposable = terminal.onData((data) => {
         onDataRef.current?.(data);
       });
-      (terminal as any)._dataDisposable = dataDisposable;
 
       // Handle resize events — same ref pattern.
       const resizeDisposable = terminal.onResize(({ cols, rows }) => {
         onResizeRef.current?.(cols, rows);
       });
-      (terminal as any)._resizeDisposable = resizeDisposable;
 
       // Cleanup on unmount
       return () => {
         containerEl.removeEventListener('mousedown', handleMouseDown);
-        (terminal as any)._dataDisposable?.dispose();
-        (terminal as any)._resizeDisposable?.dispose();
+        dataDisposable.dispose();
+        resizeDisposable.dispose();
         searchAddon.dispose();
         terminal.dispose();
         xtermRef.current = null;
@@ -227,50 +233,7 @@ export const Terminal = forwardRef<TerminalHandle, TerminalProps>(
     // Handle theme changes
     useEffect(() => {
       if (xtermRef.current) {
-        xtermRef.current.options.theme =
-          theme === 'dark'
-            ? {
-                background: '#1e1e1e',
-                foreground: '#d4d4d4',
-                cursor: '#d4d4d4',
-                black: '#000000',
-                red: '#cd3131',
-                green: '#0dbc79',
-                yellow: '#e5e510',
-                blue: '#2472c8',
-                magenta: '#bc3fbc',
-                cyan: '#11a8cd',
-                white: '#e5e5e5',
-                brightBlack: '#666666',
-                brightRed: '#f14c4c',
-                brightGreen: '#23d18b',
-                brightYellow: '#f5f543',
-                brightBlue: '#3b8eea',
-                brightMagenta: '#d670d6',
-                brightCyan: '#29b8db',
-                brightWhite: '#e5e5e5',
-              }
-            : {
-                background: '#ffffff',
-                foreground: '#333333',
-                cursor: '#333333',
-                black: '#000000',
-                red: '#cd3131',
-                green: '#00bc00',
-                yellow: '#949800',
-                blue: '#0451a5',
-                magenta: '#bc05bc',
-                cyan: '#0598bc',
-                white: '#555555',
-                brightBlack: '#666666',
-                brightRed: '#cd3131',
-                brightGreen: '#14ce14',
-                brightYellow: '#b5ba00',
-                brightBlue: '#0451a5',
-                brightMagenta: '#bc05bc',
-                brightCyan: '#0598bc',
-                brightWhite: '#a5a5a5',
-              };
+        xtermRef.current.options.theme = getTheme(theme);
       }
     }, [theme]);
 
@@ -284,13 +247,7 @@ export const Terminal = forwardRef<TerminalHandle, TerminalProps>(
       return () => window.removeEventListener('resize', handleResize);
     }, []);
 
-    return (
-      <div
-        ref={containerRef}
-        className="terminal-container"
-        data-testid="terminal"
-      />
-    );
+    return <div ref={containerRef} className="terminal-container" data-testid="terminal" />;
   }
 );
 

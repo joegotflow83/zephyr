@@ -88,12 +88,8 @@ function ToastItem({ toast, onDismiss }: ToastItemProps) {
       role="alert"
       aria-live="polite"
     >
-      <div className="flex-shrink-0 text-xl font-bold leading-none">
-        {typeIcons[toast.type]}
-      </div>
-      <div className="flex-1 text-sm leading-snug break-words">
-        {toast.message}
-      </div>
+      <div className="flex-shrink-0 text-xl font-bold leading-none">{typeIcons[toast.type]}</div>
+      <div className="flex-1 text-sm leading-snug break-words">{toast.message}</div>
       <button
         onClick={handleDismiss}
         className="flex-shrink-0 text-white/80 hover:text-white transition-colors text-lg leading-none"

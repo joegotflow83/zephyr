@@ -26,7 +26,9 @@ export const BedrockDialog: React.FC<BedrockDialogProps> = ({
 }) => {
   const [region, setRegion] = useState(currentSettings.bedrock_region ?? '');
   const [model, setModel] = useState(currentSettings.bedrock_model ?? '');
-  const [smallFastModel, setSmallFastModel] = useState(currentSettings.bedrock_small_fast_model ?? '');
+  const [smallFastModel, setSmallFastModel] = useState(
+    currentSettings.bedrock_small_fast_model ?? ''
+  );
   const [log, setLog] = useState(currentSettings.bedrock_log ?? '');
   const [bearerToken, setBearerToken] = useState('');
   const [showToken, setShowToken] = useState(false);
@@ -54,7 +56,13 @@ export const BedrockDialog: React.FC<BedrockDialogProps> = ({
     setSaving(true);
     setError(null);
     try {
-      await onSave({ region: region.trim(), model: model.trim(), smallFastModel: smallFastModel.trim(), log: log.trim(), bearerToken: bearerToken.trim() });
+      await onSave({
+        region: region.trim(),
+        model: model.trim(),
+        smallFastModel: smallFastModel.trim(),
+        log: log.trim(),
+        bearerToken: bearerToken.trim(),
+      });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save Bedrock configuration');
     } finally {
@@ -65,11 +73,15 @@ export const BedrockDialog: React.FC<BedrockDialogProps> = ({
   return (
     <div
       className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50"
-      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
     >
       <div className="bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6 w-full max-w-lg shadow-xl">
         <div className="flex items-center justify-between mb-5">
-          <h2 className="text-gray-900 dark:text-white font-semibold text-lg">Configure AWS Bedrock</h2>
+          <h2 className="text-gray-900 dark:text-white font-semibold text-lg">
+            Configure AWS Bedrock
+          </h2>
           <button
             onClick={onClose}
             className="text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors text-xl leading-none"
@@ -121,7 +133,9 @@ export const BedrockDialog: React.FC<BedrockDialogProps> = ({
                 {showToken ? 'Hide' : 'Show'}
               </button>
             </div>
-            <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">Stored encrypted via system keychain</p>
+            <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">
+              Stored encrypted via system keychain
+            </p>
           </div>
 
           {/* ANTHROPIC_MODEL */}
@@ -141,7 +155,8 @@ export const BedrockDialog: React.FC<BedrockDialogProps> = ({
           {/* ANTHROPIC_SMALL_FAST_MODEL */}
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              ANTHROPIC_SMALL_FAST_MODEL <span className="text-gray-500 font-normal">(optional)</span>
+              ANTHROPIC_SMALL_FAST_MODEL{' '}
+              <span className="text-gray-500 font-normal">(optional)</span>
             </label>
             <input
               type="text"

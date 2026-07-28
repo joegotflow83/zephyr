@@ -91,7 +91,9 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ prompts, onChange })
                 // Edit mode
                 <div>
                   <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm font-medium text-gray-900 dark:text-white">{filename}</span>
+                    <span className="text-sm font-medium text-gray-900 dark:text-white">
+                      {filename}
+                    </span>
                     <div className="flex gap-2">
                       <button
                         type="button"
@@ -121,7 +123,9 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({ prompts, onChange })
                 // View mode
                 <div>
                   <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm font-medium text-gray-900 dark:text-white">{filename}</span>
+                    <span className="text-sm font-medium text-gray-900 dark:text-white">
+                      {filename}
+                    </span>
                     <div className="flex gap-2">
                       <button
                         type="button"

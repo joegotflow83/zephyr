@@ -164,9 +164,7 @@ interface RunResult {
  */
 function runPodman(podmanPath: string, args: string[]): Promise<RunResult> {
   const machineSocket = resolveMachineSocket();
-  const env = machineSocket
-    ? { ...process.env, CONTAINER_HOST: machineSocket }
-    : undefined; // undefined → spawn inherits process.env as-is
+  const env = machineSocket ? { ...process.env, CONTAINER_HOST: machineSocket } : undefined; // undefined → spawn inherits process.env as-is
 
   return new Promise((resolve) => {
     const child = spawn(podmanPath, args, { stdio: ['ignore', 'pipe', 'pipe'], env });
@@ -209,11 +207,7 @@ export class PodmanRuntime implements ContainerRuntime {
   }
 
   async getInfo(): Promise<RuntimeInfo> {
-    const { stdout, exitCode } = await runPodman(this.podmanPath, [
-      'info',
-      '--format',
-      'json',
-    ]);
+    const { stdout, exitCode } = await runPodman(this.podmanPath, ['info', '--format', 'json']);
 
     if (exitCode !== 0) {
       throw new Error(
@@ -638,9 +632,7 @@ export class PodmanRuntime implements ContainerRuntime {
 
         // Created is a Unix timestamp (number) in some Podman versions, ISO string in others.
         const createdIso =
-          typeof c.Created === 'number'
-            ? new Date(c.Created * 1000).toISOString()
-            : c.Created;
+          typeof c.Created === 'number' ? new Date(c.Created * 1000).toISOString() : c.Created;
 
         return {
           id: c.Id,
@@ -687,16 +679,14 @@ export class PodmanRuntime implements ContainerRuntime {
     if (opts?.cols) args.push('--env', `COLUMNS=${opts.cols}`);
     if (opts?.rows) args.push('--env', `LINES=${opts.rows}`);
 
-    args.push(containerId, shell);
+    args.push(containerId, ...(opts?.command?.length ? opts.command : [shell]));
 
     // Spawn podman exec directly. Podman v4+ allocates the container-side PTY
     // on the server regardless of whether the host stdin is a real TTY, so the
     // `script` wrapper is not needed and in fact causes the session to exit
     // immediately on Linux (double-PTY interaction / hangup).
     const machineSocket = resolveMachineSocket();
-    const env = machineSocket
-      ? { ...process.env, CONTAINER_HOST: machineSocket }
-      : undefined;
+    const env = machineSocket ? { ...process.env, CONTAINER_HOST: machineSocket } : undefined;
     const child = spawn(this.podmanPath, args, {
       stdio: ['pipe', 'pipe', 'pipe'],
       env,
@@ -749,8 +739,16 @@ export class PodmanRuntime implements ContainerRuntime {
     // This updates TIOCSWINSZ inside the container so programs that call
     // ioctl(TIOCGWINSZ) (e.g. bash, ncurses apps) see the correct dimensions.
     runPodman(this.podmanPath, [
-      'exec', containerId, 'stty', 'cols', String(cols), 'rows', String(rows),
-    ]).catch(() => { /* container may have exited — ignore */ });
+      'exec',
+      containerId,
+      'stty',
+      'cols',
+      String(cols),
+      'rows',
+      String(rows),
+    ]).catch(() => {
+      /* container may have exited — ignore */
+    });
 
     // Also signal the shell to re-read its terminal size.
     if (child.pid !== undefined) {
@@ -775,9 +773,7 @@ export class PodmanRuntime implements ContainerRuntime {
     // Inject CONTAINER_HOST so `podman logs` can reach the Podman VM on
     // macOS/Windows (same as createExecSession and runPodman do).
     const machineSocket = resolveMachineSocket();
-    const env = machineSocket
-      ? { ...process.env, CONTAINER_HOST: machineSocket }
-      : undefined;
+    const env = machineSocket ? { ...process.env, CONTAINER_HOST: machineSocket } : undefined;
 
     const child = spawn(this.podmanPath, args, {
       stdio: ['ignore', 'pipe', 'pipe'],
@@ -793,8 +789,7 @@ export class PodmanRuntime implements ContainerRuntime {
     // "2026-03-20T11:09:48-04:00 ").  Keeping the raw prefix in the line
     // breaks the log-parser's start-of-line patterns (commit hashes, error
     // markers, etc.) because they anchor at `^` and the timestamp comes first.
-    const RE_PODMAN_TS =
-      /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2}) /;
+    const RE_PODMAN_TS = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2}) /;
 
     const stripTs = (line: string) => line.replace(RE_PODMAN_TS, '');
 

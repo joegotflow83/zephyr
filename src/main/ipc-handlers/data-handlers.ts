@@ -47,8 +47,20 @@ export interface DataServices {
 }
 
 export function registerDataHandlers(services: DataServices): void {
-  const { configManager, projectStore, importExport, preValidationStore, hooksStore, kiroHooksStore, claudeSettingsStore, containerOrchestrator, runtime, credentialManager, sshKeyManager, deployKeyStore } =
-    services;
+  const {
+    configManager,
+    projectStore,
+    importExport,
+    preValidationStore,
+    hooksStore,
+    kiroHooksStore,
+    claudeSettingsStore,
+    containerOrchestrator,
+    runtime,
+    credentialManager,
+    sshKeyManager,
+    deployKeyStore,
+  } = services;
   const logger = getLogger('ipc');
 
   // ── Projects ──────────────────────────────────────────────────────────────
@@ -57,18 +69,18 @@ export function registerDataHandlers(services: DataServices): void {
     return projectStore.listProjects();
   });
 
-  ipcMain.handle(
-    IPC.PROJECTS_GET,
-    async (_event, id: string): Promise<ProjectConfig | null> => {
-      return projectStore.getProject(id);
-    },
-  );
+  ipcMain.handle(IPC.PROJECTS_GET, async (_event, id: string): Promise<ProjectConfig | null> => {
+    return projectStore.getProject(id);
+  });
 
   ipcMain.handle(
     IPC.PROJECTS_ADD,
-    async (_event, config: Omit<ProjectConfig, 'id' | 'created_at' | 'updated_at'>): Promise<ProjectConfig> => {
+    async (
+      _event,
+      config: Omit<ProjectConfig, 'id' | 'created_at' | 'updated_at'>
+    ): Promise<ProjectConfig> => {
       return projectStore.addProject(config as ProjectConfig);
-    },
+    }
   );
 
   ipcMain.handle(
@@ -76,92 +88,101 @@ export function registerDataHandlers(services: DataServices): void {
     async (
       _event,
       id: string,
-      partial: Partial<Omit<ProjectConfig, 'id' | 'created_at'>>,
+      partial: Partial<Omit<ProjectConfig, 'id' | 'created_at'>>
     ): Promise<ProjectConfig> => {
       return projectStore.updateProject(id, partial);
-    },
+    }
   );
 
-  ipcMain.handle(
-    IPC.PROJECTS_REMOVE,
-    async (_event, id: string): Promise<boolean> => {
-      const project = projectStore.getProject(id);
+  ipcMain.handle(IPC.PROJECTS_REMOVE, async (_event, id: string): Promise<boolean> => {
+    const project = projectStore.getProject(id);
 
-      // Remove any registered SSH deploy keys from GitHub/GitLab before deleting the PAT.
-      // This covers both currently-active keys (tracked in deploy-key-store) and orphaned
-      // keys from previous sessions. Must happen before PAT deletion while credentials
-      // are still available. The loop's own onStateChange cleanup may also fire, but
-      // removeDeployKey / removeGitlabDeployKey are idempotent (404 treated as success).
-      if (sshKeyManager && deployKeyStore && project?.repo_url) {
-        const pendingKeys = deployKeyStore.listActiveByProject(id);
-        for (const record of pendingKeys) {
-          try {
-            const service = record.service ?? 'github';
-            const repoUrl = service === 'gitlab'
+    // Remove any registered SSH deploy keys from GitHub/GitLab before deleting the PAT.
+    // This covers both currently-active keys (tracked in deploy-key-store) and orphaned
+    // keys from previous sessions. Must happen before PAT deletion while credentials
+    // are still available. The loop's own onStateChange cleanup may also fire, but
+    // removeDeployKey / removeGitlabDeployKey are idempotent (404 treated as success).
+    if (sshKeyManager && deployKeyStore && project?.repo_url) {
+      const pendingKeys = deployKeyStore.listActiveByProject(id);
+      for (const record of pendingKeys) {
+        try {
+          const service = record.service ?? 'github';
+          const repoUrl =
+            service === 'gitlab'
               ? `https://gitlab.com/${record.repo}`
               : `https://github.com/${record.repo}`;
-            const pat = service === 'gitlab'
+          const pat =
+            service === 'gitlab'
               ? await credentialManager.getGitlabPat(id)
               : await credentialManager.getGithubPat(id);
-            if (pat) {
-              if (service === 'gitlab') {
-                await sshKeyManager.removeGitlabDeployKey(pat, repoUrl, record.key_id);
-              } else {
-                await sshKeyManager.removeDeployKey(pat, repoUrl, record.key_id);
-              }
-              deployKeyStore.markCleaned(record.key_id);
-              logger.info('Removed deploy key during project deletion', { projectId: id, keyId: record.key_id, service });
+          if (pat) {
+            if (service === 'gitlab') {
+              await sshKeyManager.removeGitlabDeployKey(pat, repoUrl, record.key_id);
+            } else {
+              await sshKeyManager.removeDeployKey(pat, repoUrl, record.key_id);
             }
-          } catch (err) {
-            logger.warn('Failed to remove deploy key during project deletion (key may need manual cleanup)', {
+            deployKeyStore.markCleaned(record.key_id);
+            logger.info('Removed deploy key during project deletion', {
+              projectId: id,
+              keyId: record.key_id,
+              service,
+            });
+          }
+        } catch (err) {
+          logger.warn(
+            'Failed to remove deploy key during project deletion (key may need manual cleanup)',
+            {
               projectId: id,
               keyId: record.key_id,
               err,
-            });
-          }
+            }
+          );
         }
       }
+    }
 
-      // Stop any running loop for this project before removing it
-      try {
-        const running = containerOrchestrator.listRunning();
-        if (running.some((l) => l.projectId === id)) {
-          await containerOrchestrator.stopLoop(id);
+    // Stop any running loop for this project before removing it
+    try {
+      const running = containerOrchestrator.listRunning();
+      if (running.some((l) => l.projectId === id)) {
+        await containerOrchestrator.stopLoop(id);
+      }
+    } catch (err) {
+      logger.warn('Failed to stop loop for deleted project', { projectId: id, err });
+    }
+
+    // Remove all Docker containers associated with this project
+    try {
+      const allContainers = await runtime.listContainers();
+      const projectContainers = allContainers.filter((c) => c.projectId === id);
+      for (const container of projectContainers) {
+        try {
+          await runtime.removeContainer(container.id, true);
+        } catch (err) {
+          logger.warn('Failed to remove container for deleted project', {
+            containerId: container.id,
+            err,
+          });
         }
-      } catch (err) {
-        logger.warn('Failed to stop loop for deleted project', { projectId: id, err });
       }
+    } catch (err) {
+      logger.warn('Failed to list containers for deleted project', { projectId: id, err });
+    }
 
-      // Remove all Docker containers associated with this project
-      try {
-        const allContainers = await runtime.listContainers();
-        const projectContainers = allContainers.filter((c) => c.projectId === id);
-        for (const container of projectContainers) {
-          try {
-            await runtime.removeContainer(container.id, true);
-          } catch (err) {
-            logger.warn('Failed to remove container for deleted project', { containerId: container.id, err });
-          }
-        }
-      } catch (err) {
-        logger.warn('Failed to list containers for deleted project', { projectId: id, err });
-      }
+    // Clean up stored credentials for this project
+    try {
+      await credentialManager.deleteGithubPat(id);
+    } catch (err) {
+      logger.warn('Failed to delete GitHub PAT for deleted project', { projectId: id, err });
+    }
+    try {
+      await credentialManager.deleteGitlabPat(id);
+    } catch (err) {
+      logger.warn('Failed to delete GitLab PAT for deleted project', { projectId: id, err });
+    }
 
-      // Clean up stored credentials for this project
-      try {
-        await credentialManager.deleteGithubPat(id);
-      } catch (err) {
-        logger.warn('Failed to delete GitHub PAT for deleted project', { projectId: id, err });
-      }
-      try {
-        await credentialManager.deleteGitlabPat(id);
-      } catch (err) {
-        logger.warn('Failed to delete GitLab PAT for deleted project', { projectId: id, err });
-      }
-
-      return projectStore.removeProject(id);
-    },
-  );
+    return projectStore.removeProject(id);
+  });
 
   // ── Settings ──────────────────────────────────────────────────────────────
 
@@ -170,25 +191,24 @@ export function registerDataHandlers(services: DataServices): void {
     return stored ?? createDefaultSettings();
   });
 
-  ipcMain.handle(
-    IPC.SETTINGS_SAVE,
-    async (_event, settings: AppSettings): Promise<void> => {
-      await configManager.saveJson('settings.json', settings);
+  ipcMain.handle(IPC.SETTINGS_SAVE, async (_event, settings: AppSettings): Promise<void> => {
+    await configManager.saveJson('settings.json', settings);
 
-      // Update log level if it changed
-      if (settings.log_level) {
-        const mappedLevel = mapLogLevel(settings.log_level);
-        setLogLevel(mappedLevel);
-        logger.info('Log level updated from settings', { level: mappedLevel });
-      }
+    // Update log level if it changed
+    if (settings.log_level) {
+      const mappedLevel = mapLogLevel(settings.log_level);
+      setLogLevel(mappedLevel);
+      logger.info('Log level updated from settings', { level: mappedLevel });
+    }
 
-      // Update max concurrent containers if it changed
-      if (settings.max_concurrent_containers) {
-        containerOrchestrator.setMaxConcurrent(settings.max_concurrent_containers);
-        logger.info('Max concurrent containers updated from settings', { max: settings.max_concurrent_containers });
-      }
-    },
-  );
+    // Update max concurrent containers if it changed
+    if (settings.max_concurrent_containers) {
+      containerOrchestrator.setMaxConcurrent(settings.max_concurrent_containers);
+      logger.info('Max concurrent containers updated from settings', {
+        max: settings.max_concurrent_containers,
+      });
+    }
+  });
 
   // ── Config import/export ──────────────────────────────────────────────────
 
@@ -228,7 +248,7 @@ export function registerDataHandlers(services: DataServices): void {
     IPC.PRE_VALIDATION_ADD,
     async (_event, filename: string, content: string): Promise<void> => {
       await preValidationStore.addScript(filename, content);
-    },
+    }
   );
 
   ipcMain.handle(IPC.PRE_VALIDATION_REMOVE, async (_event, filename: string): Promise<boolean> => {
@@ -249,7 +269,7 @@ export function registerDataHandlers(services: DataServices): void {
     IPC.HOOKS_ADD,
     async (_event, filename: string, content: string): Promise<void> => {
       await hooksStore.addHook(filename, content);
-    },
+    }
   );
 
   ipcMain.handle(IPC.HOOKS_REMOVE, async (_event, filename: string): Promise<boolean> => {
@@ -270,7 +290,7 @@ export function registerDataHandlers(services: DataServices): void {
     IPC.KIRO_HOOKS_ADD,
     async (_event, filename: string, content: string): Promise<void> => {
       await kiroHooksStore.addHook(filename, content);
-    },
+    }
   );
 
   ipcMain.handle(IPC.KIRO_HOOKS_REMOVE, async (_event, filename: string): Promise<boolean> => {
@@ -291,7 +311,7 @@ export function registerDataHandlers(services: DataServices): void {
     IPC.CLAUDE_SETTINGS_ADD,
     async (_event, filename: string, content: string): Promise<void> => {
       await claudeSettingsStore.addFile(filename, content);
-    },
+    }
   );
 
   ipcMain.handle(IPC.CLAUDE_SETTINGS_REMOVE, async (_event, filename: string): Promise<boolean> => {

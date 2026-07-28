@@ -27,6 +27,10 @@ import {
   isLoopTerminal,
   getLoopKey,
 } from '../shared/loop-types';
+import { getLogger } from './logging';
+
+const dockerLogger = getLogger('docker');
+const vmLogger = getLogger('vm');
 
 /**
  * Callback for loop state transitions
@@ -100,6 +104,32 @@ export class ContainerOrchestrator {
   }
 
   /**
+   * Return the configured VMManager, or throw if none was provided.
+   *
+   * `this.vm` is a mutable class field, so TypeScript can't narrow it across
+   * `await` points the way it would a local variable — callers should assign
+   * the result to a local (`const vm = this.requireVM()`) once per method and
+   * use that local for the rest of the method body.
+   */
+  private requireVM(): VMManager {
+    if (!this.vm) {
+      throw new Error('VMManager is not configured');
+    }
+    return this.vm;
+  }
+
+  /**
+   * Return the loop state for `key`, or throw if no such loop is tracked.
+   */
+  private requireState(key: string): LoopState {
+    const state = this.states.get(key);
+    if (!state) {
+      throw new Error(`Unknown loop key: ${key}`);
+    }
+    return state;
+  }
+
+  /**
    * Start a new loop execution.
    *
    * Creates a Docker container, starts it, and begins log streaming.
@@ -118,7 +148,9 @@ export class ContainerOrchestrator {
     // Check if already actively running — terminal states (COMPLETED, FAILED, STOPPED) can be restarted
     const existingState = this.states.get(key);
     if (existingState && !isLoopTerminal(existingState.status)) {
-      throw new Error(`Loop for project ${opts.projectId}${opts.role ? ` (${opts.role})` : ''} is already running`);
+      throw new Error(
+        `Loop for project ${opts.projectId}${opts.role ? ` (${opts.role})` : ''} is already running`
+      );
     }
     // Clear stale terminal state so we start fresh
     if (existingState) {
@@ -129,7 +161,7 @@ export class ContainerOrchestrator {
     const runningCount = this.listRunning().length;
     if (runningCount >= this.maxConcurrent) {
       throw new Error(
-        `Concurrency limit reached: ${runningCount}/${this.maxConcurrent} loops running`,
+        `Concurrency limit reached: ${runningCount}/${this.maxConcurrent} loops running`
       );
     }
 
@@ -153,10 +185,11 @@ export class ContainerOrchestrator {
       // Docker names must match [a-zA-Z0-9][a-zA-Z0-9_.-]*, so we lowercase,
       // replace any invalid characters with hyphens, and trim leading hyphens.
       // For factory roles, append the role to avoid name collisions.
-      const safeName = opts.projectName
-        .toLowerCase()
-        .replace(/[^a-z0-9_.-]+/g, '-')
-        .replace(/^-+/, '') || opts.projectId.substring(0, 8);
+      const safeName =
+        opts.projectName
+          .toLowerCase()
+          .replace(/[^a-z0-9_.-]+/g, '-')
+          .replace(/^-+/, '') || opts.projectId.substring(0, 8);
       const containerName = opts.role ? `zephyr-${safeName}-${opts.role}` : `zephyr-${safeName}`;
 
       // Remove any stale (stopped/exited) container with this name so we can
@@ -186,7 +219,7 @@ export class ContainerOrchestrator {
       // Start log streaming
       this.startLogStream(key, containerId, opts.mode);
 
-      return this.states.get(key)!;
+      return this.requireState(key);
     } catch (error) {
       // Mark as FAILED and surface the reason in the log buffer so the user
       // can see why startup failed rather than staring at an empty log panel.
@@ -221,7 +254,9 @@ export class ContainerOrchestrator {
     }
 
     if (isLoopTerminal(state.status)) {
-      throw new Error(`Loop for project ${projectId}${role ? ` (${role})` : ''} is already in terminal state ${state.status}`);
+      throw new Error(
+        `Loop for project ${projectId}${role ? ` (${role})` : ''} is already in terminal state ${state.status}`
+      );
     }
 
     // VM-backed loop path
@@ -244,7 +279,11 @@ export class ContainerOrchestrator {
 
       // Unpause first if the container is frozen — Docker requires it before stop.
       if (state.status === LoopStatus.PAUSED) {
-        try { await this.docker.unpauseContainer(state.containerId); } catch { /* best-effort */ }
+        try {
+          await this.docker.unpauseContainer(state.containerId);
+        } catch {
+          /* best-effort */
+        }
       }
 
       // Stop log streaming and pending broadcast
@@ -352,7 +391,9 @@ export class ContainerOrchestrator {
     }
 
     if (!isLoopTerminal(state.status)) {
-      throw new Error(`Cannot remove active loop for project ${projectId}${role ? ` (${role})` : ''}`);
+      throw new Error(
+        `Cannot remove active loop for project ${projectId}${role ? ` (${role})` : ''}`
+      );
     }
 
     this.clearLogBroadcastTimer(key);
@@ -372,7 +413,7 @@ export class ContainerOrchestrator {
    */
   async recoverLoops(
     containers: ContainerSummary[],
-    projectStore: { getProject: (id: string) => { id: string } | null },
+    projectStore: { getProject: (id: string) => { id: string } | null }
   ): Promise<string[]> {
     const recovered: string[] = [];
 
@@ -421,7 +462,7 @@ export class ContainerOrchestrator {
 
         recovered.push(projectId);
       } catch (error) {
-        console.error(`Failed to recover container ${container.id}:`, error);
+        dockerLogger.error(`Failed to recover container ${container.id}:`, error);
         // Remove the failed state if we added it
         if (projectId) {
           this.states.delete(projectId);
@@ -508,7 +549,16 @@ export class ContainerOrchestrator {
         });
         await this.vm.waitForCloudInit(vmName);
         const created = await this.vm.getVMInfo(vmName);
-        return created ?? { name: vmName, state: 'Running', cpus: vmConfig.cpus ?? 2, memory: '', disk: '', release: '' };
+        return (
+          created ?? {
+            name: vmName,
+            state: 'Running',
+            cpus: vmConfig.cpus ?? 2,
+            memory: '',
+            disk: '',
+            release: '',
+          }
+        );
       } else {
         throw new Error(`No persistent VM found for project ${projectId}`);
       }
@@ -606,7 +656,7 @@ export class ContainerOrchestrator {
       try {
         callback({ ...state }); // Pass a copy to prevent mutation
       } catch (error) {
-        console.error('Error in state change callback:', error);
+        dockerLogger.error('Error in state change callback:', error);
       }
     });
   }
@@ -617,12 +667,11 @@ export class ContainerOrchestrator {
   private async startLogStream(
     loopKey: string,
     containerId: string,
-    mode: LoopMode,
+    mode: LoopMode
   ): Promise<void> {
     try {
-      const logStream = await this.docker.streamLogs(
-        containerId,
-        (line) => this.handleLogLine(loopKey, line),
+      const logStream = await this.docker.streamLogs(containerId, (line) =>
+        this.handleLogLine(loopKey, line)
       );
 
       this.logStreams.set(loopKey, logStream);
@@ -636,7 +685,7 @@ export class ContainerOrchestrator {
       // is missed (e.g., the stream never started cleanly).
       this.monitorContainerExit(loopKey, containerId, mode);
     } catch (error) {
-      console.error(`Failed to start log stream for ${loopKey}:`, error);
+      dockerLogger.error(`Failed to start log stream for ${loopKey}:`, error);
       const errorMessage = error instanceof Error ? error.message : String(error);
       const state = this.states.get(loopKey);
       if (state) {
@@ -660,7 +709,7 @@ export class ContainerOrchestrator {
   private async resumeLogStream(
     loopKey: string,
     containerId: string,
-    sinceTimestamp: string,
+    sinceTimestamp: string
   ): Promise<void> {
     // Convert ISO timestamp to Unix timestamp (seconds since epoch)
     const since = Math.floor(new Date(sinceTimestamp).getTime() / 1000);
@@ -668,12 +717,14 @@ export class ContainerOrchestrator {
     const logStream = await this.docker.streamLogs(
       containerId,
       (line) => this.handleLogLine(loopKey, line),
-      since,
+      since
     );
 
     this.logStreams.set(loopKey, logStream);
 
-    logStream.onEnded?.(() => this.handleContainerExited(loopKey, containerId, LoopMode.CONTINUOUS));
+    logStream.onEnded?.(() =>
+      this.handleContainerExited(loopKey, containerId, LoopMode.CONTINUOUS)
+    );
 
     // Monitor container exit (assuming CONTINUOUS mode for recovered loops)
     this.monitorContainerExit(loopKey, containerId, LoopMode.CONTINUOUS);
@@ -690,10 +741,15 @@ export class ContainerOrchestrator {
   private async handleContainerExited(
     loopKey: string,
     containerId: string,
-    _mode: LoopMode,
+    _mode: LoopMode
   ): Promise<void> {
     const state = this.states.get(loopKey);
-    if (!state || isLoopTerminal(state.status) || state.status === LoopStatus.STOPPING || state.status === LoopStatus.PAUSED) {
+    if (
+      !state ||
+      isLoopTerminal(state.status) ||
+      state.status === LoopStatus.STOPPING ||
+      state.status === LoopStatus.PAUSED
+    ) {
       // Already handled — manual stop, paused, or prior terminal transition.
       return;
     }
@@ -778,19 +834,22 @@ export class ContainerOrchestrator {
 
     // Schedule a throttled state broadcast for log updates (once per second)
     if (!this.logBroadcastTimers.has(loopKey)) {
-      this.logBroadcastTimers.set(loopKey, setTimeout(() => {
-        this.logBroadcastTimers.delete(loopKey);
-        const currentState = this.states.get(loopKey);
-        if (currentState) {
-          this.stateCallbacks.forEach((callback) => {
-            try {
-              callback({ ...currentState });
-            } catch (error) {
-              console.error('Error in state change callback:', error);
-            }
-          });
-        }
-      }, 1000));
+      this.logBroadcastTimers.set(
+        loopKey,
+        setTimeout(() => {
+          this.logBroadcastTimers.delete(loopKey);
+          const currentState = this.states.get(loopKey);
+          if (currentState) {
+            this.stateCallbacks.forEach((callback) => {
+              try {
+                callback({ ...currentState });
+              } catch (error) {
+                dockerLogger.error('Error in state change callback:', error);
+              }
+            });
+          }
+        }, 1000)
+      );
     }
 
     // Notify log listeners
@@ -798,7 +857,7 @@ export class ContainerOrchestrator {
       try {
         callback(state.projectId, parsed);
       } catch (error) {
-        console.error('Error in log line callback:', error);
+        dockerLogger.error('Error in log line callback:', error);
       }
     });
   }
@@ -820,7 +879,7 @@ export class ContainerOrchestrator {
   private async monitorContainerExit(
     loopKey: string,
     containerId: string,
-    _mode: LoopMode,
+    _mode: LoopMode
   ): Promise<void> {
     try {
       // Poll container status until it exits
@@ -831,7 +890,12 @@ export class ContainerOrchestrator {
         await new Promise((resolve) => setTimeout(resolve, checkInterval));
 
         const state = this.states.get(loopKey);
-        if (!state || isLoopTerminal(state.status) || state.status === LoopStatus.STOPPING || state.status === LoopStatus.PAUSED) {
+        if (
+          !state ||
+          isLoopTerminal(state.status) ||
+          state.status === LoopStatus.STOPPING ||
+          state.status === LoopStatus.PAUSED
+        ) {
           // Loop was stopped manually, paused, or already in terminal state
           return;
         }
@@ -878,7 +942,7 @@ export class ContainerOrchestrator {
         }
       }
     } catch (error) {
-      console.error(`Error monitoring container ${containerId}:`, error);
+      dockerLogger.error(`Error monitoring container ${containerId}:`, error);
     }
   }
 
@@ -957,14 +1021,17 @@ export class ContainerOrchestrator {
    */
   private async vmStartLoop(opts: LoopStartOpts): Promise<LoopState> {
     const key = getLoopKey(opts.projectId, opts.role);
-    if (!this.vm) {
-      const errorMessage = 'VMManager is not configured';
+    let vm: VMManager;
+    try {
+      vm = this.requireVM();
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
       this.updateState(key, {
         status: LoopStatus.FAILED,
         error: errorMessage,
         stoppedAt: new Date().toISOString(),
       });
-      throw new Error(errorMessage);
+      throw error;
     }
 
     const { projectId, mode } = opts;
@@ -987,16 +1054,16 @@ export class ContainerOrchestrator {
         vmName = this.persistentVMNames.get(projectId);
         if (!vmName) {
           const prefix = `zephyr-${projectId.slice(0, 8)}-`;
-          const vms = await this.vm.listVMs();
+          const vms = await vm.listVMs();
           const match = vms.find((v) => v.name.startsWith(prefix));
-          vmName = match?.name ?? this.vm.generatePersistentVMName(projectId);
+          vmName = match?.name ?? vm.generatePersistentVMName(projectId);
         }
         this.persistentVMNames.set(projectId, vmName);
 
-        const vmInfo = await this.vm.getVMInfo(vmName);
+        const vmInfo = await vm.getVMInfo(vmName);
         if (!vmInfo) {
           // VM doesn't exist yet — create and provision it
-          await this.vm.createVM({
+          await vm.createVM({
             name: vmName,
             cpus: opts.vmConfig?.cpus ?? 2,
             memoryGb: opts.vmConfig?.memory_gb ?? 4,
@@ -1004,15 +1071,15 @@ export class ContainerOrchestrator {
             cloudInit: opts.vmConfig?.cloud_init,
             runtime: this.docker.runtimeType,
           });
-          await this.vm.waitForCloudInit(vmName);
+          await vm.waitForCloudInit(vmName);
         } else if (vmInfo.state === 'Stopped') {
-          await this.vm.startVM(vmName);
+          await vm.startVM(vmName);
         }
         // state === 'Running' → proceed immediately
       } else {
         // Ephemeral: create a fresh VM for this run
-        vmName = this.vm.generateEphemeralVMName(projectId);
-        await this.vm.createVM({
+        vmName = vm.generateEphemeralVMName(projectId);
+        await vm.createVM({
           name: vmName,
           cpus: opts.vmConfig?.cpus ?? 2,
           memoryGb: opts.vmConfig?.memory_gb ?? 4,
@@ -1020,7 +1087,7 @@ export class ContainerOrchestrator {
           cloudInit: opts.vmConfig?.cloud_init,
           runtime: this.docker.runtimeType,
         });
-        await this.vm.waitForCloudInit(vmName);
+        await vm.waitForCloudInit(vmName);
       }
 
       // Record VM name in state
@@ -1032,9 +1099,15 @@ export class ContainerOrchestrator {
       if (isLocalImage) {
         await this.transferImageToVM(vmName, opts.dockerImage);
       } else {
-        const pullResult = await this.vm.execInVM(vmName, [this.docker.runtimeType, 'pull', opts.dockerImage]);
+        const pullResult = await vm.execInVM(vmName, [
+          this.docker.runtimeType,
+          'pull',
+          opts.dockerImage,
+        ]);
         if (pullResult.exitCode !== 0) {
-          throw new Error(`${this.docker.runtimeType} pull failed inside VM: ${pullResult.stderr || pullResult.stdout}`);
+          throw new Error(
+            `${this.docker.runtimeType} pull failed inside VM: ${pullResult.stderr || pullResult.stdout}`
+          );
         }
       }
 
@@ -1047,8 +1120,8 @@ export class ContainerOrchestrator {
         for (const mount of opts.volumeMounts) {
           const hostPath = mount.split(':')[0];
           if (hostPath) {
-            await this.vm!.mountIntoVM(vmName, hostPath, hostPath).catch((err) => {
-              console.warn(`Failed to mount "${hostPath}" into VM ${vmName}:`, err);
+            await vm.mountIntoVM(vmName, hostPath, hostPath).catch((err) => {
+              vmLogger.warn(`Failed to mount "${hostPath}" into VM ${vmName}:`, err);
             });
           }
         }
@@ -1061,7 +1134,9 @@ export class ContainerOrchestrator {
       // happen when the docker run client process is killed (e.g. on manual
       // stop) before Docker's --rm cleanup fires, leaving the named container
       // behind. Best-effort: ignore errors (container may not exist).
-      await this.vm!.execInVM(vmName, [this.docker.runtimeType, 'rm', '-f', containerName]).catch(() => undefined);
+      await vm
+        .execInVM(vmName, [this.docker.runtimeType, 'rm', '-f', containerName])
+        .catch(() => undefined);
 
       // Build docker run args
       const dockerRunArgs = this.buildDockerRunArgs(opts);
@@ -1072,20 +1147,29 @@ export class ContainerOrchestrator {
       this.updateState(key, { status: LoopStatus.RUNNING });
 
       // Stream container run output from inside the VM
-      const abortController = await this.vm.streamExecInVM(
+      const abortController = await vm.streamExecInVM(
         vmName,
-        [this.docker.runtimeType, 'run', '--rm', ...runtimeRunFlags, '--name', containerName, ...dockerRunArgs, opts.dockerImage],
+        [
+          this.docker.runtimeType,
+          'run',
+          '--rm',
+          ...runtimeRunFlags,
+          '--name',
+          containerName,
+          ...dockerRunArgs,
+          opts.dockerImage,
+        ],
         (line) => this.handleLogLine(key, line),
         {
           onExit: (exitCode) => {
             this.handleVMContainerExit(key, vmName, containerName, mode, vmMode, exitCode);
           },
-        },
+        }
       );
 
       this.vmLogAbortControllers.set(key, abortController);
 
-      return this.states.get(key)!;
+      return this.requireState(key);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       this.updateState(key, {
@@ -1105,18 +1189,30 @@ export class ContainerOrchestrator {
    * Flow: docker save → write to host temp file → multipass transfer → docker load.
    */
   private async transferImageToVM(vmName: string, imageTag: string): Promise<void> {
+    const vm = this.requireVM();
     const tmpFile = path.join(os.tmpdir(), `zephyr-image-${Date.now()}.tar`);
     try {
       await this.docker.saveImage(imageTag, tmpFile);
-      await this.vm!.transfer(vmName, tmpFile, '/tmp/zephyr-image.tar');
-      const loadResult = await this.vm!.execInVM(vmName, [this.docker.runtimeType, 'load', '-i', '/tmp/zephyr-image.tar']);
+      await vm.transfer(vmName, tmpFile, '/tmp/zephyr-image.tar');
+      const loadResult = await vm.execInVM(vmName, [
+        this.docker.runtimeType,
+        'load',
+        '-i',
+        '/tmp/zephyr-image.tar',
+      ]);
       if (loadResult.exitCode !== 0) {
-        throw new Error(`${this.docker.runtimeType} load failed inside VM: ${loadResult.stderr || loadResult.stdout}`);
+        throw new Error(
+          `${this.docker.runtimeType} load failed inside VM: ${loadResult.stderr || loadResult.stdout}`
+        );
       }
     } finally {
-      try { fs.unlinkSync(tmpFile); } catch { /* ignore cleanup errors */ }
+      try {
+        fs.unlinkSync(tmpFile);
+      } catch {
+        /* ignore cleanup errors */
+      }
       // Best-effort removal of the tar inside the VM
-      this.vm!.execInVM(vmName, ['rm', '-f', '/tmp/zephyr-image.tar']).catch(() => undefined);
+      vm.execInVM(vmName, ['rm', '-f', '/tmp/zephyr-image.tar']).catch(() => undefined);
     }
   }
 
@@ -1127,7 +1223,7 @@ export class ContainerOrchestrator {
    * ephemeral VMs also deletes the VM. Persistent VMs keep running.
    */
   private async vmStopLoop(loopKey: string, vmName: string): Promise<void> {
-    const state = this.states.get(loopKey)!;
+    const state = this.requireState(loopKey);
 
     try {
       this.updateState(loopKey, { status: LoopStatus.STOPPING });
@@ -1140,19 +1236,20 @@ export class ContainerOrchestrator {
       }
 
       // Stop the docker container running inside the VM
+      const vm = this.requireVM();
       const containerName = this.deriveContainerName(state.projectName, state.projectId);
-      await this.vm!.execInVM(vmName, [this.docker.runtimeType, 'stop', containerName]);
+      await vm.execInVM(vmName, [this.docker.runtimeType, 'stop', containerName]);
 
       // For ephemeral VMs, delete the VM on stop; for persistent VMs, unmount
       // host directories that were mounted for this loop run.
       const isPersistent = this.persistentVMNames.has(state.projectId);
       if (!isPersistent) {
-        await this.vm!.deleteVM(vmName, true).catch((err) => {
-          console.error(`Failed to delete ephemeral VM ${vmName} on stop:`, err);
+        await vm.deleteVM(vmName, true).catch((err) => {
+          vmLogger.error(`Failed to delete ephemeral VM ${vmName} on stop:`, err);
         });
       } else {
-        await this.vm!.unmountFromVM(vmName).catch((err) => {
-          console.error(`Failed to unmount directories from VM ${vmName} on stop:`, err);
+        await vm.unmountFromVM(vmName).catch((err) => {
+          vmLogger.error(`Failed to unmount directories from VM ${vmName} on stop:`, err);
         });
       }
 
@@ -1184,10 +1281,15 @@ export class ContainerOrchestrator {
     _containerName: string,
     mode: LoopMode,
     vmMode: 'persistent' | 'ephemeral',
-    _exitCode: number,
+    _exitCode: number
   ): void {
     const state = this.states.get(loopKey);
-    if (!state || isLoopTerminal(state.status) || state.status === LoopStatus.STOPPING || state.status === LoopStatus.PAUSED) {
+    if (
+      !state ||
+      isLoopTerminal(state.status) ||
+      state.status === LoopStatus.STOPPING ||
+      state.status === LoopStatus.PAUSED
+    ) {
       // Already handled (e.g., stopLoop was called manually or loop is paused)
       return;
     }
@@ -1206,13 +1308,14 @@ export class ContainerOrchestrator {
 
     // Clean up after the loop ends: delete ephemeral VMs; unmount host
     // directories from persistent VMs.
+    const vm = this.requireVM();
     if (vmMode === 'ephemeral') {
-      this.vm!.deleteVM(vmName, true).catch((err) => {
-        console.error(`Failed to delete ephemeral VM ${vmName} after exit:`, err);
+      vm.deleteVM(vmName, true).catch((err) => {
+        vmLogger.error(`Failed to delete ephemeral VM ${vmName} after exit:`, err);
       });
     } else {
-      this.vm!.unmountFromVM(vmName).catch((err) => {
-        console.error(`Failed to unmount directories from VM ${vmName} after exit:`, err);
+      vm.unmountFromVM(vmName).catch((err) => {
+        vmLogger.error(`Failed to unmount directories from VM ${vmName} after exit:`, err);
       });
     }
   }

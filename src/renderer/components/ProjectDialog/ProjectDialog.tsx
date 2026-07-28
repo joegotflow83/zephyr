@@ -52,7 +52,7 @@ export const ProjectDialog: React.FC<ProjectDialogProps> = ({ mode, project, onS
   const [specFiles, setSpecFiles] = useState<Record<string, string>>({});
   const [preValidationScripts, setPreValidationScripts] = useState<string[]>([]);
   const [hooks, setHooks] = useState<string[]>([]);
-const [claudeSettingsFile, setClaudeSettingsFile] = useState<string | undefined>(undefined);
+  const [claudeSettingsFile, setClaudeSettingsFile] = useState<string | undefined>(undefined);
 
   // Image picker state: library = pick from ZephyrImage library, custom = free-text
   const [imageMode, setImageMode] = useState<ImageMode>('custom');
@@ -187,7 +187,11 @@ const [claudeSettingsFile, setClaudeSettingsFile] = useState<string | undefined>
     }
     setAdditionalMounts((prev) => [...prev, trimmed]);
     setNewMountPath('');
-    setMountErrors((prev) => { const next = { ...prev }; delete next.new; return next; });
+    setMountErrors((prev) => {
+      const next = { ...prev };
+      delete next.new;
+      return next;
+    });
   };
 
   const handleRemoveMount = (index: number) => {
@@ -375,7 +379,10 @@ const [claudeSettingsFile, setClaudeSettingsFile] = useState<string | undefined>
           <form onSubmit={handleSubmit} className="p-6">
             {/* Name field */}
             <div className="mb-4">
-              <label htmlFor="name" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              <label
+                htmlFor="name"
+                className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
+              >
                 Project Name <span className="text-red-400">*</span>
               </label>
               <input
@@ -397,7 +404,10 @@ const [claudeSettingsFile, setClaudeSettingsFile] = useState<string | undefined>
 
             {/* Repo URL field */}
             <div className="mb-4">
-              <label htmlFor="repoUrl" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              <label
+                htmlFor="repoUrl"
+                className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
+              >
                 Repository URL
               </label>
               <input
@@ -413,17 +423,19 @@ const [claudeSettingsFile, setClaudeSettingsFile] = useState<string | undefined>
                 } rounded text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500`}
                 placeholder="https://github.com/user/repo"
               />
-              {errors.repoUrl && (
-                <p className="mt-1 text-sm text-red-400">{errors.repoUrl}</p>
-              )}
+              {errors.repoUrl && <p className="mt-1 text-sm text-red-400">{errors.repoUrl}</p>}
               <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                Git repository URL (optional) — e.g. https://github.com/user/repo or git@github.com:user/repo
+                Git repository URL (optional) — e.g. https://github.com/user/repo or
+                git@github.com:user/repo
               </p>
             </div>
 
             {/* Local Path field */}
             <div className="mb-4">
-              <label htmlFor="localPath" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              <label
+                htmlFor="localPath"
+                className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
+              >
                 Local Path
               </label>
               <input
@@ -439,11 +451,11 @@ const [claudeSettingsFile, setClaudeSettingsFile] = useState<string | undefined>
                 } rounded text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500`}
                 placeholder="/home/user/my-project"
               />
-              {errors.localPath && (
-                <p className="mt-1 text-sm text-red-400">{errors.localPath}</p>
-              )}
+              {errors.localPath && <p className="mt-1 text-sm text-red-400">{errors.localPath}</p>}
               <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                Absolute path on your machine to mount into the container at <code className="bg-gray-100 dark:bg-gray-700 px-1 rounded">/workspace</code> (optional)
+                Absolute path on your machine to mount into the container at{' '}
+                <code className="bg-gray-100 dark:bg-gray-700 px-1 rounded">/workspace</code>{' '}
+                (optional)
               </p>
             </div>
 
@@ -475,7 +487,9 @@ const [claudeSettingsFile, setClaudeSettingsFile] = useState<string | undefined>
                 </div>
               </div>
               <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                Git <code className="bg-gray-100 dark:bg-gray-700 px-1 rounded">user.name</code> and <code className="bg-gray-100 dark:bg-gray-700 px-1 rounded">user.email</code> set inside the container (optional — defaults to Ralph / ralph@placeholder.com)
+                Git <code className="bg-gray-100 dark:bg-gray-700 px-1 rounded">user.name</code> and{' '}
+                <code className="bg-gray-100 dark:bg-gray-700 px-1 rounded">user.email</code> set
+                inside the container (optional — defaults to Ralph / ralph@placeholder.com)
               </p>
             </div>
 
@@ -495,9 +509,14 @@ const [claudeSettingsFile, setClaudeSettingsFile] = useState<string | undefined>
                         key={idx}
                         className="flex items-center justify-between bg-gray-100 dark:bg-gray-700 rounded px-3 py-1.5 text-sm"
                       >
-                        <span className="text-gray-800 dark:text-gray-200 font-mono truncate flex-1 mr-2">{hostPath}</span>
+                        <span className="text-gray-800 dark:text-gray-200 font-mono truncate flex-1 mr-2">
+                          {hostPath}
+                        </span>
                         <span className="text-gray-500 dark:text-gray-400 text-xs mr-3 shrink-0">
-                          → <code className="bg-gray-200 dark:bg-gray-600 px-1 rounded">/mnt/{basename}</code>
+                          →{' '}
+                          <code className="bg-gray-200 dark:bg-gray-600 px-1 rounded">
+                            /mnt/{basename}
+                          </code>
                         </span>
                         <button
                           type="button"
@@ -505,8 +524,18 @@ const [claudeSettingsFile, setClaudeSettingsFile] = useState<string | undefined>
                           className="text-gray-500 hover:text-red-400 transition-colors shrink-0"
                           aria-label={`Remove mount ${hostPath}`}
                         >
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                          <svg
+                            className="w-4 h-4"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M6 18L18 6M6 6l12 12"
+                            />
                           </svg>
                         </button>
                       </li>
@@ -522,9 +551,18 @@ const [claudeSettingsFile, setClaudeSettingsFile] = useState<string | undefined>
                   value={newMountPath}
                   onChange={(e) => {
                     setNewMountPath(e.target.value);
-                    setMountErrors((prev) => { const next = { ...prev }; delete next.new; return next; });
+                    setMountErrors((prev) => {
+                      const next = { ...prev };
+                      delete next.new;
+                      return next;
+                    });
                   }}
-                  onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddMount(); } }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      handleAddMount();
+                    }
+                  }}
                   className={`flex-1 px-3 py-2 bg-gray-100 dark:bg-gray-700 border ${
                     mountErrors.new ? 'border-red-500' : 'border-gray-200 dark:border-gray-600'
                   } rounded text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm`}
@@ -538,18 +576,21 @@ const [claudeSettingsFile, setClaudeSettingsFile] = useState<string | undefined>
                   Add
                 </button>
               </div>
-              {mountErrors.new && (
-                <p className="mt-1 text-sm text-red-400">{mountErrors.new}</p>
-              )}
+              {mountErrors.new && <p className="mt-1 text-sm text-red-400">{mountErrors.new}</p>}
               <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                 Extra host paths to mount into the container. Each path mounts at{' '}
-                <code className="bg-gray-100 dark:bg-gray-700 px-1 rounded">/mnt/&lt;foldername&gt;</code>.
+                <code className="bg-gray-100 dark:bg-gray-700 px-1 rounded">
+                  /mnt/&lt;foldername&gt;
+                </code>
+                .
               </p>
             </div>
 
             {/* Docker Image section — library picker or custom text input */}
             <div className="mb-4">
-              <div className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Docker Image</div>
+              <div className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Docker Image
+              </div>
 
               {/* Mode toggle: library vs custom */}
               <div className="flex gap-4 mb-3">
@@ -635,13 +676,17 @@ const [claudeSettingsFile, setClaudeSettingsFile] = useState<string | undefined>
 
             {/* Deployment section */}
             <div className="mb-4">
-              <div className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Deployment</div>
+              <div className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Deployment
+              </div>
               <div className="flex flex-col gap-2">
-                <label className={`flex items-start gap-3 p-3 rounded border cursor-pointer transition-colors ${
-                  sandboxType === 'container'
-                    ? 'border-blue-500 bg-blue-900/20'
-                    : 'border-gray-200 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500'
-                }`}>
+                <label
+                  className={`flex items-start gap-3 p-3 rounded border cursor-pointer transition-colors ${
+                    sandboxType === 'container'
+                      ? 'border-blue-500 bg-blue-900/20'
+                      : 'border-gray-200 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500'
+                  }`}
+                >
                   <input
                     type="radio"
                     name="sandbox-type"
@@ -651,17 +696,22 @@ const [claudeSettingsFile, setClaudeSettingsFile] = useState<string | undefined>
                     className="mt-0.5"
                   />
                   <div>
-                    <div className="text-sm font-medium text-gray-800 dark:text-gray-200">Local Containers</div>
+                    <div className="text-sm font-medium text-gray-800 dark:text-gray-200">
+                      Local Containers
+                    </div>
                     <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                      Agent containers run directly on this machine. Fastest option — no VM overhead.
+                      Agent containers run directly on this machine. Fastest option — no VM
+                      overhead.
                     </div>
                   </div>
                 </label>
-                <label className={`flex items-start gap-3 p-3 rounded border cursor-pointer transition-colors ${
-                  sandboxType === 'vm'
-                    ? 'border-blue-500 bg-blue-900/20'
-                    : 'border-gray-200 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500'
-                }`}>
+                <label
+                  className={`flex items-start gap-3 p-3 rounded border cursor-pointer transition-colors ${
+                    sandboxType === 'vm'
+                      ? 'border-blue-500 bg-blue-900/20'
+                      : 'border-gray-200 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500'
+                  }`}
+                >
                   <input
                     type="radio"
                     name="sandbox-type"
@@ -671,9 +721,12 @@ const [claudeSettingsFile, setClaudeSettingsFile] = useState<string | undefined>
                     className="mt-0.5"
                   />
                   <div>
-                    <div className="text-sm font-medium text-gray-800 dark:text-gray-200">VM + Containers</div>
+                    <div className="text-sm font-medium text-gray-800 dark:text-gray-200">
+                      VM + Containers
+                    </div>
                     <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                      Spin up an isolated Ubuntu VM and run agent containers inside it. Stronger isolation. Requires Multipass.
+                      Spin up an isolated Ubuntu VM and run agent containers inside it. Stronger
+                      isolation. Requires Multipass.
                     </div>
                   </div>
                 </label>
@@ -683,7 +736,9 @@ const [claudeSettingsFile, setClaudeSettingsFile] = useState<string | undefined>
             {/* VM Configuration — only shown when sandbox type is VM */}
             {sandboxType === 'vm' && (
               <div className="mb-4 border border-gray-200 dark:border-gray-600 rounded p-4 space-y-4">
-                <div className="text-sm font-semibold text-gray-800 dark:text-gray-200">VM Configuration</div>
+                <div className="text-sm font-semibold text-gray-800 dark:text-gray-200">
+                  VM Configuration
+                </div>
 
                 {/* Multipass unavailable warning */}
                 {!multipassAvailable && (
@@ -708,7 +763,9 @@ const [claudeSettingsFile, setClaudeSettingsFile] = useState<string | undefined>
 
                 {/* VM Mode */}
                 <div>
-                  <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2">VM Mode</div>
+                  <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2">
+                    VM Mode
+                  </div>
                   <div className="flex gap-6">
                     <label className="flex items-center gap-2 cursor-pointer text-sm text-gray-700 dark:text-gray-300">
                       <input
@@ -740,10 +797,15 @@ const [claudeSettingsFile, setClaudeSettingsFile] = useState<string | undefined>
 
                 {/* Resources */}
                 <div>
-                  <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2">Resources</div>
+                  <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2">
+                    Resources
+                  </div>
                   <div className="flex gap-4">
                     <div className="flex-1">
-                      <label htmlFor="vm-cpus" className="block text-xs text-gray-500 dark:text-gray-400 mb-1">
+                      <label
+                        htmlFor="vm-cpus"
+                        className="block text-xs text-gray-500 dark:text-gray-400 mb-1"
+                      >
                         CPUs
                       </label>
                       <input
@@ -757,7 +819,10 @@ const [claudeSettingsFile, setClaudeSettingsFile] = useState<string | undefined>
                       />
                     </div>
                     <div className="flex-1">
-                      <label htmlFor="vm-memory" className="block text-xs text-gray-500 dark:text-gray-400 mb-1">
+                      <label
+                        htmlFor="vm-memory"
+                        className="block text-xs text-gray-500 dark:text-gray-400 mb-1"
+                      >
                         Memory (GB)
                       </label>
                       <input
@@ -766,12 +831,17 @@ const [claudeSettingsFile, setClaudeSettingsFile] = useState<string | undefined>
                         min={1}
                         max={64}
                         value={vmMemoryGb}
-                        onChange={(e) => setVmMemoryGb(Math.max(1, parseInt(e.target.value, 10) || 1))}
+                        onChange={(e) =>
+                          setVmMemoryGb(Math.max(1, parseInt(e.target.value, 10) || 1))
+                        }
                         className="w-full px-3 py-2 bg-gray-100 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                       />
                     </div>
                     <div className="flex-1">
-                      <label htmlFor="vm-disk" className="block text-xs text-gray-500 dark:text-gray-400 mb-1">
+                      <label
+                        htmlFor="vm-disk"
+                        className="block text-xs text-gray-500 dark:text-gray-400 mb-1"
+                      >
                         Disk (GB)
                       </label>
                       <input
@@ -780,7 +850,9 @@ const [claudeSettingsFile, setClaudeSettingsFile] = useState<string | undefined>
                         min={5}
                         max={500}
                         value={vmDiskGb}
-                        onChange={(e) => setVmDiskGb(Math.max(5, parseInt(e.target.value, 10) || 5))}
+                        onChange={(e) =>
+                          setVmDiskGb(Math.max(5, parseInt(e.target.value, 10) || 5))
+                        }
                         className="w-full px-3 py-2 bg-gray-100 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                       />
                     </div>
@@ -798,7 +870,10 @@ const [claudeSettingsFile, setClaudeSettingsFile] = useState<string | undefined>
                   </button>
                   {showVmAdvanced && (
                     <div className="mt-2">
-                      <label htmlFor="vm-cloud-init" className="block text-xs text-gray-500 dark:text-gray-400 mb-1">
+                      <label
+                        htmlFor="vm-cloud-init"
+                        className="block text-xs text-gray-500 dark:text-gray-400 mb-1"
+                      >
                         Cloud-init YAML (optional override)
                       </label>
                       <textarea
@@ -812,7 +887,6 @@ const [claudeSettingsFile, setClaudeSettingsFile] = useState<string | undefined>
                       <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                         Leave blank to use the built-in template that installs Docker inside the VM.
                       </p>
-
                     </div>
                   )}
                 </div>
@@ -821,102 +895,137 @@ const [claudeSettingsFile, setClaudeSettingsFile] = useState<string | undefined>
 
             {/* Pipeline section */}
             <div className="mb-4">
-              <div className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Pipeline</div>
+              <div className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Pipeline
+              </div>
               <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
                 Choose the pipeline that defines how tasks flow between agents.
               </p>
               <div className="border border-gray-200 dark:border-gray-600 rounded p-4 space-y-3">
-                  {/* Pipeline selector */}
-                  <div>
-                    {pipelines.length === 0 ? (
-                      <p className="text-xs text-amber-600 dark:text-amber-400">
-                        No pipelines available. Create one in Settings → Pipelines.
-                      </p>
-                    ) : (
-                      <select
-                        id="factory-pipeline"
-                        aria-label="Pipeline"
-                        value={selectedPipelineId ?? ''}
-                        onChange={(e) => setSelectedPipelineId(e.target.value || undefined)}
-                        className="w-full px-2 py-1.5 text-sm bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500"
-                      >
-                        <option value="">— select a pipeline —</option>
-                        {pipelines.filter((p) => p.builtIn).length > 0 && (
-                          <optgroup label="Built-in">
-                            {pipelines.filter((p) => p.builtIn).map((p) => (
-                              <option key={p.id} value={p.id}>{p.name}</option>
+                {/* Pipeline selector */}
+                <div>
+                  {pipelines.length === 0 ? (
+                    <p className="text-xs text-amber-600 dark:text-amber-400">
+                      No pipelines available. Create one in Settings → Pipelines.
+                    </p>
+                  ) : (
+                    <select
+                      id="factory-pipeline"
+                      aria-label="Pipeline"
+                      value={selectedPipelineId ?? ''}
+                      onChange={(e) => setSelectedPipelineId(e.target.value || undefined)}
+                      className="w-full px-2 py-1.5 text-sm bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    >
+                      <option value="">— select a pipeline —</option>
+                      {pipelines.filter((p) => p.builtIn).length > 0 && (
+                        <optgroup label="Built-in">
+                          {pipelines
+                            .filter((p) => p.builtIn)
+                            .map((p) => (
+                              <option key={p.id} value={p.id}>
+                                {p.name}
+                              </option>
                             ))}
-                          </optgroup>
-                        )}
-                        {pipelines.filter((p) => !p.builtIn).length > 0 && (
-                          <optgroup label="Your Pipelines">
-                            {pipelines.filter((p) => !p.builtIn).map((p) => (
-                              <option key={p.id} value={p.id}>{p.name}</option>
+                        </optgroup>
+                      )}
+                      {pipelines.filter((p) => !p.builtIn).length > 0 && (
+                        <optgroup label="Your Pipelines">
+                          {pipelines
+                            .filter((p) => !p.builtIn)
+                            .map((p) => (
+                              <option key={p.id} value={p.id}>
+                                {p.name}
+                              </option>
                             ))}
-                          </optgroup>
-                        )}
-                      </select>
-                    )}
-                    {selectedPipelineId && (
-                      <button
-                        type="button"
-                        onClick={handleOpenPipelineBuilder}
-                        className="mt-2 text-sm text-blue-400 hover:text-blue-300 transition-colors"
-                      >
-                        {pipelines.find((p) => p.id === selectedPipelineId)?.builtIn
-                          ? 'View Pipeline →'
-                          : 'Edit Pipeline →'}
-                      </button>
-                    )}
-                    {errors.pipeline && (
-                      <p className="mt-1 text-xs text-red-500">{errors.pipeline}</p>
-                    )}
-                  </div>
-
-                  {/* Stage preview */}
-                  {(() => {
-                    const selectedPipeline = pipelines.find((p) => p.id === selectedPipelineId);
-                    return selectedPipeline ? (
-                      <div>
-                        <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2">
-                          Pipeline Stages
-                        </div>
-                        <div className="flex flex-wrap gap-1.5 items-center">
-                          <span className="px-2 py-0.5 text-xs rounded bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-600">
-                            Backlog
-                          </span>
-                          {selectedPipeline.stages.map((stage) => (
-                            <React.Fragment key={stage.id}>
-                              <span className="text-gray-400 dark:text-gray-500 text-xs" aria-hidden="true">→</span>
-                              <span
-                                className="px-2 py-0.5 text-xs rounded border border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-300"
-                                style={stage.color ? { borderColor: stage.color, backgroundColor: `${stage.color}22` } : undefined}
-                              >
-                                {stage.icon && <span aria-hidden="true" className="mr-1">{stage.icon}</span>}
-                                {stage.name}
-                                {stage.instances > 1 && (
-                                  <span className="ml-1 text-gray-400 dark:text-gray-500">×{stage.instances}</span>
-                                )}
-                              </span>
-                            </React.Fragment>
-                          ))}
-                          <span className="text-gray-400 dark:text-gray-500 text-xs" aria-hidden="true">→</span>
-                          <span className="px-2 py-0.5 text-xs rounded bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-600">
-                            Done
-                          </span>
-                        </div>
-                        {selectedPipeline.description && (
-                          <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">{selectedPipeline.description}</p>
-                        )}
-                      </div>
-                    ) : null;
-                  })()}
-
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
-                    Team coordination files (@team_plan.md, team/handovers/*, team/tasks/pending/, tasks/pending/)
-                    will be created in the workspace automatically.
-                  </p>
+                        </optgroup>
+                      )}
+                    </select>
+                  )}
+                  {selectedPipelineId && (
+                    <button
+                      type="button"
+                      onClick={handleOpenPipelineBuilder}
+                      className="mt-2 text-sm text-blue-400 hover:text-blue-300 transition-colors"
+                    >
+                      {pipelines.find((p) => p.id === selectedPipelineId)?.builtIn
+                        ? 'View Pipeline →'
+                        : 'Edit Pipeline →'}
+                    </button>
+                  )}
+                  {errors.pipeline && (
+                    <p className="mt-1 text-xs text-red-500">{errors.pipeline}</p>
+                  )}
                 </div>
+
+                {/* Stage preview */}
+                {(() => {
+                  const selectedPipeline = pipelines.find((p) => p.id === selectedPipelineId);
+                  return selectedPipeline ? (
+                    <div>
+                      <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2">
+                        Pipeline Stages
+                      </div>
+                      <div className="flex flex-wrap gap-1.5 items-center">
+                        <span className="px-2 py-0.5 text-xs rounded bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-600">
+                          Backlog
+                        </span>
+                        {selectedPipeline.stages.map((stage) => (
+                          <React.Fragment key={stage.id}>
+                            <span
+                              className="text-gray-400 dark:text-gray-500 text-xs"
+                              aria-hidden="true"
+                            >
+                              →
+                            </span>
+                            <span
+                              className="px-2 py-0.5 text-xs rounded border border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-300"
+                              style={
+                                stage.color
+                                  ? {
+                                      borderColor: stage.color,
+                                      backgroundColor: `${stage.color}22`,
+                                    }
+                                  : undefined
+                              }
+                            >
+                              {stage.icon && (
+                                <span aria-hidden="true" className="mr-1">
+                                  {stage.icon}
+                                </span>
+                              )}
+                              {stage.name}
+                              {stage.instances > 1 && (
+                                <span className="ml-1 text-gray-400 dark:text-gray-500">
+                                  ×{stage.instances}
+                                </span>
+                              )}
+                            </span>
+                          </React.Fragment>
+                        ))}
+                        <span
+                          className="text-gray-400 dark:text-gray-500 text-xs"
+                          aria-hidden="true"
+                        >
+                          →
+                        </span>
+                        <span className="px-2 py-0.5 text-xs rounded bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-600">
+                          Done
+                        </span>
+                      </div>
+                      {selectedPipeline.description && (
+                        <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                          {selectedPipeline.description}
+                        </p>
+                      )}
+                    </div>
+                  ) : null;
+                })()}
+
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                  Team coordination files (@team_plan.md, team/handovers/*, team/tasks/pending/,
+                  tasks/pending/) will be created in the workspace automatically.
+                </p>
+              </div>
             </div>
 
             {/* Pre-Validation Scripts section */}
@@ -948,11 +1057,13 @@ const [claudeSettingsFile, setClaudeSettingsFile] = useState<string | undefined>
                   {showClaudeConfig && (
                     <div className="pl-1 mt-2">
                       <HooksSection selected={hooks} onChange={setHooks} />
-                      <ClaudeSettingsSection selected={claudeSettingsFile} onChange={setClaudeSettingsFile} />
+                      <ClaudeSettingsSection
+                        selected={claudeSettingsFile}
+                        onChange={setClaudeSettingsFile}
+                      />
                     </div>
                   )}
                 </div>
-
               </div>
             </div>
 
@@ -973,7 +1084,9 @@ const [claudeSettingsFile, setClaudeSettingsFile] = useState<string | undefined>
                 </div>
 
                 {!showGithubSection && hasStoredPat && (
-                  <p className="text-xs text-green-400">Token stored — deploy keys will be created automatically on loop start.</p>
+                  <p className="text-xs text-green-400">
+                    Token stored — deploy keys will be created automatically on loop start.
+                  </p>
                 )}
 
                 {showGithubSection && (
@@ -984,21 +1097,34 @@ const [claudeSettingsFile, setClaudeSettingsFile] = useState<string | undefined>
                         type="password"
                         value={githubPat}
                         onChange={(e) => setGithubPat(e.target.value)}
-                        placeholder={hasStoredPat ? '••••••••••••  (leave blank to keep existing)' : 'github_pat_…'}
+                        placeholder={
+                          hasStoredPat
+                            ? '••••••••••••  (leave blank to keep existing)'
+                            : 'github_pat_…'
+                        }
                         className="w-full px-3 py-2 bg-gray-100 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                         autoComplete="off"
                       />
                       <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                         Fine-grained PAT scoped to this repo with:{' '}
-                        <strong className="text-gray-700 dark:text-gray-300">Administration</strong> (read/write) for deploy keys,{' '}
-                        <strong className="text-gray-700 dark:text-gray-300">Contents</strong> (read/write) to push commits,{' '}
-                        <strong className="text-gray-700 dark:text-gray-300">Actions</strong> (read) to check workflow runs.{' '}
+                        <strong className="text-gray-700 dark:text-gray-300">Administration</strong>{' '}
+                        (read/write) for deploy keys,{' '}
+                        <strong className="text-gray-700 dark:text-gray-300">Contents</strong>{' '}
+                        (read/write) to push commits,{' '}
+                        <strong className="text-gray-700 dark:text-gray-300">Actions</strong> (read)
+                        to check workflow runs.{' '}
                         <a
                           href="https://github.com/settings/personal-access-tokens/new"
                           target="_blank"
                           rel="noreferrer"
                           className="text-blue-400 hover:text-blue-300 underline"
-                          onClick={(e) => { e.preventDefault(); window.open('https://github.com/settings/personal-access-tokens/new', '_blank'); }}
+                          onClick={(e) => {
+                            e.preventDefault();
+                            window.open(
+                              'https://github.com/settings/personal-access-tokens/new',
+                              '_blank'
+                            );
+                          }}
                         >
                           Create token on GitHub
                         </a>
@@ -1042,7 +1168,9 @@ const [claudeSettingsFile, setClaudeSettingsFile] = useState<string | undefined>
                 </div>
 
                 {!showGitlabSection && hasStoredGitlabPat && (
-                  <p className="text-xs text-green-400">Token stored — deploy keys will be created automatically on loop start.</p>
+                  <p className="text-xs text-green-400">
+                    Token stored — deploy keys will be created automatically on loop start.
+                  </p>
                 )}
 
                 {showGitlabSection && (
@@ -1053,18 +1181,33 @@ const [claudeSettingsFile, setClaudeSettingsFile] = useState<string | undefined>
                         type="password"
                         value={gitlabPat}
                         onChange={(e) => setGitlabPat(e.target.value)}
-                        placeholder={hasStoredGitlabPat ? '••••••••••••  (leave blank to keep existing)' : 'glpat-…'}
+                        placeholder={
+                          hasStoredGitlabPat
+                            ? '••••••••••••  (leave blank to keep existing)'
+                            : 'glpat-…'
+                        }
                         className="w-full px-3 py-2 bg-gray-100 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                         autoComplete="off"
                       />
                       <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                        PAT with <code className="bg-gray-200 dark:bg-gray-700 px-1 rounded">api</code> or <code className="bg-gray-200 dark:bg-gray-700 px-1 rounded">write_repository</code> scope for deploy key management.{' '}
+                        PAT with{' '}
+                        <code className="bg-gray-200 dark:bg-gray-700 px-1 rounded">api</code> or{' '}
+                        <code className="bg-gray-200 dark:bg-gray-700 px-1 rounded">
+                          write_repository
+                        </code>{' '}
+                        scope for deploy key management.{' '}
                         <a
                           href="https://gitlab.com/-/user_settings/personal_access_tokens"
                           target="_blank"
                           rel="noreferrer"
                           className="text-blue-400 hover:text-blue-300 underline"
-                          onClick={(e) => { e.preventDefault(); window.open('https://gitlab.com/-/user_settings/personal_access_tokens', '_blank'); }}
+                          onClick={(e) => {
+                            e.preventDefault();
+                            window.open(
+                              'https://gitlab.com/-/user_settings/personal_access_tokens',
+                              '_blank'
+                            );
+                          }}
                         >
                           Create token on GitLab
                         </a>

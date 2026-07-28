@@ -19,6 +19,9 @@ import type {
   ProgressCallback,
   RuntimeInfo,
 } from './container-runtime';
+import { getLogger } from './logging';
+
+const logger = getLogger('docker');
 
 /**
  * DockerRuntime — ContainerRuntime implementation backed by the Docker daemon
@@ -174,7 +177,21 @@ export class DockerRuntime implements ContainerRuntime {
   // ── Container lifecycle ─────────────────────────────────────────────────────
 
   async createContainer(opts: ContainerCreateOpts): Promise<string> {
-    const { image, projectId, name, command, env, binds, labels, workingDir, autoRemove, capAdd, securityOpts, networkMode, tty } = opts;
+    const {
+      image,
+      projectId,
+      name,
+      command,
+      env,
+      binds,
+      labels,
+      workingDir,
+      autoRemove,
+      capAdd,
+      securityOpts,
+      networkMode,
+      tty,
+    } = opts;
 
     const envArray = env ? Object.entries(env).map(([k, v]) => `${k}=${v}`) : undefined;
 
@@ -337,7 +354,7 @@ export class DockerRuntime implements ContainerRuntime {
     const shell = opts?.shell || 'bash';
 
     const exec = await container.exec({
-      Cmd: [shell],
+      Cmd: opts?.command?.length ? opts.command : [shell],
       AttachStdin: true,
       AttachStdout: true,
       AttachStderr: true,
@@ -404,8 +421,7 @@ export class DockerRuntime implements ContainerRuntime {
     // Fix: if a frame's payload starts with a Docker timestamp and the buffer
     // already has unsettled content (no trailing newline), insert '\n' first so
     // each Docker log entry becomes a distinct line.
-    const RE_DOCKER_TS =
-      /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2}) /;
+    const RE_DOCKER_TS = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2}) /;
 
     stream.on('data', (chunk: Buffer) => {
       // Docker multiplexes stdout/stderr with an 8-byte header.
@@ -454,7 +470,7 @@ export class DockerRuntime implements ContainerRuntime {
     });
 
     stream.on('error', (error: Error) => {
-      console.error(`Log stream error for container ${containerId}:`, error);
+      logger.error(`Log stream error for container ${containerId}:`, error);
       stream.destroy();
     });
 

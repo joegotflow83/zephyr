@@ -53,12 +53,12 @@ export function generateDockerfile(config: ImageBuildConfig): string {
   // GitHub CLI: gh (via official GitHub apt repo)
   sections.push(
     'RUN wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | gpg --dearmor | tee /usr/share/keyrings/trivy.gpg > /dev/null && \\\n' +
-    '    echo "deb [signed-by=/usr/share/keyrings/trivy.gpg] https://aquasecurity.github.io/trivy-repo/deb generic main" | tee /etc/apt/sources.list.d/trivy.list && \\\n' +
-    '    wget -qO - https://cli.github.com/packages/githubcli-archive-keyring.gpg | tee /usr/share/keyrings/githubcli-archive-keyring.gpg > /dev/null && \\\n' +
-    '    echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | tee /etc/apt/sources.list.d/github-cli.list && \\\n' +
-    '    apt-get update && apt-get install -y trivy gh && \\\n' +
-    '    rm -rf /var/lib/apt/lists/* && \\\n' +
-    '    pip3 install --break-system-packages semgrep bandit'
+      '    echo "deb [signed-by=/usr/share/keyrings/trivy.gpg] https://aquasecurity.github.io/trivy-repo/deb generic main" | tee /etc/apt/sources.list.d/trivy.list && \\\n' +
+      '    wget -qO - https://cli.github.com/packages/githubcli-archive-keyring.gpg | tee /usr/share/keyrings/githubcli-archive-keyring.gpg > /dev/null && \\\n' +
+      '    echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | tee /etc/apt/sources.list.d/github-cli.list && \\\n' +
+      '    apt-get update && apt-get install -y trivy gh && \\\n' +
+      '    rm -rf /var/lib/apt/lists/* && \\\n' +
+      '    pip3 install --break-system-packages semgrep bandit'
   );
   sections.push('');
 
@@ -68,9 +68,9 @@ export function generateDockerfile(config: ImageBuildConfig): string {
   // prevent groupadd/useradd exit code 4 ("GID/UID already in use").
   sections.push(
     'RUN (getent passwd "${HOST_UID}" | cut -d: -f1 | xargs -r userdel -r) 2>/dev/null || true && \\\n' +
-    '    (getent group "${HOST_GID}" | cut -d: -f1 | xargs -r groupdel) 2>/dev/null || true && \\\n' +
-    '    groupadd -g ${HOST_GID} ralph && \\\n' +
-    '    useradd -m -u ${HOST_UID} -g ${HOST_GID} -s /bin/bash ralph'
+      '    (getent group "${HOST_GID}" | cut -d: -f1 | xargs -r groupdel) 2>/dev/null || true && \\\n' +
+      '    groupadd -g ${HOST_GID} ralph && \\\n' +
+      '    useradd -m -u ${HOST_UID} -g ${HOST_GID} -s /bin/bash ralph'
   );
 
   // Language install blocks
@@ -131,8 +131,8 @@ export function generateClaudeCodeInstallBlock(hasNodejs: boolean): string {
     // so that npm is available for the Claude Code global install below.
     parts.push(
       'RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - && \\\n' +
-      '    apt-get install -y nodejs && \\\n' +
-      '    rm -rf /var/lib/apt/lists/*'
+        '    apt-get install -y nodejs && \\\n' +
+        '    rm -rf /var/lib/apt/lists/*'
     );
     parts.push('');
   }
@@ -158,13 +158,13 @@ export function generateClaudeCodeConfigBlock(): string {
  */
 export function generateAIToolsInstallBlock(): string {
   return (
-    'RUN curl --proto \'=https\' --tlsv1.2 -sSf \\\n' +
+    "RUN curl --proto '=https' --tlsv1.2 -sSf \\\n" +
     '    "https://desktop-release.q.us-east-1.amazonaws.com/latest/q-x86_64-linux.zip" \\\n' +
     '    -o /tmp/q.zip && \\\n' +
     '    unzip /tmp/q.zip -d /tmp/q-install && \\\n' +
     '    /tmp/q-install/q/install.sh --no-confirm && \\\n' +
     '    rm -rf /tmp/q.zip /tmp/q-install && \\\n' +
-    '    curl --proto \'=https\' --tlsv1.2 -sSf \\\n' +
+    "    curl --proto '=https' --tlsv1.2 -sSf \\\n" +
     '    "https://desktop-release.q.us-east-1.amazonaws.com/latest/kirocli-x86_64-linux.zip" \\\n' +
     '    -o /tmp/kirocli.zip && \\\n' +
     '    unzip /tmp/kirocli.zip -d /tmp/kirocli-install && \\\n' +

@@ -104,8 +104,12 @@ export class LogExporter {
       lines.push(`Status: ${loopState.status}`);
       lines.push(`Mode: ${loopState.mode}`);
       lines.push(`Container: ${loopState.containerId || 'N/A'}`);
-      lines.push(`Started: ${loopState.startedAt ? new Date(loopState.startedAt).toISOString() : 'N/A'}`);
-      lines.push(`Completed: ${loopState.stoppedAt ? new Date(loopState.stoppedAt).toISOString() : 'N/A'}`);
+      lines.push(
+        `Started: ${loopState.startedAt ? new Date(loopState.startedAt).toISOString() : 'N/A'}`
+      );
+      lines.push(
+        `Completed: ${loopState.stoppedAt ? new Date(loopState.stoppedAt).toISOString() : 'N/A'}`
+      );
       lines.push(`Iteration: ${loopState.iteration}`);
       lines.push(`Commits: ${loopState.commits.length}`);
       lines.push(`Errors: ${loopState.errors}`);
@@ -170,10 +174,13 @@ export class LogExporter {
     lines.push('');
 
     // Group by status
-    const statusCounts = loopStates.reduce((acc, loop) => {
-      acc[loop.status] = (acc[loop.status] || 0) + 1;
-      return acc;
-    }, {} as Record<string, number>);
+    const statusCounts = loopStates.reduce(
+      (acc, loop) => {
+        acc[loop.status] = (acc[loop.status] || 0) + 1;
+        return acc;
+      },
+      {} as Record<string, number>
+    );
 
     lines.push('Status Breakdown:');
     for (const [status, count] of Object.entries(statusCounts)) {

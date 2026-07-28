@@ -22,7 +22,7 @@ export function useActiveFactories(): number {
           const activeFactoryProjectIds = new Set(
             loops
               .filter((loop: LoopState) => loop.role !== undefined && isLoopActive(loop.status))
-              .map((loop: LoopState) => loop.projectId),
+              .map((loop: LoopState) => loop.projectId)
           );
           setCount(activeFactoryProjectIds.size);
         }

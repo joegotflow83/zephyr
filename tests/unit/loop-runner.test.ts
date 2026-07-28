@@ -10,6 +10,11 @@ import type { ContainerRuntime, ContainerStatus } from '../../src/services/conta
 
 // -- Mocks --------------------------------------------------------------------
 
+const mockDockerLogger = vi.hoisted(() => ({ error: vi.fn(), warn: vi.fn(), info: vi.fn(), debug: vi.fn() }));
+vi.mock('../../src/services/logging', () => ({
+  getLogger: () => mockDockerLogger,
+}));
+
 function createMockDockerManager(): ContainerRuntime {
   return {
     runtimeType: 'docker',
@@ -470,8 +475,6 @@ describe('ContainerOrchestrator', () => {
     });
 
     it('does not throw if callback throws', async () => {
-      const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
-
       const badCallback = vi.fn(() => {
         throw new Error('Callback error');
       });
@@ -489,11 +492,10 @@ describe('ContainerOrchestrator', () => {
       // Good callback should still be called despite bad callback throwing
       expect(goodCallback).toHaveBeenCalled();
       // Error should be logged, not re-thrown
-      expect(consoleError).toHaveBeenCalledWith(
+      expect(mockDockerLogger.error).toHaveBeenCalledWith(
         'Error in state change callback:',
         expect.any(Error),
       );
-      consoleError.mockRestore();
     });
   });
 

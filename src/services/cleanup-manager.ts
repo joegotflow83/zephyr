@@ -27,7 +27,10 @@ export class CleanupManager {
     }
 
     this.trackedContainers.add(id);
-    logger.debug('Container registered for cleanup', { containerId: id, total: this.trackedContainers.size });
+    logger.debug('Container registered for cleanup', {
+      containerId: id,
+      total: this.trackedContainers.size,
+    });
   }
 
   /**
@@ -43,7 +46,10 @@ export class CleanupManager {
 
     const removed = this.trackedContainers.delete(id);
     if (removed) {
-      logger.debug('Container unregistered from cleanup', { containerId: id, total: this.trackedContainers.size });
+      logger.debug('Container unregistered from cleanup', {
+        containerId: id,
+        total: this.trackedContainers.size,
+      });
     }
   }
 
@@ -84,21 +90,21 @@ export class CleanupManager {
         } catch (error) {
           logger.error('Failed to clean up container', {
             containerId,
-            error: error instanceof Error ? error.message : String(error)
+            error: error instanceof Error ? error.message : String(error),
           });
           // Don't re-throw - best-effort cleanup
         }
       })
     );
 
-    const succeeded = results.filter(r => r.status === 'fulfilled').length;
-    const failed = results.filter(r => r.status === 'rejected').length;
+    const succeeded = results.filter((r) => r.status === 'fulfilled').length;
+    const failed = results.filter((r) => r.status === 'rejected').length;
 
     logger.info('Cleanup completed', {
       total: containerIds.length,
       succeeded,
       failed,
-      remaining: this.trackedContainers.size
+      remaining: this.trackedContainers.size,
     });
   }
 }

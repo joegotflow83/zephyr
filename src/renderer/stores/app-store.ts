@@ -12,7 +12,12 @@
  */
 
 import { create } from 'zustand';
-import type { ProjectConfig, AppSettings, ZephyrImage, ImageBuildConfig } from '../../shared/models';
+import type {
+  ProjectConfig,
+  AppSettings,
+  ZephyrImage,
+  ImageBuildConfig,
+} from '../../shared/models';
 import type { LoopState } from '../../shared/loop-types';
 import { getLoopKey } from '../../shared/loop-types';
 import type { RuntimeInfo } from '../../services/container-runtime';
@@ -168,9 +173,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   updateProject: (id, updates) =>
     set((state) => ({
-      projects: state.projects.map((p) =>
-        p.id === id ? { ...p, ...updates } : p
-      ),
+      projects: state.projects.map((p) => (p.id === id ? { ...p, ...updates } : p)),
     })),
 
   removeProject: (id) =>
@@ -203,9 +206,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       if (existing) {
         // Update existing loop
         return {
-          loops: prevState.loops.map((l) =>
-            getLoopKey(l) === key ? state : l
-          ),
+          loops: prevState.loops.map((l) => (getLoopKey(l) === key ? state : l)),
         };
       } else {
         // Add new loop
@@ -319,8 +320,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   // Docker actions
-  setDockerStatus: (connected, info) =>
-    set({ dockerConnected: connected, dockerInfo: info }),
+  setDockerStatus: (connected, info) => set({ dockerConnected: connected, dockerInfo: info }),
 
   // VM actions
   setVMInfos: (vmInfos) => set({ vmInfos }),
@@ -402,10 +402,11 @@ export const useAppStore = create<AppState>((set, get) => ({
   markMailboxRead: async (id) => {
     await window.api.mailbox.markRead(id);
     set((state) => {
-      const messages = state.mailboxMessages.map((m) =>
-        m.id === id ? { ...m, read: true } : m
-      );
-      return { mailboxMessages: messages, mailboxUnreadCount: messages.filter((m) => !m.read).length };
+      const messages = state.mailboxMessages.map((m) => (m.id === id ? { ...m, read: true } : m));
+      return {
+        mailboxMessages: messages,
+        mailboxUnreadCount: messages.filter((m) => !m.read).length,
+      };
     });
   },
 
@@ -421,7 +422,10 @@ export const useAppStore = create<AppState>((set, get) => ({
     await window.api.mailbox.delete(id);
     set((state) => {
       const messages = state.mailboxMessages.filter((m) => m.id !== id);
-      return { mailboxMessages: messages, mailboxUnreadCount: messages.filter((m) => !m.read).length };
+      return {
+        mailboxMessages: messages,
+        mailboxUnreadCount: messages.filter((m) => !m.read).length,
+      };
     });
   },
 }));
@@ -476,7 +480,10 @@ export function initializeStoreListeners() {
 
   // Mailbox push updates from main process
   window.api.mailbox.onChanged((payload) => {
-    useAppStore.setState({ mailboxMessages: payload.messages, mailboxUnreadCount: payload.unreadCount });
+    useAppStore.setState({
+      mailboxMessages: payload.messages,
+      mailboxUnreadCount: payload.unreadCount,
+    });
   });
 
   // Initial data load

@@ -104,6 +104,12 @@ export interface ExecOpts {
  */
 export interface ExecSessionOpts {
   shell?: string; // e.g. 'bash', 'sh'
+  /**
+   * Full argv to exec instead of an interactive shell. When set, `shell` is
+   * ignored. Used by planning sessions to attach the terminal directly to the
+   * LLM engine (e.g. ['kiro-cli', 'chat']) rather than to bash.
+   */
+  command?: string[];
   user?: string;
   workingDir?: string;
   env?: string[];

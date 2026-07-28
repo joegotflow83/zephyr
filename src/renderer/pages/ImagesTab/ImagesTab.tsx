@@ -11,7 +11,8 @@ import type { ZephyrImage } from '../../../shared/models';
  * Shows a build progress banner at the bottom during active builds.
  */
 export const ImagesTab: React.FC = () => {
-  const { images, loading, error, buildProgress, buildActive, rebuild, remove, refresh } = useImages();
+  const { images, loading, error, buildProgress, buildActive, rebuild, remove, refresh } =
+    useImages();
 
   const [showBuilder, setShowBuilder] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState<ZephyrImage | null>(null);
@@ -54,7 +55,9 @@ export const ImagesTab: React.FC = () => {
         <div className="flex flex-col items-center justify-center flex-1 p-6">
           <div className="text-center max-w-md">
             <div className="text-6xl mb-4">🖼️</div>
-            <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">No Images Built Yet</h2>
+            <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+              No Images Built Yet
+            </h2>
             <p className="text-gray-500 dark:text-gray-400 mb-6">
               No images built yet. Click &apos;Build New Image&apos; to get started.
             </p>
@@ -142,7 +145,9 @@ export const ImagesTab: React.FC = () => {
             <div className="p-4 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800">
               <div className="flex items-center gap-2 mb-1">
                 <div className="animate-spin rounded-full h-3 w-3 border-2 border-green-400 border-t-transparent" />
-                <div className="text-xs font-medium text-gray-500 dark:text-gray-400">Build Progress</div>
+                <div className="text-xs font-medium text-gray-500 dark:text-gray-400">
+                  Build Progress
+                </div>
               </div>
               <div className="text-sm text-green-300 font-mono">{buildProgress}</div>
             </div>

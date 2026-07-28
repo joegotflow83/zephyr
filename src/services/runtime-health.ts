@@ -1,4 +1,7 @@
 import { ContainerRuntime } from './container-runtime';
+import { getLogger } from './logging';
+
+const logger = getLogger('docker');
 
 /**
  * Callback type for runtime status change events
@@ -106,7 +109,8 @@ export class RuntimeHealthMonitor {
         }
 
         const statusChanged = this.lastKnownStatus !== isAvailable;
-        const versionChanged = version !== null && this.lastKnownVersion !== null && version !== this.lastKnownVersion;
+        const versionChanged =
+          version !== null && this.lastKnownVersion !== null && version !== this.lastKnownVersion;
 
         this.lastKnownStatus = isAvailable;
         this.lastKnownVersion = version;
@@ -122,7 +126,7 @@ export class RuntimeHealthMonitor {
         }
       }
     } catch (error) {
-      console.error('Error checking runtime availability:', error);
+      logger.error('Error checking runtime availability:', error);
 
       if (this.lastKnownStatus !== false) {
         this.lastKnownStatus = false;
@@ -137,7 +141,7 @@ export class RuntimeHealthMonitor {
       try {
         callback(isAvailable);
       } catch (error) {
-        console.error('Error in RuntimeHealthMonitor callback:', error);
+        logger.error('Error in RuntimeHealthMonitor callback:', error);
       }
     }
   }

@@ -48,13 +48,9 @@ export function deriveTransitions(pipeline: Pipeline): DerivedTransitions {
   // and never by individual child tasks. Including them in the flow would make
   // deriveTransitions().forward['lastRegularStage'] point at the debrief stage
   // instead of 'done', causing child tasks to land there on every forward signal.
-  const debriefIds = new Set(
-    pipeline.stages.filter((s) => s.role === 'debrief').map((s) => s.id),
-  );
+  const debriefIds = new Set(pipeline.stages.filter((s) => s.role === 'debrief').map((s) => s.id));
 
-  const flow = all.filter(
-    (c) => c !== 'blocked' && c !== 'needs_input' && !debriefIds.has(c),
-  ); // [backlog, ...non-debrief stages, done]
+  const flow = all.filter((c) => c !== 'blocked' && c !== 'needs_input' && !debriefIds.has(c)); // [backlog, ...non-debrief stages, done]
 
   const allowed: Record<string, string[]> = {};
   const forward: Record<string, string | null> = {};
