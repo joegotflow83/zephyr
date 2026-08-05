@@ -88,9 +88,9 @@ export const IPC = {
   TERMINAL_WRITE: 'terminal:write',
   TERMINAL_RESIZE: 'terminal:resize',
 
-  // Planning sessions (interactive LLM chat in a throwaway container)
-  PLANNING_OPEN: 'planning:open',
-  PLANNING_CLOSE: 'planning:close',
+  // Agent sessions (interactive LLM chat in a throwaway container: plan | work)
+  AGENT_SESSION_OPEN: 'agent-session:open',
+  AGENT_SESSION_CLOSE: 'agent-session:close',
 
   // Terminal events (outbound from main to renderer)
   TERMINAL_DATA: 'terminal:data',

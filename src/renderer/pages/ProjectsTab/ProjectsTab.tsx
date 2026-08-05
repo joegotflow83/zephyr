@@ -4,8 +4,9 @@ import { useProjects } from '../../hooks/useProjects';
 import { useAppStore } from '../../stores/app-store';
 import { ProjectDialog } from '../../components/ProjectDialog/ProjectDialog';
 import { ConfirmDialog } from '../../components/ConfirmDialog/ConfirmDialog';
-import { PlanningSessionDialog } from '../../components/PlanningSessionDialog/PlanningSessionDialog';
+import { AgentSessionDialog } from '../../components/AgentSessionDialog/AgentSessionDialog';
 import type { ProjectConfig } from '../../../shared/models';
+import { isLoopTerminal } from '../../../shared/loop-types';
 
 interface ToastMethods {
   success: (message: string) => void;
@@ -27,6 +28,7 @@ export const ProjectsTab: React.FC<ProjectsTabProps> = ({ toast }) => {
   const removeLoop = useAppStore((state) => state.removeLoop);
   const vmInfos = useAppStore((state) => state.vmInfos);
   const multipassAvailable = useAppStore((state) => state.multipassAvailable);
+  const loops = useAppStore((state) => state.loops);
 
   // Search filter — matches against the columns shown in the table
   const [search, setSearch] = useState('');
@@ -46,8 +48,11 @@ export const ProjectsTab: React.FC<ProjectsTabProps> = ({ toast }) => {
     [key: string]: boolean;
   }>({});
 
-  // Planning session state — the project whose planning dialog is open
-  const [planningProject, setPlanningProject] = useState<ProjectConfig | null>(null);
+  // Agent session state — the project whose session dialog is open, and its mode
+  const [agentSession, setAgentSession] = useState<{
+    project: ProjectConfig;
+    mode: 'plan' | 'work';
+  } | null>(null);
 
   // Load projects on mount
   useEffect(() => {
@@ -69,13 +74,18 @@ export const ProjectsTab: React.FC<ProjectsTabProps> = ({ toast }) => {
   };
 
   const handlePlan = (project: ProjectConfig) => {
-    setPlanningProject(project);
+    setAgentSession({ project, mode: 'plan' });
   };
 
-  // The main process has already written the specs back to the project store;
-  // refresh so the table and any open dialog reflect them.
-  const handlePlanningClose = (specFiles?: Record<string, string>) => {
-    setPlanningProject(null);
+  const handleWork = (project: ProjectConfig) => {
+    setAgentSession({ project, mode: 'work' });
+  };
+
+  // In plan mode the main process has already written the specs back to the
+  // project store; refresh so the table and any open dialog reflect them.
+  // Work mode writes through the bind mount, so there is nothing to read back.
+  const handleSessionClose = (specFiles?: Record<string, string>) => {
+    setAgentSession(null);
     if (specFiles) {
       const count = Object.keys(specFiles).length;
       toast.success(
@@ -172,6 +182,12 @@ export const ProjectsTab: React.FC<ProjectsTabProps> = ({ toast }) => {
     setDialogMode(null);
     setEditingProject(undefined);
   };
+
+  // Projects with a live loop can't host a work session — two writers, one tree.
+  const projectsWithRunningLoop = useMemo(
+    () => new Set(loops.filter((l) => !isLoopTerminal(l.status)).map((l) => l.projectId)),
+    [loops]
+  );
 
   const query = search.trim().toLowerCase();
 
@@ -318,6 +334,8 @@ export const ProjectsTab: React.FC<ProjectsTabProps> = ({ toast }) => {
                         onEdit={handleEdit}
                         onDelete={handleDelete}
                         onPlan={handlePlan}
+                        onWork={handleWork}
+                        hasRunningLoop={projectsWithRunningLoop.has(project.id)}
                         onStartVM={handleStartVM}
                         onStopVM={handleStopVM}
                       />
@@ -354,9 +372,13 @@ export const ProjectsTab: React.FC<ProjectsTabProps> = ({ toast }) => {
         />
       )}
 
-      {/* Planning Session Dialog */}
-      {planningProject && (
-        <PlanningSessionDialog project={planningProject} onClose={handlePlanningClose} />
+      {/* Agent Session Dialog (plan or work) */}
+      {agentSession && (
+        <AgentSessionDialog
+          project={agentSession.project}
+          mode={agentSession.mode}
+          onClose={handleSessionClose}
+        />
       )}
     </div>
   );

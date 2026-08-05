@@ -28,6 +28,7 @@ import type { PipelineStore } from '../../services/pipeline-store';
 import { deriveTransitions } from '../../lib/pipeline/transitions';
 import { getLogger } from '../../services/logging';
 import { buildDebriefContext } from './factory-task-handlers';
+import { hasActiveWorkSession } from './agent-session-handlers';
 
 /**
  * Bash hook script injected into containers for factory mode loops.
@@ -979,6 +980,14 @@ export function registerLoopHandlers(services: LoopServices): LoopHandlerContext
    * hooks/prompts mounting, deploy keys, etc. Called by the FACTORY_START handler.
    */
   async function startLoopCore(rawOpts: LoopStartOpts): Promise<LoopState> {
+    // An interactive work session already has an agent editing this working
+    // tree; a loop would be a second writer on the same files.
+    if (hasActiveWorkSession(rawOpts.projectId)) {
+      throw new Error(
+        'A work session is open for this project. Close it before starting a loop so two agents do not edit the same files.'
+      );
+    }
+
     // Store raw opts keyed by loopKey before any mutation so restart can replay them.
     const startLoopKey = getLoopKey(rawOpts.projectId, rawOpts.role);
     loopOptsMap.set(startLoopKey, rawOpts);

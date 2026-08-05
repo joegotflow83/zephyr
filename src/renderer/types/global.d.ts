@@ -245,19 +245,23 @@ declare global {
         onError: (callback: (sessionId: string, error: string) => void) => () => void;
       };
 
-      planning: {
+      agentSession: {
         /**
-         * Start a planning session: creates a throwaway container for the
-         * project and attaches a terminal to the configured LLM engine.
-         * Output flows over the terminal.* event listeners.
+         * Start an agent session: creates a throwaway container for the project
+         * and attaches a terminal to the configured LLM engine. Output flows
+         * over the terminal.* event listeners.
+         *
+         * 'plan' drafts spec files; 'work' edits the project directly and is
+         * refused while a loop is running for the project.
          */
         open: (
           projectId: string,
+          mode: 'plan' | 'work',
           opts?: { rows?: number; cols?: number }
         ) => Promise<{ success: boolean; session?: TerminalSession; error?: string }>;
         /**
-         * End a planning session: removes the container and writes the
-         * project's specs directory back into ProjectConfig.spec_files.
+         * End a session: removes the container and, for planning sessions,
+         * writes the specs directory back into ProjectConfig.spec_files.
          */
         close: (sessionId: string) => Promise<{
           success: boolean;

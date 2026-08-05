@@ -5,9 +5,11 @@ import { useAppStore } from '../../stores/app-store';
 import { logger } from '../../utils/logger';
 import type { ProjectConfig } from '../../../shared/models';
 
-interface PlanningSessionDialogProps {
+interface AgentSessionDialogProps {
   project: ProjectConfig;
-  /** Called after the session is closed; receives the spec files read back. */
+  /** 'plan' drafts spec files; 'work' edits the project directly. */
+  mode: 'plan' | 'work';
+  /** Called after the session is closed; receives spec files in plan mode. */
   onClose: (specFiles?: Record<string, string>) => void;
 }
 
@@ -15,14 +17,18 @@ interface PlanningSessionDialogProps {
  * Full-screen modal hosting an interactive chat with the configured LLM engine,
  * running inside a throwaway container with the project mounted at /workspace.
  *
- * Purpose is planning: talk through a feature and let the agent write spec
- * files into /workspace/specs. On close those files are read back into
- * ProjectConfig.spec_files, which stays the source of truth.
+ * In 'plan' mode the project is mounted read-only and only /workspace/specs is
+ * writable; the specs are read back into ProjectConfig.spec_files on close, so
+ * the store stays the source of truth and the code itself cannot be touched. In
+ * 'work' mode the agent edits the project itself; the bind mount writes through
+ * to the host, so there is nothing to read back.
  */
-export const PlanningSessionDialog: React.FC<PlanningSessionDialogProps> = ({
+export const AgentSessionDialog: React.FC<AgentSessionDialogProps> = ({
   project,
+  mode,
   onClose,
 }) => {
+  const isPlan = mode === 'plan';
   const { settings } = useAppStore();
   const theme = settings?.theme === 'light' ? 'light' : 'dark';
   const engineLabel = settings?.llm_provider === 'kiro' ? 'Kiro' : 'Claude Code';
@@ -42,16 +48,16 @@ export const PlanningSessionDialog: React.FC<PlanningSessionDialogProps> = ({
     let cancelled = false;
 
     const start = async () => {
-      const result = await window.api.planning.open(project.id, { rows: 24, cols: 80 });
+      const result = await window.api.agentSession.open(project.id, mode, { rows: 24, cols: 80 });
       if (cancelled) {
         // The dialog closed while the container was starting — do not leak it.
         if (result.success && result.session) {
-          void window.api.planning.close(result.session.id);
+          void window.api.agentSession.close(result.session.id);
         }
         return;
       }
       if (!result.success || !result.session) {
-        setError(result.error ?? 'Failed to start planning session');
+        setError(result.error ?? 'Failed to start the session');
         setStatus('error');
         return;
       }
@@ -69,9 +75,9 @@ export const PlanningSessionDialog: React.FC<PlanningSessionDialogProps> = ({
     return () => {
       cancelled = true;
     };
-  }, [project.id]);
+  }, [project.id, mode]);
 
-  // Planning sessions reuse the terminal:* streams, so filter by session ID.
+  // Agent sessions reuse the terminal:* streams, so filter by session ID.
   useEffect(() => {
     const offData = window.api.terminal.onData((id, data) => {
       if (id === sessionIdRef.current) terminalRef.current?.write(data);
@@ -101,7 +107,7 @@ export const PlanningSessionDialog: React.FC<PlanningSessionDialogProps> = ({
     }
   }, []);
 
-  // Ends the session, removes the container, and reports the spec files back.
+  // Ends the session, removes the container, and reports any spec files back.
   const handleClose = useCallback(async () => {
     if (closing) return;
     if (!sessionId) {
@@ -110,13 +116,13 @@ export const PlanningSessionDialog: React.FC<PlanningSessionDialogProps> = ({
     }
     setClosing(true);
     try {
-      const result = await window.api.planning.close(sessionId);
+      const result = await window.api.agentSession.close(sessionId);
       if (!result.success) {
-        logger.error('Failed to close planning session', result.error);
+        logger.error('Failed to close agent session', result.error);
       }
       onClose(result.specFiles);
     } catch (err) {
-      logger.error('Failed to close planning session', err);
+      logger.error('Failed to close agent session', err);
       onClose();
     }
   }, [closing, sessionId, onClose]);
@@ -128,22 +134,29 @@ export const PlanningSessionDialog: React.FC<PlanningSessionDialogProps> = ({
       className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[200] p-6"
       role="dialog"
       aria-modal="true"
-      aria-labelledby="planning-dialog-title"
+      aria-labelledby="agent-session-dialog-title"
     >
       <div className="bg-gray-50 dark:bg-gray-800 rounded-lg shadow-xl w-full h-full max-w-6xl flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
           <div>
             <h2
-              id="planning-dialog-title"
+              id="agent-session-dialog-title"
               className="text-xl font-bold text-gray-900 dark:text-white"
             >
-              Plan: {project.name}
+              {isPlan ? 'Plan' : 'Work'}: {project.name}
             </h2>
             <p className="text-sm text-gray-500 dark:text-gray-400">
-              {engineLabel} in {project.local_path ?? 'no local path'} — specs written to
-              /workspace/specs are saved to the project on close
-              {specCount > 0 && ` (${specCount} existing spec file${specCount === 1 ? '' : 's'})`}
+              {engineLabel} in {project.local_path ?? 'no local path'} —{' '}
+              {isPlan ? (
+                <>
+                  read-only except /workspace/specs, which is saved to the project on close
+                  {specCount > 0 &&
+                    ` (${specCount} existing spec file${specCount === 1 ? '' : 's'})`}
+                </>
+              ) : (
+                'edits are saved directly to this directory'
+              )}
             </p>
           </div>
           <button
@@ -151,7 +164,7 @@ export const PlanningSessionDialog: React.FC<PlanningSessionDialogProps> = ({
             disabled={closing}
             className="px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white rounded font-medium hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
           >
-            {closing ? 'Saving specs...' : 'End Session'}
+            {closing ? (isPlan ? 'Saving specs...' : 'Closing...') : 'End Session'}
           </button>
         </div>
 
@@ -167,7 +180,7 @@ export const PlanningSessionDialog: React.FC<PlanningSessionDialogProps> = ({
             <div className="flex items-center justify-center h-full p-6">
               <div className="text-center max-w-lg">
                 <p className="text-lg mb-2 text-red-600 dark:text-red-400">
-                  Could not start the planning session
+                  Could not start the {isPlan ? 'planning' : 'work'} session
                 </p>
                 <p className="text-sm text-gray-500 dark:text-gray-400">{error}</p>
               </div>
@@ -178,7 +191,8 @@ export const PlanningSessionDialog: React.FC<PlanningSessionDialogProps> = ({
             <div className="h-full flex flex-col">
               {status === 'ended' && (
                 <div className="px-4 py-2 text-sm bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 border-b border-gray-200 dark:border-gray-700">
-                  The agent exited. Close the session to save any spec files it wrote.
+                  The agent exited.
+                  {isPlan ? ' Close the session to save any spec files it wrote.' : ''}
                 </div>
               )}
               <div className="flex-1 overflow-hidden">

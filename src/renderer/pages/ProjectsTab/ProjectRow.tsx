@@ -11,6 +11,9 @@ interface ProjectRowProps {
   onEdit: (project: ProjectConfig) => void;
   onDelete: (project: ProjectConfig) => void;
   onPlan?: (project: ProjectConfig) => void;
+  onWork?: (project: ProjectConfig) => void;
+  /** True when a loop is running for this project — blocks work sessions. */
+  hasRunningLoop?: boolean;
   onStartVM?: (project: ProjectConfig) => void;
   onStopVM?: (project: ProjectConfig) => void;
 }
@@ -29,6 +32,8 @@ export const ProjectRow: React.FC<ProjectRowProps> = ({
   onEdit,
   onDelete,
   onPlan,
+  onWork,
+  hasRunningLoop = false,
   onStartVM,
   onStopVM,
 }) => {
@@ -37,9 +42,12 @@ export const ProjectRow: React.FC<ProjectRowProps> = ({
 
   const stopVMDisabled = isStoppingVM;
 
-  // Planning mounts local_path into a container built from docker_image, so both
-  // are required before the button does anything useful.
+  // Agent sessions mount local_path into a container built from docker_image, so
+  // both are required before the buttons do anything useful.
   const planEnabled = Boolean(project.local_path && project.docker_image);
+  // A work session edits the working tree, so it must not overlap with a loop.
+  // The main process enforces this too; this is just the visible half.
+  const workEnabled = planEnabled && !hasRunningLoop;
 
   return (
     <tr className="border-b border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800">
@@ -104,11 +112,31 @@ export const ProjectRow: React.FC<ProjectRowProps> = ({
             }`}
             title={
               planEnabled
-                ? 'Chat with the configured LLM engine in this project to draft spec files'
+                ? 'Draft spec files with the configured LLM engine — the project is mounted read-only'
                 : 'Requires a local path and a container image on this project'
             }
           >
             Plan
+          </button>
+        )}
+        {onWork && (
+          <button
+            onClick={() => onWork(project)}
+            disabled={!workEnabled}
+            className={`px-3 py-1 rounded font-medium transition-colors ${
+              workEnabled
+                ? 'bg-purple-700 text-white hover:bg-purple-600'
+                : 'bg-gray-100 dark:bg-gray-700 text-gray-500 cursor-not-allowed'
+            }`}
+            title={
+              workEnabled
+                ? 'Chat with the configured LLM engine to change files in this project'
+                : hasRunningLoop
+                  ? 'A loop is running for this project — stop it before starting a work session'
+                  : 'Requires a local path and a container image on this project'
+            }
+          >
+            Work
           </button>
         )}
         <button

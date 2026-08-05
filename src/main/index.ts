@@ -24,7 +24,7 @@ import { registerCredentialHandlers } from './ipc-handlers/credential-handlers';
 import { registerLoopHandlers } from './ipc-handlers/loop-handlers';
 import { registerLogHandlers } from './ipc-handlers/log-handlers';
 import { registerTerminalHandlers } from './ipc-handlers/terminal-handlers';
-import { registerPlanningHandlers } from './ipc-handlers/planning-handlers';
+import { registerAgentSessionHandlers } from './ipc-handlers/agent-session-handlers';
 import { registerUpdateHandlers } from './ipc-handlers/update-handlers';
 import { registerAutoUpdateHandlers } from './ipc-handlers/auto-update-handlers';
 import { registerImageHandlers } from './ipc-handlers/image-handlers';
@@ -155,13 +155,17 @@ const { dispatchFactoryStage, stopWatchdog } = registerLoopHandlers({
 });
 registerLogHandlers({ logExporter, containerOrchestrator });
 registerTerminalHandlers({ terminalManager, vmManager });
-const closePlanningSessions = registerPlanningHandlers({
+const closeAgentSessions = registerAgentSessionHandlers({
   runtime,
   terminalManager,
   projectStore,
   configManager,
   authInjector,
   credentialManager,
+  containerOrchestrator,
+  hooksStore,
+  claudeSettingsStore,
+  kiroHooksStore,
 });
 registerUpdateHandlers({ selfUpdater });
 registerAutoUpdateHandlers({ autoUpdater });
@@ -403,10 +407,10 @@ async function gracefulShutdown(): Promise<void> {
     logger.debug('Stopping runtime health monitor');
     runtimeHealth.stop();
 
-    // 3b. Tear down planning sessions first so their spec files are written
+    // 3b. Tear down agent sessions first so their spec files are written
     // back to the project store before the terminals are torn down.
-    logger.debug('Closing planning sessions');
-    await closePlanningSessions();
+    logger.debug('Closing agent sessions');
+    await closeAgentSessions();
 
     // 4. Close all terminal sessions
     logger.debug('Closing all terminal sessions');

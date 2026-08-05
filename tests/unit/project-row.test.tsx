@@ -183,6 +183,129 @@ describe('ProjectRow', () => {
     });
   });
 
+  describe('Agent Session Buttons (Plan / Work)', () => {
+    const mockOnPlan = vi.fn();
+    const mockOnWork = vi.fn();
+
+    // Agent sessions need a directory to mount and an image to run.
+    const sessionReadyProject = createProjectConfig({
+      name: 'Session Project',
+      repo_url: 'https://github.com/user/repo',
+      docker_image: 'ubuntu:22.04',
+      local_path: '/home/user/code/repo',
+    });
+
+    it('does not render the Work button without an onWork handler', () => {
+      render(
+        <table>
+          <tbody>
+            <ProjectRow
+              project={sessionReadyProject}
+              onEdit={mockOnEdit}
+              onDelete={mockOnDelete}
+            />
+          </tbody>
+        </table>
+      );
+
+      expect(screen.queryByRole('button', { name: /Work/i })).not.toBeInTheDocument();
+    });
+
+    it('enables the Work button when the project has a local path and image', () => {
+      render(
+        <table>
+          <tbody>
+            <ProjectRow
+              project={sessionReadyProject}
+              onEdit={mockOnEdit}
+              onDelete={mockOnDelete}
+              onPlan={mockOnPlan}
+              onWork={mockOnWork}
+            />
+          </tbody>
+        </table>
+      );
+
+      const workButton = screen.getByRole('button', { name: /Work/i });
+      expect(workButton).toBeEnabled();
+      expect(workButton).toHaveAttribute(
+        'title',
+        'Chat with the configured LLM engine to change files in this project'
+      );
+    });
+
+    it('calls onWork with the project when clicked', async () => {
+      const user = userEvent.setup();
+
+      render(
+        <table>
+          <tbody>
+            <ProjectRow
+              project={sessionReadyProject}
+              onEdit={mockOnEdit}
+              onDelete={mockOnDelete}
+              onWork={mockOnWork}
+            />
+          </tbody>
+        </table>
+      );
+
+      await user.click(screen.getByRole('button', { name: /Work/i }));
+
+      expect(mockOnWork).toHaveBeenCalledWith(sessionReadyProject);
+      expect(mockOnWork).toHaveBeenCalledTimes(1);
+    });
+
+    it('disables the Work button when the project has no local path', () => {
+      render(
+        <table>
+          <tbody>
+            <ProjectRow
+              project={defaultProject}
+              onEdit={mockOnEdit}
+              onDelete={mockOnDelete}
+              onWork={mockOnWork}
+            />
+          </tbody>
+        </table>
+      );
+
+      const workButton = screen.getByRole('button', { name: /Work/i });
+      expect(workButton).toBeDisabled();
+      expect(workButton).toHaveAttribute(
+        'title',
+        'Requires a local path and a container image on this project'
+      );
+    });
+
+    it('disables the Work button while a loop is running for the project', () => {
+      render(
+        <table>
+          <tbody>
+            <ProjectRow
+              project={sessionReadyProject}
+              onEdit={mockOnEdit}
+              onDelete={mockOnDelete}
+              onPlan={mockOnPlan}
+              onWork={mockOnWork}
+              hasRunningLoop={true}
+            />
+          </tbody>
+        </table>
+      );
+
+      const workButton = screen.getByRole('button', { name: /Work/i });
+      expect(workButton).toBeDisabled();
+      expect(workButton).toHaveAttribute(
+        'title',
+        'A loop is running for this project — stop it before starting a work session'
+      );
+
+      // Planning does not touch the working tree, so a live loop must not block it.
+      expect(screen.getByRole('button', { name: /Plan/i })).toBeEnabled();
+    });
+  });
+
   describe('VM Controls (persistent VM projects)', () => {
     const persistentVMProject = createProjectConfig({
       name: 'VM Project',

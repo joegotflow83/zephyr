@@ -183,12 +183,12 @@ contextBridge.exposeInMainWorld('api', {
     },
   },
 
-  // Planning sessions reuse the terminal:* event channels for I/O — only the
-  // container lifecycle differs, so there is no planning-specific data stream.
-  planning: {
-    open: (projectId: string, opts?: unknown) =>
-      ipcRenderer.invoke(IPC.PLANNING_OPEN, projectId, opts),
-    close: (sessionId: string) => ipcRenderer.invoke(IPC.PLANNING_CLOSE, sessionId),
+  // Agent sessions reuse the terminal:* event channels for I/O — only the
+  // container lifecycle differs, so there is no session-specific data stream.
+  agentSession: {
+    open: (projectId: string, mode: 'plan' | 'work', opts?: unknown) =>
+      ipcRenderer.invoke(IPC.AGENT_SESSION_OPEN, projectId, mode, opts),
+    close: (sessionId: string) => ipcRenderer.invoke(IPC.AGENT_SESSION_CLOSE, sessionId),
   },
 
   updates: {
